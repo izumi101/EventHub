@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>EventHub — Discover Events That Matter</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- SEO Meta Tags -->
+  <meta name="description" content="EventHub — Discover and book concerts, festivals, conferences, and workshops worldwide. Built for event lovers, by event lovers.">
+  <meta name="keywords" content="events, concerts, festivals, conferences, workshops, tickets, booking">
+  <meta name="author" content="EventHub">
+  <meta name="theme-color" content="#FAF7F2">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="EventHub — Discover Events That Matter">
+  <meta property="og:description" content="From intimate concerts to global conferences. Find your next unforgettable experience.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="EventHub">
+  <meta property="og:locale" content="en_US">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EventHub — Discover Events">
+  <meta name="twitter:description" content="From intimate concerts to global conferences. Find your next unforgettable experience.">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+
+  <!-- Self-hosted brand fonts (Ember) — preload critical weights -->
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/fonts/clash-display-600.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/fonts/satoshi-400.woff2">
+  <link rel="preload" as="font" type="font/woff2" crossorigin href="/assets/fonts/satoshi-500.woff2">
+
+  <!-- Inline critical loading styles -->
+  <style>
+    .app-loader{display:flex;align-items:center;justify-content:center;height:100vh;background:#FAF7F2;flex-direction:column;gap:1.25rem}
+    .app-loader-logo{width:40px;height:40px;border-radius:11px;background:#E8552D;display:flex;align-items:center;justify-content:center}
+    .app-loader-logo span{color:#fff;font-weight:700;font-size:1.125rem;font-family:'Satoshi',system-ui,sans-serif}
+    .app-loader-spinner{width:24px;height:24px;border:2px solid #ECE6DD;border-top-color:#E8552D;border-radius:50%;animation:spin .7s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <app-root>
+    <!-- Loading screen shown while Angular bootstraps -->
+    <div class="app-loader">
+      <div class="app-loader-logo"><span>E</span></div>
+      <div class="app-loader-spinner"></div>
+    </div>
+  </app-root>
+</body>
+</html>

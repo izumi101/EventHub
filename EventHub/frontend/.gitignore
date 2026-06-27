@@ -1,0 +1,15 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+.angular/
+
+# TLS certificates (self-signed dev certs — never commit private keys)
+certs/
+
+# Env / editor
+.env
+.DS_Store
+.claude/
+npm-debug.log*

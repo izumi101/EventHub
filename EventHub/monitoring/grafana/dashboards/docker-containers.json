@@ -1,0 +1,194 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "label_replace(rate(container_cpu_usage_seconds_total{id=~\"/docker/[0-9a-f].+\", cpu=\"total\"}[2m]) * 100, \"container\", \"$1\", \"id\", \"/docker/([0-9a-f]{12}).*\")",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Docker container CPU",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "label_replace(container_memory_working_set_bytes{id=~\"/docker/[0-9a-f].+\"}, \"container\", \"$1\", \"id\", \"/docker/([0-9a-f]{12}).*\")",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Docker container memory",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "label_replace(rate(container_network_receive_bytes_total{id=~\"/docker/[0-9a-f].+\"}[2m]), \"container\", \"$1\", \"id\", \"/docker/([0-9a-f]{12}).*\")",
+          "legendFormat": "{{container}} in",
+          "refId": "A"
+        },
+        {
+          "expr": "label_replace(rate(container_network_transmit_bytes_total{id=~\"/docker/[0-9a-f].+\"}[2m]), \"container\", \"$1\", \"id\", \"/docker/([0-9a-f]{12}).*\")",
+          "legendFormat": "{{container}} out",
+          "refId": "B"
+        }
+      ],
+      "title": "Docker container network",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "expr": "label_replace(rate(container_fs_reads_bytes_total{id=~\"/docker/[0-9a-f].+\"}[2m]), \"container\", \"$1\", \"id\", \"/docker/([0-9a-f]{12}).*\")",
+          "legendFormat": "{{container}} read",
+          "refId": "A"
+        },
+        {
+          "expr": "label_replace(rate(container_fs_writes_bytes_total{id=~\"/docker/[0-9a-f].+\"}[2m]), \"container\", \"$1\", \"id\", \"/docker/([0-9a-f]{12}).*\")",
+          "legendFormat": "{{container}} write",
+          "refId": "B"
+        }
+      ],
+      "title": "Docker container disk IO",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 39,
+  "tags": [
+    "eventhub",
+    "docker"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Docker Containers",
+  "uid": "eventhub-docker-containers",
+  "version": 1,
+  "weekStart": ""
+}

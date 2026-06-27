@@ -1,0 +1,88 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: eventhub_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-eventhub}
+      POSTGRES_USER: ${POSTGRES_USER:-eventhub_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eventhub_password}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: eventhub_redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: eventhub_backend
+    restart: unless-stopped
+    # daphne = ASGI server needed for Django Channels / WebSocket
+    command: daphne -b 0.0.0.0 -p 8000 eventhub_backend.asgi:application
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-only-change-me}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,192.168.0.16,192.168.0.104,10.212.0.144,172.20.10.3}
+      DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200,https://localhost,https://127.0.0.1,https://192.168.0.16,https://192.168.0.104,https://10.212.0.144,https://172.20.10.3}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200,https://localhost,https://127.0.0.1,https://192.168.0.16,https://192.168.0.104,https://10.212.0.144,https://172.20.10.3}
+      DJANGO_SEED_DATA: ${DJANGO_SEED_DATA:-1}
+      DJANGO_COLLECTSTATIC: ${DJANGO_COLLECTSTATIC:-0}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
+      POSTGRES_DB: ${POSTGRES_DB:-eventhub}
+      POSTGRES_USER: ${POSTGRES_USER:-eventhub_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eventhub_password}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_your_key_here}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_your_key_here}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_secret_here}
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_media:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # python:slim has no curl; /api/health/ also verifies the DB connection.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/', timeout=3)\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: eventhub_frontend
+    restart: unless-stopped
+    ports:
+      - "4200:80"
+      - "443:443"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  backend_media:

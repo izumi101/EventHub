@@ -1,0 +1,18 @@
+Django>=5.0,<6.0
+djangorestframework>=3.14
+djangorestframework-simplejwt>=5.3
+django-cors-headers>=4.3
+psycopg[binary]>=3.1
+gunicorn>=21.2
+daphne>=4.1
+whitenoise>=6.6
+stripe>=7.0
+Pillow>=10.0
+python-dotenv>=1.0.0
+# Real-time WebSocket
+channels>=4.1
+channels-redis>=4.2
+# Semantic search
+pgvector>=0.3
+sentence-transformers>=3.0
+openpyxl>=3.1

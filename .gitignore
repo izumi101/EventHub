@@ -1,0 +1,16 @@
+node_modules/
+venv/
+__pycache__/
+*.pyc
+.env
+**/node_modules/
+**/venv/
+**/.venv/
+**/__pycache__/
+**/dist/
+**/build/
+
+# OS / editor / agent-runtime junk
+.DS_Store
+.hex-skills/
+.claude/scheduled_tasks.lock
