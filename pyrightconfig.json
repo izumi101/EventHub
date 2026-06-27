@@ -1,0 +1,16 @@
+{
+  "venvPath": "EventHub/backend",
+  "venv": "venv",
+  "pythonPath": "EventHub/backend/venv/bin/python",
+  "pythonVersion": "3.12",
+  "extraPaths": [
+    "EventHub/backend"
+  ],
+  "include": [
+    "EventHub/backend"
+  ],
+  "exclude": [
+    "EventHub/backend/venv",
+    "EventHub/frontend"
+  ]
+}
