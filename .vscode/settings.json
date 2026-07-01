@@ -1,6 +1,0 @@
-{
-  "python.defaultInterpreterPath": "${workspaceFolder}/EventHub/backend/venv/bin/python",
-  "python.analysis.extraPaths": [
-    "${workspaceFolder}/EventHub/backend"
-  ]
-}

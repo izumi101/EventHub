@@ -6,30 +6,6 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["start", "--prefix", "EventHub/frontend"],
       "port": 4201
-    },
-    {
-      "name": "ember-preview",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "EventHub"],
-      "port": 8765
-    },
-    {
-      "name": "ember-app",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8766", "--directory", "EventHub/frontend/dist/eventhub-frontend/browser"],
-      "port": 8766
-    },
-    {
-      "name": "ember-docker",
-      "runtimeExecutable": "true",
-      "runtimeArgs": [],
-      "port": 4200
-    },
-    {
-      "name": "ember-proxy",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["EventHub/ember-proxy.py"],
-      "port": 8767
     }
   ]
 }
