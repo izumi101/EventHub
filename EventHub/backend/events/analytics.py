@@ -20,12 +20,10 @@ def _active_regs(event):
     ).select_related('payment', 'ticket_type', 'affiliate')
 
 
-def event_analytics(event) -> dict:
-    regs = list(_active_regs(event))
-
-    confirmed = [r for r in regs if r.status == RegistrationStatusChoices.CONFIRMED]
-    checked_in = [r for r in confirmed if r.is_checked_in]
-
+def _revenue(event):
+    """Money taken for the event: (gross, refunded, paid_count, group_confirmed).
+    Ticket payments plus group bookings; `group_confirmed` lists
+    (booking, amount, seats) of the bookings still in force."""
     # ── Revenue (net of refunds) from every payment of the event ──
     # Includes cancelled registrations: a full refund cancels the ticket, and
     # skipping those rows would make the "refunded" figure leave them out.
@@ -56,6 +54,21 @@ def event_analytics(event) -> dict:
         else:
             paid_count += 1
             group_confirmed.append((booking, amount, len(booking.seats.all())))
+    return gross, refunded, paid_count, group_confirmed
+
+
+def net_revenue(event) -> Decimal:
+    gross, refunded, _, _ = _revenue(event)
+    return gross - refunded
+
+
+def event_analytics(event) -> dict:
+    regs = list(_active_regs(event))
+
+    confirmed = [r for r in regs if r.status == RegistrationStatusChoices.CONFIRMED]
+    checked_in = [r for r in confirmed if r.is_checked_in]
+
+    gross, refunded, paid_count, group_confirmed = _revenue(event)
     group_seats = sum(seats for _, _, seats in group_confirmed)
     group_checked_in = sum(
         1 for booking, _, _ in group_confirmed for bs in booking.seats.all() if bs.is_checked_in

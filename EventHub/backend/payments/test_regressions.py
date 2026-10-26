@@ -268,3 +268,10 @@ class OrganizerBookingRefundTests(PaymentBase):
             self.client.post(f'/api/bookings/{self.booking.id}/refund/')
         kpis = event_analytics(self.event)['kpis']
         self.assertEqual((kpis['refunded'], kpis['net_revenue'], kpis['tickets_sold']), (2000.0, 0.0, 0))
+
+    def test_dashboard_stats_report_money_taken_not_price_times_registrations(self):
+        stats = self.client.get(f'/api/events/{self.event.id}/stats/').data
+        self.assertEqual((stats['net_revenue'], stats['currency']), ('2000.00', self.event.currency))
+        with patch('stripe.Refund.create'):
+            self.client.post(f'/api/bookings/{self.booking.id}/refund/')
+        self.assertEqual(self.client.get(f'/api/events/{self.event.id}/stats/').data['net_revenue'], '0.00')

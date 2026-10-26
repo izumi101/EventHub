@@ -9,6 +9,7 @@ from django.http import Http404
 from django.utils import timezone
 
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
+from common.exceptions import DomainError
 
 from ..models import INACTIVE_REGISTRATION_STATUSES, Event, EventSeat, Registration
 from .holds import SEAT_HOLD_MINUTES, release_expired_seat_holds
@@ -94,7 +95,8 @@ def register_for_event(*, user, event: Event, notes: str = '', seat_id=None,
             logger.exception('Queue check failed for event %s; letting the buyer through', event.id)
             token_ok = True
         if not token_ok:
-            raise ValueError('QUEUE_REQUIRED')
+            raise DomainError('This event has a waiting room. Join the queue to get a ticket.',
+                              code='QUEUE_REQUIRED')
 
     free = event.available_spots
     if free <= 0:
