@@ -77,8 +77,8 @@ jobs:
         run: npm test
       - name: Production build (type-checks templates, enforces bundle budgets)
         run: npm run build -- --configuration production
-      - name: Audit runtime dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit dependencies (runtime and dev)
+        run: npm audit --audit-level=high
 
   docker:
     runs-on: ubuntu-latest
