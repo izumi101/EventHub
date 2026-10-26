@@ -16,8 +16,6 @@ import {
   Ticket,
   FileText,
 } from 'lucide-angular';
-import { jsPDF } from 'jspdf';
-import html2canvas from 'html2canvas';
 import * as QRCode from 'qrcode';
 
 @Component({
@@ -501,6 +499,8 @@ export class MyRegistrationsComponent implements OnInit {
       const actions = el.querySelector('.js-ticket-actions') as HTMLElement | null;
       if (actions) actions.style.display = 'none';
 
+      // Heavy PDF libraries are loaded on demand, not in the initial bundle.
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import('jspdf'), import('html2canvas')]);
       const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       if (actions) actions.style.display = 'flex';
 

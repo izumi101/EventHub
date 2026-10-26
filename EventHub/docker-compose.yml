@@ -1,3 +1,6 @@
+# Defaults here are safe for a server (DEBUG off, no demo data, no fake
+# payments). For local development copy .env.example to .env — it turns on
+# DEBUG, mock payments and demo data.
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -6,7 +9,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-eventhub}
       POSTGRES_USER: ${POSTGRES_USER:-eventhub_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eventhub_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
@@ -36,26 +39,34 @@ services:
     restart: unless-stopped
     # daphne = ASGI server needed for Django Channels / WebSocket
     command: daphne -b 0.0.0.0 -p 8000 eventhub_backend.asgi:application
-    environment:
-      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-insecure-dev-only-change-me}
-      DJANGO_DEBUG: ${DJANGO_DEBUG:-1}
-      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend,192.168.0.16,192.168.0.104,10.212.0.144,172.20.10.3}
-      DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200,https://localhost,https://127.0.0.1,https://192.168.0.16,https://192.168.0.104,https://10.212.0.144,https://172.20.10.3}
-      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:4200,http://127.0.0.1:4200,https://localhost,https://127.0.0.1,https://192.168.0.16,https://192.168.0.104,https://10.212.0.144,https://172.20.10.3}
-      DJANGO_SEED_DATA: ${DJANGO_SEED_DATA:-1}
+    environment: &backend-env
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env (see .env.example)}
+      DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,backend}
+      DJANGO_CORS_ALLOWED_ORIGINS: ${DJANGO_CORS_ALLOWED_ORIGINS:-http://localhost:4200,https://localhost}
+      DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:4200,https://localhost}
+      DJANGO_SEED_DATA: ${DJANGO_SEED_DATA:-0}
+      DJANGO_SEED_ADMIN_PASSWORD: ${DJANGO_SEED_ADMIN_PASSWORD:-}
       DJANGO_COLLECTSTATIC: ${DJANGO_COLLECTSTATIC:-0}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
       POSTGRES_DB: ${POSTGRES_DB:-eventhub}
       POSTGRES_USER: ${POSTGRES_USER:-eventhub_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eventhub_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-sk_test_your_key_here}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-pk_test_your_key_here}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-whsec_your_secret_here}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_MOCK_MODE: ${STRIPE_MOCK_MODE:-0}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+      EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-EventHub <no-reply@eventhub.local>}
+    # Only nginx (frontend container) should talk to Django. The port is
+    # published on localhost for `npm start` development only.
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - backend_media:/app/media
     depends_on:
@@ -71,6 +82,19 @@ services:
       retries: 10
       start_period: 40s
 
+  # Periodic jobs that used to run inside GET requests: release expired seat
+  # holds and group bookings, advance waitlists, mark past events completed.
+  scheduler:
+    build:
+      context: ./backend
+    container_name: eventhub_scheduler
+    restart: unless-stopped
+    entrypoint: ["python", "manage.py", "run_maintenance", "--loop", "60"]
+    environment: *backend-env
+    depends_on:
+      backend:
+        condition: service_healthy
+
   frontend:
     build:
       context: ./frontend
@@ -79,6 +103,12 @@ services:
     ports:
       - "4200:80"
       - "443:443"
+    volumes:
+      # User uploads are served by nginx directly from the backend's volume.
+      - backend_media:/usr/share/nginx/media:ro
+      # TLS certificate: put server.crt/server.key here (e.g. from mkcert);
+      # a self-signed pair is generated on first start if the folder is empty.
+      - ./frontend/certs:/etc/nginx/certs
     depends_on:
       backend:
         condition: service_healthy

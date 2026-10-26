@@ -1,33 +1,39 @@
+# Optional monitoring stack; start it after the app (it joins the app's network):
+#   docker compose -f docker-compose.monitoring.yml up -d
+# UIs are bound to localhost only; reach them over an SSH tunnel on a server.
 services:
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.4.13
     container_name: eventhub_grafana
     restart: unless-stopped
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      # No default: refuse to start with admin/admin.
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
       - eventhub
     depends_on:
       - prometheus
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.15.1
     container_name: eventhub_prometheus
     restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
-      - "--web.enable-lifecycle"
     volumes:
       - prometheus_data:/prometheus
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     networks:
       - eventhub
     depends_on:
@@ -38,8 +44,9 @@ services:
     container_name: eventhub_cadvisor
     restart: unless-stopped
     privileged: true
-    ports:
-      - "8080:8080"
+    # No published port: only Prometheus (same network) scrapes it.
+    expose:
+      - "8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
