@@ -195,6 +195,21 @@ class AnalyticsTests(Base):
         self.assertEqual((kpis['gross_revenue'], kpis['refunded'], kpis['net_revenue']), (200.0, 100.0, 100.0))
 
 
+class AdminDashboardTests(Base):
+    def test_revenue_is_per_currency_and_net_of_refunds(self):
+        kzt_event = self.make_event(title='KZT', currency='KZT')
+        usd = Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
+        Payment.objects.create(registration=usd, amount=100, refunded_amount=40, currency='usd', status='completed')
+        kzt = Registration.objects.create(user=self.other, event=kzt_event, status='confirmed')
+        Payment.objects.create(registration=kzt, amount=5000, currency='kzt', status='completed')
+        admin = User.objects.create_superuser('root', 'root@example.com', 'Str0ng-pass!')
+        self.client.force_authenticate(admin)
+        data = self.client.get('/api/admin-dashboard/').data
+        self.assertEqual(data['revenue_by_currency'], [
+            {'currency': 'KZT', 'amount': '5000.00'}, {'currency': 'USD', 'amount': '60.00'},
+        ])
+
+
 class ValidationTests(Base):
     def test_duplicate_promo_code_is_a_400_not_a_500(self):
         self.client.force_authenticate(self.organizer)
