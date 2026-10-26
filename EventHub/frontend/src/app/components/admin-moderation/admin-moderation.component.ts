@@ -61,7 +61,12 @@ import { LucideAngularModule, Shield, Users, CalendarDays, Ticket, Wallet, Check
                   <lucide-icon [img]="icons.Wallet" class="w-4 h-4"></lucide-icon>
                   <span class="text-xs font-medium uppercase tracking-wide">Revenue</span>
                 </div>
-                <p class="num text-2xl font-bold text-foreground">{{ '$' + stats.total_revenue }}</p>
+                <!-- One line per currency: amounts in different currencies can't be added up. -->
+                @for (r of stats.revenue_by_currency; track r.currency) {
+                  <p class="num text-2xl font-bold text-foreground">{{ r.amount }} <span class="text-sm font-semibold text-muted-foreground">{{ r.currency }}</span></p>
+                } @empty {
+                  <p class="num text-2xl font-bold text-foreground">0</p>
+                }
               </div>
             </div>
           }
