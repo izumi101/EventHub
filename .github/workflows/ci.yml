@@ -45,6 +45,9 @@ jobs:
       - name: Lint (pyflakes rules)
         run: ruff check --select F,E9 --exclude "*/migrations/*" .
       - name: Migrations are up to date
+        # Not a test run: without DEBUG the settings refuse the dev secret key.
+        env:
+          DJANGO_DEBUG: "1"
         run: python manage.py makemigrations --check --dry-run
       - name: Tests (PostgreSQL, real transactions)
         run: python manage.py test --noinput
