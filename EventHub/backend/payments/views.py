@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from events.models import Registration
 from .models import Payment
 from .services import (
+    stripe_to_dict,
     confirm_stripe_checkout_session,
     create_checkout_session,
     create_mock_checkout_session,
@@ -74,6 +75,9 @@ class StripeWebhookView(APIView):
     When checkout.session.completed event is received, marks the corresponding payment as completed and confirms the registration.
     """
     permission_classes = [AllowAny]
+    # Signed by Stripe; bursts from Stripe's few IPs must not hit the
+    # anonymous rate limit (a 429 just delays every confirmation).
+    throttle_classes = []
 
     def post(self, request):
         payload = request.body
@@ -88,7 +92,7 @@ class StripeWebhookView(APIView):
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
         if event['type'] in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
-            session = event['data']['object']
+            session = stripe_to_dict(event['data']['object'])
             metadata = session.get('metadata') or {}
             # Delayed payment methods report "completed" before the money is in.
             if session.get('payment_status', 'paid') != 'paid':

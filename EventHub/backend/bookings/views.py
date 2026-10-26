@@ -126,8 +126,9 @@ class VerifyBookingView(APIView):
         if booking.status == Booking.Status.HOLDING and not settings.STRIPE_MOCK_MODE:
             import stripe
             stripe.api_key = settings.STRIPE_SECRET_KEY
+            from payments.services import stripe_to_dict
             try:
-                session = stripe.checkout.Session.retrieve(session_id)
+                session = stripe_to_dict(stripe.checkout.Session.retrieve(session_id))
             except stripe.error.StripeError as exc:
                 logger.warning('Could not retrieve Stripe session %s: %s', session_id, exc)
             else:

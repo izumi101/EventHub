@@ -26,17 +26,21 @@ def event_analytics(event) -> dict:
     confirmed = [r for r in regs if r.status == RegistrationStatusChoices.CONFIRMED]
     checked_in = [r for r in confirmed if r.is_checked_in]
 
-    # ── Revenue (net of refunds) from completed payments ──
+    # ── Revenue (net of refunds) from every payment of the event ──
+    # Includes cancelled registrations: a full refund cancels the ticket, and
+    # skipping those rows would make the "refunded" figure leave them out.
+    from payments.models import Payment
     gross = Decimal('0')
     refunded = Decimal('0')
     paid_count = 0
-    for r in regs:
-        pay = getattr(r, 'payment', None)
-        if pay and pay.status in (PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED):
-            gross += pay.amount
-            refunded += pay.refunded_amount
-            if pay.status == PaymentStatusChoices.COMPLETED:
-                paid_count += 1
+    for pay in Payment.objects.filter(
+        registration__event=event,
+        status__in=[PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED],
+    ):
+        gross += pay.amount
+        refunded += pay.refunded_amount
+        if pay.status == PaymentStatusChoices.COMPLETED:
+            paid_count += 1
     net = gross - refunded
 
     tickets_sold = len(confirmed)

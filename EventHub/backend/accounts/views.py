@@ -132,14 +132,15 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        from rest_framework_simplejwt.exceptions import TokenError
         from rest_framework_simplejwt.tokens import RefreshToken
 
         refresh_token = request.data.get('refresh')
         if refresh_token:
             try:
                 RefreshToken(refresh_token).blacklist()
-            except Exception:
-                pass
+            except TokenError:
+                pass  # already invalid or blacklisted — the user is logged out either way
         return Response({'message': 'Successfully logged out'}, status=status.HTTP_200_OK)
 
 

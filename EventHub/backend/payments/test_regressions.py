@@ -4,6 +4,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import stripe
 from django.contrib.auth.models import User
 from django.test import override_settings
 from django.utils import timezone
@@ -42,9 +43,12 @@ class PaymentBase(APITestCase):
         return self.client.post(f'/api/payments/create-checkout/{reg.id}/')
 
     def webhook(self, session):
-        with patch('stripe.Webhook.construct_event', return_value={
-            'type': 'checkout.session.completed', 'data': {'object': session},
-        }):
+        # A real stripe.Event, not a dict: since stripe-python 15 Stripe
+        # objects have no .get(), which broke every real webhook.
+        event = stripe.Event.construct_from(
+            {'type': 'checkout.session.completed', 'data': {'object': session}}, 'sk_test_x',
+        )
+        with patch('stripe.Webhook.construct_event', return_value=event):
             return self.client.post('/api/payments/webhook/', data={}, content_type='application/json')
 
 
@@ -101,6 +105,27 @@ class LatePaymentTests(PaymentBase):
         reg.refresh_from_db()
         self.assertEqual(reg.status, 'cancelled')
         self.assertEqual(Payment.objects.get(registration=reg).status, 'refunded')
+
+    def test_paid_webhook_confirms_pending_ticket(self):
+        reg = self.pending()
+        Payment.objects.create(registration=reg, amount=5000, stripe_checkout_session_id='cs_ok')
+        response = self.webhook({'id': 'cs_ok', 'payment_intent': 'pi_ok', 'payment_status': 'paid',
+                                 'metadata': {'registration_id': str(reg.id)}})
+        self.assertEqual(response.status_code, 200)
+        reg.refresh_from_db()
+        self.assertEqual(reg.status, 'confirmed')
+
+    def test_success_page_verification_handles_stripe_objects(self):
+        reg = self.pending()
+        Payment.objects.create(registration=reg, amount=5000, stripe_checkout_session_id='cs_v')
+        session = stripe.checkout.Session.construct_from(
+            {'id': 'cs_v', 'payment_intent': 'pi_v', 'payment_status': 'paid',
+             'metadata': {'registration_id': str(reg.id)}}, 'sk_test_x')
+        self.client.force_authenticate(self.buyer)
+        with patch('stripe.checkout.Session.retrieve', return_value=session):
+            response = self.client.get('/api/payments/verify/?session_id=cs_v')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'completed')
 
     def test_older_session_of_a_paid_ticket_is_refunded(self):
         reg = self.pending(status='confirmed', seat_held_until=None)

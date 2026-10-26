@@ -11,7 +11,9 @@ from rest_framework.response import Response
 
 from common.choices import RegistrationStatusChoices
 
-from ..models import Registration
+from django.db.models import Prefetch
+
+from ..models import Event, Registration
 from ..serializers import RegistrationSerializer
 from ..services import check_in_registration
 
@@ -113,10 +115,14 @@ class MyRegistrationsView(generics.ListAPIView):
             .filter(user=self.request.user)
             .exclude(status=RegistrationStatusChoices.CANCELLED)
             .select_related(
-                'event', 'event__organizer', 'event__category', 'user', 'seat', 'seat__seat_map',
-                'payment', 'promo_code', 'ticket_type', 'refund_request',
+                'user', 'seat', 'seat__seat_map', 'payment', 'promo_code', 'ticket_type', 'refund_request',
             )
-            .prefetch_related('answers__question', 'event__ticket_types')
+            .prefetch_related(
+                # Events come with their capacity counts annotated, so the
+                # nested event card doesn't run extra queries per ticket.
+                Prefetch('event', queryset=Event.objects.select_related('organizer', 'category').with_capacity()),
+                'answers__question',
+            )
         )
         # ?event=<id> lets the event page fetch exactly its own registration
         # instead of paging through everything the user ever booked.
