@@ -1,0 +1,5 @@
+# Optional: semantic search / recommendations (pulls in PyTorch, several GB).
+# Without it the API falls back to keyword search.
+#   uv pip compile requirements-search.txt --python-version 3.12 -o requirements-search.lock
+-c requirements.lock
+sentence-transformers>=3.0

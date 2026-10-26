@@ -12,14 +12,18 @@ export interface BookingSeatDto {
   price: string;
   attendee_name: string;
   claimed: boolean;
-  ticket_uuid: string;
+  /** True when the signed-in viewer claimed this seat. */
+  claimed_by_me: boolean;
+  /** The QR ticket — only sent to the booking owner and to whoever claimed the seat. */
+  ticket_uuid: string | null;
   is_checked_in: boolean;
 }
 
 export interface BookingDto {
   id: string;
   status: 'holding' | 'confirmed' | 'cancelled' | 'expired';
-  share_token: string;
+  /** Only returned to the owner (and to visitors of the share link itself). */
+  share_token: string | null;
   hold_expires_at: string | null;
   event_id: number;
   event_title: string;
@@ -28,7 +32,12 @@ export interface BookingDto {
   owner_username: string;
   seats: BookingSeatDto[];
   seat_count: number;
+  /** Sum of seat prices, before tax & service fee. */
   total_price: string;
+  /** What checkout charges: seat prices plus tax & fees. */
+  total_due: string;
+  currency: string;
+  is_owner: boolean;
   is_expired: boolean;
   created_at: string;
 }

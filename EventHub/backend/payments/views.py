@@ -9,8 +9,8 @@ from django.shortcuts import get_object_or_404
 
 from events.models import Registration
 from .models import Payment
-from common.choices import PaymentStatusChoices
 from .services import (
+    stripe_to_dict,
     confirm_stripe_checkout_session,
     create_checkout_session,
     create_mock_checkout_session,
@@ -43,34 +43,29 @@ class CreateCheckoutSessionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        payment = getattr(registration, 'payment', None)
-        if payment and payment.status == PaymentStatusChoices.COMPLETED:
-            return Response(
-                {'error': 'Payment already completed'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        # Local dev without a real Stripe key: simulate a successful payment.
-        if settings.STRIPE_MOCK_MODE:
-            success_url, _payment = create_mock_checkout_session(registration=registration)
-            return Response({
-                'checkout_url': success_url,
-                'session_id': _payment.stripe_checkout_session_id,
-                'mock': True,
-            })
-
         try:
+            # Local dev with explicit STRIPE_MOCK_MODE: simulate a successful payment.
+            if settings.STRIPE_MOCK_MODE:
+                success_url, _payment = create_mock_checkout_session(registration=registration)
+                return Response({
+                    'checkout_url': success_url,
+                    'session_id': _payment.stripe_checkout_session_id,
+                    'mock': True,
+                })
+
             checkout_session, _payment = create_checkout_session(registration=registration)
             return Response({
                 'checkout_url': checkout_session.url,
                 'session_id': checkout_session.id,
             })
-
+        except ValueError as exc:
+            # Not payable any more: paid already, cancelled, hold expired.
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.StripeError as e:
             logger.error('Stripe error creating checkout session: %s', e)
             return Response(
-                {'error': str(e)},
-                status=status.HTTP_400_BAD_REQUEST,
+                {'error': 'The payment provider is unavailable. Please try again.'},
+                status=status.HTTP_502_BAD_GATEWAY,
             )
 
 
@@ -80,6 +75,9 @@ class StripeWebhookView(APIView):
     When checkout.session.completed event is received, marks the corresponding payment as completed and confirms the registration.
     """
     permission_classes = [AllowAny]
+    # Signed by Stripe; bursts from Stripe's few IPs must not hit the
+    # anonymous rate limit (a 429 just delays every confirmation).
+    throttle_classes = []
 
     def post(self, request):
         payload = request.body
@@ -93,28 +91,20 @@ class StripeWebhookView(APIView):
             logger.warning('Invalid Stripe webhook signature or payload: %s', e)
             return Response(status=status.HTTP_400_BAD_REQUEST)
 
-        if event['type'] == 'checkout.session.completed':
-            session = event['data']['object']
-            metadata = session.get('metadata', {})
+        if event['type'] in ('checkout.session.completed', 'checkout.session.async_payment_succeeded'):
+            session = stripe_to_dict(event['data']['object'])
+            metadata = session.get('metadata') or {}
+            # Delayed payment methods report "completed" before the money is in.
+            if session.get('payment_status', 'paid') != 'paid':
+                return Response(status=status.HTTP_200_OK)
 
-            # Single-seat registration payment
-            registration_id = metadata.get('registration_id')
-            if registration_id:
-                try:
-                    confirm_stripe_checkout_session(session)
-                    logger.info('Payment completed for registration %s', registration_id)
-                except Payment.DoesNotExist:
-                    logger.warning('Payment object not found for session %s', session['id'])
-
-            # Group booking payment
-            booking_id = metadata.get('booking_id')
-            if booking_id:
-                try:
-                    from bookings.payments import confirm_booking_by_session
-                    confirm_booking_by_session(session['id'])
-                    logger.info('Booking %s confirmed via webhook', booking_id)
-                except Exception as exc:
-                    logger.warning('Booking confirm failed for %s: %s', booking_id, exc)
+            # Errors propagate as a 500 on purpose: Stripe retries the
+            # webhook, and both confirmations are idempotent.
+            if metadata.get('registration_id'):
+                confirm_stripe_checkout_session(session)
+            if metadata.get('booking_id'):
+                from bookings.payments import confirm_booking_by_session
+                confirm_booking_by_session(session)
 
         return Response(status=status.HTTP_200_OK)
 
@@ -131,11 +121,12 @@ class VerifyPaymentView(APIView):
             return Response({'error': 'session_id required'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            payment = verify_payment_service(session_id)
+            payment = verify_payment_service(session_id, request.user)
             return Response({
                 'status': payment.status,
                 'event_title': payment.registration.event.title,
                 'amount': str(payment.amount),
+                'currency': (payment.currency or 'usd').upper(),
             })
         except Payment.DoesNotExist:
             return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -179,52 +170,33 @@ class MarkOfflinePaidView(APIView):
         if not can_manage_event(registration.event, request.user):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        payment = mark_offline_paid_service(
-            registration=registration,
-            amount=request.data.get('amount'),
-        )
+        try:
+            payment = mark_offline_paid_service(
+                registration=registration,
+                amount=request.data.get('amount'),
+            )
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'status': payment.status, 'amount': str(payment.amount), 'method': payment.method})
 
 
 class InvoiceView(APIView):
     """Render a printable HTML invoice for a registration.
 
-    Accessible to the ticket owner or the event organizer. Auth comes via the
-    `token` query param (so a plain browser tab/window can open it) or a normal
-    Authorization header.
+    Accessible to the ticket owner or the event organizer via the normal
+    Authorization header (the SPA fetches it as a blob). Tokens are never
+    accepted in the query string: URLs end up in logs, history and Referer.
     """
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, registration_id):
         registration = get_object_or_404(
             Registration.objects.select_related('event', 'user', 'ticket_type', 'seat', 'promo_code', 'payment'),
             id=registration_id,
         )
-
-        user = request.user if request.user.is_authenticated else None
-        if user is None:
-            user = self._user_from_token(request)
-
-        if user is None:
-            return Response({'error': 'Authentication required.'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        is_owner = registration.user_id == user.id
-        is_manager = can_manage_event(registration.event, user)
-        if not (is_owner or is_manager):
+        user = request.user
+        if not (registration.user_id == user.id or can_manage_event(registration.event, user)):
             return Response({'error': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)
 
         from .invoice import invoice_response
         return invoice_response(registration)
-
-    @staticmethod
-    def _user_from_token(request):
-        token = request.query_params.get('token')
-        if not token:
-            return None
-        try:
-            from rest_framework_simplejwt.tokens import AccessToken
-            from django.contrib.auth.models import User
-            access = AccessToken(token)
-            return User.objects.filter(id=access['user_id']).first()
-        except Exception:
-            return None

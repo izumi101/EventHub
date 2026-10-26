@@ -1,11 +1,13 @@
 """Attendee engagement: favorites, reviews, notifications."""
 
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
 from ..models import Event, Favorite, Notification, Review
+from .base import event_queryset_for_user
 from ..serializers import (
     FavoriteSerializer,
     NotificationSerializer,
@@ -19,14 +21,20 @@ class FavoritesListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Favorite.objects.filter(user=self.request.user).select_related('event', 'event__organizer', 'event__category')
+        return (
+            Favorite.objects.filter(user=self.request.user)
+            .prefetch_related(
+                Prefetch('event', queryset=Event.objects.select_related('organizer', 'category').with_capacity()),
+            )
+        )
 
 
 class FavoriteToggleView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, event_id):
-        event = get_object_or_404(Event, pk=event_id)
+        # Only events the user may see (no favouriting someone else's draft).
+        event = get_object_or_404(event_queryset_for_user(request.user), pk=event_id)
         fav, created = Favorite.objects.get_or_create(user=request.user, event=event)
         if not created:
             fav.delete()

@@ -21,7 +21,6 @@ from .lifecycle import (
     cancel_event,
     clone_event,
     create_event,
-    mark_completed_if_past,
     reject_event,
     submit_event,
     update_event,
@@ -31,6 +30,8 @@ from .registration import (
     cancel_registration,
     check_in_registration,
     ensure_attendee_can_buy,
+    ensure_event_on_sale,
+    get_active_registration,
     register_for_event,
 )
 from .refunds import (
@@ -47,7 +48,6 @@ __all__ = [
     'cancel_event',
     'clone_event',
     'create_event',
-    'mark_completed_if_past',
     'reject_event',
     'submit_event',
     'update_event',
@@ -55,6 +55,8 @@ __all__ = [
     'cancel_registration',
     'check_in_registration',
     'ensure_attendee_can_buy',
+    'ensure_event_on_sale',
+    'get_active_registration',
     'register_for_event',
     'request_refund',
     'resolve_refund_request',

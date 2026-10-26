@@ -1,11 +1,14 @@
 """Event lifecycle: create/update/clone and status transitions."""
 
+import logging
+
 from django.db import transaction
-from django.utils import timezone
 
-from common.choices import EventStatusChoices, RegistrationStatusChoices
+from common.choices import EventStatusChoices
 
-from ..models import Event
+from ..models import INACTIVE_REGISTRATION_STATUSES, Event
+
+logger = logging.getLogger(__name__)
 
 
 def create_event(*, organizer, validated_data):
@@ -42,6 +45,14 @@ def clone_event(*, event: Event, actor):
         status=EventStatusChoices.DRAFT,
         is_online=event.is_online,
         online_link=event.online_link,
+        tax_percent=event.tax_percent,
+        service_fee_percent=event.service_fee_percent,
+        fees_passed_to_buyer=event.fees_passed_to_buyer,
+        currency=event.currency,
+        refundable=event.refundable,
+        seo_title=event.seo_title,
+        seo_description=event.seo_description,
+        image=event.image.name if event.image else None,
     )
 
     # Copy seat map + seats (all freshly available).
@@ -89,6 +100,10 @@ def clone_event(*, event: Event, actor):
 
 @transaction.atomic
 def approve_event(event: Event):
+    # Only something waiting for review can be published — approving a
+    # cancelled or completed event would put it back on sale.
+    if event.status not in (EventStatusChoices.PENDING, EventStatusChoices.REJECTED):
+        raise ValueError(f'Only events pending review can be approved (this one is {event.status}).')
     event.status = EventStatusChoices.PUBLISHED
     event.save(update_fields=['status'])
     return event
@@ -96,19 +111,10 @@ def approve_event(event: Event):
 
 @transaction.atomic
 def reject_event(event: Event):
+    if event.status != EventStatusChoices.PENDING:
+        raise ValueError(f'Only events pending review can be rejected (this one is {event.status}).')
     event.status = EventStatusChoices.REJECTED
     event.save(update_fields=['status'])
-    return event
-
-
-def mark_completed_if_past(event: Event):
-    """Lazily flip a published event to COMPLETED once it has ended."""
-    if event.status != EventStatusChoices.PUBLISHED:
-        return event
-    end = event.end_date or event.date
-    if end and end < timezone.now():
-        event.status = EventStatusChoices.COMPLETED
-        event.save(update_fields=['status'])
     return event
 
 
@@ -125,47 +131,104 @@ def submit_event(*, event: Event, actor):
     return event
 
 
-@transaction.atomic
 def cancel_event(*, event: Event, actor):
-    """Organizer cancels an event: refund paid tickets, notify every attendee."""
+    """Organizer cancels an event: refund paid tickets, void the rest,
+    notify every attendee.
+
+    Each ticket is refunded in its own savepoint, so one failing refund
+    (Stripe error, DB error) neither aborts the others nor rolls back money
+    that was already returned — and the attendee is told the truth.
+    """
     from common.permissions import can_manage_event
+    from payments.services import refund_payment
+    from ..notify import notify
+    from .registration import cancel_registration
+
     if not can_manage_event(event, actor):
         raise PermissionError('Only the organizer can cancel this event.')
-    if event.status in (EventStatusChoices.CANCELLED, EventStatusChoices.COMPLETED):
-        raise ValueError('This event is already finished or cancelled.')
 
-    # Snapshot attendees BEFORE refunds (full refunds cancel registrations).
+    with transaction.atomic():
+        event = Event.objects.select_for_update().get(pk=event.pk)
+        if event.status in (EventStatusChoices.CANCELLED, EventStatusChoices.COMPLETED):
+            raise ValueError('This event is already finished or cancelled.')
+        event.status = EventStatusChoices.CANCELLED
+        event.save(update_fields=['status'])
+
     regs = list(
-        event.registrations.exclude(status__in=[
-            RegistrationStatusChoices.CANCELLED, RegistrationStatusChoices.REJECTED,
-        ]).select_related('payment', 'user')
+        event.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES)
+        .select_related('payment', 'user')
     )
 
-    event.status = EventStatusChoices.CANCELLED
-    event.save(update_fields=['status'])
-
-    refunded = 0
+    refunded, failed = 0, 0
+    outcome = {}
     for reg in regs:
         payment = getattr(reg, 'payment', None)
-        if payment and payment.is_refundable:
-            try:
-                from payments.services import refund_payment
-                refund_payment(payment=payment, reason='Event cancelled by the organizer', notify_user=False)
-                refunded += 1
-            except Exception:
-                pass
-
-    from ..notify import notify
-    for reg in regs:
         try:
-            notify(
-                reg.user, 'event_cancelled',
-                f'❌ Event cancelled: {event.title}',
-                'The organizer has cancelled this event.'
-                + (' Your payment has been refunded.' if getattr(reg, 'payment', None) else ''),
-                event=event,
-            )
+            with transaction.atomic():
+                if payment and payment.is_refundable:
+                    refund_payment(payment=payment, reason='Event cancelled by the organizer',
+                                   notify_user=False)
+                    refunded += 1
+                    outcome[reg.id] = 'refunded'
+                # Free / unpaid / already-refunded tickets are voided too, so
+                # nothing for this event passes the door scanner any more.
+                cancel_registration(registration=reg)
+                outcome.setdefault(reg.id, 'voided')
         except Exception:
-            pass
+            failed += 1
+            outcome[reg.id] = 'failed'
+            logger.exception('Refund failed for registration %s while cancelling event %s', reg.id, event.id)
 
-    return {'notified': len(regs), 'refunded': refunded}
+    bookings_refunded, bookings_failed = _cancel_group_bookings(event)
+
+    for reg in regs:
+        state = outcome.get(reg.id)
+        if state == 'refunded':
+            extra = ' Your payment has been refunded.'
+        elif state == 'failed':
+            extra = ' We could not refund your payment automatically — the organizer will contact you.'
+        else:
+            extra = ''
+        notify(
+            reg.user, 'event_cancelled',
+            f'❌ Event cancelled: {event.title}',
+            'The organizer has cancelled this event.' + extra,
+            event=event,
+        )
+
+    return {
+        'notified': len(regs),
+        'refunded': refunded + bookings_refunded,
+        'refund_failed': failed + bookings_failed,
+    }
+
+
+def _cancel_group_bookings(event):
+    from bookings.models import Booking
+    from bookings.services import _release_booking_seats
+    from payments.services import _refund_payment_intent
+
+    refunded, failed = 0, 0
+    for booking in Booking.objects.filter(
+        event=event, status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
+    ):
+        try:
+            with transaction.atomic():
+                booking = Booking.objects.select_for_update().get(pk=booking.pk)
+                if booking.status == Booking.Status.CONFIRMED and booking.stripe_payment_intent_id:
+                    _refund_payment_intent(booking.stripe_payment_intent_id,
+                                           key=f'event-cancel-booking-{booking.pk}')
+                    refunded += 1
+                was_paid = booking.status == Booking.Status.CONFIRMED
+                _release_booking_seats(booking)
+                booking.status = Booking.Status.CANCELLED
+                booking.save(update_fields=['status'])
+        except Exception:
+            failed += 1
+            logger.exception('Could not cancel group booking %s for event %s', booking.pk, event.id)
+            continue
+        from ..notify import notify
+        notify(booking.owner, 'event_cancelled', f'❌ Event cancelled: {event.title}',
+               'The organizer has cancelled this event.'
+               + (' Your group payment has been refunded.' if was_paid else ''), event=event)
+    return refunded, failed

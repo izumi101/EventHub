@@ -48,7 +48,7 @@ import * as QRCode from 'qrcode';
                       {{ b.event_date | date:'EEE, MMM d, y · h:mm a' }} · {{ b.event_location }}
                     </p>
                     <p class="text-xs text-muted-foreground mt-1">
-                      {{ b.seat_count }} seats · {{ '$' + b.total_price }}
+                      {{ b.seat_count }} seats · {{ b.total_due }} {{ b.currency }}
                     </p>
                   </div>
                   <span class="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
@@ -86,7 +86,7 @@ import * as QRCode from 'qrcode';
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-foreground">
                           Row {{ s.row }}, Seat {{ s.col }}
-                          <span class="text-xs font-normal text-muted-foreground capitalize">· {{ s.zone }} · {{ '$' + s.price }}</span>
+                          <span class="text-xs font-normal text-muted-foreground capitalize">· {{ s.zone }} · {{ s.price }} {{ b.currency }}</span>
                         </p>
                         <p class="text-xs" [class]="s.attendee_name ? 'text-[color:var(--pine-600)]' : 'text-muted-foreground'">
                           {{ s.attendee_name || 'Unclaimed' }}
@@ -94,7 +94,7 @@ import * as QRCode from 'qrcode';
                         </p>
                       </div>
                       @if (b.status === 'confirmed') {
-                        @if (qrCodes[s.ticket_uuid]) {
+                        @if (s.ticket_uuid && qrCodes[s.ticket_uuid]) {
                           <button class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in" (click)="zoomSeat = s" title="Tap to enlarge">
                             <img [src]="qrCodes[s.ticket_uuid]" alt="QR" class="w-14 h-14 block" />
                           </button>
@@ -133,13 +133,13 @@ import * as QRCode from 'qrcode';
         <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
           <h3 class="text-base font-bold text-foreground leading-tight">Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}</h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">{{ zoomSeat.attendee_name || 'Unclaimed seat' }} — show at the entrance</p>
-          @if (qrCodes[zoomSeat.ticket_uuid]) {
+          @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
             <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
               <img [src]="qrCodes[zoomSeat.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
             </div>
           }
           <p class="text-sm font-mono font-semibold text-foreground tracking-wider mt-4">
-            #{{ zoomSeat.ticket_uuid.substring(0, 8).toUpperCase() }}
+            #{{ (zoomSeat.ticket_uuid || '').substring(0, 8).toUpperCase() }}
           </p>
           <button (click)="zoomSeat = null" class="btn btn-secondary btn-full mt-5">Close</button>
         </div>
@@ -174,10 +174,11 @@ export class MyBookingsComponent implements OnInit {
     for (const b of this.bookings) {
       if (b.status !== 'confirmed') continue;
       for (const s of b.seats) {
-        if (this.qrCodes[s.ticket_uuid]) continue;
-        const url = `${window.location.origin}/validate/${s.ticket_uuid}`;
+        const uuid = s.ticket_uuid;
+        if (!uuid || this.qrCodes[uuid]) continue;
+        const url = `${window.location.origin}/validate/${uuid}`;
         QRCode.toDataURL(url, { width: 300, margin: 0 })
-          .then(dataUrl => { this.qrCodes[s.ticket_uuid] = dataUrl; })
+          .then(dataUrl => { this.qrCodes[uuid] = dataUrl; })
           .catch(() => {});
       }
     }

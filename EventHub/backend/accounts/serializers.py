@@ -1,9 +1,9 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
-from .models import UserProfile, EmailVerificationCode
-from common.auth import password_meets_policy
+from .models import UserProfile
+from common.auth import email_in_use, password_meets_policy, validate_username as check_username
 from common.choices import RoleChoices
-from .services import register_user
+from .services import register_user, verify_registration_code
 
 
 # ---- Serializer (manual) ---- #
@@ -21,14 +21,10 @@ class RegisterSerializer(serializers.Serializer):
     verification_code = serializers.CharField(write_only=True, required=True, min_length=6, max_length=6)
 
     def validate_username(self, value):
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('Username already exists.')
-        return value
-
-    def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError('Email already registered.')
-        return value
+        try:
+            return check_username(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
 
     def validate_password(self, value):
         is_valid, message = password_meets_policy(value)
@@ -40,14 +36,20 @@ class RegisterSerializer(serializers.Serializer):
         if data['password'] != data['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match.'})
 
-        email = data.get('email')
-        code = data.get('verification_code')
-        if email and code:
-            verification = EmailVerificationCode.objects.filter(email=email, code=code, is_used=False).first()
-            if not verification or verification.is_expired:
-                raise serializers.ValidationError({'verification_code': 'Invalid or expired verification code.'})
-            data['_verification'] = verification
-        
+        # The code proves the caller owns the address; only then is it safe
+        # to say whether the address is taken (no account enumeration).
+        try:
+            data['_verification'] = verify_registration_code(data['email'], data['verification_code'])
+        except ValueError as exc:
+            raise serializers.ValidationError({'verification_code': str(exc)})
+        if email_in_use(data['email']):
+            raise serializers.ValidationError({'email': 'Email already registered.'})
+
+        is_valid, message = password_meets_policy(
+            data['password'], User(username=data['username'], email=data['email']),
+        )
+        if not is_valid:
+            raise serializers.ValidationError({'password': message})
         return data
 
     def create(self, validated_data):
@@ -72,12 +74,13 @@ class OrganizerCreateSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=20, required=False, allow_blank=True)
 
     def validate_username(self, value):
-        if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError('Username already exists.')
-        return value
+        try:
+            return check_username(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
 
     def validate_email(self, value):
-        if User.objects.filter(email=value).exists():
+        if email_in_use(value):
             raise serializers.ValidationError('Email already registered.')
         return value
 

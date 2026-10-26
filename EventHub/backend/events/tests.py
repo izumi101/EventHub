@@ -90,6 +90,7 @@ class EventsTests(APITestCase):
             "date": (timezone.now() + timedelta(days=2)).isoformat(),
             "location": "Online",
             "is_online": True,
+            "online_link": "https://meet.example.com/design",
             "price": 0.00,
             "max_participants": 20
         }
@@ -146,9 +147,14 @@ class EventsTests(APITestCase):
         second = self.client.post(register_url, {"notes": "Re-registering"})
         self.assertEqual(second.status_code, status.HTTP_201_CREATED)
 
-        registration = Registration.objects.get(user=self.attendee, event=self.event)
+        # The cancelled row stays as history; the new ticket is a fresh row
+        # with its own QR code.
+        old = Registration.objects.get(id=first.data["id"])
+        registration = Registration.objects.get(id=second.data["id"])
+        self.assertEqual(old.status, "cancelled")
         self.assertEqual(registration.status, "pending")
         self.assertEqual(registration.notes, "Re-registering")
+        self.assertNotEqual(old.ticket_uuid, registration.ticket_uuid)
 
     def test_cancel_pending_registration(self):
         # Attendees may only release an unpaid (pending) hold.
@@ -212,9 +218,21 @@ class EventsTests(APITestCase):
         self.assertEqual(second.data["status"], "used")
 
     def test_admin_can_approve_event(self):
+        self.event.status = "pending"
+        self.event.save()
         self.client.force_authenticate(user=self.admin)
         url = reverse("event-approve", args=[self.event.id])
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.event.refresh_from_db()
         self.assertEqual(self.event.status, "published")
+
+    def test_approve_refuses_cancelled_event(self):
+        # Approving must not put a cancelled event back on sale.
+        self.event.status = "cancelled"
+        self.event.save()
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post(reverse("event-approve", args=[self.event.id]))
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.event.refresh_from_db()
+        self.assertEqual(self.event.status, "cancelled")

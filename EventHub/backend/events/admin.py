@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .models import (
     Category, Event, Registration, PromoCode, EventQuestion, WaitlistEntry,
-    TicketType, EventStaff, Webhook, WebhookDelivery, Affiliate, RefundRequest,
+    TicketType, EventStaff, Webhook, Affiliate, RefundRequest,
 )
 
 
@@ -61,6 +61,7 @@ class EventAdmin(admin.ModelAdmin):
 class RegistrationAdmin(admin.ModelAdmin):
     list_display = ['user', 'event', 'status', 'registered_at']
     list_filter = ['status']
+    list_select_related = ['user', 'event']
 
 
 @admin.register(EventQuestion)
