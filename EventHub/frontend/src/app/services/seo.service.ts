@@ -6,10 +6,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Event as EventModel } from '../models/models';
 
 const SITE_NAME = 'EventHub';
-const BASE_URL = 'https://eventhub.app';
+// Canonical/OG URLs follow the host the app is actually served from.
+const BASE_URL = window.location.origin;
 const DEFAULT_DESCRIPTION =
   'Discover and book concerts, festivals, conferences, and workshops worldwide.';
-const DEFAULT_IMAGE = `${BASE_URL}/assets/og-default.png`;
+const DEFAULT_IMAGE = `${BASE_URL}/assets/logo.png`;
 
 @Injectable({ providedIn: 'root' })
 export class SeoService {
