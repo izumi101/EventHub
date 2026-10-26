@@ -56,6 +56,17 @@ class QueueTests(TestCase):
         job.refresh_from_db()
         self.assertEqual(job.status, Job.STATUS_DONE)
 
+    def test_job_that_keeps_killing_the_worker_is_given_up(self):
+        job = enqueue_email('Hi', 'body', 'a@example.com')
+        Job.objects.filter(pk=job.pk).update(
+            status=Job.STATUS_RUNNING, attempts=job.max_attempts,
+            run_after=timezone.now() - timedelta(seconds=1),
+        )
+        self.assertEqual(run_due_jobs(), 0)
+        job.refresh_from_db()
+        self.assertEqual(job.status, Job.STATUS_FAILED)
+        self.assertEqual(len(mail.outbox), 0)
+
     def test_unknown_kind_is_rejected(self):
         with self.assertRaises(ValueError):
             enqueue('rm_rf', {})
