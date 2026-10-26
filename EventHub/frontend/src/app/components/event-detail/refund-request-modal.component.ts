@@ -4,15 +4,16 @@ import { FormsModule } from '@angular/forms';
 import { EventService } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event } from '../../models/models';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 /** Small dialog where an attendee asks the organizer to refund their ticket. */
 @Component({
   selector: 'app-refund-request-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [DialogDirective, CommonModule, FormsModule],
   template: `
     <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" (click)="closed.emit()">
-      <div class="card w-full max-w-md p-6 animate-slide-up" (click)="$event.stopPropagation()">
+      <div class="card w-full max-w-md p-6 animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="closed.emit()">
         <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
         <p class="text-sm text-muted-foreground mb-4">
           The organizer will review your request and approve or decline it. You'll be notified of their decision.

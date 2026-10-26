@@ -8,11 +8,12 @@ import { ModalService } from '../../services/modal.service';
 import { BookingDto, BookingService } from '../../services/booking.service';
 import { Event as EventModel, EventStatsResponse, Registration } from '../../models/models';
 import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, RotateCcw, DollarSign, Mail } from 'lucide-angular';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-attendee-list',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [DialogDirective, CommonModule, RouterModule, FormsModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
@@ -266,7 +267,7 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
     <!-- Refund modal -->
     @if (refundReg) {
       <div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in" (click)="refundReg = null">
-        <div class="card w-full max-w-sm p-6 animate-slide-up" (click)="$event.stopPropagation()">
+        <div class="card w-full max-w-sm p-6 animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="refundReg = null">
           <h3 class="text-lg font-bold text-foreground mb-1">Refund ticket</h3>
           <p class="text-sm text-muted-foreground mb-4">
             {{ refundReg.full_name || refundReg.username }} · paid {{ refundReg.payment?.net_amount }} {{ currency }}
@@ -295,7 +296,7 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
     <!-- Message attendees modal -->
     @if (showMessage) {
       <div class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in" (click)="showMessage = false">
-        <div class="card w-full max-w-md p-6 animate-slide-up" (click)="$event.stopPropagation()">
+        <div class="card w-full max-w-md p-6 animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="showMessage = false">
           <h3 class="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
             <lucide-icon [img]="icons.Mail" class="w-5 h-5 text-primary"></lucide-icon>
             Message attendees

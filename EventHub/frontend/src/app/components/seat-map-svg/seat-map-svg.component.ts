@@ -60,6 +60,8 @@ const STAGE_H = 46;
         <svg
           [attr.viewBox]="vb.x + ' ' + vb.y + ' ' + vb.w + ' ' + vb.h"
           width="100%" height="100%"
+          role="group"
+          aria-label="Seat map. Arrow keys move between seats, Space or Enter selects."
           [class.cursor-grabbing]="panning"
           [class.cursor-grab]="!panning"
         >
@@ -73,7 +75,17 @@ const STAGE_H = 46;
           <!-- Seats -->
           @for (s of seats; track s.id) {
             <g
+              class="seat"
+              role="checkbox"
+              [attr.data-seat-id]="s.id"
+              [attr.tabindex]="s.id === focusId ? 0 : -1"
+              [attr.aria-checked]="isSelected(s)"
+              [attr.aria-disabled]="!s.is_available"
+              [attr.aria-label]="seatLabel(s)"
               (click)="toggleSeat(s, $event)"
+              (keydown)="onSeatKey(s, $event)"
+              (focus)="onSeatFocus(s)"
+              (blur)="hovered = null"
               (mouseenter)="hover(s, $event)"
               (mousemove)="moveTip($event)"
               [style.cursor]="s.is_available ? 'pointer' : 'not-allowed'"
@@ -123,7 +135,7 @@ const STAGE_H = 46;
 
         <!-- Hint -->
         <div class="absolute bottom-2 left-2 text-[10px] text-muted-foreground bg-background/80 backdrop-blur px-2 py-0.5 rounded">
-          Scroll to zoom · drag to pan
+          Scroll to zoom · drag to pan · arrows + Space to pick
         </div>
       </div>
 
@@ -156,6 +168,8 @@ const STAGE_H = 46;
     .zoom-btn:hover { background: var(--muted); color: var(--foreground); }
     .seat-selected { filter: drop-shadow(0 1px 3px rgba(79,70,229,.5)); }
     svg rect[rx="5"] { transition: fill .12s, stroke .12s; }
+    .seat { outline: none; }
+    .seat:focus-visible rect { stroke: var(--ring, #2563eb); stroke-width: 3; }
   `],
 })
 export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
@@ -170,6 +184,7 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLDivElement>;
 
   readonly icons = { Plus, Minus, Maximize, Wifi };
+  private readonly money = new MoneyPipe();
   readonly SEAT = SEAT;
   readonly PAD = PAD;
 
@@ -189,6 +204,8 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
   private vbStart = { x: 0, y: 0 };
 
   hovered: (Seat & { zone?: string }) | null = null;
+  /** Roving tabindex: the one seat reachable with Tab; arrows move it. */
+  focusId: number | null = null;
   tipX = 0; tipY = 0;
 
   wsConnected = false;
@@ -226,6 +243,12 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
 
     // Fit canvas height to a sensible aspect (cap)
     this.canvasHeight = Math.min(460, Math.max(280, totalH * 0.9));
+
+    if (!this.seats.some(s => s.id === this.focusId)) {
+      const first = this.seats.find(s => this.selectedIds.has(s.id))
+        ?? this.seats.find(s => s.is_available) ?? this.seats[0];
+      this.focusId = first.id;
+    }
   }
 
   seatX(s: Seat): number { return PAD + (s.col - 1) * CELL; }
@@ -261,6 +284,11 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
   toggleSeat(s: Seat, evt: MouseEvent): void {
     evt.stopPropagation();
     if (this.draggedDuringPress) return;   // ignore clicks that were drags
+    this.focusId = s.id;
+    this.select(s);
+  }
+
+  private select(s: Seat): void {
     if (!s.is_available) return;
 
     if (this.selectedIds.has(s.id)) {
@@ -281,6 +309,65 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
   private emit(): void {
     const chosen = this.seats.filter(s => this.selectedIds.has(s.id));
     this.selectionChange.emit(chosen);
+  }
+
+  // ───────── keyboard ─────────
+  seatLabel(s: Seat): string {
+    const price = s.price ? `, ${this.money.transform(s.price, this.currency)}` : '';
+    return `Row ${s.row}, seat ${s.col}, ${s.price_zone}${price}${s.is_available ? '' : ', taken'}`;
+  }
+
+  onSeatKey(s: Seat, e: KeyboardEvent): void {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      this.select(s);
+      return;
+    }
+    const step = ({ ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] } as
+      Record<string, [number, number]>)[e.key];
+    if (!step) return;
+    e.preventDefault();
+    const next = this.neighbour(s, step[0], step[1]);
+    if (!next) return;
+    this.focusId = next.id;
+    this.canvasRef.nativeElement.querySelector<SVGGElement>(`[data-seat-id="${next.id}"]`)?.focus();
+  }
+
+  /** Nearest seat in a direction: same row for left/right; for up/down the
+   *  closest row that has seats, then the closest column in it. */
+  private neighbour(s: Seat, dRow: number, dCol: number): Seat | undefined {
+    const distance = (o: Seat) => dCol
+      ? Math.abs(o.col - s.col)
+      : Math.abs(o.row - s.row) * 10000 + Math.abs(o.col - s.col);
+    return this.seats
+      .filter(o => dCol
+        ? o.row === s.row && Math.sign(o.col - s.col) === dCol
+        : Math.sign(o.row - s.row) === dRow)
+      .sort((a, b) => distance(a) - distance(b))[0];
+  }
+
+  onSeatFocus(s: Seat): void {
+    this.focusId = s.id;
+    this.ensureVisible(s);
+    this.hovered = { ...s, zone: s.price_zone };
+    // Place the tooltip once the (possibly panned) view has rendered.
+    requestAnimationFrame(() => {
+      const el = this.canvasRef?.nativeElement.querySelector(`[data-seat-id="${s.id}"]`);
+      const canvas = this.canvasRef?.nativeElement.getBoundingClientRect();
+      if (!el || !canvas) return;
+      const rect = el.getBoundingClientRect();
+      this.tipX = rect.right - canvas.left + 4;
+      this.tipY = rect.bottom - canvas.top + 4;
+    });
+  }
+
+  private ensureVisible(s: Seat): void {
+    const x = this.seatX(s), y = this.seatY(s);
+    const inside = x >= this.vb.x && x + SEAT <= this.vb.x + this.vb.w
+      && y >= this.vb.y && y + SEAT <= this.vb.y + this.vb.h;
+    if (!inside) {
+      this.vb = this.clamp({ ...this.vb, x: x + SEAT / 2 - this.vb.w / 2, y: y + SEAT / 2 - this.vb.h / 2 });
+    }
   }
 
   // ───────── zoom & pan ─────────

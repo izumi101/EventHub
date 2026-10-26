@@ -18,11 +18,12 @@ import {
 } from 'lucide-angular';
 import * as QRCode from 'qrcode';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-my-registrations',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -268,6 +269,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         <div
           class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
           (click)="$event.stopPropagation()"
+          appDialog (dismiss)="qrModalReg = null"
         >
           <span class="badge badge-confirmed mb-3">Confirmed</span>
           <h3 class="text-base font-bold text-foreground leading-tight">{{ qrModalReg.event.title }}</h3>
@@ -301,7 +303,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
     <!-- Refund request modal -->
     @if (refundReg) {
       <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" (click)="refundReg = null">
-        <div class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
+        <div class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="refundReg = null">
           <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
           <p class="text-sm text-muted-foreground mb-4">
             For "{{ refundReg.event.title }}" — {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}.
