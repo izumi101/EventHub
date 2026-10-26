@@ -54,22 +54,43 @@ EventHub/
 
 ```bash
 cd EventHub
+cp .env.example .env      # режим разработки: DEBUG, демо-данные, тестовая оплата
 docker compose up --build
 ```
 
+Без `.env` compose не запустится: значения по умолчанию в `docker-compose.yml` рассчитаны на сервер (DEBUG выключен, демо-данных и фиктивной оплаты нет, секреты обязательны).
+
 После запуска:
 
-- Frontend: http://localhost:4200
-- Backend API: http://localhost:8000/api/
+- Frontend: http://localhost:4200 и https://localhost (self-signed сертификат)
+- Backend API: http://localhost:8000/api/ (порт открыт только на localhost)
 - Django admin: http://localhost:8000/admin/
 - PostgreSQL (для DataGrip/DBeaver): localhost:5433
 
-Тестовые аккаунты (создаются автосидом при первом запуске):
+Тестовые аккаунты (создаются, когда `DJANGO_SEED_DATA=1` и `DJANGO_DEBUG=1`):
 
 ```text
-admin / admin123
 organizer / password123
 attendee / password123
+admin / <пароль из DJANGO_SEED_ADMIN_PASSWORD или из лога backend при первом запуске>
+```
+
+`STRIPE_MOCK_MODE=1` (только вместе с `DJANGO_DEBUG=1`) подтверждает оплату без списания денег. Для настоящего Stripe укажите тестовые ключи и `STRIPE_MOCK_MODE=0`.
+
+### HTTPS и камера на телефоне
+
+Сканер QR использует камеру, а браузеры дают к ней доступ только по HTTPS. Положите сертификат в `EventHub/frontend/certs/server.crt` и `server.key` (например, `mkcert localhost 192.168.0.10`). Если папка пустая, контейнер сам создаст self-signed сертификат для `localhost`. Ключи монтируются в контейнер, в образ они не попадают. Чтобы открыть приложение с телефона, добавьте IP компьютера в `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS` и `DJANGO_CSRF_TRUSTED_ORIGINS` в `.env`.
+
+### Фоновые задачи
+
+Сервис `scheduler` раз в минуту запускает `python manage.py run_maintenance`: освобождает места с истёкшим удержанием, закрывает просроченные групповые брони, двигает лист ожидания и переводит прошедшие события в `completed`. GET-запросы в базу больше не пишут.
+
+### Облегчённый образ без семантического поиска
+
+`sentence-transformers` тянет PyTorch, это несколько гигабайт. Без него поиск работает по ключевым словам:
+
+```bash
+docker compose build --build-arg INSTALL_SEMANTIC_SEARCH=0 backend scheduler
 ```
 
 Остановить контейнеры:
@@ -86,20 +107,40 @@ docker compose down -v
 
 ## Локальная разработка без Docker
 
+Нужны PostgreSQL 16 с расширением pgvector и Redis.
+
 ```bash
 # Backend
 cd EventHub/backend
 python -m venv venv && source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.lock                 # + requirements-search.lock для семантического поиска
+export DJANGO_DEBUG=1 STRIPE_MOCK_MODE=1
 python manage.py migrate
 python manage.py seed_data --noinput
-python manage.py runserver
+daphne -p 8000 eventhub_backend.asgi:application # HTTP + WebSocket
+python manage.py run_maintenance --loop 60       # в отдельном терминале
 
-# Frontend
+# Frontend (dev-сервер проксирует /api, /ws и /media на backend)
 cd EventHub/frontend
-npm install
+npm ci
 npm start
 ```
+
+## Тесты и проверки
+
+```bash
+cd EventHub/backend
+python manage.py test        # нужен PostgreSQL: часть тестов проверяет настоящие транзакции и гонки
+ruff check --select F,E9 --exclude "*/migrations/*" .
+
+cd EventHub/frontend
+npm run build                # сборка с проверкой шаблонов и бюджетов бандла
+npm audit --omit=dev
+```
+
+Те же проверки запускает GitHub Actions (`.github/workflows/ci.yml`) на каждый push и pull request.
+
+Зависимости Python зафиксированы в `requirements.lock` и `requirements-search.lock`. Диапазоны версий задаются в `requirements*.txt`, lock-файлы пересобираются командой из их заголовка (`uv pip compile …`).
 
 ## Переменные окружения
 
@@ -116,9 +157,14 @@ cp EventHub/.env.example EventHub/.env
 | `DJANGO_SECRET_KEY` | секретный ключ Django — обязательно заменить перед реальным деплоем |
 | `DJANGO_DEBUG` | `1` для разработки, `0` для продакшена |
 | `DJANGO_ALLOWED_HOSTS`, `DJANGO_CORS_ALLOWED_ORIGINS`, `DJANGO_CSRF_TRUSTED_ORIGINS` | списки доверенных хостов/источников |
-| `DJANGO_SEED_DATA` | `1` — автозаполнение демо-данными при старте |
+| `DJANGO_SEED_DATA` | `1` — демо-данные при старте (работает только с `DJANGO_DEBUG=1`) |
+| `DJANGO_SEED_ADMIN_PASSWORD` | пароль демо-админа; если пусто, генерируется и печатается в лог |
 | `FRONTEND_URL` | используется для редиректов после оплаты |
-| `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` | ключи Stripe |
+| `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` | ключи Stripe; при `DJANGO_DEBUG=0` обязательны |
+| `STRIPE_MOCK_MODE` | `1` — оплата без Stripe (только для разработки, только с `DJANGO_DEBUG=1`) |
+| `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | SMTP для кодов подтверждения; при `DJANGO_DEBUG=0` обязательны |
+| `DJANGO_NUM_PROXIES` | сколько прокси стоит перед Django (по умолчанию `1` — nginx); нужно для корректного rate limiting |
+| `GRAFANA_ADMIN_PASSWORD` | пароль Grafana для `docker-compose.monitoring.yml` (обязателен) |
 
 ## API
 
@@ -132,7 +178,11 @@ cp EventHub/.env.example EventHub/.env
 
 ## Перед продакшн-деплоем
 
-- Установить `DJANGO_DEBUG=0` и сгенерировать новый `DJANGO_SECRET_KEY`.
+При `DJANGO_DEBUG=0` backend сам откажется стартовать без ключей Stripe, SMTP и явного `DJANGO_ALLOWED_HOSTS`. Кроме этого:
+
+- Сгенерировать новый `DJANGO_SECRET_KEY`.
 - Задать точные списки `DJANGO_ALLOWED_HOSTS`, CORS и CSRF origins под реальный домен.
+- Не публиковать порт 8000: снаружи должен быть доступен только nginx.
+- Поставить настоящий TLS-сертификат и включить HSTS (строка закомментирована в `frontend/nginx-security-headers.conf`).
 - Использовать managed PostgreSQL или защищённый Docker-инстанс.
 - Хранить продовые ключи Stripe в секретах деплоя, не в Git.

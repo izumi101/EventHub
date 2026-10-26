@@ -1,47 +1,17 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterModule } from '@angular/router';
-import { FormsModule } from '@angular/forms';
-import { LucideAngularModule, Twitter, Linkedin, Github, ChevronUp, Mail, X } from 'lucide-angular';
+import { LucideAngularModule, Twitter, Linkedin, Github, ChevronUp, X } from 'lucide-angular';
 import { AuthService } from '../../services/auth.service';
 import { SearchService } from '../../services/search.service';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, LucideAngularModule],
   template: `
     <footer class="bg-card border-t border-border mt-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-
-        <!-- Newsletter Section -->
-        <div class="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-2xl border border-primary/20 p-6 sm:p-8 mb-12">
-          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-            <div>
-              <h3 class="text-foreground font-semibold text-lg mb-1">Stay in the loop</h3>
-              <p class="text-muted-foreground text-sm">Get notified about the hottest events in your city.</p>
-            </div>
-            <form (submit)="subscribeNewsletter($event)" class="flex gap-2 w-full sm:w-auto">
-              <div class="flex items-center gap-2 bg-background border border-border rounded-xl px-4 py-2.5 flex-1 sm:w-64">
-                <lucide-icon [img]="icons.Mail" class="w-4 h-4 text-muted-foreground flex-shrink-0"></lucide-icon>
-                <input
-                  type="email"
-                  [(ngModel)]="newsletterEmail"
-                  name="email"
-                  placeholder="your@email.com"
-                  required
-                  class="bg-transparent text-foreground placeholder:text-muted-foreground outline-none text-sm flex-1 w-full"
-                />
-              </div>
-              <button
-                type="submit"
-                class="bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-medium text-sm hover:bg-primary/90 transition-colors whitespace-nowrap"
-              >
-                {{ newsletterSubmitted ? '✓ Subscribed!' : 'Subscribe' }}
-              </button>
-            </form>
-          </div>
-        </div>
 
         <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
           
@@ -252,13 +222,11 @@ import { SearchService } from '../../services/search.service';
   `]
 })
 export class FooterComponent {
-  readonly icons = { Twitter, Linkedin, Github, ChevronUp, Mail, X };
+  readonly icons = { Twitter, Linkedin, Github, ChevronUp, X };
 
   activeModal: 'terms' | 'privacy' | 'faq' | null = null;
   modalTitle = '';
   showBackToTop = false;
-  newsletterEmail = '';
-  newsletterSubmitted = false;
 
   faqItems = [
     { question: 'How do I purchase tickets?', answer: 'Browse events on the homepage, click on an event you like, and follow the checkout process to secure your tickets. You\'ll receive a confirmation email with your digital ticket.', open: false },
@@ -321,17 +289,5 @@ export class FooterComponent {
   /** Scroll to top smoothly */
   scrollToTop(): void {
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  /** Handle newsletter subscription */
-  subscribeNewsletter(event: Event | any): void {
-    event.preventDefault();
-    if (!this.newsletterEmail) return;
-    this.newsletterSubmitted = true;
-    // Reset after 3 seconds
-    setTimeout(() => {
-      this.newsletterSubmitted = false;
-      this.newsletterEmail = '';
-    }, 3000);
   }
 }

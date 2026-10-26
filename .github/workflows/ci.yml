@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: EventHub/backend
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: eventhub
+          POSTGRES_USER: eventhub_user
+          POSTGRES_PASSWORD: eventhub_password
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U eventhub_user -d eventhub"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: eventhub
+      POSTGRES_USER: eventhub_user
+      POSTGRES_PASSWORD: eventhub_password
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: EventHub/backend/requirements.lock
+      - name: Install dependencies
+        run: pip install -r requirements.lock ruff pip-audit
+      - name: Lint (pyflakes rules)
+        run: ruff check --select F,E9 --exclude "*/migrations/*" .
+      - name: Migrations are up to date
+        run: python manage.py makemigrations --check --dry-run
+      - name: Tests (PostgreSQL, real transactions)
+        run: python manage.py test --noinput
+      - name: Dependency audit
+        # twisted (via daphne) has no stable release with these fixes yet
+        # (only 26.10.0rc1); drop the ignores once it ships.
+        run: >-
+          pip-audit -r requirements.lock --progress-spinner off
+          --ignore-vuln CVE-2026-106454 --ignore-vuln CVE-2026-115778
+          --ignore-vuln CVE-2026-115774 --ignore-vuln CVE-2026-115775
+          --ignore-vuln CVE-2026-115776 --ignore-vuln CVE-2026-115877
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: EventHub/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: EventHub/frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - name: Production build (type-checks templates, enforces bundle budgets)
+        run: npm run build -- --configuration production
+      - name: Audit runtime dependencies
+        run: npm audit --omit=dev --audit-level=high
+
+  compose:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: EventHub
+    steps:
+      - uses: actions/checkout@v4
+      - name: docker-compose files are valid
+        run: |
+          docker compose --env-file .env.example config -q
+          GRAFANA_ADMIN_PASSWORD=ci docker compose -f docker-compose.monitoring.yml config -q
