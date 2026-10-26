@@ -18,8 +18,8 @@ import { DialogDirective } from '../../directives/dialog.directive';
         <p class="text-sm text-muted-foreground mb-4">
           The organizer will review your request and approve or decline it. You'll be notified of their decision.
         </p>
-        <label class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
-        <textarea [(ngModel)]="reason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
+        <label for="refund-request-modal-reason" class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
+        <textarea id="refund-request-modal-reason" [(ngModel)]="reason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
         <div class="flex gap-2">
           <button (click)="closed.emit()" class="btn btn-secondary flex-1">Cancel</button>
           <button (click)="submit()" [disabled]="submitting" class="btn btn-primary flex-1">

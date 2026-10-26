@@ -48,8 +48,8 @@ import {
               <input [(ngModel)]="newDescription" placeholder="Description (optional)"
                 class="input flex-1 min-w-40" maxlength="300" />
               <div class="flex items-center gap-2">
-                <label class="text-xs text-muted-foreground">Color</label>
-                <input type="color" [(ngModel)]="newColor" class="w-9 h-9 rounded cursor-pointer border border-border" />
+                <label for="checkin-lists-new-color" class="text-xs text-muted-foreground">Color</label>
+                <input id="checkin-lists-new-color" type="color" [(ngModel)]="newColor" class="w-9 h-9 rounded cursor-pointer border border-border" />
               </div>
               <button (click)="createList()" [disabled]="creating || !newName.trim()"
                 class="btn btn-primary">
@@ -194,9 +194,9 @@ import {
 
                   <!-- Quick scan -->
                   <div class="p-4 border-b border-border bg-muted/30">
-                    <label class="text-xs font-medium text-muted-foreground mb-1.5 block">Quick scan by ticket UUID</label>
+                    <label for="checkin-lists-scan-uuid" class="text-xs font-medium text-muted-foreground mb-1.5 block">Quick scan by ticket UUID</label>
                     <div class="flex gap-2">
-                      <input [(ngModel)]="scanUuid" placeholder="Paste ticket UUID…"
+                      <input id="checkin-lists-scan-uuid" [(ngModel)]="scanUuid" placeholder="Paste ticket UUID…"
                         class="input flex-1 text-sm" (keydown.enter)="quickScan()" />
                       <button (click)="quickScan()" [disabled]="!scanUuid.trim() || scanning"
                         class="btn btn-primary btn-sm">

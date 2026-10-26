@@ -45,39 +45,39 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             <h2 class="font-semibold text-foreground mb-4">New ticket tier</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-foreground mb-1.5">Name</label>
-                <input [(ngModel)]="form.name" placeholder="e.g. VIP, Early Bird, General Admission" class="input w-full" />
+                <label for="ticket-types-name" class="block text-sm font-medium text-foreground mb-1.5">Name</label>
+                <input id="ticket-types-name" [(ngModel)]="form.name" placeholder="e.g. VIP, Early Bird, General Admission" class="input w-full" />
               </div>
               <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-foreground mb-1.5">Description <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input [(ngModel)]="form.description" placeholder="What's included with this tier?" class="input w-full" />
+                <label for="ticket-types-description" class="block text-sm font-medium text-foreground mb-1.5">Description <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="ticket-types-description" [(ngModel)]="form.description" placeholder="What's included with this tier?" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Type</label>
-                <select [(ngModel)]="form.kind" class="input w-full">
+                <label for="ticket-types-kind" class="block text-sm font-medium text-foreground mb-1.5">Type</label>
+                <select id="ticket-types-kind" [(ngModel)]="form.kind" class="input w-full">
                   <option value="paid">Paid</option>
                   <option value="free">Free</option>
                   <option value="donation">Donation (pay what you want)</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">
+                <label for="ticket-types-price" class="block text-sm font-medium text-foreground mb-1.5">
                   {{ form.kind === 'donation' ? 'Minimum ($)' : 'Price ($)' }}
                 </label>
-                <input type="number" [(ngModel)]="form.price" min="0" step="0.01" [disabled]="form.kind === 'free'" class="input w-full" />
+                <input id="ticket-types-price" type="number" [(ngModel)]="form.price" min="0" step="0.01" [disabled]="form.kind === 'free'" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Quantity <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
-                <input type="number" [(ngModel)]="form.quantity" min="1" placeholder="Unlimited" class="input w-full" />
+                <label for="ticket-types-quantity" class="block text-sm font-medium text-foreground mb-1.5">Quantity <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
+                <input id="ticket-types-quantity" type="number" [(ngModel)]="form.quantity" min="1" placeholder="Unlimited" class="input w-full" />
               </div>
               <div></div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Sales start <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input type="datetime-local" [(ngModel)]="form.sale_start" class="input w-full" />
+                <label for="ticket-types-sale-start" class="block text-sm font-medium text-foreground mb-1.5">Sales start <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="ticket-types-sale-start" type="datetime-local" [(ngModel)]="form.sale_start" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Sales end <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input type="datetime-local" [(ngModel)]="form.sale_end" class="input w-full" />
+                <label for="ticket-types-sale-end" class="block text-sm font-medium text-foreground mb-1.5">Sales end <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="ticket-types-sale-end" type="datetime-local" [(ngModel)]="form.sale_end" class="input w-full" />
               </div>
             </div>
             <div class="flex gap-2 mt-4">

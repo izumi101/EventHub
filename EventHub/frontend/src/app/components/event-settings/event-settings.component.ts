@@ -160,12 +160,12 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         @if (tab === 'webhooks') {
           <div class="card p-5 mb-5">
             <h2 class="font-semibold text-foreground mb-3">New webhook</h2>
-            <label class="block text-sm font-medium text-foreground mb-1.5">Endpoint URL</label>
-            <input [(ngModel)]="hookUrl" placeholder="https://your-server.com/webhook" class="input w-full mb-3" />
-            <label class="block text-sm font-medium text-foreground mb-1.5">Secret <span class="text-muted-foreground font-normal">(optional, signs payloads)</span></label>
-            <input [(ngModel)]="hookSecret" placeholder="A shared secret" class="input w-full mb-3" />
-            <label class="block text-sm font-medium text-foreground mb-2">Trigger on</label>
-            <div class="grid grid-cols-2 gap-2 mb-4">
+            <label for="event-settings-hook-url" class="block text-sm font-medium text-foreground mb-1.5">Endpoint URL</label>
+            <input id="event-settings-hook-url" [(ngModel)]="hookUrl" placeholder="https://your-server.com/webhook" class="input w-full mb-3" />
+            <label for="event-settings-hook-secret" class="block text-sm font-medium text-foreground mb-1.5">Secret <span class="text-muted-foreground font-normal">(optional, signs payloads)</span></label>
+            <input id="event-settings-hook-secret" [(ngModel)]="hookSecret" placeholder="A shared secret" class="input w-full mb-3" />
+            <p id="hook-triggers-caption" class="block text-sm font-medium text-foreground mb-2">Trigger on</p>
+            <div class="grid grid-cols-2 gap-2 mb-4" role="group" aria-labelledby="hook-triggers-caption">
               @for (t of allTriggers; track t.key) {
                 <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer p-2 rounded-lg border border-border">
                   <input type="checkbox" [checked]="hookTriggers.includes(t.key)" (change)="toggleTrigger(t.key)" class="w-4 h-4 rounded" />
@@ -232,20 +232,20 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               </p>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Rows</label>
-                  <input type="number" [(ngModel)]="smRows" min="1" max="26" class="input" />
+                  <label for="event-settings-sm-rows" class="block text-sm font-medium text-foreground mb-1.5">Rows</label>
+                  <input id="event-settings-sm-rows" type="number" [(ngModel)]="smRows" min="1" max="26" class="input" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Seats per row</label>
-                  <input type="number" [(ngModel)]="smCols" min="1" max="30" class="input" />
+                  <label for="event-settings-sm-cols" class="block text-sm font-medium text-foreground mb-1.5">Seats per row</label>
+                  <input id="event-settings-sm-cols" type="number" [(ngModel)]="smCols" min="1" max="30" class="input" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Premium rows</label>
-                  <input type="number" [(ngModel)]="smPremium" min="0" class="input" />
+                  <label for="event-settings-sm-premium" class="block text-sm font-medium text-foreground mb-1.5">Premium rows</label>
+                  <input id="event-settings-sm-premium" type="number" [(ngModel)]="smPremium" min="0" class="input" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">VIP rows</label>
-                  <input type="number" [(ngModel)]="smVip" min="0" class="input" />
+                  <label for="event-settings-sm-vip" class="block text-sm font-medium text-foreground mb-1.5">VIP rows</label>
+                  <input id="event-settings-sm-vip" type="number" [(ngModel)]="smVip" min="0" class="input" />
                 </div>
               </div>
               <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer mb-4">

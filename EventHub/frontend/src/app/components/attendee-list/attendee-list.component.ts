@@ -273,15 +273,15 @@ import { DialogDirective } from '../../directives/dialog.directive';
             {{ refundReg.full_name || refundReg.username }} · paid {{ refundReg.payment?.net_amount }} {{ currency }}
           </p>
 
-          <label class="block text-sm font-medium text-foreground mb-1.5">Amount to refund</label>
+          <label for="attendee-list-refund-amount" class="block text-sm font-medium text-foreground mb-1.5">Amount to refund</label>
           <div class="flex items-center gap-2 mb-2">
             <span class="text-muted-foreground">$</span>
-            <input type="number" [(ngModel)]="refundAmount" [max]="refundReg.payment?.net_amount" min="0" step="0.01" class="input flex-1" />
+            <input id="attendee-list-refund-amount" type="number" [(ngModel)]="refundAmount" [max]="refundReg.payment?.net_amount ?? null" min="0" step="0.01" class="input flex-1" />
             <button (click)="refundAmount = refundReg.payment?.net_amount || ''" class="btn btn-ghost btn-sm text-xs">Full</button>
           </div>
 
-          <label class="block text-sm font-medium text-foreground mb-1.5 mt-3">Reason (optional)</label>
-          <input [(ngModel)]="refundReason" placeholder="e.g. Event cancelled" class="input w-full mb-4" />
+          <label for="attendee-list-refund-reason" class="block text-sm font-medium text-foreground mb-1.5 mt-3">Reason (optional)</label>
+          <input id="attendee-list-refund-reason" [(ngModel)]="refundReason" placeholder="e.g. Event cancelled" class="input w-full mb-4" />
 
           <div class="flex gap-2">
             <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
@@ -303,19 +303,19 @@ import { DialogDirective } from '../../directives/dialog.directive';
           </h3>
           <p class="text-sm text-muted-foreground mb-4">Sends an in-app notification (and email if configured).</p>
 
-          <label class="block text-sm font-medium text-foreground mb-1.5">Send to</label>
-          <select [(ngModel)]="msgAudience" class="input w-full mb-3">
+          <label for="attendee-list-msg-audience" class="block text-sm font-medium text-foreground mb-1.5">Send to</label>
+          <select id="attendee-list-msg-audience" [(ngModel)]="msgAudience" class="input w-full mb-3">
             <option value="all">Everyone</option>
             <option value="confirmed">Confirmed only</option>
             <option value="pending">Pending payment</option>
             <option value="checked_in">Checked in</option>
           </select>
 
-          <label class="block text-sm font-medium text-foreground mb-1.5">Subject</label>
-          <input [(ngModel)]="msgSubject" placeholder="e.g. Schedule update" class="input w-full mb-3" />
+          <label for="attendee-list-msg-subject" class="block text-sm font-medium text-foreground mb-1.5">Subject</label>
+          <input id="attendee-list-msg-subject" [(ngModel)]="msgSubject" placeholder="e.g. Schedule update" class="input w-full mb-3" />
 
-          <label class="block text-sm font-medium text-foreground mb-1.5">Message</label>
-          <textarea [(ngModel)]="msgBody" rows="4" placeholder="Write your message to attendees…" class="input resize-none w-full mb-4"></textarea>
+          <label for="attendee-list-msg-body" class="block text-sm font-medium text-foreground mb-1.5">Message</label>
+          <textarea id="attendee-list-msg-body" [(ngModel)]="msgBody" rows="4" placeholder="Write your message to attendees…" class="input resize-none w-full mb-4"></textarea>
 
           <div class="flex gap-2">
             <button (click)="showMessage = false" class="btn btn-secondary flex-1">Cancel</button>
