@@ -318,6 +318,19 @@ class WaitlistTests(Base):
         self.assertFalse(self.other.notifications.filter(type='seat_available').exists())
 
 
+class AttendeeListTests(Base):
+    def test_plain_list_by_default_paginated_on_request(self):
+        for i in range(3):
+            Registration.objects.create(user=self.make_user(f'p{i}'), event=self.event, status='confirmed')
+        self.client.force_authenticate(self.organizer)
+        url = f'/api/events/{self.event.id}/registrations/'
+        plain = self.client.get(url).data
+        self.assertEqual(len(plain), 3)
+        self.assertNotIn('event', plain[0])  # not re-serialised per row
+        page = self.client.get(url, {'page': 1, 'page_size': 2}).data
+        self.assertEqual((page['count'], len(page['results'])), (3, 2))
+
+
 class CommandTests(Base):
     def test_run_maintenance_releases_holds_and_completes_past_events(self):
         # Important #23: this work moved out of GET requests into a scheduler.

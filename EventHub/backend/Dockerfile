@@ -14,11 +14,23 @@ RUN apt-get update \
 COPY requirements.lock requirements-search.lock ./
 RUN pip install --upgrade pip && pip install -r requirements.lock
 
-# Semantic search pulls in PyTorch (several GB). Build a slim image with
-#   docker compose build --build-arg INSTALL_SEMANTIC_SEARCH=0 backend
-# — search then falls back to keyword matching.
+# Semantic search (sentence-transformers + PyTorch). Set
+# INSTALL_SEMANTIC_SEARCH=0 in .env for a slim image — search then falls back
+# to keyword matching. PyTorch comes from its CPU-only index: the PyPI build
+# drags in ~3 GB of CUDA libraries a CPU server never uses, so those pins are
+# dropped from the lock. The embedding model is downloaded at build time, so
+# containers don't fetch it from Hugging Face at runtime.
 ARG INSTALL_SEMANTIC_SEARCH=1
-RUN if [ "$INSTALL_SEMANTIC_SEARCH" = "1" ]; then pip install -r requirements-search.lock; fi
+ENV HF_HOME=/opt/hf-cache
+RUN if [ "$INSTALL_SEMANTIC_SEARCH" = "1" ]; then \
+        TORCH_VERSION=$(sed -n 's/^torch==//p' requirements-search.lock) \
+        && pip install --index-url https://download.pytorch.org/whl/cpu "torch==${TORCH_VERSION}" \
+        && grep -vE '^(torch|triton|nvidia-[a-z0-9-]+)==' requirements-search.lock > /tmp/search-cpu.lock \
+        && pip install -r /tmp/search-cpu.lock \
+        && python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"; \
+    fi
+# Never reach out to Hugging Face from a running container.
+ENV HF_HUB_OFFLINE=1
 
 COPY . .
 RUN chmod +x /app/entrypoint.sh

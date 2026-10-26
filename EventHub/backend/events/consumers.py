@@ -38,7 +38,11 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
 
         # Join broadcast group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
-        await self.accept()
+        # A client that authenticated via the JWT subprotocol must get it
+        # echoed back, or the browser drops the connection.
+        from .ws_auth import JWT_SUBPROTOCOL
+        offered = self.scope.get('subprotocols') or []
+        await self.accept(subprotocol=JWT_SUBPROTOCOL if JWT_SUBPROTOCOL in offered else None)
 
         # Send full seat snapshot so the client doesn't need a separate HTTP call
         snapshot = await self._get_seat_snapshot()
