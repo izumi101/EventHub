@@ -47,6 +47,13 @@ def index_event(event) -> None:
         logger.warning('[Search] Failed to index event %s: %s', event.id, exc)
 
 
+def index_event_async(event) -> None:
+    """Embed in a background thread — loading the model and encoding can
+    take seconds and must not hold up the HTTP request that saved the event."""
+    import threading
+    threading.Thread(target=index_event, args=(event,), daemon=True).start()
+
+
 def semantic_search(query: str, limit: int = 20, extra_qs=None, max_distance: float = 0.79):
     """
     Return events ordered by cosine similarity to query.
@@ -65,9 +72,10 @@ def semantic_search(query: str, limit: int = 20, extra_qs=None, max_distance: fl
 
     if not qs.filter(embedding__isnull=False).exists():
         # Fallback: plain title/description keyword search
-        return (extra_qs or Event.objects.filter(status='published')).filter(
-            title__icontains=query
-        )
+        # `extra_qs or …` would evaluate (load!) the whole queryset to test
+        # its truthiness — compare with None instead.
+        base = extra_qs if extra_qs is not None else Event.objects.filter(status='published')
+        return base.filter(title__icontains=query)
 
     query_vec = embed_text(query)
     top_ids = list(

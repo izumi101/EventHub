@@ -1,10 +1,48 @@
 import uuid
 from django.db import models
+from django.db.models import Q
+from django.db.models.functions import Lower
 from django.contrib.auth.models import User
 from django.utils import timezone
 from pgvector.django import VectorField
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
+
+
+INACTIVE_REGISTRATION_STATUSES = [
+    RegistrationStatusChoices.CANCELLED,
+    RegistrationStatusChoices.REJECTED,
+]
+
+
+class EventQuerySet(models.QuerySet):
+    def with_capacity(self):
+        """Annotate the counts behind `available_spots` / `ticket_types.sold`
+        so list endpoints don't issue several queries per event."""
+        from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery
+        from django.db.models.functions import Coalesce
+        from bookings.models import Booking, BookingSeat
+
+        active_regs = (
+            Registration.objects
+            .filter(event=OuterRef('pk'))
+            .exclude(status__in=INACTIVE_REGISTRATION_STATUSES)
+            .order_by().values('event').annotate(c=Count('pk')).values('c')
+        )
+        booked = (
+            BookingSeat.objects
+            .filter(
+                booking__event=OuterRef('pk'),
+                booking__status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
+            )
+            .order_by().values('booking__event').annotate(c=Count('pk')).values('c')
+        )
+        return self.annotate(
+            _active_registrations=Coalesce(Subquery(active_regs, output_field=IntegerField()), 0),
+            _booked_seats=Coalesce(Subquery(booked, output_field=IntegerField()), 0),
+        ).prefetch_related(
+            Prefetch('ticket_types', queryset=TicketType.objects.with_sold()),
+        )
 
 
 class Category(models.Model):
@@ -61,6 +99,8 @@ class Event(models.Model):
     seo_title = models.CharField(max_length=200, blank=True, help_text='Custom <title> / og:title (falls back to event title)')
     seo_description = models.CharField(max_length=500, blank=True, help_text='Custom meta description / og:description')
 
+    objects = EventQuerySet.as_manager()
+
     class Meta:
         ordering = ['-date']
 
@@ -68,40 +108,52 @@ class Event(models.Model):
         return self.title
 
     @property
-    def available_spots(self):
-        registered = self.registrations.exclude(status__in=[
-            RegistrationStatusChoices.CANCELLED,
-            RegistrationStatusChoices.REJECTED,
-        ]).count()
+    def active_registration_count(self):
+        # `_active_registrations` is annotated by `with_capacity()` on list
+        # endpoints; fall back to a query for single objects.
+        cached = getattr(self, '_active_registrations', None)
+        if cached is not None:
+            return cached
+        return self.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES).count()
+
+    @property
+    def booked_seat_count(self):
         # Group bookings hold seats without Registration rows — count their
         # seats too so capacity reflects every kind of sale.
-        try:
-            from bookings.models import BookingSeat, Booking
-            booked = BookingSeat.objects.filter(
-                booking__event=self,
-                booking__status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
-            ).count()
-        except Exception:
-            booked = 0
-        return max(self.max_participants - registered - booked, 0)
+        cached = getattr(self, '_booked_seats', None)
+        if cached is not None:
+            return cached
+        from bookings.models import BookingSeat, Booking
+        return BookingSeat.objects.filter(
+            booking__event=self,
+            booking__status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
+        ).count()
+
+    @property
+    def available_spots(self):
+        return max(self.max_participants - self.active_registration_count - self.booked_seat_count, 0)
+
+    def _ticket_types_list(self):
+        # `.all()` is served from the prefetch cache when the queryset used
+        # prefetch_related('ticket_types'), so list pages don't run N queries.
+        return list(self.ticket_types.all())
 
     @property
     def has_ticket_types(self):
-        return self.ticket_types.exists()
+        return bool(self._ticket_types_list())
 
     @property
     def is_free(self):
         # With ticket tiers, the event is free only if every tier is free.
-        if self.has_ticket_types:
-            return not self.ticket_types.exclude(kind=TicketType.KIND_FREE).exists()
+        types = self._ticket_types_list()
+        if types:
+            return all(t.kind == TicketType.KIND_FREE for t in types)
         return self.price == 0
 
     @property
     def price_from(self):
         """Lowest purchasable price across tiers (for 'from $X' display)."""
-        if not self.has_ticket_types:
-            return self.price
-        prices = [t.price for t in self.ticket_types.filter(is_active=True)]
+        prices = [t.price for t in self._ticket_types_list() if t.is_active]
         return min(prices) if prices else self.price
 
     @property
@@ -183,11 +235,33 @@ class Registration(models.Model):
     )
 
     class Meta:
-        unique_together = ('user', 'event')
         ordering = ['-registered_at']
+        constraints = [
+            # One live ticket per user per event. Cancelled/rejected rows stay
+            # as history (with their payment/refund records), so buying again
+            # after a cancellation creates a fresh registration and QR code.
+            models.UniqueConstraint(
+                fields=['user', 'event'],
+                condition=~Q(status__in=['cancelled', 'rejected']),
+                name='uniq_active_registration_per_user_event',
+            ),
+        ]
+        indexes = [
+            models.Index(fields=['event', 'status'], name='reg_event_status_idx'),
+            models.Index(fields=['status', 'seat_held_until'], name='reg_status_hold_idx'),
+        ]
 
     def __str__(self):
         return f'{self.user.username} -> {self.event.title}'
+
+
+class TicketTypeQuerySet(models.QuerySet):
+    def with_sold(self):
+        from django.db.models import Count
+        return self.annotate(_sold=Count(
+            'registrations',
+            filter=~Q(registrations__status__in=INACTIVE_REGISTRATION_STATUSES),
+        ))
 
 
 class TicketType(models.Model):
@@ -223,6 +297,8 @@ class TicketType(models.Model):
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    objects = TicketTypeQuerySet.as_manager()
+
     class Meta:
         ordering = ['order', 'price', 'id']
 
@@ -231,10 +307,10 @@ class TicketType(models.Model):
 
     @property
     def sold(self):
-        return self.registrations.exclude(status__in=[
-            RegistrationStatusChoices.CANCELLED,
-            RegistrationStatusChoices.REJECTED,
-        ]).count()
+        cached = getattr(self, '_sold', None)
+        if cached is not None:
+            return cached
+        return self.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES).count()
 
     @property
     def available(self):
@@ -296,8 +372,11 @@ class PromoCode(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('event', 'code')
         ordering = ['-created_at']
+        constraints = [
+            # Codes are looked up case-insensitively, so uniqueness must be too.
+            models.UniqueConstraint(Lower('code'), 'event', name='uniq_promo_code_ci_per_event'),
+        ]
 
     def __str__(self):
         return f'{self.code} ({self.event.title})'
@@ -389,6 +468,9 @@ class WaitlistEntry(models.Model):
         unique_together = ('user', 'event')
         ordering = ['created_at']  # FIFO
         verbose_name_plural = 'waitlist entries'
+        indexes = [
+            models.Index(fields=['event', 'status', 'created_at'], name='waitlist_event_status_idx'),
+        ]
 
     def __str__(self):
         return f'{self.user.username} waiting for {self.event.title} ({self.status})'
@@ -544,8 +626,10 @@ class Affiliate(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ('event', 'code')
         ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(Lower('code'), 'event', name='uniq_affiliate_code_ci_per_event'),
+        ]
 
     def __str__(self):
         return f'{self.name} ({self.code}) @ {self.event.title}'
@@ -599,6 +683,9 @@ class CheckInLog(models.Model):
         ordering = ['-created_at']
         verbose_name = 'check-in log entry'
         verbose_name_plural = 'check-in log entries'
+        indexes = [
+            models.Index(fields=['checkin_list', 'registration'], name='checkinlog_list_reg_idx'),
+        ]
 
     def __str__(self):
         return f'{self.action} — {self.registration} via {self.checkin_list.name}'

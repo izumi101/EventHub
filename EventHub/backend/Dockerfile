@@ -14,4 +14,6 @@ RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8000
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["gunicorn", "eventhub_backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# ASGI server: serves both the REST API and the seat-map WebSockets
+# (gunicorn + WSGI would silently drop the WebSocket routes).
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "eventhub_backend.asgi:application"]

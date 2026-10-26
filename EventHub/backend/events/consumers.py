@@ -11,7 +11,6 @@ import logging
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
-from django.contrib.auth.models import AnonymousUser
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +31,11 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
         self.event_id = self.scope['url_route']['kwargs']['event_id']
         self.group_name = f'seat_map_{self.event_id}'
 
+        # Same visibility as the HTTP API: drafts/pending events are private.
+        if not await self._can_view():
+            await self.close(code=4403)
+            return
+
         # Join broadcast group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
@@ -45,7 +49,8 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
         logger.debug('WS connect: event=%s group=%s', self.event_id, self.group_name)
 
     async def disconnect(self, close_code):
-        await self.channel_layer.group_discard(self.group_name, self.channel_name)
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(self.group_name, self.channel_name)
         logger.debug('WS disconnect: event=%s code=%s', self.event_id, close_code)
 
     # ── Receive message from WebSocket client (ignored — read-only for now)
@@ -66,6 +71,19 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
         }))
 
     # ── DB helpers (run in threadpool)
+    @database_sync_to_async
+    def _can_view(self):
+        from common.choices import EventStatusChoices
+        from .models import Event
+        event = Event.objects.filter(pk=self.event_id).only('status', 'organizer_id').first()
+        if event is None:
+            return False
+        if event.status in (EventStatusChoices.PUBLISHED, EventStatusChoices.COMPLETED,
+                            EventStatusChoices.CANCELLED):
+            return True
+        user = self.scope.get('user')
+        return bool(user and user.is_authenticated and (user.is_superuser or event.organizer_id == user.id))
+
     @database_sync_to_async
     def _get_seat_snapshot(self):
         from .models import SeatMap

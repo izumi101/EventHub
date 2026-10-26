@@ -1,17 +1,20 @@
 """Refund requests: attendee submission and organizer resolution."""
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
+from django.http import Http404
 
-from ..models import Event, Registration
+from ..models import Event
 
 
 @transaction.atomic
 def request_refund(*, user, event: Event, reason: str = ''):
     """Attendee asks the organizer to refund their paid ticket."""
     from ..models import RefundRequest
+    from .registration import get_active_registration
 
-    registration = get_object_or_404(Registration, user=user, event=event)
+    registration = get_active_registration(user=user, event=event)
+    if registration is None:
+        raise Http404('Registration not found')
 
     # A scanned ticket means the attendee entered the event — the service
     # was delivered, so the refund window is closed for good.
@@ -48,7 +51,7 @@ def request_refund(*, user, event: Event, reason: str = ''):
         notify(
             event.organizer, 'event_updated',
             f'💸 Refund requested: {event.title}',
-            f'{user.username} requested a refund of ${payment.net_amount}.'
+            f'{user.username} requested a refund of {payment.net_amount} {event.currency}.'
             + (f' Reason: {reason}' if reason else ''),
             event=event,
         )
@@ -64,12 +67,14 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
     from django.utils import timezone as _tz
     from ..models import RefundRequest
 
+    from common.permissions import can_manage_event
+    if not can_manage_event(refund_request.registration.event, actor):
+        raise PermissionError('Only the organizer can resolve refund requests.')
+
+    # Lock: two organizers clicking "approve" at once must not both refund.
+    refund_request = RefundRequest.objects.select_for_update().get(pk=refund_request.pk)
     registration = refund_request.registration
     event = registration.event
-
-    from common.permissions import can_manage_event
-    if not can_manage_event(event, actor):
-        raise PermissionError('Only the organizer can resolve refund requests.')
 
     if refund_request.status != RefundRequest.STATUS_PENDING:
         raise ValueError('This request has already been resolved.')

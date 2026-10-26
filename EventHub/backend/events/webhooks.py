@@ -7,13 +7,13 @@ attempt is logged to WebhookDelivery for the organizer to inspect.
 """
 import hashlib
 import hmac
+import http.client
+import ipaddress
 import json
 import logging
-import threading
-import ipaddress
 import socket
-import urllib.error
-import urllib.request
+import ssl
+import threading
 from urllib.parse import urlsplit
 
 from django.utils import timezone
@@ -22,41 +22,93 @@ from .models import Webhook, WebhookDelivery
 
 logger = logging.getLogger(__name__)
 
-
-class _NoRedirect(urllib.request.HTTPRedirectHandler):
-    """Refuse redirects so a vetted public URL can't 302 to an internal one."""
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
-_OPENER = urllib.request.build_opener(_NoRedirect)
-
-
-def _is_public_url(url: str) -> bool:
-    """SSRF guard: allow only http(s) to a publicly-routable host.
-
-    Webhook URLs are organizer-controlled, so without this an organizer could
-    point one at internal infrastructure (cloud metadata, localhost, private
-    ranges) and have the server fetch it. Resolve the host and reject any
-    private / loopback / link-local / reserved address.
-    """
-    try:
-        parts = urlsplit(url)
-        if parts.scheme not in ('http', 'https') or not parts.hostname:
-            return False
-        port = parts.port or (443 if parts.scheme == 'https' else 80)
-        infos = socket.getaddrinfo(parts.hostname, port, proto=socket.IPPROTO_TCP)
-    except Exception:
-        return False
-    for info in infos:
-        ip = ipaddress.ip_address(info[4][0])
-        if (ip.is_private or ip.is_loopback or ip.is_link_local
-                or ip.is_reserved or ip.is_multicast or ip.is_unspecified):
-            return False
-    return True
-
 # Keep the HTTP call short so a slow receiver can't pile up threads.
 TIMEOUT_SECONDS = 5
+
+
+class UnsafeWebhookURL(Exception):
+    pass
+
+
+def _public_ips(host: str, port: int) -> list:
+    """Resolve `host` and return its addresses, or raise if any of them is not
+    a public internet address (loopback, private, CGNAT, link-local/cloud
+    metadata, reserved, multicast, IPv4-mapped variants of those…)."""
+    try:
+        infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
+    except OSError as exc:
+        raise UnsafeWebhookURL(f'Cannot resolve {host}: {exc}')
+    ips = []
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split('%', 1)[0])
+        if ip.version == 6 and ip.ipv4_mapped is not None:
+            ip = ip.ipv4_mapped
+        if not ip.is_global or ip.is_multicast:
+            raise UnsafeWebhookURL(f'{host} resolves to a non-public address')
+        ips.append(str(ip))
+    if not ips:
+        raise UnsafeWebhookURL(f'{host} has no addresses')
+    return ips
+
+
+def _split(url: str):
+    parts = urlsplit(url)
+    if parts.scheme not in ('http', 'https') or not parts.hostname:
+        raise UnsafeWebhookURL('Only http(s) URLs are allowed')
+    port = parts.port or (443 if parts.scheme == 'https' else 80)
+    return parts, port
+
+
+def is_public_url(url: str) -> bool:
+    """SSRF guard used when a webhook is saved (delivery re-checks)."""
+    try:
+        parts, port = _split(url)
+        _public_ips(parts.hostname, port)
+    except (UnsafeWebhookURL, ValueError):
+        return False
+    return True
+
+
+class _PinnedMixin:
+    """Connect to an address vetted *before* the request instead of letting
+    the socket layer resolve the name again (DNS rebinding: the first lookup
+    returns a public IP, the second one 127.0.0.1). TLS still verifies the
+    certificate against the original host name."""
+
+    def __init__(self, *args, pinned_ip, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pinned_ip = pinned_ip
+
+        def create_connection(address, timeout=None, source_address=None):
+            return socket.create_connection((self._pinned_ip, address[1]), timeout, source_address)
+
+        self._create_connection = create_connection
+
+
+class _PinnedHTTPConnection(_PinnedMixin, http.client.HTTPConnection):
+    pass
+
+
+class _PinnedHTTPSConnection(_PinnedMixin, http.client.HTTPSConnection):
+    pass
+
+
+def _post(url: str, body: bytes, headers: dict) -> int:
+    """POST without following redirects (http.client never does) to the
+    vetted address. Returns the HTTP status."""
+    parts, port = _split(url)
+    ip = _public_ips(parts.hostname, port)[0]
+    if parts.scheme == 'https':
+        conn = _PinnedHTTPSConnection(parts.hostname, port, timeout=TIMEOUT_SECONDS,
+                                      context=ssl.create_default_context(), pinned_ip=ip)
+    else:
+        conn = _PinnedHTTPConnection(parts.hostname, port, timeout=TIMEOUT_SECONDS, pinned_ip=ip)
+    path = (parts.path or '/') + (f'?{parts.query}' if parts.query else '')
+    try:
+        conn.request('POST', path, body=body, headers=headers)
+        return conn.getresponse().status
+    finally:
+        conn.close()
 
 
 def _sign(secret: str, body: bytes) -> str:
@@ -67,39 +119,25 @@ def _sign(secret: str, body: bytes) -> str:
 
 def _deliver(webhook_id: int, trigger: str, body: bytes, signature: str):
     """Runs in a worker thread: POST once, log the outcome."""
-    import urllib.request
-    import urllib.error
-
     webhook = Webhook.objects.filter(id=webhook_id).first()
     if webhook is None:
         return
 
-    if not _is_public_url(webhook.url):
-        logger.warning('Blocked webhook delivery to non-public URL: %s', webhook.url)
-        WebhookDelivery.objects.create(
-            webhook_id=webhook_id, trigger=trigger,
-            status_code=None, success=False, error='Blocked: non-public URL (SSRF guard)',
-        )
-        return
-
     status_code, success, error = None, False, ''
     try:
-        req = urllib.request.Request(
-            webhook.url, data=body, method='POST',
-            headers={
-                'Content-Type': 'application/json',
-                'X-EventHub-Event': trigger,
-                'X-EventHub-Signature': signature,
-                'User-Agent': 'EventHub-Webhooks/1.0',
-            },
-        )
-        with _OPENER.open(req, timeout=TIMEOUT_SECONDS) as resp:
-            status_code = resp.status
-            success = 200 <= resp.status < 300
-    except urllib.error.HTTPError as exc:
-        status_code = exc.code
-        error = f'HTTP {exc.code}'
-    except Exception as exc:  # network, timeout, bad URL…
+        status_code = _post(webhook.url, body, {
+            'Content-Type': 'application/json',
+            'X-EventHub-Event': trigger,
+            'X-EventHub-Signature': signature,
+            'User-Agent': 'EventHub-Webhooks/1.0',
+        })
+        success = 200 <= status_code < 300
+        if not success:
+            error = f'HTTP {status_code}'
+    except UnsafeWebhookURL as exc:
+        logger.warning('Blocked webhook delivery to %s: %s', webhook.url, exc)
+        error = f'Blocked (SSRF guard): {exc}'[:300]
+    except Exception as exc:  # network, timeout, TLS…
         error = str(exc)[:300]
 
     try:
@@ -115,10 +153,14 @@ def _deliver(webhook_id: int, trigger: str, body: bytes, signature: str):
 
 
 def fire(event, trigger: str, payload: dict):
-    """Dispatch `trigger` for `event` to all subscribed webhooks (async)."""
+    """Dispatch `trigger` for `event` to all subscribed webhooks (async).
+
+    Never raises: a webhook problem must not break the business flow that
+    triggered it."""
     try:
         hooks = list(Webhook.objects.filter(event=event, is_active=True))
     except Exception:
+        logger.exception('Could not load webhooks for event %s', getattr(event, 'id', None))
         return
 
     if not hooks:

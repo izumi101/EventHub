@@ -41,7 +41,7 @@ def session_key(event_id: int, user_id: int) -> str:
 
 
 def is_queue_active(event) -> bool:
-    """True if fill rate >= threshold and queue has waiters."""
+    """True once the event is at least QUEUE_THRESHOLD full (active registrations / capacity)."""
     if event.max_participants == 0:
         return False
     registered = event.registrations.exclude(status__in=['cancelled', 'rejected']).count()

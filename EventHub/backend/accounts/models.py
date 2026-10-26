@@ -8,6 +8,10 @@ from datetime import timedelta
 from common.choices import RoleChoices
 from common.codes import generate_numeric_code
 
+# A 6-digit code has 10^6 values; a handful of guesses per code keeps
+# brute force impractical even if request throttling is bypassed.
+MAX_CODE_ATTEMPTS = 5
+
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
@@ -40,6 +44,8 @@ class PasswordResetCode(models.Model):
     code = models.CharField(max_length=6)
     reset_token = models.CharField(max_length=64, blank=True, null=True)
     is_used = models.BooleanField(default=False)
+    # Wrong guesses against this code; it is burned after MAX_CODE_ATTEMPTS.
+    attempts = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 
@@ -69,6 +75,7 @@ class EmailVerificationCode(models.Model):
     email = models.EmailField()
     code = models.CharField(max_length=6)
     is_used = models.BooleanField(default=False)
+    attempts = models.PositiveSmallIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
 

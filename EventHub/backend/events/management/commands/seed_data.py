@@ -1,8 +1,11 @@
+import os
+import secrets
 from datetime import timedelta
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib.auth.models import User
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from accounts.models import UserProfile
@@ -17,6 +20,14 @@ class Command(BaseCommand):
         parser.add_argument('--noinput', action='store_true', help='Run without prompts.')
 
     def handle(self, *args, **options):
+        # Demo accounts have publicly known passwords — never on a real deployment.
+        if not settings.DEBUG:
+            raise CommandError('seed_data creates demo accounts; run it only with DJANGO_DEBUG=1.')
+
+        # The superuser never gets a hard-coded password: take it from the
+        # environment or generate one and print it once.
+        self.admin_password = os.environ.get('DJANGO_SEED_ADMIN_PASSWORD') or secrets.token_urlsafe(12)
+
         users = self.seed_users()
         categories = self.seed_categories()
         events = self.seed_events(users, categories)
@@ -25,14 +36,17 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(
             f'Seed data ready: {len(users)} users, {len(categories)} categories, {len(events)} events.'
         ))
-        self.stdout.write('Demo logins: admin/admin123, organizer/password123, attendee/password123')
+        self.stdout.write('Demo logins: organizer/password123, attendee/password123')
+        if self.admin_created:
+            self.stdout.write(f'Admin login: admin / {self.admin_password}')
 
     def seed_users(self):
+        self.admin_created = False
         specs = [
             {
                 'username': 'admin',
                 'email': 'admin@eventhub.local',
-                'password': 'admin123',
+                'password': self.admin_password,
                 'first_name': 'EventHub',
                 'last_name': 'Admin',
                 'is_staff': True,
@@ -67,6 +81,8 @@ class Command(BaseCommand):
                 setattr(user, field, value)
             if created:
                 user.set_password(password)
+                if username == 'admin':
+                    self.admin_created = True
             user.save()
             profile, _ = UserProfile.objects.get_or_create(user=user)
             for field, value in profile_data.items():
@@ -156,12 +172,14 @@ class Command(BaseCommand):
         return events
 
     def seed_registrations(self, users, events):
-        free_registration, _ = Registration.objects.update_or_create(
+        # Cancelled rows are history; only the live registration is upserted.
+        active = Registration.objects.exclude(status__in=['cancelled', 'rejected'])
+        free_registration, _ = active.update_or_create(
             user=users['attendee'],
             event=events['Angular Meetup Almaty'],
             defaults={'status': 'confirmed', 'notes': 'Excited to join the Angular meetup.'},
         )
-        paid_registration, _ = Registration.objects.update_or_create(
+        paid_registration, _ = active.update_or_create(
             user=users['attendee'],
             event=events['Startup Pitch Night'],
             defaults={'status': 'pending', 'notes': 'Interested in the pitch session.'},
@@ -170,7 +188,7 @@ class Command(BaseCommand):
             registration=paid_registration,
             defaults={
                 'amount': paid_registration.event.price,
-                'currency': 'usd',
+                'currency': (paid_registration.event.currency or 'USD').lower(),
                 'status': 'pending',
             },
         )

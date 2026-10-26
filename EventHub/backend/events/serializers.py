@@ -1,5 +1,8 @@
+import re
+
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.utils import timezone
 from .models import (
     Category, Event, Registration, SeatMap, EventSeat, Favorite, Review,
     Notification, PromoCode, EventQuestion, QuestionAnswer, WaitlistEntry,
@@ -8,6 +11,8 @@ from .models import (
 )
 from common.choices import EventStatusChoices, RegistrationStatusChoices
 from .services import create_event, update_event
+
+CURRENCY_RE = re.compile(r'^[A-Z]{3}$')
 
 
 # ---- ModelSerializer ---- #
@@ -19,7 +24,17 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description', 'icon', 'event_count']
 
     def get_event_count(self, obj):
+        cached = getattr(obj, '_event_count', None)  # annotated by the list view
+        if cached is not None:
+            return cached
         return obj.events.filter(status=EventStatusChoices.PUBLISHED).count()
+
+
+class CategoryMiniSerializer(serializers.ModelSerializer):
+    """Nested in every event card — no per-event count query."""
+    class Meta:
+        model = Category
+        fields = ['id', 'name', 'description', 'icon']
 
 
 # ---- Serializer (manual) for event creation ---- #
@@ -53,6 +68,53 @@ class EventCreateSerializer(serializers.ModelSerializer):
             'currency': {'required': False},
             'refundable': {'required': False},
         }
+
+    def validate_price(self, value):
+        if value is not None and value < 0:
+            raise serializers.ValidationError('Price cannot be negative.')
+        return value
+
+    def validate_tax_percent(self, value):
+        return self._percent(value)
+
+    def validate_service_fee_percent(self, value):
+        return self._percent(value)
+
+    @staticmethod
+    def _percent(value):
+        if value is not None and not (0 <= value <= 100):
+            raise serializers.ValidationError('Must be between 0 and 100.')
+        return value
+
+    def validate_currency(self, value):
+        value = (value or '').strip().upper()
+        if not CURRENCY_RE.match(value):
+            raise serializers.ValidationError('Use a 3-letter ISO 4217 currency code, e.g. USD or KZT.')
+        return value
+
+    def validate_max_participants(self, value):
+        if value is not None and value < 1:
+            raise serializers.ValidationError('Capacity must be at least 1.')
+        if self.instance is not None and value is not None:
+            sold = self.instance.active_registration_count + self.instance.booked_seat_count
+            if value < sold:
+                raise serializers.ValidationError(
+                    f'{sold} tickets are already sold or held — capacity cannot go below that.'
+                )
+        return value
+
+    def validate(self, attrs):
+        date = attrs.get('date', getattr(self.instance, 'date', None))
+        end_date = attrs.get('end_date', getattr(self.instance, 'end_date', None))
+        if date and end_date and end_date < date:
+            raise serializers.ValidationError({'end_date': 'The event cannot end before it starts.'})
+        if self.instance is None and date and date < timezone.now():
+            raise serializers.ValidationError({'date': 'The event date must be in the future.'})
+        is_online = attrs.get('is_online', getattr(self.instance, 'is_online', False))
+        online_link = attrs.get('online_link', getattr(self.instance, 'online_link', ''))
+        if is_online and not online_link:
+            raise serializers.ValidationError({'online_link': 'Online events need a link.'})
+        return attrs
 
     def create(self, validated_data):
         organizer = self.context['request'].user
@@ -91,15 +153,26 @@ class TicketTypeSerializer(serializers.ModelSerializer):
         price = attrs.get('price', getattr(self.instance, 'price', 0))
         if kind == TicketType.KIND_PAID and (price is None or price <= 0):
             raise serializers.ValidationError({'price': 'Paid tickets need a price above zero.'})
+        if price is not None and price < 0:
+            raise serializers.ValidationError({'price': 'Price cannot be negative.'})
         if kind == TicketType.KIND_FREE:
             attrs['price'] = 0
+        start = attrs.get('sale_start', getattr(self.instance, 'sale_start', None))
+        end = attrs.get('sale_end', getattr(self.instance, 'sale_end', None))
+        if start and end and end <= start:
+            raise serializers.ValidationError({'sale_end': 'Sales must end after they start.'})
+        lo = attrs.get('min_per_order', getattr(self.instance, 'min_per_order', 1))
+        hi = attrs.get('max_per_order', getattr(self.instance, 'max_per_order', 10))
+        if lo and hi and lo > hi:
+            raise serializers.ValidationError({'max_per_order': 'Must be at least min_per_order.'})
         return attrs
 
 
 # ---- ModelSerializer ---- #
 class EventListSerializer(serializers.ModelSerializer):
     organizer = OrganizerMiniSerializer(read_only=True)
-    category = CategorySerializer(read_only=True)
+    category = CategoryMiniSerializer(read_only=True)
+    online_link = serializers.SerializerMethodField()
     available_spots = serializers.ReadOnlyField()
     is_free = serializers.ReadOnlyField()
     has_ticket_types = serializers.ReadOnlyField()
@@ -125,6 +198,24 @@ class EventListSerializer(serializers.ModelSerializer):
         # so the "X left / Y registered" capacity bar never contradicts itself.
         return max(obj.max_participants - obj.available_spots, 0)
 
+    def get_online_link(self, obj):
+        # The join link is what an online ticket buys — only the event team
+        # and people holding a confirmed ticket get it.
+        if not obj.online_link:
+            return ''
+        request = self.context.get('request')
+        user = getattr(request, 'user', None)
+        if user is None or not user.is_authenticated:
+            return ''
+        if user.is_superuser or obj.organizer_id == user.id:
+            return obj.online_link
+        from common.permissions import can_manage_event
+        if can_manage_event(obj, user) or obj.registrations.filter(
+            user=user, status=RegistrationStatusChoices.CONFIRMED,
+        ).exists():
+            return obj.online_link
+        return ''
+
 
 # ---- ModelSerializer ---- #
 class RegistrationSerializer(serializers.ModelSerializer):
@@ -144,6 +235,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'payment', 'promo', 'ticket_type', 'answers', 'breakdown', 'refund_request',
         ]
         read_only_fields = ['id', 'registered_at', 'status', 'ticket_uuid', 'is_checked_in', 'checked_in_at']
+
+    def get_fields(self):
+        fields = super().get_fields()
+        if self.context.get('omit_event'):
+            fields.pop('event', None)
+        return fields
 
     def get_full_name(self, obj):
         name = f'{obj.user.first_name} {obj.user.last_name}'.strip()
@@ -182,7 +279,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     answers = serializers.SerializerMethodField()
 
     def get_answers(self, obj):
-        rows = obj.answers.select_related('question').all()
+        rows = obj.answers.all()  # prefetch_related('answers__question') upstream
         return [
             {'label': a.question.label, 'answer': a.answer, 'type': a.question.question_type}
             for a in rows
@@ -303,6 +400,8 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         ).exists()
         if not attended:
             raise serializers.ValidationError('Only attendees with a confirmed ticket can leave a review.')
+        if Review.objects.filter(event_id=event_id, user=request.user).exists():
+            raise serializers.ValidationError('You have already reviewed this event.')
         return attrs
 
 
@@ -344,7 +443,7 @@ class RefundRequestSerializer(serializers.ModelSerializer):
 class EventStaffSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.EmailField(source='user.email', read_only=True)
-    # Write: invite by username.
+    # Write: invite by username (create only; updates change the role).
     invite_username = serializers.CharField(write_only=True, required=False)
 
     class Meta:
@@ -352,20 +451,23 @@ class EventStaffSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'email', 'role', 'invite_username', 'created_at']
         read_only_fields = ['id', 'username', 'email', 'created_at']
 
-    def validate_invite_username(self, value):
-        from django.contrib.auth.models import User
-        user = User.objects.filter(username__iexact=value.strip()).first()
-        if user is None:
-            raise serializers.ValidationError('No user with that username.')
-        self._invited_user = user
-        return value
+    def validate(self, attrs):
+        if self.instance is None:
+            name = (attrs.get('invite_username') or '').strip()
+            if not name:
+                raise serializers.ValidationError({'invite_username': 'Enter the username to invite.'})
+            user = User.objects.filter(username__iexact=name).first()
+            if user is None:
+                raise serializers.ValidationError({'invite_username': 'No user with that username.'})
+            if self.context['event'].organizer_id == user.id:
+                raise serializers.ValidationError({'invite_username': 'The organizer already has full access.'})
+            attrs['_invited_user'] = user
+        attrs.pop('invite_username', None)
+        return attrs
 
     def create(self, validated_data):
-        validated_data.pop('invite_username', None)
         event = self.context['event']
-        user = self._invited_user
-        if event.organizer_id == user.id:
-            raise serializers.ValidationError('The organizer already has full access.')
+        user = validated_data.pop('_invited_user')
         staff, _ = EventStaff.objects.update_or_create(
             event=event, user=user, defaults={'role': validated_data.get('role', EventStaff.ROLE_CHECK_IN)},
         )
@@ -385,6 +487,27 @@ class WebhookSerializer(serializers.ModelSerializer):
     def get_deliveries_count(self, obj):
         return obj.deliveries.count()
 
+    def validate_url(self, value):
+        from .webhooks import is_public_url
+        if not is_public_url(value):
+            raise serializers.ValidationError(
+                'Webhook URLs must be http(s) and resolve to a public internet address.'
+            )
+        return value
+
+    def validate_secret(self, value):
+        # Every delivery is signed: generate a secret when none is given.
+        if not (value or '').strip():
+            import secrets
+            return secrets.token_hex(32)
+        return value.strip()
+
+    def create(self, validated_data):
+        if not validated_data.get('secret'):
+            import secrets
+            validated_data['secret'] = secrets.token_hex(32)
+        return super().create(validated_data)
+
     def validate_triggers(self, value):
         valid = {c[0] for c in Webhook.TRIGGER_CHOICES}
         bad = [t for t in (value or []) if t not in valid]
@@ -394,6 +517,19 @@ class WebhookSerializer(serializers.ModelSerializer):
 
 
 # ---- Affiliates ---- #
+def _validate_unique_code(serializer, model, value, label):
+    """Case-insensitive per-event uniqueness → a 400 instead of an IntegrityError."""
+    code = value.strip().upper()
+    event = serializer.instance.event if serializer.instance else serializer.context.get('event')
+    if event is not None:
+        clash = model.objects.filter(event=event, code__iexact=code)
+        if serializer.instance is not None:
+            clash = clash.exclude(pk=serializer.instance.pk)
+        if clash.exists():
+            raise serializers.ValidationError(f'This event already has a {label} with that code.')
+    return code
+
+
 class AffiliateSerializer(serializers.ModelSerializer):
     sales = serializers.ReadOnlyField()
     revenue = serializers.SerializerMethodField()
@@ -404,7 +540,7 @@ class AffiliateSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'clicks', 'sales', 'revenue', 'created_at']
 
     def validate_code(self, value):
-        return value.strip().upper()
+        return _validate_unique_code(self, Affiliate, value, 'referral link')
 
     def get_revenue(self, obj):
         from decimal import Decimal
@@ -432,7 +568,7 @@ class PromoCodeSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'times_used', 'created_at']
 
     def validate_code(self, value):
-        return value.strip().upper()
+        return _validate_unique_code(self, PromoCode, value, 'promo code')
 
     def validate_discount_value(self, value):
         if value <= 0:

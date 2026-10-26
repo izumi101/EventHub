@@ -13,14 +13,23 @@ from ..models import Event
 
 
 class IsOrganizerOrReadOnly(BasePermission):
+    """Edit: owner, superuser or co-organizer. Delete: owner or superuser only."""
+
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
             return True
-        return obj.organizer == request.user
+        if request.method == 'DELETE':
+            return request.user.is_superuser or obj.organizer_id == request.user.id
+        return can_manage_event(obj, request.user)
+
+
+def is_event_owner(event, user) -> bool:
+    """Owner-level rights (team management, deletion) — co-organizers excluded."""
+    return user.is_superuser or event.organizer_id == user.id
 
 
 def event_queryset_for_user(user):
-    queryset = Event.objects.select_related('organizer', 'category').prefetch_related('registrations')
+    queryset = Event.objects.select_related('organizer', 'category')
     if user.is_authenticated and user.is_superuser:
         return queryset
     if user.is_authenticated:

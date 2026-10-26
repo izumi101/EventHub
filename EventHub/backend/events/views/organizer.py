@@ -33,7 +33,7 @@ from ..serializers import (
     WebhookSerializer,
 )
 from ..services import resolve_refund_request
-from .base import ManagedDetail, ManagedEventListCreate
+from .base import ManagedDetail, ManagedEventListCreate, is_event_owner
 
 
 class EventPromoCodesView(generics.ListCreateAPIView):
@@ -49,6 +49,11 @@ class EventPromoCodesView(generics.ListCreateAPIView):
         if not can_manage_event(event, self.request.user):
             return PromoCode.objects.none()
         return event.promo_codes.all()
+
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['event'] = self._event()
+        return ctx
 
     def perform_create(self, serializer):
         event = self._event()
@@ -140,19 +145,26 @@ class TicketTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 # ── Event staff ──
 class EventStaffView(ManagedEventListCreate):
+    """Co-organizers can see the team; only the owner can change it (a
+    co-organizer must not be able to appoint more co-organizers)."""
     model = EventStaff
     serializer_class = EventStaffSerializer
 
     def perform_create(self, serializer):
         event = self._event()
-        if not can_manage_event(event, self.request.user):
-            raise PermissionDenied('You do not manage this event.')
+        if not is_event_owner(event, self.request.user):
+            raise PermissionDenied('Only the event owner can manage the team.')
         serializer.save()  # create() reads event from context
 
 
 class EventStaffDetailView(ManagedDetail):
     model = EventStaff
     serializer_class = EventStaffSerializer
+
+    def check_object_permissions(self, request, obj):
+        super().check_object_permissions(request, obj)
+        if request.method not in ('GET', 'HEAD', 'OPTIONS') and not is_event_owner(obj.event, request.user):
+            raise PermissionDenied('Only the event owner can manage the team.')
 
 
 # ── Webhooks ──
@@ -180,6 +192,7 @@ class AffiliateDetailView(ManagedDetail):
 class AffiliateClickView(generics.GenericAPIView):
     """Public: record a click when someone opens an event via ?ref=CODE."""
     permission_classes = [AllowAny]
+    throttle_scope = 'affiliate_click'
 
     def post(self, request, event_id):
         code = (request.data.get('code') or '').strip()
@@ -214,11 +227,11 @@ class ResolveRefundRequestView(generics.GenericAPIView):
 
     def post(self, request, pk):
         rr = get_object_or_404(RefundRequest.objects.select_related('registration__event', 'registration__user'), pk=pk)
-        approve = bool(request.data.get('approve'))
+        approve = request.data.get('approve') in (True, 'true', 'True', '1', 1)
         try:
-            resolve_refund_request(
+            rr = resolve_refund_request(
                 refund_request=rr, actor=request.user, approve=approve,
-                note=request.data.get('note', ''),
+                note=str(request.data.get('note', '') or '')[:300],
             )
         except PermissionError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
