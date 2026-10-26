@@ -17,11 +17,12 @@ import {
   FileText,
 } from 'lucide-angular';
 import * as QRCode from 'qrcode';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-my-registrations',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -303,7 +304,7 @@ import * as QRCode from 'qrcode';
         <div class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
           <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
           <p class="text-sm text-muted-foreground mb-4">
-            For "{{ refundReg.event.title }}" — {{ '$' + refundReg.payment?.net_amount }}.
+            For "{{ refundReg.event.title }}" — {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}.
             The organizer reviews and approves or declines it.
           </p>
           <label class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>

@@ -241,8 +241,8 @@ def register_for_event(*, user, event: Event, notes: str = '', seat_id=None,
     if answers:
         _save_question_answers(registration, answers)
 
-    # Side effects that talk to the outside world run only once the
-    # registration is really committed.
+    # Redis isn't transactional: release the queue token only after commit.
+    # (Webhooks below are queued jobs, committed with the registration.)
     event_id, user_id = event.id, user.id
     transaction.on_commit(lambda: _leave_queue(event_id, user_id))
 
@@ -253,7 +253,7 @@ def register_for_event(*, user, event: Event, notes: str = '', seat_id=None,
         'status': registration.status,
         'ticket_type': ticket_type.name if ticket_type else None,
     }
-    transaction.on_commit(lambda: fire(event, 'registration_created', payload))
+    fire(event, 'registration_created', payload)  # queued in this transaction
 
     return registration
 
@@ -401,6 +401,6 @@ def check_in_registration(*, registration: Registration, actor):
         'checked_in_at': registration.checked_in_at.isoformat(),
     }
     event = registration.event
-    transaction.on_commit(lambda: fire(event, 'attendee_checked_in', payload))
+    fire(event, 'attendee_checked_in', payload)  # queued in this transaction
 
     return registration, False

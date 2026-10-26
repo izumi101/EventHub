@@ -6,11 +6,12 @@ import { EventService, TicketType, TicketKind } from '../../services/event.servi
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-ticket-types',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -105,7 +106,7 @@ import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angu
                 <div class="w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold"
                      [class]="t.kind === 'donation' ? 'bg-ember/10 text-ember' : t.kind === 'free' ? 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]' : 'bg-primary/10 text-primary'">
                   @if (t.kind === 'free') { <span class="text-sm">Free</span> }
-                  @else { <span class="text-base">{{ '$' + t.price }}</span> }
+                  @else { <span class="text-base">{{ t.price | money: event?.currency }}</span> }
                   @if (t.kind === 'donation') { <span class="text-[9px] uppercase">min</span> }
                 </div>
                 <div class="flex-1 min-w-0">

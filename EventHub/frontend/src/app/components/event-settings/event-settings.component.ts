@@ -7,11 +7,12 @@ import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash2, Copy, Check, Link2, RotateCcw, Armchair, AlertTriangle } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-event-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -135,7 +136,7 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
                       <p class="text-[10px] uppercase text-muted-foreground">sales</p>
                     </div>
                     <div class="text-center px-3">
-                      <p class="font-bold text-[color:var(--pine-600)]">{{ '$' + a.revenue }}</p>
+                      <p class="font-bold text-[color:var(--pine-600)]">{{ a.revenue | money: event?.currency }}</p>
                       <p class="text-[10px] uppercase text-muted-foreground">revenue</p>
                     </div>
                     <button (click)="removeAffiliate(a)" class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]">
@@ -287,7 +288,7 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
                   <div class="flex items-start justify-between gap-3 mb-2">
                     <div class="min-w-0">
                       <p class="font-semibold text-foreground">{{ r.full_name }}
-                        <span class="text-xs font-normal text-muted-foreground">· {{ '$' + r.amount }}@if (r.ticket_type) { · {{ r.ticket_type }} }</span>
+                        <span class="text-xs font-normal text-muted-foreground">· {{ r.amount | money: event?.currency }}@if (r.ticket_type) { · {{ r.ticket_type }} }</span>
                       </p>
                       <p class="text-xs text-muted-foreground">Requested {{ r.created_at | date:'MMM d, HH:mm' }}</p>
                     </div>

@@ -7,6 +7,7 @@ import { LucideAngularModule, Plus, Minus, Maximize, Wifi } from 'lucide-angular
 import { Subscription } from 'rxjs';
 import { Seat, ZonePrice } from '../../models/models';
 import { SeatWsService, WsSeatUpdate } from '../../services/seat-ws.service';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 interface ViewBox { x: number; y: number; w: number; h: number; }
 
@@ -19,7 +20,7 @@ const STAGE_H = 46;
 @Component({
   selector: 'app-seat-map-svg',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, LucideAngularModule],
   template: `
     <div class="seat-map-wrap relative select-none">
       <!-- Toolbar -->
@@ -112,7 +113,7 @@ const STAGE_H = 46;
             <span class="capitalize">{{ hovered.zone || hovered.price_zone }}</span>
             @if (hovered.price) {
               <span class="opacity-70 mx-1">·</span>
-              <span class="font-semibold">{{ '$' + hovered.price }}</span>
+              <span class="font-semibold">{{ hovered.price | money: currency }}</span>
             }
             @if (!hovered.is_available) {
               <span class="ml-1 text-ember">· Taken</span>
@@ -132,7 +133,7 @@ const STAGE_H = 46;
           <div class="flex items-center gap-1.5">
             <span class="w-3.5 h-3.5 rounded border-2" [style.background]="zoneFill(z.zone)" [style.border-color]="zoneStroke(z.zone)"></span>
             <span class="capitalize text-foreground">{{ z.zone }}</span>
-            <span class="font-semibold text-foreground">{{ '$' + z.price }}</span>
+            <span class="font-semibold text-foreground">{{ z.price | money: currency }}</span>
           </div>
         }
         <div class="flex items-center gap-1.5">
@@ -162,6 +163,8 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
   @Input() maxSelection = 1;
   @Input() eventId: number | null = null;
   @Input() zonePrices: ZonePrice[] = [];
+  /** ISO code of the event's currency, for price labels. */
+  @Input() currency = 'USD';
   @Output() selectionChange = new EventEmitter<Seat[]>();
 
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLDivElement>;

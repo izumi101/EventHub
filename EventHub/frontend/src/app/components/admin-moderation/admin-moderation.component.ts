@@ -8,11 +8,12 @@ import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Shield, Users, CalendarDays, Ticket, Wallet, Check, X, Clock, UserPlus } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-admin-moderation',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
@@ -96,7 +97,7 @@ import { LucideAngularModule, Shield, Users, CalendarDays, Ticket, Wallet, Check
                     </p>
                     <p class="text-sm text-foreground/80 mt-1.5 line-clamp-2">{{ ev.description }}</p>
                     <p class="text-xs text-muted-foreground mt-1">
-                      {{ ev.is_free ? 'Free' : '$' + ev.price }} · capacity {{ ev.max_participants }}
+                      {{ ev.is_free ? 'Free' : (ev.price | money: ev.currency) }} · capacity {{ ev.max_participants }}
                       @if (ev.is_online) { · online }
                     </p>
                   </div>

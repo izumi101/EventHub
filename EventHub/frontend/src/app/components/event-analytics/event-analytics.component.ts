@@ -4,11 +4,12 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { EventService, EventAnalytics } from '../../services/event.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, TrendingUp, Ticket, UserCheck, Wallet, BarChart3 } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-event-analytics',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
@@ -37,9 +38,9 @@ import { LucideAngularModule, TrendingUp, Ticket, UserCheck, Wallet, BarChart3 }
                 <lucide-icon [img]="icons.Wallet" class="w-4 h-4"></lucide-icon>
                 <span class="text-xs font-medium uppercase tracking-wide">Net revenue</span>
               </div>
-              <p class="num text-2xl font-bold text-foreground">{{ '$' + (data.kpis.net_revenue | number:'1.2-2') }}</p>
+              <p class="num text-2xl font-bold text-foreground">{{ data.kpis.net_revenue | money: data.currency }}</p>
               @if (data.kpis.refunded > 0) {
-                <p class="text-xs text-muted-foreground mt-0.5">−{{ '$' + (data.kpis.refunded | number:'1.2-2') }} refunded</p>
+                <p class="text-xs text-muted-foreground mt-0.5">−{{ data.kpis.refunded | money: data.currency }} refunded</p>
               }
             </div>
             <div class="card p-4">
@@ -63,7 +64,7 @@ import { LucideAngularModule, TrendingUp, Ticket, UserCheck, Wallet, BarChart3 }
                 <lucide-icon [img]="icons.TrendingUp" class="w-4 h-4"></lucide-icon>
                 <span class="text-xs font-medium uppercase tracking-wide">Avg order</span>
               </div>
-              <p class="num text-2xl font-bold text-foreground">{{ '$' + (data.kpis.avg_order_value | number:'1.2-2') }}</p>
+              <p class="num text-2xl font-bold text-foreground">{{ data.kpis.avg_order_value | money: data.currency }}</p>
               <p class="text-xs text-muted-foreground mt-0.5">{{ data.kpis.paid_orders }} paid · {{ data.kpis.pending }} pending</p>
             </div>
           </div>
@@ -85,7 +86,7 @@ import { LucideAngularModule, TrendingUp, Ticket, UserCheck, Wallet, BarChart3 }
                       [style.height.%]="day.tickets / maxTickets * 100"
                     ></div>
                     <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-foreground text-background text-[10px] font-medium rounded px-1.5 py-0.5 whitespace-nowrap z-10">
-                      {{ day.date | date:'MMM d' }}: {{ day.tickets }} · {{ '$' + day.revenue }}
+                      {{ day.date | date:'MMM d' }}: {{ day.tickets }} · {{ day.revenue | money: data.currency }}
                     </div>
                   </div>
                 }
@@ -108,7 +109,7 @@ import { LucideAngularModule, TrendingUp, Ticket, UserCheck, Wallet, BarChart3 }
                   @for (t of data.by_ticket_type; track t.name) {
                     <div class="flex items-center justify-between text-sm py-1.5 border-b border-border/60 last:border-0">
                       <span class="text-foreground font-medium">{{ t.name }}</span>
-                      <span class="text-muted-foreground">{{ t.count }} · <span class="num font-semibold text-foreground">{{ '$' + (t.revenue | number:'1.2-2') }}</span></span>
+                      <span class="text-muted-foreground">{{ t.count }} · <span class="num font-semibold text-foreground">{{ t.revenue | money: data.currency }}</span></span>
                     </div>
                   }
                 </div>
@@ -125,7 +126,7 @@ import { LucideAngularModule, TrendingUp, Ticket, UserCheck, Wallet, BarChart3 }
                   @for (a of data.by_affiliate; track a.name) {
                     <div class="flex items-center justify-between text-sm py-1.5 border-b border-border/60 last:border-0">
                       <span class="text-foreground font-medium">{{ a.name }}</span>
-                      <span class="text-muted-foreground">{{ a.count }} · <span class="num font-semibold text-foreground">{{ '$' + (a.revenue | number:'1.2-2') }}</span></span>
+                      <span class="text-muted-foreground">{{ a.count }} · <span class="num font-semibold text-foreground">{{ a.revenue | money: data.currency }}</span></span>
                     </div>
                   }
                 </div>

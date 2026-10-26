@@ -179,7 +179,7 @@ def cancel_event(*, event: Event, actor):
             outcome[reg.id] = 'failed'
             logger.exception('Refund failed for registration %s while cancelling event %s', reg.id, event.id)
 
-    bookings_refunded, bookings_failed = _cancel_group_bookings(event)
+    bookings_refunded, bookings_failed = _cancel_group_bookings(event, actor)
 
     for reg in regs:
         state = outcome.get(reg.id)
@@ -203,10 +203,9 @@ def cancel_event(*, event: Event, actor):
     }
 
 
-def _cancel_group_bookings(event):
+def _cancel_group_bookings(event, actor):
     from bookings.models import Booking
-    from bookings.services import _release_booking_seats
-    from payments.services import _refund_payment_intent
+    from bookings.services import cancel_booking, refund_booking
 
     refunded, failed = 0, 0
     for booking in Booking.objects.filter(
@@ -214,21 +213,14 @@ def _cancel_group_bookings(event):
     ):
         try:
             with transaction.atomic():
-                booking = Booking.objects.select_for_update().get(pk=booking.pk)
-                if booking.status == Booking.Status.CONFIRMED and booking.stripe_payment_intent_id:
-                    _refund_payment_intent(booking.stripe_payment_intent_id,
-                                           key=f'event-cancel-booking-{booking.pk}')
+                if booking.status == Booking.Status.CONFIRMED:
+                    # Notifies the owner and fires the refund webhook.
+                    refund_booking(booking, actor=actor, reason='Event cancelled by the organizer',
+                                   event_cancelled=True)
                     refunded += 1
-                was_paid = booking.status == Booking.Status.CONFIRMED
-                _release_booking_seats(booking)
-                booking.status = Booking.Status.CANCELLED
-                booking.save(update_fields=['status'])
+                else:
+                    cancel_booking(booking)
         except Exception:
             failed += 1
             logger.exception('Could not cancel group booking %s for event %s', booking.pk, event.id)
-            continue
-        from ..notify import notify
-        notify(booking.owner, 'event_cancelled', f'❌ Event cancelled: {event.title}',
-               'The organizer has cancelled this event.'
-               + (' Your group payment has been refunded.' if was_paid else ''), event=event)
     return refunded, failed

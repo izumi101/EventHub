@@ -147,9 +147,9 @@ class EventViewSet(viewsets.ModelViewSet):
                 'Ask an administrator to create an organizer account for you.'
             )
         event = serializer.save()
-        # Index the new event in the background once it is committed.
+        # Queued for the worker (semantic-search embedding).
         from ..search import index_event_async
-        transaction.on_commit(lambda: index_event_async(event))
+        index_event_async(event)
 
     def destroy(self, request, *args, **kwargs):
         event = self.get_object()

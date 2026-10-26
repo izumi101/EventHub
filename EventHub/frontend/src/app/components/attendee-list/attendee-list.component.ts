@@ -4,6 +4,8 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { EventService } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
+import { ModalService } from '../../services/modal.service';
+import { BookingDto, BookingService } from '../../services/booking.service';
 import { Event as EventModel, EventStatsResponse, Registration } from '../../models/models';
 import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, RotateCcw, DollarSign, Mail } from 'lucide-angular';
 
@@ -146,12 +148,12 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
                     <td class="px-4 py-3">
                       @if (reg.payment) {
                         @if (reg.payment.status === 'refunded') {
-                          <span class="text-xs text-[color:var(--destructive)] font-medium">Refunded {{ '$' + reg.payment.refunded_amount }}</span>
+                          <span class="text-xs text-[color:var(--destructive)] font-medium">Refunded {{ reg.payment.refunded_amount }} {{ currency }}</span>
                         } @else if (+reg.payment.refunded_amount > 0) {
-                          <span class="text-xs text-foreground">{{ '$' + reg.payment.net_amount }}</span>
-                          <span class="text-[10px] text-ember ml-1">(−{{ '$' + reg.payment.refunded_amount }})</span>
+                          <span class="text-xs text-foreground">{{ reg.payment.net_amount }} {{ currency }}</span>
+                          <span class="text-[10px] text-ember ml-1">(−{{ reg.payment.refunded_amount }} {{ currency }})</span>
                         } @else {
-                          <span class="text-xs text-foreground font-medium">{{ '$' + reg.payment.amount }}</span>
+                          <span class="text-xs text-foreground font-medium">{{ reg.payment.amount }} {{ currency }}</span>
                           <span class="text-[10px] text-muted-foreground ml-1">{{ reg.payment.method === 'offline' ? 'cash' : 'card' }}</span>
                         }
                       } @else {
@@ -209,8 +211,8 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
                 <div class="flex items-center justify-between text-xs">
                   @if (reg.payment) {
                     <span class="text-foreground font-medium">
-                      @if (reg.payment.status === 'refunded') { Refunded {{ '$' + reg.payment.refunded_amount }} }
-                      @else { {{ '$' + reg.payment.net_amount }} }
+                      @if (reg.payment.status === 'refunded') { Refunded {{ reg.payment.refunded_amount }} {{ currency }} }
+                      @else { {{ reg.payment.net_amount }} {{ currency }} }
                     </span>
                   } @else {
                     <span class="text-muted-foreground">No payment</span>
@@ -226,6 +228,38 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
             }
           </div>
         }
+
+        <!-- Group bookings -->
+        @if (bookings.length) {
+          <section class="mt-10" aria-labelledby="group-bookings-heading">
+            <h2 id="group-bookings-heading" class="text-base font-semibold text-foreground mb-3">Group bookings</h2>
+            <div class="card divide-y divide-border">
+              @for (b of bookings; track b.id) {
+                <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-foreground">{{ b.owner_username }} · {{ b.seat_count || b.seats.length }} seats</p>
+                    <p class="text-xs text-muted-foreground">
+                      {{ b.created_at | date:'MMM d, y · h:mm a' }} ·
+                      @if (b.status === 'refunded') {
+                        <span class="text-[color:var(--destructive)] font-medium">Refunded {{ b.amount_paid }} {{ b.currency }}</span>
+                      } @else if (b.status === 'confirmed') {
+                        Paid {{ b.amount_paid || b.total_due }} {{ b.currency }}
+                      } @else {
+                        Awaiting payment · {{ b.total_due }} {{ b.currency }}
+                      }
+                    </p>
+                  </div>
+                  @if (b.status === 'confirmed') {
+                    <button (click)="refundBooking(b)" [disabled]="refundingBookingId === b.id"
+                            class="btn btn-secondary btn-sm text-[color:var(--destructive)] flex-shrink-0">
+                      {{ refundingBookingId === b.id ? 'Refunding…' : 'Refund booking' }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </section>
+        }
       </div>
     </div>
 
@@ -235,7 +269,7 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
         <div class="card w-full max-w-sm p-6 animate-slide-up" (click)="$event.stopPropagation()">
           <h3 class="text-lg font-bold text-foreground mb-1">Refund ticket</h3>
           <p class="text-sm text-muted-foreground mb-4">
-            {{ refundReg.full_name || refundReg.username }} · paid {{ '$' + refundReg.payment?.net_amount }}
+            {{ refundReg.full_name || refundReg.username }} · paid {{ refundReg.payment?.net_amount }} {{ currency }}
           </p>
 
           <label class="block text-sm font-medium text-foreground mb-1.5">Amount to refund</label>
@@ -251,7 +285,7 @@ import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, Ro
           <div class="flex gap-2">
             <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
             <button (click)="confirmRefund()" [disabled]="refunding || !refundAmount" class="btn btn-danger flex-1">
-              {{ refunding ? 'Refunding…' : 'Refund $' + (refundAmount || '0') }}
+              {{ refunding ? 'Refunding…' : 'Refund ' + (refundAmount || '0') + ' ' + currency }}
             </button>
           </div>
         </div>
@@ -310,6 +344,10 @@ export class AttendeeListComponent implements OnInit {
   refundReason = '';
   refunding = false;
 
+  // Group bookings
+  bookings: BookingDto[] = [];
+  refundingBookingId: string | null = null;
+
   // Message modal
   showMessage = false;
   msgAudience = 'all';
@@ -323,7 +361,13 @@ export class AttendeeListComponent implements OnInit {
     private route: ActivatedRoute,
     private eventService: EventService,
     private toastService: ToastService,
+    private bookingService: BookingService,
+    private modalService: ModalService,
   ) {}
+
+  get currency(): string {
+    return this.event?.currency || 'USD';
+  }
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -338,6 +382,10 @@ export class AttendeeListComponent implements OnInit {
     this.loading = true;
     this.eventService.getEvent(this.eventId).subscribe(e => { this.event = e; });
     this.eventService.getEventStats(this.eventId).subscribe(s => { this.stats = s; });
+    this.bookingService.listForEvent(this.eventId).subscribe({
+      next: bookings => { this.bookings = bookings; },
+      error: () => { this.bookings = []; },
+    });
     this.eventService.getEventRegistrations(this.eventId).subscribe({
       next: regs => {
         this.registrations = regs.filter(r => r.status !== 'cancelled');
@@ -419,6 +467,29 @@ export class AttendeeListComponent implements OnInit {
       },
       error: err => {
         this.refunding = false;
+        this.toastService.error(err.error?.error || 'Refund failed.');
+      },
+    });
+  }
+
+  async refundBooking(b: BookingDto): Promise<void> {
+    const ok = await this.modalService.open({
+      title: 'Refund group booking?',
+      message: `${b.owner_username} gets ${b.amount_paid || b.total_due} ${b.currency} back and all `
+        + `${b.seats.length} seats return to sale. Their QR tickets stop working.`,
+      confirmText: 'Refund',
+      isDestructive: true,
+    });
+    if (!ok) return;
+    this.refundingBookingId = b.id;
+    this.bookingService.refund(b.id).subscribe({
+      next: () => {
+        this.refundingBookingId = null;
+        this.toastService.success('Group booking refunded.');
+        this.loadData();
+      },
+      error: err => {
+        this.refundingBookingId = null;
         this.toastService.error(err.error?.error || 'Refund failed.');
       },
     });

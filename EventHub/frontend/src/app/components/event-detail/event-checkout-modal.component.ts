@@ -5,6 +5,7 @@ import { EventService, PromoQuote, EventQuestion, TicketType } from '../../servi
 import { ToastService } from '../../services/toast.service';
 import { Event, Seat, SeatMap } from '../../models/models';
 import { SeatSelectorComponent } from '../seat-selector/seat-selector.component';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 /** The "Confirm registration" checkout dialog.
  *
@@ -15,7 +16,7 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
 @Component({
   selector: 'app-event-checkout-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule, SeatSelectorComponent],
+  imports: [MoneyPipe, CommonModule, FormsModule, SeatSelectorComponent],
   template: `
     <div
       class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
@@ -43,7 +44,7 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
             </div>
             <div class="flex justify-between">
               <span class="text-muted-foreground">Price</span>
-              <span class="font-semibold text-foreground">{{ event.is_free ? 'Free' : '$' + currentGaPrice }}</span>
+              <span class="font-semibold text-foreground">{{ event.is_free ? 'Free' : (currentGaPrice | money: event.currency) }}</span>
             </div>
             @if (selectedSeat) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
@@ -60,31 +61,31 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
             @if (promoQuote) {
               <div class="flex justify-between text-[color:var(--pine-600)] mt-1.5">
                 <span>Promo {{ promoQuote.code }}</span>
-                <span class="font-medium">−{{ '$' + promoQuote.savings }}</span>
+                <span class="font-medium">−{{ promoQuote.savings | money: event.currency }}</span>
               </div>
             }
             @if (showFeeLines()) {
               <div class="flex justify-between text-muted-foreground mt-1.5">
                 <span>Subtotal</span>
-                <span>{{ '$' + checkoutSubtotal }}</span>
+                <span>{{ checkoutSubtotal | money: event.currency }}</span>
               </div>
               @if (taxAmount > 0) {
                 <div class="flex justify-between text-muted-foreground">
                   <span>Tax ({{ event.tax_percent }}%)</span>
-                  <span>{{ '$' + taxAmount.toFixed(2) }}</span>
+                  <span>{{ taxAmount | money: event.currency }}</span>
                 </div>
               }
               @if (feeAmount > 0) {
                 <div class="flex justify-between text-muted-foreground">
                   <span>Service fee ({{ event.service_fee_percent }}%)</span>
-                  <span>{{ '$' + feeAmount.toFixed(2) }}</span>
+                  <span>{{ feeAmount | money: event.currency }}</span>
                 </div>
               }
             }
             @if (selectedTicketType || promoQuote || showFeeLines()) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
                 <span class="text-foreground font-semibold">Total</span>
-                <span class="text-foreground font-bold">{{ '$' + checkoutTotal }}</span>
+                <span class="text-foreground font-bold">{{ checkoutTotal | money: event.currency }}</span>
               </div>
             }
           </div>
@@ -117,8 +118,8 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
                     <div class="text-right flex-shrink-0">
                       <span class="font-bold text-foreground">
                         @if (tt.kind === 'free') { Free }
-                        @else if (tt.kind === 'donation') { {{ '$' + tt.price }}+ }
-                        @else { {{ '$' + tt.price }} }
+                        @else if (tt.kind === 'donation') { {{ tt.price | money: event.currency }}+ }
+                        @else { {{ tt.price | money: event.currency }} }
                       </span>
                     </div>
                   </div>
@@ -163,7 +164,7 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
               } @else {
                 <div class="flex items-center justify-between p-2.5 rounded-lg bg-[color:var(--pine-50)] border border-transparent">
                   <span class="text-sm font-medium text-[color:var(--pine-600)]">
-                    ✓ {{ promoQuote.code }} applied — you save {{ '$' + promoQuote.savings }}
+                    ✓ {{ promoQuote.code }} applied — you save {{ promoQuote.savings | money: event.currency }}
                   </span>
                   <button (click)="removePromo()" class="text-xs text-[color:var(--pine-600)] hover:underline">Remove</button>
                 </div>
@@ -270,7 +271,7 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
             } @else if (!event.is_free && !event.has_ticket_types && !seatMapMissing && !selectedSeat) {
               Select a seat to continue
             } @else if (confirmIsPaid()) {
-              Proceed to payment — {{ '$' + checkoutTotal }}
+              Proceed to payment — {{ checkoutTotal | money: event.currency }}
             } @else {
               Confirm registration
             }
