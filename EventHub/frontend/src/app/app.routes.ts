@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './guards/auth.guard';
+import { roleGuard } from './guards/role.guard';
 
 import { HomeComponent } from './components/home/home.component';
 import { EventDetailComponent } from './components/event-detail/event-detail.component';
@@ -18,7 +19,7 @@ export const routes: Routes = [
   { path: 'events/:id', component: EventDetailComponent, title: 'EventHub — Event Details' },
   { path: 'events/:id/group', loadComponent: () => import('./components/group-booking/group-booking.component').then(m => m.GroupBookingComponent), canActivate: [authGuard], title: 'EventHub — Group Booking' },
   { path: 'booking/:token', loadComponent: () => import('./components/booking-claim/booking-claim.component').then(m => m.BookingClaimComponent), title: 'EventHub — Claim Your Seat' },
-  { path: 'create-event', component: EventFormComponent, canActivate: [authGuard], title: 'EventHub — Create Event' },
+  { path: 'create-event', component: EventFormComponent, canActivate: [roleGuard('organizer')], title: 'EventHub — Create Event' },
   { path: 'edit-event/:id', component: EventFormComponent, canActivate: [authGuard], title: 'EventHub — Edit Event' },
   { path: 'login', component: LoginComponent, title: 'EventHub — Sign In' },
   { path: 'forgot-password', loadComponent: () => import('./components/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent), title: 'EventHub — Reset Password' },
@@ -28,8 +29,8 @@ export const routes: Routes = [
   { path: 'my-events', component: MyEventsComponent, canActivate: [authGuard], title: 'EventHub — My Events' },
   { path: 'my-registrations', component: MyRegistrationsComponent, canActivate: [authGuard], title: 'EventHub — My Tickets' },
   { path: 'my-bookings', loadComponent: () => import('./components/my-bookings/my-bookings.component').then(m => m.MyBookingsComponent), canActivate: [authGuard], title: 'EventHub — My Bookings' },
-  { path: 'admin/moderation', loadComponent: () => import('./components/admin-moderation/admin-moderation.component').then(m => m.AdminModerationComponent), canActivate: [authGuard], title: 'EventHub — Moderation' },
-  { path: 'organizer/dashboard', loadComponent: () => import('./components/dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [authGuard], title: 'EventHub — Organizer Dashboard' },
+  { path: 'admin/moderation', loadComponent: () => import('./components/admin-moderation/admin-moderation.component').then(m => m.AdminModerationComponent), canActivate: [roleGuard('admin')], title: 'EventHub — Moderation' },
+  { path: 'organizer/dashboard', loadComponent: () => import('./components/dashboard/dashboard.component').then(m => m.DashboardComponent), canActivate: [roleGuard('organizer')], title: 'EventHub — Organizer Dashboard' },
   { path: 'organizer/events/:id/attendees', loadComponent: () => import('./components/attendee-list/attendee-list.component').then(m => m.AttendeeListComponent), canActivate: [authGuard], title: 'EventHub — Attendee List' },
   { path: 'organizer/events/:id/analytics', loadComponent: () => import('./components/event-analytics/event-analytics.component').then(m => m.EventAnalyticsComponent), canActivate: [authGuard], title: 'EventHub — Analytics' },
   { path: 'organizer/events/:id/checkin-lists', loadComponent: () => import('./components/checkin-lists/checkin-lists.component').then(m => m.CheckinListsComponent), canActivate: [authGuard], title: 'EventHub — Check-in Lists' },

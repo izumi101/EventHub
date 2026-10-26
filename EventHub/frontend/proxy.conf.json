@@ -4,5 +4,16 @@
     "secure": false,
     "changeOrigin": true,
     "logLevel": "debug"
+  },
+  "/ws": {
+    "target": "http://backend:8000",
+    "secure": false,
+    "ws": true,
+    "changeOrigin": true
+  },
+  "/media": {
+    "target": "http://backend:8000",
+    "secure": false,
+    "changeOrigin": true
   }
 }

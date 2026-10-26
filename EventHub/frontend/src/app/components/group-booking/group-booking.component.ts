@@ -67,13 +67,13 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                           <span class="text-foreground">Row {{ s.row }}, Seat {{ s.col }}
                             <span class="text-xs text-muted-foreground capitalize ml-1">({{ s.price_zone }})</span>
                           </span>
-                          <span class="font-semibold text-foreground">{{ '$' + s.price }}</span>
+                          <span class="font-semibold text-foreground">{{ s.price }} {{ currency }}</span>
                         </li>
                       }
                     </ul>
                     <div class="flex items-center justify-between border-t border-border pt-3 mb-4">
                       <span class="text-sm text-muted-foreground">{{ selected.length }} seat(s)</span>
-                      <span class="text-lg font-bold text-foreground">{{ '$' + selectionTotal }}</span>
+                      <span class="text-lg font-bold text-foreground">{{ selectionTotal }} {{ currency }}</span>
                     </div>
                   }
                   <button
@@ -105,14 +105,19 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                             <span class="text-xs text-muted-foreground ml-1">· unclaimed</span>
                           }
                         </span>
-                        <span class="font-semibold text-foreground">{{ '$' + s.price }}</span>
+                        <span class="font-semibold text-foreground">{{ s.price }} {{ currency }}</span>
                       </li>
                     }
                   </ul>
 
                   <div class="flex items-center justify-between border-t border-border pt-3 mb-4">
                     <span class="text-sm text-muted-foreground">{{ booking.seat_count }} seats</span>
-                    <span class="text-lg font-bold text-foreground">{{ '$' + booking.total_price }}</span>
+                    <span class="text-right">
+                      <span class="text-lg font-bold text-foreground">{{ booking.total_due }} {{ booking.currency }}</span>
+                      @if (booking.total_due !== booking.total_price) {
+                        <span class="block text-xs text-muted-foreground">incl. tax & fees</span>
+                      }
+                    </span>
                   </div>
 
                   <!-- Share link -->
@@ -127,7 +132,7 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                   </div>
 
                   <button (click)="pay()" [disabled]="paying" class="btn btn-primary btn-full mb-2">
-                    {{ paying ? 'Processing…' : 'Pay for group — $' + booking.total_price }}
+                    {{ paying ? 'Processing…' : 'Pay for group — ' + booking.total_due + ' ' + booking.currency }}
                   </button>
                   <button (click)="cancelHold()" class="btn btn-ghost btn-full btn-sm text-muted-foreground">
                     Release seats
@@ -185,6 +190,10 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+  }
+
+  get currency(): string {
+    return this.booking?.currency || this.event?.currency || 'USD';
   }
 
   get selectionTotal(): string {

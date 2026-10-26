@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { BookingService, BookingDto, BookingSeatDto } from '../../services/booking.service';
 import { ToastService } from '../../services/toast.service';
+import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Users, Check, Armchair } from 'lucide-angular';
 import * as QRCode from 'qrcode';
 
@@ -37,6 +38,12 @@ import * as QRCode from 'qrcode';
             <div class="note note-success mb-4 text-center">
               Booking confirmed & paid. Claim your seat to put your name on the ticket.
             </div>
+            @if (!isLoggedIn) {
+              <p class="text-xs text-center text-muted-foreground mb-4">
+                <a routerLink="/login" [queryParams]="{ returnUrl: '/booking/' + token }" class="underline">Sign in</a>
+                before claiming to get your own QR ticket.
+              </p>
+            }
             <div class="space-y-2">
               @for (s of booking.seats; track s.id) {
                 <div class="card p-4">
@@ -53,11 +60,14 @@ import * as QRCode from 'qrcode';
                       </div>
                     </div>
 
-                    @if (s.attendee_name) {
-                      @if (qrCodes[s.ticket_uuid]) {
+                    @if (s.attendee_name || s.claimed) {
+                      <!-- Only your own seat carries a QR; other guests' tickets stay private. -->
+                      @if (s.ticket_uuid && qrCodes[s.ticket_uuid]) {
                         <button class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in flex-shrink-0" (click)="zoomSeat = s" title="Show ticket QR">
                           <img [src]="qrCodes[s.ticket_uuid]" alt="QR" class="w-14 h-14 block" />
                         </button>
+                      } @else {
+                        <span class="text-xs text-muted-foreground flex-shrink-0">Claimed</span>
                       }
                     } @else if (claimingId === s.seat_id) {
                       <div class="flex gap-2">
@@ -84,8 +94,8 @@ import * as QRCode from 'qrcode';
               @for (s of booking.seats; track s.id) {
                 <div
                   class="card p-4 flex items-center justify-between transition-colors"
-                  [class.ring-2]="claimingId === s.id"
-                  [class.ring-primary]="claimingId === s.id"
+                  [class.ring-2]="claimingId === s.seat_id"
+                  [class.ring-primary]="claimingId === s.seat_id"
                 >
                   <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
@@ -93,7 +103,7 @@ import * as QRCode from 'qrcode';
                     </div>
                     <div>
                       <p class="text-sm font-semibold text-foreground">Row {{ s.row }}, Seat {{ s.col }}</p>
-                      <p class="text-xs text-muted-foreground capitalize">{{ s.zone }} · {{ '$' + s.price }}</p>
+                      <p class="text-xs text-muted-foreground capitalize">{{ s.zone }} · {{ s.price }} {{ booking.currency }}</p>
                     </div>
                   </div>
 
@@ -102,7 +112,7 @@ import * as QRCode from 'qrcode';
                       <lucide-icon [img]="icons.Check" class="w-4 h-4"></lucide-icon>
                       {{ s.attendee_name }}
                     </span>
-                  } @else if (claimingId === s.id) {
+                  } @else if (claimingId === s.seat_id) {
                     <div class="flex gap-2">
                       <input
                         [(ngModel)]="claimName"
@@ -133,7 +143,7 @@ import * as QRCode from 'qrcode';
         <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
           <h3 class="text-base font-bold text-foreground leading-tight">Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}</h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">{{ zoomSeat.attendee_name }} — show at the entrance</p>
-          @if (qrCodes[zoomSeat.ticket_uuid]) {
+          @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
             <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
               <img [src]="qrCodes[zoomSeat.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
             </div>
@@ -160,7 +170,12 @@ export class BookingClaimComponent implements OnInit {
     private route: ActivatedRoute,
     private bookingService: BookingService,
     private toast: ToastService,
+    private auth: AuthService,
   ) {}
+
+  get isLoggedIn(): boolean {
+    return this.auth.isLoggedIn;
+  }
 
   ngOnInit(): void {
     this.token = this.route.snapshot.paramMap.get('token') || '';
@@ -175,10 +190,11 @@ export class BookingClaimComponent implements OnInit {
   private generateQrs(): void {
     if (!this.booking || this.booking.status !== 'confirmed') return;
     for (const s of this.booking.seats) {
-      if (!s.attendee_name || this.qrCodes[s.ticket_uuid]) continue;
-      const url = `${window.location.origin}/validate/${s.ticket_uuid}`;
+      const uuid = s.ticket_uuid;  // null unless this seat is yours
+      if (!uuid || this.qrCodes[uuid]) continue;
+      const url = `${window.location.origin}/validate/${uuid}`;
       QRCode.toDataURL(url, { width: 300, margin: 0 })
-        .then(dataUrl => { this.qrCodes[s.ticket_uuid] = dataUrl; })
+        .then(dataUrl => { this.qrCodes[uuid] = dataUrl; })
         .catch(() => {});
     }
   }

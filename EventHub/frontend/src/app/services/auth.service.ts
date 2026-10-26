@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap } from 'rxjs';
+import { BehaviorSubject, Observable, finalize, shareReplay, tap } from 'rxjs';
 import {
   ApiMessageResponse,
   AuthResponse,
+  ChangePasswordResponse,
   PasswordResetTokenResponse,
   RefreshTokenResponse,
   RegistrationCodeResponse,
@@ -109,12 +110,14 @@ export class AuthService {
     );
   }
 
-  changePassword(oldPassword: string, newPassword: string, newPassword2: string): Observable<ApiMessageResponse> {
-    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/change-password/`, {
-      old_password: oldPassword,
-      new_password: newPassword,
-      new_password2: newPassword2,
-    });
+  changePassword(oldPassword: string, newPassword: string, newPassword2: string): Observable<ChangePasswordResponse> {
+    return this.http.post<ChangePasswordResponse>(
+      `${this.apiUrl}/change-password/`,
+      { old_password: oldPassword, new_password: newPassword, new_password2: newPassword2 },
+    ).pipe(
+      // The backend signs out every other session; keep this one with the new pair.
+      tap(res => { if (res.tokens) this.storeTokens(res.tokens.access, res.tokens.refresh); })
+    );
   }
 
   uploadAvatar(file: File): Observable<User> {
@@ -137,18 +140,33 @@ export class AuthService {
     );
   }
 
+  private refreshInFlight$: Observable<RefreshTokenResponse> | null = null;
+
+  /**
+   * Exchange the refresh token for a new access token. Concurrent callers
+   * share one request: with token rotation + blacklisting, a second parallel
+   * refresh would present an already-blacklisted token and log the user out.
+   */
   refreshToken(): Observable<RefreshTokenResponse> {
-    const refresh = localStorage.getItem(this.refreshTokenKey);
-    return this.http.post<RefreshTokenResponse>(`${this.apiUrl}/token/refresh/`, { refresh }).pipe(
-      tap(res => {
-        localStorage.setItem(this.accessTokenKey, res.access);
-      })
-    );
+    if (!this.refreshInFlight$) {
+      const refresh = localStorage.getItem(this.refreshTokenKey);
+      this.refreshInFlight$ = this.http.post<RefreshTokenResponse>(`${this.apiUrl}/token/refresh/`, { refresh }).pipe(
+        // The old refresh token is blacklisted after rotation — store the new one.
+        tap(res => this.storeTokens(res.access, res.refresh)),
+        finalize(() => { this.refreshInFlight$ = null; }),
+        shareReplay({ bufferSize: 1, refCount: false }),
+      );
+    }
+    return this.refreshInFlight$;
+  }
+
+  private storeTokens(access: string, refresh?: string): void {
+    localStorage.setItem(this.accessTokenKey, access);
+    if (refresh) localStorage.setItem(this.refreshTokenKey, refresh);
   }
 
   private handleAuth(res: AuthResponse): void {
-    localStorage.setItem(this.accessTokenKey, res.tokens.access);
-    localStorage.setItem(this.refreshTokenKey, res.tokens.refresh);
+    this.storeTokens(res.tokens.access, res.tokens.refresh);
     localStorage.setItem(this.userKey, JSON.stringify(res.user));
     this.currentUserSubject.next(res.user);
   }
