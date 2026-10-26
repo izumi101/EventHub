@@ -10,7 +10,7 @@ const SITE_NAME = 'EventHub';
 const BASE_URL = window.location.origin;
 const DEFAULT_DESCRIPTION =
   'Discover and book concerts, festivals, conferences, and workshops worldwide.';
-const DEFAULT_IMAGE = `${BASE_URL}/assets/logo.png`;
+const DEFAULT_IMAGE = `${BASE_URL}/assets/og-default.png`;
 
 @Injectable({ providedIn: 'root' })
 export class SeoService {

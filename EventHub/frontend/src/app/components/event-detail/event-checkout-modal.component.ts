@@ -6,6 +6,7 @@ import { ToastService } from '../../services/toast.service';
 import { Event, Seat, SeatMap } from '../../models/models';
 import { SeatSelectorComponent } from '../seat-selector/seat-selector.component';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 /** The "Confirm registration" checkout dialog.
  *
@@ -16,7 +17,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 @Component({
   selector: 'app-event-checkout-modal',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, FormsModule, SeatSelectorComponent],
+  imports: [DialogDirective, MoneyPipe, CommonModule, FormsModule, SeatSelectorComponent],
   template: `
     <div
       class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
@@ -25,6 +26,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
       <div
         class="card w-full max-w-md shadow-lg animate-slide-up"
         (click)="$event.stopPropagation()"
+        appDialog (dismiss)="closed.emit()"
       >
         <div class="flex items-center justify-between p-5 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">Confirm registration</h2>

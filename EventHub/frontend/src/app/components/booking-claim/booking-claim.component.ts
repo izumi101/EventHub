@@ -7,11 +7,12 @@ import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Users, Check, Armchair } from 'lucide-angular';
 import * as QRCode from 'qrcode';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-booking-claim',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-lg py-10">
@@ -140,7 +141,7 @@ import * as QRCode from 'qrcode';
     <!-- QR zoom -->
     @if (zoomSeat) {
       <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" (click)="zoomSeat = null">
-        <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
+        <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="zoomSeat = null">
           <h3 class="text-base font-bold text-foreground leading-tight">Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}</h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">{{ zoomSeat.attendee_name }} — show at the entrance</p>
           @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
