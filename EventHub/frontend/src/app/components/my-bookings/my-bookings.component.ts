@@ -67,9 +67,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0"></lucide-icon>
                       Seats are held until {{ b.hold_expires_at | date:'h:mm a' }} — complete the payment from the event page.
                     </div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim their seats</label>
+                    <label [attr.for]="'share-' + b.id" class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim their seats</label>
                     <div class="flex gap-2">
-                      <input readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
+                      <input [id]="'share-' + b.id" readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
                       <button (click)="copyLink(b)" class="btn btn-secondary btn-sm flex-shrink-0">
                         <lucide-icon [img]="copiedId === b.id ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
                       </button>
@@ -114,7 +114,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       Each seat has its own QR ticket — share the invite link and friends see theirs too.
                     </p>
                     <div class="flex gap-2 mt-2">
-                      <input readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
+                      <input aria-label="Invite link" readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
                       <button (click)="copyLink(b)" class="btn btn-secondary btn-sm flex-shrink-0">
                         <lucide-icon [img]="copiedId === b.id ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
                       </button>

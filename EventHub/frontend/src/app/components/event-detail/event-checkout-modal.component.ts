@@ -142,10 +142,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
           <!-- Promo code (paid events) -->
           @if (showPromoField()) {
             <div>
-              <label class="block text-sm font-medium text-foreground mb-1.5">Promo code</label>
+              <label for="checkout-promo" class="block text-sm font-medium text-foreground mb-1.5">Promo code</label>
               @if (!promoQuote) {
                 <div class="flex gap-2">
                   <input
+                    id="checkout-promo"
                     [(ngModel)]="promoInput"
                     (keyup.enter)="applyPromo()"
                     placeholder="Enter code"
@@ -203,35 +204,35 @@ import { DialogDirective } from '../../directives/dialog.directive';
               <p class="text-sm font-semibold text-foreground">A few questions from the organizer</p>
               @for (q of questions; track q.id) {
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">
+                  <label [attr.for]="'question-' + q.id" class="block text-sm font-medium text-foreground mb-1.5">
                     {{ q.label }}
                     @if (q.is_required) { <span class="text-destructive">*</span> }
                   </label>
 
                   @switch (q.question_type) {
                     @case ('textarea') {
-                      <textarea [(ngModel)]="answers[q.id]" rows="2" class="input resize-none w-full"></textarea>
+                      <textarea [id]="'question-' + q.id" [(ngModel)]="answers[q.id]" rows="2" class="input resize-none w-full"></textarea>
                     }
                     @case ('dropdown') {
-                      <select [(ngModel)]="answers[q.id]" class="input w-full">
+                      <select [id]="'question-' + q.id" [(ngModel)]="answers[q.id]" class="input w-full">
                         <option value="">Select…</option>
                         @for (opt of q.options; track opt) { <option [value]="opt">{{ opt }}</option> }
                       </select>
                     }
                     @case ('checkbox') {
                       <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                        <input type="checkbox" [(ngModel)]="answers[q.id]" class="w-4 h-4 rounded" />
+                        <input [id]="'question-' + q.id" type="checkbox" [(ngModel)]="answers[q.id]" class="w-4 h-4 rounded" />
                         Yes
                       </label>
                     }
                     @case ('date') {
-                      <input type="date" [(ngModel)]="answers[q.id]" class="input w-full" />
+                      <input [id]="'question-' + q.id" type="date" [(ngModel)]="answers[q.id]" class="input w-full" />
                     }
                     @case ('phone') {
-                      <input type="tel" [(ngModel)]="answers[q.id]" placeholder="+1 555 000 0000" class="input w-full" />
+                      <input [id]="'question-' + q.id" type="tel" [(ngModel)]="answers[q.id]" placeholder="+1 555 000 0000" class="input w-full" />
                     }
                     @default {
-                      <input type="text" [(ngModel)]="answers[q.id]" class="input w-full" />
+                      <input [id]="'question-' + q.id" type="text" [(ngModel)]="answers[q.id]" class="input w-full" />
                     }
                   }
                 </div>

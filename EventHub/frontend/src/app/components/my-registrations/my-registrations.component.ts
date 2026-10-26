@@ -309,8 +309,8 @@ import { DialogDirective } from '../../directives/dialog.directive';
             For "{{ refundReg.event.title }}" — {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}.
             The organizer reviews and approves or declines it.
           </p>
-          <label class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
-          <textarea [(ngModel)]="refundReason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
+          <label for="my-registrations-refund-reason" class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
+          <textarea id="my-registrations-refund-reason" [(ngModel)]="refundReason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
           <div class="flex gap-2">
             <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
             <button (click)="submitRefundRequest()" [disabled]="submittingRefund" class="btn btn-primary flex-1">

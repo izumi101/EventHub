@@ -41,13 +41,13 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
             <h2 class="font-semibold text-foreground mb-4">New question</h2>
             <div class="space-y-4">
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Question</label>
-                <input [(ngModel)]="form.label" placeholder="e.g. What's your t-shirt size?" class="input w-full" />
+                <label for="event-questions-label" class="block text-sm font-medium text-foreground mb-1.5">Question</label>
+                <input id="event-questions-label" [(ngModel)]="form.label" placeholder="e.g. What's your t-shirt size?" class="input w-full" />
               </div>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Type</label>
-                  <select [(ngModel)]="form.question_type" class="input w-full">
+                  <label for="event-questions-question-type" class="block text-sm font-medium text-foreground mb-1.5">Type</label>
+                  <select id="event-questions-question-type" [(ngModel)]="form.question_type" class="input w-full">
                     <option value="text">Short text</option>
                     <option value="textarea">Long text</option>
                     <option value="dropdown">Dropdown</option>
@@ -65,8 +65,8 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
               </div>
               @if (form.question_type === 'dropdown') {
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Options (one per line)</label>
-                  <textarea [(ngModel)]="optionsText" rows="3" placeholder="Small&#10;Medium&#10;Large" class="input resize-none w-full"></textarea>
+                  <label for="event-questions-options-text" class="block text-sm font-medium text-foreground mb-1.5">Options (one per line)</label>
+                  <textarea id="event-questions-options-text" [(ngModel)]="optionsText" rows="3" placeholder="Small&#10;Medium&#10;Large" class="input resize-none w-full"></textarea>
                 </div>
               }
             </div>
