@@ -17,6 +17,7 @@ from channels.auth import AuthMiddlewareStack  # noqa: E402
 from channels.routing import ProtocolTypeRouter, URLRouter  # noqa: E402
 from channels.security.websocket import AllowedHostsOriginValidator  # noqa: E402
 from events.routing import websocket_urlpatterns  # noqa: E402
+from events.ws_auth import JwtSubprotocolAuthMiddleware  # noqa: E402
 
 application = ProtocolTypeRouter({
     # Regular HTTP → Django REST Framework
@@ -25,7 +26,10 @@ application = ProtocolTypeRouter({
     # WebSocket → Django Channels (seat-map real-time updates)
     'websocket': AllowedHostsOriginValidator(
         AuthMiddlewareStack(
-            URLRouter(websocket_urlpatterns)
+            # The SPA authenticates with its JWT (see events/ws_auth.py).
+            JwtSubprotocolAuthMiddleware(
+                URLRouter(websocket_urlpatterns)
+            )
         )
     ),
 })

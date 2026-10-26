@@ -1,8 +1,9 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, inject } from '@angular/core';
 import { Observable, Subject, timer } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { retry, takeUntil } from 'rxjs/operators';
 import { Seat } from '../models/models';
+import { AuthService } from './auth.service';
 
 /** Reconnect with exponential backoff (1 s, 2 s, 4 s … capped at 30 s) and give
  *  up after this many attempts — the HTTP seat map still works without WS. */
@@ -24,6 +25,7 @@ export type WsMessage = WsSeatUpdate | WsSnapshot;
 
 @Injectable({ providedIn: 'root' })
 export class SeatWsService implements OnDestroy {
+  private auth = inject(AuthService);
   private socket$: WebSocketSubject<WsMessage> | null = null;
   private destroy$ = new Subject<void>();
 
@@ -41,7 +43,13 @@ export class SeatWsService implements OnDestroy {
     // to Daphne, so this works over HTTPS and without exposing port 8000.
     const wsUrl = `${protocol}://${window.location.host}/ws/seats/${eventId}/`;
 
-    this.socket$ = webSocket<WsMessage>({ url: wsUrl });
+    // Browsers can't send headers with a WebSocket and URLs end up in logs,
+    // so the access token travels as the second subprotocol (events/ws_auth.py).
+    const token = this.auth.getToken();
+    this.socket$ = webSocket<WsMessage>({
+      url: wsUrl,
+      protocol: token ? ['eventhub.jwt', token] : undefined,
+    });
 
     this.socket$.pipe(
       retry({

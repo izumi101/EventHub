@@ -100,6 +100,24 @@ jobs:
           docker run --rm --add-host backend:127.0.0.1 eventhub-frontend
           sh -c '/docker-entrypoint.d/10-self-signed-cert.sh && nginx -t'
 
+  search-image:
+    # The full backend image: CPU-only PyTorch and the embedding model baked
+    # in, so semantic search works without network access at runtime.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image with semantic search
+        run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=1 -t eventhub-backend-search EventHub/backend
+      - name: CPU-only torch, model works offline
+        run: >-
+          docker run --rm --network none --entrypoint python eventhub-backend-search -c
+          "import torch; assert not torch.cuda.is_available() and '+cpu' in torch.__version__, torch.__version__;
+          from sentence_transformers import SentenceTransformer;
+          v = SentenceTransformer('all-MiniLM-L6-v2').encode('concert in Almaty');
+          assert len(v) == 384; print('torch', torch.__version__, 'embedding', len(v))"
+      - name: Image size
+        run: docker image ls eventhub-backend-search --format '{{.Size}}'
+
   e2e:
     # The whole stack as a developer runs it: docker compose up with the
     # example .env (DEBUG, mock payments, demo data), then a browser test.
@@ -130,7 +148,14 @@ jobs:
           E2E_BASE_URL: http://localhost:4200
         run: npx playwright test
       - name: The worker sent the queued sign-up email
-        run: docker compose logs worker | grep -q "Your verification code is"
+        # The worker polls every 2 s; give it a moment after the last test.
+        run: |
+          for i in $(seq 1 30); do
+            docker compose logs worker | grep -q "Your verification code is" && exit 0
+            sleep 1
+          done
+          docker compose logs worker
+          exit 1
       - name: Stack logs
         if: failure()
         run: docker compose logs --tail 200
