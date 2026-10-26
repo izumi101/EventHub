@@ -6,6 +6,8 @@ checkout flow so the number the attendee sees equals the number they pay.
 """
 from decimal import Decimal, ROUND_HALF_UP
 
+from django.db.models import F, Q
+
 from .models import PromoCode
 
 
@@ -27,15 +29,39 @@ def get_valid_promo(event, code: str) -> PromoCode:
         .filter(event=event, code__iexact=code.strip())
         .first()
     )
-    if promo is None:
-        raise PromoError('This promo code does not exist.')
-    if not promo.is_active:
-        raise PromoError('This promo code is no longer active.')
-    if promo.is_expired:
-        raise PromoError('This promo code has expired.')
-    if promo.is_exhausted:
-        raise PromoError('This promo code has reached its usage limit.')
+    # One message for "unknown", "inactive", "expired" and "used up" so the
+    # public validate endpoint can't be used to enumerate existing codes.
+    if promo is None or not promo.is_valid:
+        raise PromoError(INVALID_PROMO_MESSAGE)
     return promo
+
+
+INVALID_PROMO_MESSAGE = 'This promo code is invalid or no longer available.'
+
+
+def reserve_promo(promo: PromoCode) -> None:
+    """Atomically take one use of `promo` (call inside the registration's
+    transaction). Two buyers racing for the last use of a `max_uses=1` code
+    can't both succeed: the conditional UPDATE matches for only one of them.
+    """
+    taken = (
+        PromoCode.objects
+        .filter(pk=promo.pk, is_active=True)
+        .filter(Q(max_uses__isnull=True) | Q(times_used__lt=F('max_uses')))
+        .update(times_used=F('times_used') + 1)
+    )
+    if not taken:
+        raise PromoError(INVALID_PROMO_MESSAGE)
+
+
+def release_promo(registration) -> None:
+    """Give back the use reserved by a registration that will never be paid
+    (hold expired, cancelled, refunded)."""
+    if not registration.promo_code_id:
+        return
+    PromoCode.objects.filter(pk=registration.promo_code_id, times_used__gt=0).update(
+        times_used=F('times_used') - 1,
+    )
 
 
 def apply_discount(base_price, promo: PromoCode) -> Decimal:

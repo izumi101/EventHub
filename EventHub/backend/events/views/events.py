@@ -3,6 +3,7 @@
 import logging
 
 from django.db import transaction
+from django.db.models import Count, Q
 from django.http import Http404
 from django.utils import timezone
 from rest_framework import generics, viewsets, status, filters
@@ -39,7 +40,6 @@ from ..services import (
     attendee_cancel,
     cancel_event as cancel_event_service,
     clone_event,
-    mark_completed_if_past,
     register_for_event as register_for_event_service,
     reject_event as reject_event_service,
     release_expired_seat_holds,
@@ -53,7 +53,9 @@ logger = logging.getLogger(__name__)
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):
-    queryset = Category.objects.all()
+    queryset = Category.objects.annotate(
+        _event_count=Count('events', filter=Q(events__status=EventStatusChoices.PUBLISHED)),
+    )
     serializer_class = CategorySerializer
     pagination_class = None
 
@@ -69,6 +71,7 @@ class EventViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'description', 'location']
     ordering_fields = ['date', 'price', 'created_at']
+    throttle_scope = None  # set per action, e.g. validate-promo
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -86,11 +89,9 @@ class EventViewSet(viewsets.ModelViewSet):
             else:
                 # Ticket holders keep access to events that left the public
                 # list (cancelled / completed) — their tickets link here.
-                from django.db.models import Q
                 queryset = (
                     Event.objects
                     .select_related('organizer', 'category')
-                    .prefetch_related('registrations')
                     .filter(
                         Q(organizer=user)
                         | Q(status__in=[EventStatusChoices.PUBLISHED, EventStatusChoices.CANCELLED, EventStatusChoices.COMPLETED])
@@ -101,7 +102,7 @@ class EventViewSet(viewsets.ModelViewSet):
         else:
             if not status_param:
                 status_param = EventStatusChoices.PUBLISHED
-            queryset = restrict_status_list(queryset, user, status_param)
+            queryset = restrict_status_list(queryset, user, status_param).with_capacity()
 
         # Hide events that already happened unless explicitly requested.
         if not is_detail and self.request.query_params.get('upcoming') == 'true':
@@ -129,7 +130,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 queryset = semantic_search(semantic_q, limit=40, extra_qs=queryset)
             except Exception:
                 # Fallback to keyword if embeddings not ready
-                from django.db.models import Q
+                logger.warning('Semantic search unavailable, falling back to keyword search', exc_info=True)
                 queryset = queryset.filter(
                     Q(title__icontains=semantic_q) |
                     Q(description__icontains=semantic_q)
@@ -146,21 +147,26 @@ class EventViewSet(viewsets.ModelViewSet):
                 'Ask an administrator to create an organizer account for you.'
             )
         event = serializer.save()
-        # Index new event asynchronously (fire-and-forget in same process for now)
-        try:
-            from ..search import index_event
-            import threading
-            threading.Thread(target=index_event, args=(event,), daemon=True).start()
-        except Exception:
-            pass
+        # Index the new event in the background once it is committed.
+        from ..search import index_event_async
+        transaction.on_commit(lambda: index_event_async(event))
 
-    def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()
-        # Lazy lifecycle: a published event whose end has passed becomes
-        # "completed" the first time anyone opens it.
-        mark_completed_if_past(instance)
-        serializer = self.get_serializer(instance)
-        return Response(serializer.data)
+    def destroy(self, request, *args, **kwargs):
+        event = self.get_object()
+        # Sold tickets carry money and an audit trail: such an event is
+        # cancelled (which refunds buyers), never silently deleted.
+        from bookings.models import Booking
+        has_sales = (
+            event.registrations.filter(payment__isnull=False).exists()
+            or event.registrations.filter(status=RegistrationStatusChoices.CONFIRMED).exists()
+            or Booking.objects.filter(event=event, status=Booking.Status.CONFIRMED).exists()
+        )
+        if has_sales:
+            return Response(
+                {'error': 'This event has sold tickets. Cancel it instead — buyers will be refunded.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     # Custom action: get registrations for an event
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
@@ -169,8 +175,16 @@ class EventViewSet(viewsets.ModelViewSet):
         if not can_manage_event(event, request.user):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
-        registrations = event.registrations.all()
-        serializer = RegistrationSerializer(registrations, many=True)
+        registrations = (
+            event.registrations
+            .select_related('user', 'seat', 'payment', 'promo_code', 'ticket_type', 'refund_request')
+            .prefetch_related('answers__question')
+        )
+        # The organizer's attendee table doesn't need the full event nested
+        # in every row (it was re-serialising the same event N times).
+        serializer = RegistrationSerializer(
+            registrations, many=True, context={'request': request, 'omit_event': True},
+        )
         return Response(serializer.data)
 
     # Custom action: get stats for an event dashboard
@@ -195,7 +209,10 @@ class EventViewSet(viewsets.ModelViewSet):
         if not request.user.is_superuser:
             return Response({'error': 'Only admins can approve events'}, status=status.HTTP_403_FORBIDDEN)
         event = self.get_object()
-        approve_event_service(event)
+        try:
+            approve_event_service(event)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Event approved and published', 'status': EventStatusChoices.PUBLISHED})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -203,7 +220,10 @@ class EventViewSet(viewsets.ModelViewSet):
         if not request.user.is_superuser:
             return Response({'error': 'Only admins can reject events'}, status=status.HTTP_403_FORBIDDEN)
         event = self.get_object()
-        reject_event_service(event)
+        try:
+            reject_event_service(event)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Event rejected', 'status': EventStatusChoices.REJECTED})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -226,7 +246,7 @@ class EventViewSet(viewsets.ModelViewSet):
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        serializer = RegistrationSerializer(registration)
+        serializer = RegistrationSerializer(registration, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -283,7 +303,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response({'message': 'Event cancelled.', 'status': event.status, **result})
+        return Response({'message': 'Event cancelled.', 'status': EventStatusChoices.CANCELLED, **result})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='seat-map/create')
     def create_seat_map(self, request, pk=None):
@@ -358,7 +378,7 @@ class EventViewSet(viewsets.ModelViewSet):
             # The waitlist leads to a ticket — same attendee-only rule as buying.
             from ..services import ensure_attendee_can_buy
             try:
-                ensure_attendee_can_buy(request.user)
+                ensure_attendee_can_buy(request.user, event)
             except ValueError as exc:
                 return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
             # Only meaningful when the event is actually full.
@@ -374,13 +394,12 @@ class EventViewSet(viewsets.ModelViewSet):
             leave_waitlist(user=request.user, event=event)
             return Response({'status': 'left'})
 
-        # GET
-        release_expired_seat_holds(event)
-        promote_waitlist(event)
+        # GET — read only; offers are advanced by writes and the scheduler.
         pos = position(user=request.user, event=event)
         return Response(pos or {'status': 'not_joined'})
 
-    @action(detail=True, methods=['post'], permission_classes=[AllowAny], url_path='validate-promo')
+    @action(detail=True, methods=['post'], permission_classes=[AllowAny], url_path='validate-promo',
+            throttle_scope='promo')
     def validate_promo(self, request, pk=None):
         """Public: check a promo code and return the discounted price.
 
@@ -401,6 +420,10 @@ class EventViewSet(viewsets.ModelViewSet):
             seat = EventSeat.objects.filter(id=seat_id, seat_map__event=event).first()
             if seat:
                 base_price = seat_price(event, seat)
+        elif not event.is_free:
+            # GA tickets are charged at the dynamic price locked at
+            # registration, so quote the discount against that same number.
+            base_price = get_dynamic_price(event)['current_price']
 
         try:
             return Response(quote(event, code, base_price=base_price))
@@ -453,10 +476,9 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def seat_map(self, request, pk=None):
-        """Получить схему мест для события."""
+        """Seat map for an event (read only — expired holds are released by
+        the scheduler and by the next purchase on this event)."""
         event = self.get_object()
-        # Release any expired holds so the map reflects real availability.
-        release_expired_seat_holds(event)
         try:
             seat_map = event.seat_map
         except SeatMap.DoesNotExist:
@@ -471,7 +493,11 @@ class MyEventsView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Event.objects.filter(organizer=self.request.user).select_related('organizer', 'category').prefetch_related('registrations')
+        return (
+            Event.objects.filter(organizer=self.request.user)
+            .select_related('organizer', 'category')
+            .with_capacity()
+        )
 
 
 class RecommendationsView(generics.ListAPIView):
@@ -484,4 +510,8 @@ class RecommendationsView(generics.ListAPIView):
             return get_recommendations(self.request.user, limit=10)
         except Exception as exc:
             logger.warning('Recommendations error: %s', exc)
-            return Event.objects.filter(status=EventStatusChoices.PUBLISHED).order_by('-created_at')[:10]
+            return (
+                Event.objects.filter(status=EventStatusChoices.PUBLISHED, date__gte=timezone.now())
+                .select_related('organizer', 'category').with_capacity()
+                .order_by('-created_at')[:10]
+            )

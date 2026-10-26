@@ -6,7 +6,6 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from django.utils import timezone
 from datetime import timedelta
-import stripe
 
 from events.models import Category, Event, Registration
 from payments.models import Payment
@@ -95,7 +94,7 @@ class PaymentsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_verify_payment_success(self):
-        payment = Payment.objects.create(
+        Payment.objects.create(
             registration=self.paid_registration,
             amount=50.00,
             stripe_checkout_session_id="cs_test_12345",

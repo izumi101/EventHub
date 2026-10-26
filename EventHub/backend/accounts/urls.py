@@ -1,5 +1,4 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
 from . import views
 
 urlpatterns = [
@@ -10,7 +9,7 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('profile/avatar/', views.AvatarUploadView.as_view(), name='profile_avatar'),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('token/refresh/', views.ThrottledTokenRefreshView.as_view(), name='token_refresh'),
     # Password reset flow
     path('password-reset/request/', views.PasswordResetRequestView.as_view(), name='password_reset_request'),
     path('password-reset/verify/', views.PasswordResetVerifyView.as_view(), name='password_reset_verify'),

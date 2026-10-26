@@ -1,28 +1,48 @@
-from django.core.management.base import BaseCommand
-from events.models import Event, SeatMap, EventSeat
+from django.core.management.base import BaseCommand, CommandError
+from django.db import transaction
+
+from events.models import Event, EventSeat, Registration, SeatMap
 
 
 class Command(BaseCommand):
-    help = 'Generate seat maps for all events that don\'t have them.'
+    help = 'Generate seat maps for events that don\'t have them.'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--force',
             action='store_true',
-            help='Regenerate seat maps even if they exist',
+            help='Regenerate the seat map of the events given with --event '
+                 '(refused when any seat is sold or held).',
+        )
+        parser.add_argument(
+            '--event', type=int, action='append', dest='event_ids', default=[],
+            help='Only process this event id (repeatable). Required with --force.',
         )
 
     def handle(self, *args, **options):
         force = options.get('force', False)
+        event_ids = options.get('event_ids') or []
 
-        # Получаем события без seat_map или все, если force
         if force:
-            events = Event.objects.all()
-            SeatMap.objects.all().delete()
-            EventSeat.objects.all().delete()
+            if not event_ids:
+                raise CommandError('--force needs at least one --event ID: it never wipes every seat map.')
+            events = Event.objects.filter(id__in=event_ids)
+            with transaction.atomic():
+                for event in events:
+                    sold = (
+                        Registration.objects.filter(event=event, seat__isnull=False).exists()
+                        or EventSeat.objects.filter(seat_map__event=event, booking_seat__isnull=False).exists()
+                    )
+                    if sold:
+                        raise CommandError(
+                            f'Event {event.id} has seats sold or on hold — refusing to regenerate its map.'
+                        )
+                    SeatMap.objects.filter(event=event).delete()
         else:
-            # Только события без seat_map
+            # Only events without a seat map
             events = Event.objects.filter(seat_map__isnull=True)
+            if event_ids:
+                events = events.filter(id__in=event_ids)
 
         if not events.exists():
             self.stdout.write(self.style.SUCCESS('No events to process.'))

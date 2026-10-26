@@ -1,11 +1,16 @@
+import logging
+
+from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.views import TokenRefreshView
 
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, OrganizerCreateSerializer
 from .services import (
     build_auth_payload,
+    change_password,
     confirm_password_reset,
     login_user,
     request_password_reset,
@@ -13,6 +18,8 @@ from .services import (
     verify_password_reset_code,
     verify_registration_code,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class RegisterView(APIView):
@@ -59,16 +66,16 @@ class RegisterSendCodeView(APIView):
 
         try:
             verification = send_registration_code(email)
-        except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except Exception:
-            return Response({'error': 'Failed to send verification email. Please try again.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            logger.exception('Sending the verification email failed')
+            return Response({'error': 'Failed to send verification email. Please try again.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
-        payload = {'message': 'Verification code sent successfully. Please check your email.'}
-        # Dev convenience: without real SMTP the console backend only logs the
-        # email, so surface the code to the UI instead of stranding the user.
-        from django.conf import settings
-        if 'console' in settings.EMAIL_BACKEND:
+        # Same answer whether or not the address already has an account.
+        payload = {'message': 'If this address can be used, a verification code has been sent to it.'}
+        # Dev convenience, local only: with DEBUG on and no SMTP the console
+        # backend only logs the email, so surface the code to the UI. Never
+        # in production — it would let anyone "verify" someone else's address.
+        if verification is not None and settings.DEBUG and 'console' in settings.EMAIL_BACKEND:
             payload['dev_code'] = verification.code
             payload['message'] = 'Email is not configured — use this code.'
         return Response(payload)
@@ -241,11 +248,13 @@ class PasswordResetConfirmView(APIView):
     Resets the user's password using the one-time reset token.
     """
     permission_classes = [AllowAny]
+    throttle_scope = 'password_reset'
 
     def post(self, request):
-        reset_token = request.data.get('reset_token', '').strip()
-        new_password = request.data.get('new_password', '').strip()
-        new_password2 = request.data.get('new_password2', '').strip()
+        reset_token = str(request.data.get('reset_token', '')).strip()
+        # Passwords are taken verbatim: stripping would silently change them.
+        new_password = str(request.data.get('new_password', ''))
+        new_password2 = str(request.data.get('new_password2', ''))
 
         if not reset_token or not new_password:
             return Response({'error': 'Reset token and new password are required.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -262,26 +271,28 @@ class PasswordResetConfirmView(APIView):
 
 
 class ChangePasswordView(APIView):
-    """Change password for authenticated users (old password required)."""
+    """Change password for authenticated users (old password required).
+
+    Every other session is signed out; the response carries a fresh token
+    pair for the current device.
+    """
     permission_classes = [IsAuthenticated]
+    throttle_scope = 'change_password'
 
     def post(self, request):
-        old_password = request.data.get('old_password', '')
-        new_password = request.data.get('new_password', '')
-        new_password2 = request.data.get('new_password2', '')
+        old_password = str(request.data.get('old_password', ''))
+        new_password = str(request.data.get('new_password', ''))
+        new_password2 = str(request.data.get('new_password2', ''))
 
         if not old_password or not new_password:
             return Response({'error': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if not request.user.check_password(old_password):
-            return Response({'error': 'Current password is incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            tokens = change_password(request.user, old_password, new_password, new_password2)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({'message': 'Password changed successfully.', 'tokens': tokens})
 
-        if new_password != new_password2:
-            return Response({'error': 'Passwords do not match.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        if len(new_password) < 8:
-            return Response({'error': 'Password must be at least 8 characters.'}, status=status.HTTP_400_BAD_REQUEST)
-
-        request.user.set_password(new_password)
-        request.user.save()
-        return Response({'message': 'Password changed successfully.'})
+class ThrottledTokenRefreshView(TokenRefreshView):
+    throttle_scope = 'token_refresh'

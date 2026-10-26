@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -13,7 +15,13 @@ from .serializers import (
     BookingCreateSerializer,
     ClaimSeatSerializer,
 )
-from .services import create_booking, claim_seat, cancel_booking, release_expired_bookings
+from .services import create_booking, claim_seat, cancel_booking
+
+logger = logging.getLogger(__name__)
+
+
+def _ctx(request, **extra):
+    return {'viewer': request.user, **extra}
 
 
 class BookingCreateView(APIView):
@@ -32,7 +40,7 @@ class BookingCreateView(APIView):
             )
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
-        return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
+        return Response(BookingSerializer(booking, context=_ctx(request)).data, status=status.HTTP_201_CREATED)
 
 
 class BookingDetailView(APIView):
@@ -41,9 +49,7 @@ class BookingDetailView(APIView):
 
     def get(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
-        release_expired_bookings(booking.event)
-        booking.refresh_from_db()
-        return Response(BookingSerializer(booking).data)
+        return Response(BookingSerializer(booking, context=_ctx(request)).data)
 
 
 class BookingCheckoutView(APIView):
@@ -78,14 +84,13 @@ class SharedBookingView(APIView):
 
     def get(self, request, token):
         booking = get_object_or_404(Booking, share_token=token)
-        release_expired_bookings(booking.event)
-        booking.refresh_from_db()
-        return Response(BookingSerializer(booking).data)
+        return Response(BookingSerializer(booking, context=_ctx(request, via_share_link=True)).data)
 
 
 class ClaimSeatView(APIView):
     """POST /api/bookings/shared/{token}/claim/  — claim one seat."""
     permission_classes = [AllowAny]
+    throttle_scope = 'claim'
 
     def post(self, request, token):
         booking = get_object_or_404(Booking, share_token=token)
@@ -101,7 +106,7 @@ class ClaimSeatView(APIView):
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         booking.refresh_from_db()
-        return Response(BookingSerializer(booking).data)
+        return Response(BookingSerializer(booking, context=_ctx(request, via_share_link=True)).data)
 
 
 class VerifyBookingView(APIView):
@@ -118,19 +123,20 @@ class VerifyBookingView(APIView):
 
         booking = get_object_or_404(Booking, stripe_session_id=session_id, owner=request.user)
 
-        if booking.status != Booking.Status.CONFIRMED and not settings.STRIPE_MOCK_MODE:
+        if booking.status == Booking.Status.HOLDING and not settings.STRIPE_MOCK_MODE:
+            import stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
             try:
-                import stripe
-                stripe.api_key = settings.STRIPE_SECRET_KEY
                 session = stripe.checkout.Session.retrieve(session_id)
+            except stripe.error.StripeError as exc:
+                logger.warning('Could not retrieve Stripe session %s: %s', session_id, exc)
+            else:
                 if session.get('payment_status') == 'paid':
                     from .payments import confirm_booking_by_session
-                    confirm_booking_by_session(session_id)
+                    confirm_booking_by_session(session)
                     booking.refresh_from_db()
-            except Exception:
-                pass
 
-        return Response(BookingSerializer(booking).data)
+        return Response(BookingSerializer(booking, context=_ctx(request)).data)
 
 
 class MyBookingsView(APIView):
@@ -142,6 +148,6 @@ class MyBookingsView(APIView):
             Booking.objects
             .filter(owner=request.user)
             .exclude(status__in=[Booking.Status.EXPIRED, Booking.Status.CANCELLED])
-            .prefetch_related('seats__seat')
+            .select_related('event', 'owner')
         )
-        return Response(BookingSerializer(bookings, many=True).data)
+        return Response(BookingSerializer(bookings, many=True, context=_ctx(request)).data)

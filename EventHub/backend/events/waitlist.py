@@ -63,6 +63,8 @@ def promote_waitlist(event: Event):
     Safe to call often and concurrently — uses row locks on the entries.
     """
     now = timezone.now()
+    # Re-read the counts: the caller's instance may carry stale annotations.
+    event = Event.objects.get(pk=event.pk)
 
     # 1. Expire offers that timed out so their spot can pass on.
     WaitlistEntry.objects.filter(
