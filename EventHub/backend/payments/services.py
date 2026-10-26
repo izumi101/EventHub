@@ -19,6 +19,12 @@ logger = logging.getLogger(__name__)
 CHECKOUT_SESSION_MINUTES = 31
 
 
+def stripe_to_dict(obj) -> dict:
+    """Plain dict from a Stripe object. Since stripe-python 15, StripeObject is
+    no longer a dict: `.get()` raises AttributeError, so convert at the edge."""
+    return obj.to_dict() if hasattr(obj, 'to_dict') else dict(obj)
+
+
 def _lock_registration(registration_id, **filters):
     return (
         Registration.objects
@@ -407,7 +413,7 @@ def verify_payment(session_id: str, user):
     if payment.status not in (PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED) \
             and not getattr(settings, 'STRIPE_MOCK_MODE', False):
         try:
-            session = stripe.checkout.Session.retrieve(session_id)
+            session = stripe_to_dict(stripe.checkout.Session.retrieve(session_id))
             if session.get('payment_status') == 'paid':
                 confirm_stripe_checkout_session(session)
                 payment.refresh_from_db()

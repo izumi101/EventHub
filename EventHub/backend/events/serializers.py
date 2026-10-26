@@ -1,3 +1,4 @@
+import logging
 import re
 
 from rest_framework import serializers
@@ -13,6 +14,7 @@ from common.choices import EventStatusChoices, RegistrationStatusChoices
 from .services import create_event, update_event
 
 CURRENCY_RE = re.compile(r'^[A-Z]{3}$')
+logger = logging.getLogger(__name__)
 
 
 # ---- ModelSerializer ---- #
@@ -294,6 +296,9 @@ class RegistrationSerializer(serializers.ModelSerializer):
             from .billing import price_breakdown
             return price_breakdown(obj)
         except Exception:
+            # Don't break the ticket list over one bad row, but a pricing
+            # error is a bug — make it visible in the logs.
+            logger.exception('Price breakdown failed for registration %s', obj.pk)
             return None
 
     refund_request = serializers.SerializerMethodField()

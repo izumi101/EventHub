@@ -1,5 +1,6 @@
 """Attendee engagement: favorites, reviews, notifications."""
 
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
@@ -22,8 +23,9 @@ class FavoritesListView(generics.ListAPIView):
     def get_queryset(self):
         return (
             Favorite.objects.filter(user=self.request.user)
-            .select_related('event', 'event__organizer', 'event__category')
-            .prefetch_related('event__ticket_types')
+            .prefetch_related(
+                Prefetch('event', queryset=Event.objects.select_related('organizer', 'category').with_capacity()),
+            )
         )
 
 

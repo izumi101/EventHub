@@ -184,6 +184,17 @@ class MoneyTests(Base):
         self.assertNotIn('has been refunded', note.body)
 
 
+class AnalyticsTests(Base):
+    def test_full_refunds_are_reported(self):
+        from events.analytics import event_analytics
+        kept = Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
+        Payment.objects.create(registration=kept, amount=100, status='completed')
+        gone = Registration.objects.create(user=self.other, event=self.event, status='cancelled')
+        Payment.objects.create(registration=gone, amount=100, refunded_amount=100, status='refunded')
+        kpis = event_analytics(self.event)['kpis']
+        self.assertEqual((kpis['gross_revenue'], kpis['refunded'], kpis['net_revenue']), (200.0, 100.0, 100.0))
+
+
 class ValidationTests(Base):
     def test_duplicate_promo_code_is_a_400_not_a_500(self):
         self.client.force_authenticate(self.organizer)
@@ -262,6 +273,34 @@ class QueryCountTests(Base):
             ev = self.make_event(title=f'E{i}')
             TicketType.objects.create(event=ev, name='GA', kind='paid', price=10)
         self.assertEqual(count(), few)
+
+    def test_my_registrations_query_count_does_not_grow_with_tickets(self):
+        self.client.force_authenticate(self.attendee)
+
+        def count():
+            with CaptureQueriesContext(connection) as ctx:
+                self.assertEqual(self.client.get('/api/my-registrations/').status_code, 200)
+            return len(ctx.captured_queries)
+
+        Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
+        one = count()
+        for i in range(5):
+            Registration.objects.create(user=self.attendee, event=self.make_event(title=f'R{i}'),
+                                        status='confirmed')
+        self.assertEqual(count(), one)
+
+
+class WaitlistTests(Base):
+    def test_cancelling_an_event_does_not_offer_spots_to_the_waitlist(self):
+        from events.models import WaitlistEntry
+        self.event.max_participants = 1
+        self.event.save()
+        Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
+        WaitlistEntry.objects.create(user=self.other, event=self.event)
+        self.client.force_authenticate(self.organizer)
+        self.client.post(f'/api/events/{self.event.id}/cancel-event/')
+        self.assertEqual(WaitlistEntry.objects.get(user=self.other).status, 'waiting')
+        self.assertFalse(self.other.notifications.filter(type='seat_available').exists())
 
 
 class CommandTests(Base):
