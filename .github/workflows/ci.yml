@@ -2,7 +2,6 @@ name: CI
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 permissions:
@@ -76,7 +75,7 @@ jobs:
       - name: Audit runtime dependencies
         run: npm audit --omit=dev --audit-level=high
 
-  compose:
+  docker:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -87,3 +86,11 @@ jobs:
         run: |
           docker compose --env-file .env.example config -q
           GRAFANA_ADMIN_PASSWORD=ci docker compose -f docker-compose.monitoring.yml config -q
+      - name: Build backend image (without the PyTorch layer)
+        run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=0 -t eventhub-backend ./backend
+      - name: Build frontend image
+        run: docker build -t eventhub-frontend ./frontend
+      - name: nginx config is valid in the image
+        run: >-
+          docker run --rm --add-host backend:127.0.0.1 eventhub-frontend
+          sh -c '/docker-entrypoint.d/10-self-signed-cert.sh && nginx -t'
