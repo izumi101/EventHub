@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User
+from django.db import IntegrityError
 from .models import UserProfile
 from common.auth import email_in_use, password_meets_policy, validate_username as check_username
 from common.choices import RoleChoices
@@ -53,7 +54,11 @@ class RegisterSerializer(serializers.Serializer):
         return data
 
     def create(self, validated_data):
-        return register_user(validated_data)
+        try:
+            return register_user(validated_data)
+        except IntegrityError:
+            # Lost a race with a simultaneous sign-up (DB unique index).
+            raise serializers.ValidationError({'email': 'Email already registered.'})
 
 
 # ---- Serializer (manual) ---- #
@@ -92,7 +97,10 @@ class OrganizerCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         from .services import create_organizer
-        return create_organizer(validated_data)
+        try:
+            return create_organizer(validated_data)
+        except IntegrityError:
+            raise serializers.ValidationError({'email': 'Email already registered.'})
 
 
 # ---- ModelSerializer ---- #
