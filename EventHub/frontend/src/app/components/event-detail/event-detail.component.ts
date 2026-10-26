@@ -812,7 +812,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         this.registering = false;
         // High-demand event → enter the virtual waiting room and retry
         // automatically once admitted.
-        if (err.error?.error === 'QUEUE_REQUIRED') {
+        if (err.error?.code === 'QUEUE_REQUIRED') {
           this.showCheckout = false;
           this.enterQueue(payload);
           return;

@@ -261,6 +261,16 @@ class BookingRuleTests(Base):
         self.assertEqual(response.status_code, 400)
 
 
+    def test_waiting_room_refusal_carries_a_stable_code(self):
+        # The SPA branches on `code`, not on the human-readable message.
+        with patch('events.queue.is_queue_active', return_value=True), \
+                patch('events.queue.validate_queue_token', return_value=False):
+            response = self.register()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['code'], 'QUEUE_REQUIRED')
+        self.assertNotEqual(response.data['error'], 'QUEUE_REQUIRED')
+        self.assertFalse(Registration.objects.filter(event=self.event).exists())
+
 class ExportTests(Base):
     def test_formula_injection_is_neutralised(self):
         # Important #3.

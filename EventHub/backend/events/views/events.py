@@ -20,8 +20,9 @@ from rest_framework.response import Response
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
 from common.permissions import can_manage_event
+from common.exceptions import error_response
 
-from ..analytics import event_analytics
+from ..analytics import event_analytics, net_revenue
 from ..exports import attendees_csv_response
 from ..messaging import broadcast_to_attendees
 from ..models import Category, Event, EventSeat, SeatMap, TicketType
@@ -214,7 +215,11 @@ class EventViewSet(viewsets.ModelViewSet):
             'total_registrations': total_regs,
             'checked_in': checked_in,
             'remaining': total_regs - checked_in,
-            'check_in_rate': round((checked_in / total_regs * 100), 2) if total_regs > 0 else 0
+            'check_in_rate': round((checked_in / total_regs * 100), 2) if total_regs > 0 else 0,
+            # Money actually taken (tickets + group bookings, net of refunds),
+            # in the event's currency — not price × registrations.
+            'net_revenue': str(net_revenue(event)),
+            'currency': event.currency,
         })
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -257,7 +262,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 affiliate_code=request.data.get('affiliate_code', ''),
             )
         except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(exc)
 
         serializer = RegistrationSerializer(registration, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
