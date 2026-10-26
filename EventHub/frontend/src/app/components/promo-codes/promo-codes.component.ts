@@ -6,11 +6,12 @@ import { EventService, PromoCode } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-promo-codes',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -107,7 +108,7 @@ import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign }
                 <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
                      [class]="c.discount_type === 'percent' ? 'bg-ember/10 text-ember' : 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]'">
                   @if (c.discount_type === 'percent') { {{ c.discount_value }}% }
-                  @else { {{ '$' + c.discount_value }} }
+                  @else { {{ c.discount_value | money: event?.currency }} }
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">

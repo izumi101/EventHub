@@ -44,6 +44,7 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                   [eventId]="eventId"
                   [maxSelection]="8"
                   [zonePrices]="zonePrices"
+                  [currency]="currency"
                   (selectionChange)="onSelection($event)"
                 ></app-seat-map-svg>
               } @else {

@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'events',
     'payments',
     'bookings',
+    'jobs',
 ]
 
 MIDDLEWARE = [
@@ -241,6 +242,11 @@ _default_email_backend = (
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', _default_email_backend)
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@eventhub.local>')
 
+# Background jobs (emails, webhooks, search indexing) are executed by
+# `manage.py run_worker`. JOBS_RUN_INLINE=1 runs them right after the request's
+# transaction commits instead — handy for local development without a worker.
+JOBS_RUN_INLINE = env_bool('JOBS_RUN_INLINE', False)
+
 # ---- Logging ---- #
 LOGGING = {
     'version': 1,
@@ -278,6 +284,11 @@ LOGGING = {
             'propagate': False,
         },
         'bookings': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'jobs': {
             'handlers': ['console'],
             'level': 'INFO',
             'propagate': False,

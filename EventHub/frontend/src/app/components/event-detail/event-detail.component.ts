@@ -27,6 +27,7 @@ import {
   ChevronLeft,
   Heart,
 } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 /** Event page: hero, status banners, key info and the booking sidebar.
  *
@@ -37,7 +38,7 @@ import {
 @Component({
   selector: 'app-event-detail',
   standalone: true,
-  imports: [
+  imports: [MoneyPipe, 
     CommonModule, RouterModule, LucideAngularModule,
     EventReviewsComponent, EventCheckoutModalComponent, RefundRequestModalComponent,
   ],
@@ -292,15 +293,15 @@ import {
                         <span class="text-3xl font-extrabold text-foreground tracking-tight leading-none">
                           @if (event.is_free) { Free
                           } @else if (event.has_ticket_types) {
-                            {{ '$' + event.price_from }}
+                            {{ event.price_from | money: event.currency }}
                           } @else if (pricingData && pricingData.multiplier !== 1.0) {
-                            {{ '$' + pricingData.current_price }}
+                            {{ pricingData.current_price | money: event.currency }}
                           } @else {
-                            {{ '$' + event.price }}
+                            {{ event.price | money: event.currency }}
                           }
                         </span>
                         @if (!event.has_ticket_types && pricingData && !event.is_free && pricingData.base_price !== pricingData.current_price) {
-                          <span class="text-sm text-muted-foreground line-through">{{ '$' + pricingData.base_price }}</span>
+                          <span class="text-sm text-muted-foreground line-through">{{ pricingData.base_price | money: event.currency }}</span>
                         }
                         @if (!event.has_ticket_types && pricingData && !event.is_free) {
                           <span

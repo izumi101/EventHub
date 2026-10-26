@@ -1,9 +1,9 @@
 """Outbound webhook dispatch.
 
 `fire(event, trigger, payload)` looks up active webhooks subscribed to the
-trigger and POSTs the payload to each, signed with HMAC-SHA256. Delivery runs
-in a background thread so it never blocks the checkout request, and every
-attempt is logged to WebhookDelivery for the organizer to inspect.
+trigger and queues one delivery job per webhook (jobs app), signed with
+HMAC-SHA256. The worker POSTs it, retries failures with backoff, and logs
+every attempt to WebhookDelivery for the organizer to inspect.
 """
 import hashlib
 import hmac
@@ -13,7 +13,6 @@ import json
 import logging
 import socket
 import ssl
-import threading
 from urllib.parse import urlsplit
 
 from django.utils import timezone
@@ -117,15 +116,18 @@ def _sign(secret: str, body: bytes) -> str:
     return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
 
 
-def _deliver(webhook_id: int, trigger: str, body: bytes, signature: str):
-    """Runs in a worker thread: POST once, log the outcome."""
-    webhook = Webhook.objects.filter(id=webhook_id).first()
+def deliver_job(*, webhook_id: int, trigger: str, body: str, signature: str):
+    """Job handler: POST once and log the attempt. Raises on failure so the
+    job queue retries with backoff; SSRF blocks are not retried."""
+    from jobs.queue import PermanentJobError
+
+    webhook = Webhook.objects.filter(id=webhook_id, is_active=True).first()
     if webhook is None:
-        return
+        return  # deleted or switched off since the event happened
 
     status_code, success, error = None, False, ''
     try:
-        status_code = _post(webhook.url, body, {
+        status_code = _post(webhook.url, body.encode(), {
             'Content-Type': 'application/json',
             'X-EventHub-Event': trigger,
             'X-EventHub-Signature': signature,
@@ -140,23 +142,25 @@ def _deliver(webhook_id: int, trigger: str, body: bytes, signature: str):
     except Exception as exc:  # network, timeout, TLS…
         error = str(exc)[:300]
 
-    try:
-        Webhook.objects.filter(id=webhook_id).update(
-            last_triggered_at=timezone.now(), last_status=status_code,
-        )
-        WebhookDelivery.objects.create(
-            webhook_id=webhook_id, trigger=trigger,
-            status_code=status_code, success=success, error=error,
-        )
-    except Exception as exc:
-        logger.warning('Failed to log webhook delivery: %s', exc)
+    Webhook.objects.filter(id=webhook_id).update(
+        last_triggered_at=timezone.now(), last_status=status_code,
+    )
+    WebhookDelivery.objects.create(
+        webhook_id=webhook_id, trigger=trigger,
+        status_code=status_code, success=success, error=error,
+    )
+    if error.startswith('Blocked'):
+        raise PermanentJobError(error)
+    if not success:
+        raise RuntimeError(error or 'delivery failed')
 
 
 def fire(event, trigger: str, payload: dict):
     """Dispatch `trigger` for `event` to all subscribed webhooks (async).
 
     Never raises: a webhook problem must not break the business flow that
-    triggered it."""
+    triggered it. Call it inside the business transaction: the delivery jobs
+    are committed (or rolled back) together with the change they report."""
     try:
         hooks = list(Webhook.objects.filter(event=event, is_active=True))
     except Exception:
@@ -173,12 +177,13 @@ def fire(event, trigger: str, payload: dict):
         'timestamp': timezone.now().isoformat(),
         'data': payload,
     }
-    body = json.dumps(envelope, default=str).encode()
+    body = json.dumps(envelope, default=str)
 
+    from jobs.queue import enqueue
     for hook in hooks:
         if trigger not in (hook.triggers or []):
             continue
-        signature = _sign(hook.secret, body)
-        threading.Thread(
-            target=_deliver, args=(hook.id, trigger, body, signature), daemon=True,
-        ).start()
+        signature = _sign(hook.secret, body.encode())
+        enqueue('deliver_webhook', {
+            'webhook_id': hook.id, 'trigger': trigger, 'body': body, 'signature': signature,
+        }, max_attempts=6)

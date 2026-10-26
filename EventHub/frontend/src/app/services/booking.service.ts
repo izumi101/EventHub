@@ -21,7 +21,7 @@ export interface BookingSeatDto {
 
 export interface BookingDto {
   id: string;
-  status: 'holding' | 'confirmed' | 'cancelled' | 'expired';
+  status: 'holding' | 'confirmed' | 'cancelled' | 'expired' | 'refunded';
   /** Only returned to the owner (and to visitors of the share link itself). */
   share_token: string | null;
   hold_expires_at: string | null;
@@ -37,6 +37,8 @@ export interface BookingDto {
   /** What checkout charges: seat prices plus tax & fees. */
   total_due: string;
   currency: string;
+  amount_paid: string | null;
+  refunded_at: string | null;
   is_owner: boolean;
   is_expired: boolean;
   created_at: string;
@@ -74,6 +76,16 @@ export class BookingService {
 
   mine(): Observable<BookingDto[]> {
     return this.http.get<BookingDto[]>(`${this.api}/mine/`);
+  }
+
+  /** Event team: every active / paid / refunded group booking of an event. */
+  listForEvent(eventId: number): Observable<BookingDto[]> {
+    return this.http.get<BookingDto[]>(`${this.api}/event/${eventId}/`);
+  }
+
+  /** Event team: full refund of one paid group booking (seats go back on sale). */
+  refund(id: string, reason = ''): Observable<BookingDto> {
+    return this.http.post<BookingDto>(`${this.api}/${id}/refund/`, { reason });
   }
 
   verify(sessionId: string): Observable<BookingDto> {

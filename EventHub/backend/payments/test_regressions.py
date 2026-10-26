@@ -217,3 +217,54 @@ class SharedBookingTests(PaymentBase):
         self.client.force_authenticate(self.buyer)
         data = self.client.get(f'/api/bookings/{self.booking.id}/').data
         self.assertTrue(all(s['ticket_uuid'] for s in data['seats']))
+
+
+@override_settings(STRIPE_MOCK_MODE=False)
+class OrganizerBookingRefundTests(PaymentBase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_authenticate(self.organizer)
+        self.client.post(f'/api/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 3}, format='json')
+        self.seats = list(self.event.seat_map.seats.all()[:2])
+        self.booking = Booking.objects.create(
+            owner=self.buyer, event=self.event, status=Booking.Status.CONFIRMED,
+            stripe_payment_intent_id='pi_group', amount_paid=Decimal('2000.00'),
+        )
+        for seat in self.seats:
+            BookingSeat.objects.create(booking=self.booking, seat=seat, price=1000)
+            seat.is_available = False
+            seat.save()
+
+    def test_organizer_refunds_a_group_booking(self):
+        with patch('stripe.Refund.create') as refund:
+            response = self.client.post(f'/api/bookings/{self.booking.id}/refund/', {'reason': 'Venue change'})
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(refund.call_args.kwargs['payment_intent'], 'pi_group')
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.status, Booking.Status.REFUNDED)
+        # Seats are back on sale and the tickets are gone.
+        self.assertTrue(all(s.is_available for s in self.event.seat_map.seats.filter(id__in=[x.id for x in self.seats])))
+        self.assertFalse(self.booking.seats.exists())
+        # Refunding twice is refused.
+        response = self.client.post(f'/api/bookings/{self.booking.id}/refund/')
+        self.assertEqual(response.status_code, 400)
+
+    def test_only_the_event_team_can_refund_or_list(self):
+        self.client.force_authenticate(self.buyer)
+        self.assertEqual(self.client.post(f'/api/bookings/{self.booking.id}/refund/').status_code, 403)
+        self.assertEqual(self.client.get(f'/api/bookings/event/{self.event.id}/').status_code, 403)
+
+    def test_team_list_hides_tickets(self):
+        data = self.client.get(f'/api/bookings/event/{self.event.id}/').data
+        self.assertEqual(len(data), 1)
+        self.assertTrue(all(s['ticket_uuid'] is None for s in data[0]['seats']))
+
+    def test_analytics_include_group_bookings(self):
+        from events.analytics import event_analytics
+        kpis = event_analytics(self.event)['kpis']
+        self.assertEqual((kpis['group_bookings'], kpis['group_seats'], kpis['tickets_sold']), (1, 2, 2))
+        self.assertEqual(kpis['gross_revenue'], 2000.0)
+        with patch('stripe.Refund.create'):
+            self.client.post(f'/api/bookings/{self.booking.id}/refund/')
+        kpis = event_analytics(self.event)['kpis']
+        self.assertEqual((kpis['refunded'], kpis['net_revenue'], kpis['tickets_sold']), (2000.0, 0.0, 0))
