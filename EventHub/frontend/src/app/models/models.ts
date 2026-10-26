@@ -28,6 +28,8 @@ export interface AuthResponse {
 
 export interface RefreshTokenResponse {
   access: string;
+  /** Present because the backend rotates refresh tokens (ROTATE_REFRESH_TOKENS). */
+  refresh?: string;
 }
 
 export interface ApiMessageResponse {
@@ -177,10 +179,16 @@ export interface CheckoutSessionResponse {
   session_id: string;
 }
 
+export interface ChangePasswordResponse extends ApiMessageResponse {
+  /** Fresh pair for this device — every other session was signed out. */
+  tokens?: { access: string; refresh: string };
+}
+
 export interface PaymentVerificationResponse {
   status: string;
   event_title: string;
   amount: string;
+  currency?: string;
 }
 
 export interface PasswordResetTokenResponse extends ApiMessageResponse {

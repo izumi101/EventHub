@@ -5,11 +5,15 @@ Django settings for the EventHub REST API.
 from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 import os
+import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
+# `manage.py test` runs with DEBUG off but must not need production secrets.
+TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
 
 
 def env_bool(name, default=False):
@@ -30,7 +34,7 @@ _default_key = 'django-insecure-dev-only-change-me'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _default_key)
 DEBUG = env_bool('DJANGO_DEBUG', False)
 
-if not DEBUG and SECRET_KEY == _default_key:
+if not DEBUG and not TESTING and SECRET_KEY == _default_key:
     raise RuntimeError(
         'You must set DJANGO_SECRET_KEY environment variable in production! '
         'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
@@ -104,6 +108,16 @@ CHANNEL_LAYERS = {
     },
 }
 
+# Shared cache: throttling counters must be shared by every worker process
+# (a per-process LocMem cache multiplies every rate limit by the worker count).
+CACHES = {
+    'default': (
+        {'BACKEND': 'django.core.cache.backends.redis.RedisCache', 'LOCATION': REDIS_URL}
+        if os.environ.get('REDIS_URL') and not TESTING
+        else {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'}
+    ),
+}
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -144,13 +158,27 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
+    'EXCEPTION_HANDLER': 'common.exceptions.exception_handler',
+    # Only nginx talks to Django; it appends the real client address as the
+    # last X-Forwarded-For entry. Without this DRF would trust the whole,
+    # client-supplied header and every request could fake a new identity.
+    'NUM_PROXIES': int(os.environ.get('DJANGO_NUM_PROXIES', '1')),
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.ScopedRateThrottle',
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
+        'anon': '300/min',
+        'user': '1200/min',
         'login': '5/min',
         'register': '3/min',
         'password_reset': '3/min',
+        'change_password': '5/min',
+        'token_refresh': '30/min',
+        'promo': '10/min',
+        'claim': '10/min',
+        'affiliate_click': '30/min',
     },
 }
 
@@ -180,18 +208,20 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:4200').rstrip('/')
 
-STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', 'sk_test_your_key_here')
-STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', 'pk_test_your_key_here')
-STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', 'whsec_your_secret_here')
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
-# When no real Stripe key is configured (local dev), payments are simulated:
-# the registration is confirmed instantly without ever calling Stripe.
-# With a real `sk_...` key this is False and the normal Stripe flow runs.
-STRIPE_MOCK_MODE = (
-    not STRIPE_SECRET_KEY
-    or STRIPE_SECRET_KEY == 'sk_test_your_key_here'
-    or 'your_key_here' in STRIPE_SECRET_KEY
-)
+
+def _is_placeholder(value):
+    return not value or 'your_' in value or value.endswith('_here')
+
+
+# Simulated payments (tickets confirmed without charging anyone) are an
+# explicit local-development opt-in. A missing Stripe key never turns them on.
+STRIPE_MOCK_MODE = env_bool('STRIPE_MOCK_MODE', False)
+if STRIPE_MOCK_MODE and not DEBUG and not TESTING:
+    raise ImproperlyConfigured('STRIPE_MOCK_MODE=1 is only allowed together with DJANGO_DEBUG=1.')
 
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
@@ -209,6 +239,7 @@ _default_email_backend = (
     else 'django.core.mail.backends.console.EmailBackend'
 )
 EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', _default_email_backend)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@eventhub.local>')
 
 # ---- Logging ---- #
 LOGGING = {
@@ -241,11 +272,36 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'payments': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'bookings': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }
 
-import sys
-if 'test' in sys.argv:
+# ---- Production guard rails: fail at start-up, not at the first sale ---- #
+if not DEBUG and not TESTING:
+    _problems = []
+    if '*' in ALLOWED_HOSTS:
+        _problems.append('DJANGO_ALLOWED_HOSTS must list real host names, not "*"')
+    if _is_placeholder(STRIPE_SECRET_KEY) or _is_placeholder(STRIPE_WEBHOOK_SECRET):
+        _problems.append('STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set')
+    if 'console' in EMAIL_BACKEND or 'locmem' in EMAIL_BACKEND:
+        _problems.append('EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
+                         'sign-up and password-reset codes are delivered by email')
+    if _problems:
+        raise ImproperlyConfigured(
+            'Refusing to start with DJANGO_DEBUG=0: ' + '; '.join(_problems)
+            + '. For local development set DJANGO_DEBUG=1 (see .env.example).'
+        )
+
+if TESTING:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {}
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'

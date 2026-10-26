@@ -11,7 +11,8 @@ class Payment(models.Model):
         (METHOD_OFFLINE, 'Offline / manual'),
     ]
 
-    registration = models.OneToOneField(Registration, on_delete=models.CASCADE, related_name='payment')
+    # PROTECT: money records must never disappear with an event or a user.
+    registration = models.OneToOneField(Registration, on_delete=models.PROTECT, related_name='payment')
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
     stripe_checkout_session_id = models.CharField(max_length=255, blank=True)
     amount = models.DecimalField(max_digits=10, decimal_places=2)

@@ -1,8 +1,12 @@
 import { Injectable, OnDestroy } from '@angular/core';
-import { Observable, Subject, BehaviorSubject, timer, EMPTY } from 'rxjs';
+import { Observable, Subject, timer } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
-import { catchError, switchMap, tap, retryWhen, delay, takeUntil } from 'rxjs/operators';
+import { retry, takeUntil } from 'rxjs/operators';
 import { Seat } from '../models/models';
+
+/** Reconnect with exponential backoff (1 s, 2 s, 4 s … capped at 30 s) and give
+ *  up after this many attempts — the HTTP seat map still works without WS. */
+const MAX_RECONNECTS = 8;
 
 export interface WsSeatUpdate {
   type: 'seat_update';
@@ -22,7 +26,6 @@ export type WsMessage = WsSeatUpdate | WsSnapshot;
 export class SeatWsService implements OnDestroy {
   private socket$: WebSocketSubject<WsMessage> | null = null;
   private destroy$ = new Subject<void>();
-  private reconnectDelay = 2000;
 
   /** Emits individual seat updates (is_available flipped) */
   private updates$ = new Subject<WsSeatUpdate>();
@@ -34,24 +37,26 @@ export class SeatWsService implements OnDestroy {
     if (this.socket$) this.disconnect();
 
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-    // In dev: backend is on port 8000, frontend proxy passes /ws/ → backend
-    const wsUrl = `${protocol}://${window.location.hostname}:8000/ws/seats/${eventId}/`;
+    // Same origin as the page: nginx (and the dev-server proxy) forward /ws/
+    // to Daphne, so this works over HTTPS and without exposing port 8000.
+    const wsUrl = `${protocol}://${window.location.host}/ws/seats/${eventId}/`;
 
-    this.socket$ = webSocket<WsMessage>({
-      url: wsUrl,
-      openObserver: { next: () => console.log(`[SeatWS] Connected event=${eventId}`) },
-      closeObserver: { next: () => console.log(`[SeatWS] Disconnected event=${eventId}`) },
-    });
+    this.socket$ = webSocket<WsMessage>({ url: wsUrl });
 
     this.socket$.pipe(
-      retryWhen(errors => errors.pipe(delay(this.reconnectDelay))),
+      retry({
+        count: MAX_RECONNECTS,
+        delay: (_err, attempt) => timer(Math.min(1000 * 2 ** (attempt - 1), 30_000)),
+        resetOnSuccess: true,
+      }),
       takeUntil(this.destroy$),
     ).subscribe({
       next: msg => {
         if (msg.type === 'snapshot') this.snapshot$.next(msg as WsSnapshot);
         if (msg.type === 'seat_update') this.updates$.next(msg as WsSeatUpdate);
       },
-      error: err => console.warn('[SeatWS] Error', err),
+      // Live updates are a progressive enhancement; the page keeps working.
+      error: () => { this.socket$ = null; },
     });
   }
 

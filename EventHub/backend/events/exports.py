@@ -16,6 +16,18 @@ HEADERS = [
 ]
 
 
+_FORMULA_PREFIXES = ('=', '+', '-', '@', '\t', '\r')
+
+
+def _safe(value):
+    """Neutralise spreadsheet formula injection: a name like
+    '=HYPERLINK("http://evil", "click")' must stay text in the organizer's
+    Excel, so values starting with a formula trigger get a leading quote."""
+    if isinstance(value, str) and value.startswith(_FORMULA_PREFIXES):
+        return "'" + value
+    return value
+
+
 def _rows(event):
     regs = (
         event.registrations
@@ -34,11 +46,11 @@ def _rows(event):
         pay = getattr(r, 'payment', None)
         if pay:
             amount = float(pay.net_amount)
-        yield [
+        yield [_safe(v) for v in [
             full_name, u.username, u.email, tier, r.status,
             'Yes' if r.is_checked_in else 'No', seat, zone, promo, amount,
             r.registered_at.strftime('%Y-%m-%d %H:%M'), str(r.ticket_uuid),
-        ]
+        ]]
 
 
 def attendees_csv_response(event) -> HttpResponse:
@@ -83,7 +95,7 @@ def attendees_csv_response(event) -> HttpResponse:
     for r in range(2, row_count + 2):
         cell = ws.cell(row=r, column=amount_col)
         if isinstance(cell.value, (int, float)):
-            cell.number_format = '$#,##0.00'
+            cell.number_format = '#,##0.00'
 
     # Auto width (capped) + freeze header + filter
     for i, w in enumerate(widths, start=1):

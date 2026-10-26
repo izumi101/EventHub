@@ -12,6 +12,8 @@ from datetime import timedelta
 from django.db import transaction
 from django.utils import timezone
 
+from common.choices import EventStatusChoices
+
 from .models import Event, WaitlistEntry
 from .notify import notify
 
@@ -63,6 +65,11 @@ def promote_waitlist(event: Event):
     Safe to call often and concurrently — uses row locks on the entries.
     """
     now = timezone.now()
+    # Re-read the counts: the caller's instance may carry stale annotations.
+    event = Event.objects.get(pk=event.pk)
+    # Spots freed by cancelling/finishing the event are not for sale.
+    if event.status != EventStatusChoices.PUBLISHED or event.date < now:
+        return 0
 
     # 1. Expire offers that timed out so their spot can pass on.
     WaitlistEntry.objects.filter(

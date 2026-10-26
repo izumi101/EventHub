@@ -1,5 +1,6 @@
 # pyrefly: ignore [missing-import]
 from django.contrib.auth.models import User
+from django.core import mail
 # pyrefly: ignore [missing-import]
 from django.urls import reverse
 # pyrefly: ignore [missing-import]
@@ -32,10 +33,15 @@ class AccountsTests(APITestCase):
         self.assertTrue(EmailVerificationCode.objects.filter(email="newuser@example.com").exists())
 
     def test_send_verification_code_existing_email(self):
+        # Same answer as for a new address (no account enumeration), but no
+        # code is issued — the owner gets a "someone tried" email instead.
         url = reverse("register_send_code")
         data = {"email": "testuser@example.com"}
         response = self.client.post(url, data)
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("dev_code", response.data)
+        self.assertFalse(EmailVerificationCode.objects.filter(email="testuser@example.com").exists())
+        self.assertEqual(len(mail.outbox), 1)
 
     def test_verify_registration_code_success(self):
         email = "newuser@example.com"

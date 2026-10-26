@@ -36,9 +36,10 @@ def seat_price(event, seat) -> Decimal:
 
 def zone_price_table(event) -> list[dict]:
     """Return the price for each zone present in the event's seat map."""
+    from django.core.exceptions import ObjectDoesNotExist
     try:
         seat_map = event.seat_map
-    except Exception:
+    except ObjectDoesNotExist:
         return []
 
     base = Decimal(str(event.price or 0))

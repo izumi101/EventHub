@@ -1,5 +1,8 @@
 """Registrations: ticket check-in by UUID and the attendee's own list."""
 
+import uuid as uuid_lib
+
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from rest_framework import generics, viewsets, status
 from rest_framework.decorators import action
@@ -8,9 +11,11 @@ from rest_framework.response import Response
 
 from common.choices import RegistrationStatusChoices
 
-from ..models import Registration
+from django.db.models import Prefetch
+
+from ..models import Event, Registration
 from ..serializers import RegistrationSerializer
-from ..services import check_in_registration, reconcile_paid_registrations
+from ..services import check_in_registration
 
 
 class RegistrationViewSet(viewsets.GenericViewSet):
@@ -20,7 +25,12 @@ class RegistrationViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=['post'], url_path='check-in/(?P<uuid>[^/.]+)')
     def check_in(self, request, uuid=None):
-        registration = Registration.objects.filter(ticket_uuid=uuid).first()
+        try:
+            uuid = uuid_lib.UUID(str(uuid))
+        except ValueError:
+            return Response({'error': 'Invalid ticket code.', 'status': 'invalid'},
+                            status=status.HTTP_400_BAD_REQUEST)
+        registration = Registration.objects.select_related('event').filter(ticket_uuid=uuid).first()
         if registration is None:
             # Group-booking tickets live in BookingSeat, not Registration.
             return self._check_in_booking_seat(request, uuid)
@@ -57,7 +67,7 @@ class RegistrationViewSet(viewsets.GenericViewSet):
         from django.utils import timezone as _tz
 
         seat_ticket = get_object_or_404(
-            BookingSeat.objects.select_related('booking__event', 'booking__owner', 'claimed_by'),
+            BookingSeat.objects.select_related('booking__event', 'booking__owner', 'claimed_by', 'seat'),
             ticket_uuid=uuid,
         )
         booking = seat_ticket.booking
@@ -73,7 +83,13 @@ class RegistrationViewSet(viewsets.GenericViewSet):
             or (seat_ticket.claimed_by.username if seat_ticket.claimed_by_id else '')
             or booking.owner.username
         )
-        if seat_ticket.is_checked_in:
+        # Conditional UPDATE: of two simultaneous scans only one flips the flag.
+        with transaction.atomic():
+            admitted = BookingSeat.objects.filter(pk=seat_ticket.pk, is_checked_in=False).update(
+                is_checked_in=True, checked_in_at=_tz.now(),
+            )
+        if not admitted:
+            seat_ticket.refresh_from_db(fields=['checked_in_at'])
             return Response({
                 'message': 'Ticket already checked in!',
                 'status': 'used',
@@ -81,9 +97,6 @@ class RegistrationViewSet(viewsets.GenericViewSet):
                 'checked_in_at': seat_ticket.checked_in_at,
             })
 
-        seat_ticket.is_checked_in = True
-        seat_ticket.checked_in_at = _tz.now()
-        seat_ticket.save(update_fields=['is_checked_in', 'checked_in_at'])
         return Response({
             'message': f'Ticket valid! Group seat {seat_ticket.seat.row}-{seat_ticket.seat.col}.',
             'status': 'success',
@@ -97,10 +110,20 @@ class MyRegistrationsView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        # Heal any pending-but-paid registrations before listing so the UI
-        # reflects the true (confirmed) state instead of "payment incomplete".
-        reconcile_paid_registrations(user=self.request.user)
-        qs = Registration.objects.filter(user=self.request.user).exclude(status=RegistrationStatusChoices.CANCELLED).select_related('event', 'event__organizer', 'event__category', 'seat')
+        qs = (
+            Registration.objects
+            .filter(user=self.request.user)
+            .exclude(status=RegistrationStatusChoices.CANCELLED)
+            .select_related(
+                'user', 'seat', 'seat__seat_map', 'payment', 'promo_code', 'ticket_type', 'refund_request',
+            )
+            .prefetch_related(
+                # Events come with their capacity counts annotated, so the
+                # nested event card doesn't run extra queries per ticket.
+                Prefetch('event', queryset=Event.objects.select_related('organizer', 'category').with_capacity()),
+                'answers__question',
+            )
+        )
         # ?event=<id> lets the event page fetch exactly its own registration
         # instead of paging through everything the user ever booked.
         event_id = self.request.query_params.get('event')

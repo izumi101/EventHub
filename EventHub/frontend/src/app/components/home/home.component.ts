@@ -283,6 +283,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   readonly icons = { Search, MapPin, SlidersHorizontal, ChevronRight, X };
 
   private searchSub?: Subscription;
+  private locationSub?: Subscription;
 
   constructor(
     private eventService: EventService,
@@ -305,7 +306,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       }
     });
 
-    this.searchService.searchLocation$.pipe(
+    // Kept in its own subscription so it is released with the component —
+    // the root SearchService outlives every visit to the home page.
+    this.locationSub = this.searchService.searchLocation$.pipe(
       distinctUntilChanged()
     ).subscribe(loc => {
       this.searchLocation = loc;
@@ -314,6 +317,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.searchSub?.unsubscribe();
+    this.locationSub?.unsubscribe();
   }
 
   get hasActiveFilters(): boolean {

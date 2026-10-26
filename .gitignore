@@ -17,3 +17,6 @@ __pycache__/
 .idea/
 .vscode/
 pyrightconfig.json
+
+# Local Redis snapshots
+dump.rdb

@@ -1,19 +1,46 @@
 import logging
 import secrets
 
+from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
 from django.db import transaction
+from django.db.models import F
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import EmailVerificationCode, PasswordResetCode
-from common.auth import get_user_by_identifier, password_meets_policy
+from .models import MAX_CODE_ATTEMPTS, EmailVerificationCode, PasswordResetCode
+from common.auth import (
+    email_in_use,
+    get_user_by_identifier,
+    password_meets_policy,
+    revoke_all_refresh_tokens,
+)
 
 logger = logging.getLogger(__name__)
 
-WELCOME_FROM_EMAIL = 'EventHub Team <eventhub.supporting@gmail.com>'
-VERIFICATION_FROM_EMAIL = 'EventHub <eventhub.supporting@gmail.com>'
+INVALID_CODE_MESSAGE = 'Invalid or expired code.'
+
+
+def _from_email():
+    return settings.DEFAULT_FROM_EMAIL
+
+
+def _code_matches(model, entry, code) -> bool:
+    """Check a 6-digit code against `entry`, counting the attempt *before*
+    comparing: parallel guesses can't exceed MAX_CODE_ATTEMPTS, and the code
+    is burned once the budget is spent."""
+    if entry is None or entry.is_used or entry.is_expired:
+        return False
+    counted = model.objects.filter(
+        pk=entry.pk, is_used=False, attempts__lt=MAX_CODE_ATTEMPTS,
+    ).update(attempts=F('attempts') + 1)
+    if not counted:
+        return False
+    if secrets.compare_digest(str(entry.code), str(code or '').strip()):
+        return True
+    model.objects.filter(pk=entry.pk, attempts__gte=MAX_CODE_ATTEMPTS).update(is_used=True)
+    return False
 
 
 def build_auth_payload(user):
@@ -59,7 +86,7 @@ def register_user(validated_data):
         send_mail(
             'Welcome to EventHub 🎉',
             'Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe\'re really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let\'s build something awesome together 🔥\n\nSee you inside,\nEventHub Team',
-            WELCOME_FROM_EMAIL,
+            _from_email(),
             [user.email],
             fail_silently=True,
         )
@@ -89,7 +116,7 @@ def create_organizer(validated_data):
         send_mail(
             'Your EventHub organizer account',
             f'Hello!\n\nAn administrator created an organizer account for you on EventHub.\n\nUsername: {user.username}\n\nSign in and start creating events. Remember to change your password after the first login.\n\nEventHub Team',
-            WELCOME_FROM_EMAIL,
+            _from_email(),
             [user.email],
             fail_silently=True,
         )
@@ -99,15 +126,27 @@ def create_organizer(validated_data):
     return user
 
 
-def send_registration_code(email: str) -> EmailVerificationCode:
-    if User.objects.filter(email=email).exists():
-        raise ValueError('A user with this email already exists')
+def send_registration_code(email: str):
+    """Email a sign-up code. Returns the code row, or None when the address
+    already has an account — the API answers the same in both cases so it
+    can't be used to find out who is registered; the owner gets a heads-up."""
+    if email_in_use(email):
+        send_mail(
+            'EventHub — sign-up attempt',
+            'Someone tried to create an EventHub account with this email address, '
+            'but you already have one. If it was you, sign in or reset your password. '
+            'Otherwise you can ignore this email.',
+            _from_email(),
+            [email],
+            fail_silently=True,
+        )
+        return None
 
     verification = EmailVerificationCode.create_for_email(email)
     send_mail(
         'EventHub — Registration Verification Code',
         f'Your verification code is: {verification.code}\n\nThis code expires in 15 minutes.',
-        VERIFICATION_FROM_EMAIL,
+        _from_email(),
         [email],
         fail_silently=False,
     )
@@ -115,8 +154,12 @@ def send_registration_code(email: str) -> EmailVerificationCode:
 
 
 def verify_registration_code(email: str, code: str) -> EmailVerificationCode:
-    verification = EmailVerificationCode.objects.filter(email=email, code=code, is_used=False).first()
-    if not verification or verification.is_expired:
+    verification = (
+        EmailVerificationCode.objects
+        .filter(email__iexact=(email or '').strip(), is_used=False)
+        .order_by('-created_at').first()
+    )
+    if not _code_matches(EmailVerificationCode, verification, code):
         raise ValueError('Invalid or expired verification code.')
     return verification
 
@@ -138,7 +181,7 @@ def request_password_reset(identifier: str):
     send_mail(
         'EventHub — Password Reset Code',
         f'Your password reset code is: {reset_code.code}\n\nThis code expires in 15 minutes.\n\nIf you did not request this, please ignore this email.',
-        VERIFICATION_FROM_EMAIL,
+        _from_email(),
         [user.email],
         fail_silently=True,
     )
@@ -147,15 +190,15 @@ def request_password_reset(identifier: str):
 
 def verify_password_reset_code(identifier: str, code: str):
     user = get_user_by_identifier(identifier)
-    if not user:
-        raise ValueError('Invalid code.')
-
-    reset_entry = PasswordResetCode.objects.filter(
-        user=user, code=code, is_used=False
-    ).first()
-
-    if not reset_entry or reset_entry.is_expired:
-        raise ValueError('Invalid or expired code.')
+    reset_entry = None
+    if user is not None:
+        reset_entry = (
+            PasswordResetCode.objects.filter(user=user, is_used=False)
+            .order_by('-created_at').first()
+        )
+    # Same answer for "no such account" and "wrong code" (no enumeration).
+    if not _code_matches(PasswordResetCode, reset_entry, code):
+        raise ValueError(INVALID_CODE_MESSAGE)
 
     reset_token = secrets.token_urlsafe(48)
     reset_entry.reset_token = reset_token
@@ -163,25 +206,46 @@ def verify_password_reset_code(identifier: str, code: str):
     return reset_entry
 
 
+@transaction.atomic
 def confirm_password_reset(reset_token: str, new_password: str, new_password2: str):
     if new_password != new_password2:
         raise ValueError('Passwords do not match.')
 
-    is_valid, message = password_meets_policy(new_password)
-    if not is_valid:
-        raise ValueError(message)
-
-    reset_entry = PasswordResetCode.objects.filter(
-        reset_token=reset_token, is_used=False
-    ).first()
+    reset_entry = (
+        PasswordResetCode.objects.select_for_update()
+        .filter(reset_token=reset_token, is_used=False).first()
+    ) if reset_token else None
 
     if not reset_entry or reset_entry.is_expired:
         raise ValueError('Invalid or expired reset token.')
 
     user = reset_entry.user
+    is_valid, message = password_meets_policy(new_password, user)
+    if not is_valid:
+        raise ValueError(message)
+
     user.set_password(new_password)
     user.save(update_fields=['password'])
+    revoke_all_refresh_tokens(user)
 
     reset_entry.is_used = True
     reset_entry.save(update_fields=['is_used'])
     return user
+
+
+@transaction.atomic
+def change_password(user, old_password: str, new_password: str, new_password2: str):
+    """Returns a fresh token pair for the current device; every other session
+    (all previously issued refresh tokens) is signed out."""
+    if not user.check_password(old_password):
+        raise ValueError('Current password is incorrect.')
+    if new_password != new_password2:
+        raise ValueError('Passwords do not match.')
+    is_valid, message = password_meets_policy(new_password, user)
+    if not is_valid:
+        raise ValueError(message)
+    user.set_password(new_password)
+    user.save(update_fields=['password'])
+    revoke_all_refresh_tokens(user)
+    refresh = RefreshToken.for_user(user)
+    return {'refresh': str(refresh), 'access': str(refresh.access_token)}
