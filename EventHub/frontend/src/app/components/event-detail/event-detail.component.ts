@@ -494,7 +494,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         } @else if (event.has_ticket_types) {
                           Choose tickets
                         } @else {
-                          {{ event.is_free ? 'Register for free' : 'Get tickets — $' + currentGaPrice }}
+                          {{ event.is_free ? 'Register for free' : 'Get tickets — ' + (currentGaPrice | money: event.currency) }}
                         }
                       </button>
                       @if (!event.is_free && !event.has_ticket_types) {
