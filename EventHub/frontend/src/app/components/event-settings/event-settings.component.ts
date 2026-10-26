@@ -301,7 +301,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                     <div class="flex gap-2">
                       <button (click)="resolveRefund(r, false)" [disabled]="resolvingId === r.id" class="btn btn-secondary flex-1 text-sm">Decline</button>
                       <button (click)="resolveRefund(r, true)" [disabled]="resolvingId === r.id" class="btn btn-primary flex-1 text-sm">
-                        {{ resolvingId === r.id ? '…' : 'Approve & refund $' + r.amount }}
+                        {{ resolvingId === r.id ? '…' : 'Approve & refund ' + (r.amount | money: event?.currency) }}
                       </button>
                     </div>
                   } @else if (r.organizer_note) {

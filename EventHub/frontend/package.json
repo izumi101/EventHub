@@ -5,7 +5,8 @@
     "ng": "ng",
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
-    "watch": "ng build --watch --configuration development"
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test --watch=false"
   },
   "private": true,
   "dependencies": {
@@ -26,12 +27,16 @@
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "^21.2.14",
+    "@angular/build": "^21.2.28",
     "@angular/cli": "^21.2.14",
     "@angular/compiler-cli": "^21.2.25",
+    "@playwright/test": "^1.63.0",
     "@types/qrcode": "^1.5.6",
     "autoprefixer": "^10.4.16",
+    "jsdom": "^26.1.0",
     "postcss": "^8.5.9",
     "tailwindcss": "^3.4.1",
-    "typescript": "5.9"
+    "typescript": "5.9",
+    "vitest": "^4.1.12"
   }
 }

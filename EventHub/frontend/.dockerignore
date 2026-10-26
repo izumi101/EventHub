@@ -6,3 +6,6 @@ dist/
 npm-debug.log*
 .claude/
 certs/
+test-results/
+playwright-report/
+e2e/
