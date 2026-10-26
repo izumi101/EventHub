@@ -58,6 +58,12 @@ def _claim(limit: int) -> list:
     """Lease up to `limit` due jobs. Short transaction; SKIP LOCKED lets
     several workers run side by side without taking the same job."""
     now = timezone.now()
+    # A job whose lease ran out while it was running took its worker down
+    # with it (OOM, kill). Once it has used up its attempts, stop handing it
+    # out — otherwise a job that crashes the worker would cycle forever.
+    Job.objects.filter(
+        status=Job.STATUS_RUNNING, run_after__lte=now, attempts__gte=F('max_attempts'),
+    ).update(status=Job.STATUS_FAILED, last_error='The worker stopped while running this job.')
     with transaction.atomic():
         jobs = list(
             Job.objects.select_for_update(skip_locked=True)
