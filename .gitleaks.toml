@@ -1,0 +1,13 @@
+# gitleaks configuration (picked up automatically from the repository root by
+# the CI scan and by the pre-commit hook).
+title = "EventHub gitleaks config"
+
+[extend]
+useDefault = true
+
+# Keep every allowlist as narrow as possible: one rule, one file. Never
+# allowlist a real secret; rotate it instead.
+[[allowlists]]
+description = "SVG icon constant named `LinkedinIcon` is not a LinkedIn client id"
+targetRules = ["linkedin-client-id"]
+paths = ['''^EventHub/frontend/src/app/components/footer/brand-icons\.ts$''']
