@@ -24,7 +24,7 @@
 | Оплата | Stripe (Checkout, Webhooks) |
 | Поиск | sentence-transformers, pgvector |
 | Frontend | Angular 21 (standalone components), RxJS, Tailwind CSS |
-| Инфраструктура | Docker Compose, Nginx, Prometheus + Grafana (опционально) |
+| Инфраструктура | Docker Compose, Nginx, Unleash — feature flags (опционально, `docs/FEATURE_FLAGS.md`), Prometheus + Grafana (опционально) |
 
 ## Структура проекта
 
@@ -35,6 +35,7 @@ EventHub/
 │   ├── events/                # события, брони, карты мест, поиск, аналитика
 │   ├── bookings/               # групповые бронирования
 │   ├── payments/               # Stripe-интеграция
+│   ├── featureflags/           # feature flags (Unleash) с безопасными значениями по умолчанию
 │   └── eventhub_backend/        # настройки Django-проекта
 ├── frontend/                 # Angular SPA
 │   └── src/app/
