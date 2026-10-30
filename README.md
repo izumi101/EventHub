@@ -136,7 +136,7 @@ npm start
 ```bash
 cd EventHub/backend
 python manage.py test        # нужен PostgreSQL: часть тестов проверяет настоящие транзакции и гонки
-ruff check --select F,E9 --exclude "*/migrations/*" .
+ruff format --check . && ruff check .   # правила — в pyproject.toml
 
 cd EventHub/frontend
 npm test                     # unit-тесты (Vitest)
