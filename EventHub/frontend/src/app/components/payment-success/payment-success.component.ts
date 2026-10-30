@@ -3,8 +3,37 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute } from '@angular/router';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
-import { PaymentVerificationResponse } from '../../models/models';
+import { BookingStatus, PaymentStatus } from '../../models/models';
 import { LucideAngularModule, CheckCircle, AlertCircle } from 'lucide-angular';
+
+/** What the page tells the buyer, from a ticket payment or a group booking. */
+type Outcome = 'paid' | 'processing' | 'refunded';
+
+interface PaymentResult {
+  outcome: Outcome;
+  event_title: string;
+  amount: string;
+  currency?: string;
+}
+
+// Keyed by the API's status enums: a status the backend adds later won't
+// compile until someone decides how this page presents it.
+const PAYMENT_OUTCOME: Record<PaymentStatus, Outcome> = {
+  completed: 'paid',
+  refunded: 'refunded',
+  pending: 'processing',
+  failed: 'processing',
+};
+
+// A booking that ended (expired/cancelled) by the time the money arrived is
+// refunded automatically by the backend.
+const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
+  confirmed: 'paid',
+  refunded: 'refunded',
+  expired: 'refunded',
+  cancelled: 'refunded',
+  holding: 'processing',
+};
 
 @Component({
   selector: 'app-payment-success',
@@ -20,7 +49,7 @@ import { LucideAngularModule, CheckCircle, AlertCircle } from 'lucide-angular';
             <p class="text-sm text-muted-foreground">Confirming your payment...</p>
           </div>
 
-        } @else if (data && data.status === 'completed') {
+        } @else if (data && data.outcome === 'paid') {
           <div class="flex flex-col items-center gap-3 mb-6">
             <div class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center">
               <lucide-icon [img]="icons.CheckCircle" class="w-8 h-8 text-[color:var(--pine-600)]" aria-hidden="true"></lucide-icon>
@@ -42,7 +71,7 @@ import { LucideAngularModule, CheckCircle, AlertCircle } from 'lucide-angular';
             }
             <div class="px-4 py-3 flex justify-between gap-3">
               <span class="text-muted-foreground flex-shrink-0">Status</span>
-              <span class="badge badge-confirmed">{{ data.status | titlecase }}</span>
+              <span class="badge badge-confirmed">Paid</span>
             </div>
           </div>
 
@@ -67,7 +96,7 @@ import { LucideAngularModule, CheckCircle, AlertCircle } from 'lucide-angular';
             <div class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center">
               <lucide-icon [img]="icons.AlertCircle" class="w-8 h-8 text-[color:var(--destructive)]" aria-hidden="true"></lucide-icon>
             </div>
-            @if (data.status === 'refunded' || data.status === 'expired' || data.status === 'cancelled') {
+            @if (data.outcome === 'refunded') {
               <h1 class="text-xl font-bold text-foreground">Payment refunded</h1>
               <p class="text-sm text-muted-foreground">
                 Your seat hold had ended before the payment arrived, so the money was returned automatically.
@@ -112,7 +141,7 @@ import { LucideAngularModule, CheckCircle, AlertCircle } from 'lucide-angular';
 })
 export class PaymentSuccessComponent implements OnInit {
   loading = true;
-  data: PaymentVerificationResponse | null = null;
+  data: PaymentResult | null = null;
   error = '';
   isBooking = false;
 
@@ -139,7 +168,7 @@ export class PaymentSuccessComponent implements OnInit {
         booking$.subscribe({
           next: b => {
             this.data = {
-              status: b.status === 'confirmed' ? 'completed' : b.status,
+              outcome: BOOKING_OUTCOME[b.status],
               event_title: b.event_title,
               amount: b.total_due ?? b.total_price,
               currency: b.currency,
@@ -161,7 +190,15 @@ export class PaymentSuccessComponent implements OnInit {
         return;
       }
       this.paymentService.verifyPayment(sessionId).subscribe({
-        next: d => { this.data = d; this.loading = false; },
+        next: d => {
+          this.data = {
+            outcome: PAYMENT_OUTCOME[d.status],
+            event_title: d.event_title,
+            amount: d.amount,
+            currency: d.currency,
+          };
+          this.loading = false;
+        },
         error: err => { this.error = err.error?.error || err.error?.detail || 'Verification failed.'; this.loading = false; },
       });
     });

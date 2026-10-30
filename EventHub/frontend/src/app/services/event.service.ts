@@ -6,6 +6,7 @@ import {
   CheckInResponse,
   Event,
   EventActionResponse,
+  EventAttendee,
   EventFormPayload,
   EventStatsResponse,
   PaginatedResponse,
@@ -13,6 +14,7 @@ import {
 } from '../models/models';
 import { map } from 'rxjs/operators';
 import { environment } from '../../environments/environment';
+import type { components } from '../api/openapi';
 
 @Injectable({ providedIn: 'root' })
 export class EventService {
@@ -130,8 +132,8 @@ export class EventService {
   /**
    * Retrieves all confirmed registrations for a specific event.
    */
-  getEventRegistrations(eventId: number): Observable<Registration[]> {
-    return this.http.get<Registration[]>(`${this.apiUrl}/events/${eventId}/registrations/`);
+  getEventRegistrations(eventId: number): Observable<EventAttendee[]> {
+    return this.http.get<EventAttendee[]>(`${this.apiUrl}/events/${eventId}/registrations/`);
   }
 
   // ── Favorites ──
@@ -368,161 +370,23 @@ export class EventService {
   }
 }
 
-export interface QueueStatus {
-  status: 'queued' | 'admitted' | 'not_in_queue' | 'not_needed';
-  position?: number;
-  total?: number;
-  wait_minutes?: number;
-  token?: string;
-  expires_in?: number;
-  message?: string;
-}
+// API shapes come from the backend's OpenAPI schema (see models/models.ts).
+type Schemas = components['schemas'];
 
-export interface EventAnalytics {
-  currency: string;
-  kpis: {
-    net_revenue: number;
-    gross_revenue: number;
-    refunded: number;
-    tickets_sold: number;
-    paid_orders: number;
-    avg_order_value: number;
-    capacity: number;
-    sold_through_pct: number;
-    checked_in: number;
-    checkin_rate_pct: number;
-    pending: number;
-  };
-  timeline: { date: string; tickets: number; revenue: number }[];
-  by_ticket_type: { name: string; count: number; revenue: number }[];
-  by_affiliate: { name: string; count: number; revenue: number }[];
-}
-
-export interface BroadcastResult {
-  recipients: number;
-  notified: number;
-  emailed: number;
-  email_enabled: boolean;
-}
-
-export interface RefundRequest {
-  id: number;
-  username: string;
-  full_name: string;
-  amount: string;
-  ticket_type: string | null;
-  status: 'pending' | 'approved' | 'rejected';
-  reason: string;
-  organizer_note: string;
-  created_at: string;
-  resolved_at: string | null;
-}
-
-export interface PriceBreakdown {
-  subtotal: string;
-  tax_percent: string;
-  tax: string;
-  fee_percent: string;
-  fee: string;
-  fees_passed_to_buyer: boolean;
-  total: string;
-  currency: string;
-}
-
-export interface PromoQuote {
-  code: string;
-  discount_type: 'percent' | 'fixed';
-  discount_value: string;
-  base_price: string;
-  final_price: string;
-  savings: string;
-}
-
-export interface PromoCode {
-  id: number;
-  code: string;
-  discount_type: 'percent' | 'fixed';
-  discount_value: string;
-  max_uses: number | null;
-  times_used: number;
-  expires_at: string | null;
-  is_active: boolean;
-  created_at: string;
-  is_valid: boolean;
-  is_expired: boolean;
-  is_exhausted: boolean;
-}
-
-export type TicketKind = 'paid' | 'free' | 'donation';
-export type SaleState = 'on_sale' | 'sold_out' | 'scheduled' | 'ended' | 'inactive';
-
-export interface TicketType {
-  id: number;
-  name: string;
-  description: string;
-  kind: TicketKind;
-  price: string;
-  quantity: number | null;
-  min_per_order: number;
-  max_per_order: number;
-  sale_start: string | null;
-  sale_end: string | null;
-  is_active: boolean;
-  order: number;
-  sold: number;
-  available: number | null;
-  is_sold_out: boolean;
-  on_sale: boolean;
-  sale_state: SaleState;
-}
-
-export type QuestionType = 'text' | 'textarea' | 'dropdown' | 'checkbox' | 'date' | 'phone';
-
-export interface EventQuestion {
-  id: number;
-  label: string;
-  question_type: QuestionType;
-  options: string[];
-  is_required: boolean;
-  order: number;
-}
-
-export interface WaitlistStatus {
-  status: 'waiting' | 'offered' | 'converted' | 'expired' | 'not_joined' | 'spots_available' | 'left';
-  position?: number | null;
-  offer_expires_at?: string | null;
-  message?: string;
-}
-
-export interface EventStaff {
-  id: number;
-  username: string;
-  email: string;
-  role: 'co_organizer' | 'check_in';
-  created_at: string;
-}
-
-export type WebhookTrigger = 'ticket_sold' | 'registration_created' | 'refund_issued' | 'attendee_checked_in';
-
-export interface Webhook {
-  id: number;
-  url: string;
-  secret: string;
-  triggers: WebhookTrigger[];
-  is_active: boolean;
-  created_at: string;
-  last_triggered_at: string | null;
-  last_status: number | null;
-  deliveries_count: number;
-}
-
-export interface Affiliate {
-  id: number;
-  name: string;
-  code: string;
-  clicks: number;
-  sales: number;
-  revenue: string;
-  is_active: boolean;
-  created_at: string;
-}
+export type QueueStatus = Schemas['QueueStatus'];
+export type EventAnalytics = Schemas['EventAnalytics'];
+export type BroadcastResult = Schemas['BroadcastResult'];
+export type RefundRequest = Schemas['RefundRequest'];
+export type PriceBreakdown = Schemas['PriceBreakdown'];
+export type PromoQuote = Schemas['PromoQuote'];
+export type PromoCode = Schemas['PromoCode'];
+export type TicketKind = Schemas['TicketKindEnum'];
+export type SaleState = Schemas['SaleStateEnum'];
+export type TicketType = Schemas['TicketType'];
+export type QuestionType = Schemas['QuestionTypeEnum'];
+export type EventQuestion = Schemas['EventQuestion'];
+export type WaitlistStatus = Schemas['WaitlistStatus'];
+export type EventStaff = Schemas['EventStaff'];
+export type WebhookTrigger = Schemas['WebhookTriggerEnum'];
+export type Webhook = Schemas['Webhook'];
+export type Affiliate = Schemas['Affiliate'];

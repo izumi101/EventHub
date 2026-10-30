@@ -8,7 +8,7 @@ async function login(page: Page, username: string, password: string) {
   await page.fill('input[name="username"]', username);
   await page.fill('input[name="password"]', password);
   const [response] = await Promise.all([
-    page.waitForResponse(r => r.url().includes('/api/auth/login/')),
+    page.waitForResponse(r => r.url().includes('/api/v1/auth/login/')),
     page.click('button[type="submit"]'),
   ]);
   expect(response.status()).toBe(200);
@@ -54,11 +54,11 @@ test('attendee buys a paid ticket and gets the online link', async ({ page }) =>
   await expect(page.getByText(PAID_ONLINE_EVENT).first()).toBeVisible();
 
   // The join link is only revealed to confirmed ticket holders.
-  const events = await page.request.get('/api/events/?search=Django');
+  const events = await page.request.get('/api/v1/events/?search=Django');
   const id = (await events.json()).results[0].id;
   const token = await page.evaluate(() => localStorage.getItem('access_token'));
-  const anonymous = await (await page.request.get(`/api/events/${id}/`, { headers: {} })).json();
-  const holder = await (await page.request.get(`/api/events/${id}/`, {
+  const anonymous = await (await page.request.get(`/api/v1/events/${id}/`, { headers: {} })).json();
+  const holder = await (await page.request.get(`/api/v1/events/${id}/`, {
     headers: { Authorization: `Bearer ${token}` },
   })).json();
   expect(anonymous.online_link).toBe('');
@@ -68,14 +68,14 @@ test('attendee buys a paid ticket and gets the online link', async ({ page }) =>
 });
 
 test('seat map updates arrive over the WebSocket through nginx', async ({ page }) => {
-  const events = await (await page.request.get('/api/events/?search=Startup')).json();
+  const events = await (await page.request.get('/api/v1/events/?search=Startup')).json();
   const id = events.results[0].id;
 
   // The demo data has no seat maps: the organizer creates one (400 if it exists).
-  const org = await (await page.request.post('/api/auth/login/', {
+  const org = await (await page.request.post('/api/v1/auth/login/', {
     data: { username: 'organizer', password: 'password123' },
   })).json();
-  await page.request.post(`/api/events/${id}/seat-map/create/`, {
+  await page.request.post(`/api/v1/events/${id}/seat-map/create/`, {
     data: { rows: 2, cols: 4, sync_capacity: false },
     headers: { Authorization: `Bearer ${org.tokens.access}` },
   });
@@ -90,7 +90,7 @@ test('seat map updates arrive over the WebSocket through nginx', async ({ page }
 });
 
 test('sign-up code is queued for the worker, not sent in the request', async ({ request }) => {
-  const response = await request.post('/api/auth/register/send-code/', {
+  const response = await request.post('/api/v1/auth/register/send-code/', {
     data: { email: `e2e-${Date.now()}@example.com` },
   });
   expect(response.status()).toBe(200);

@@ -51,6 +51,15 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
       - name: Tests (PostgreSQL, real transactions)
         run: python manage.py test --noinput
+      - name: OpenAPI schema is valid and committed
+        env:
+          DJANGO_DEBUG: "1"
+        run: |
+          python manage.py spectacular --file /tmp/openapi.yaml --validate --fail-on-warn
+          diff -u openapi.yaml /tmp/openapi.yaml || {
+            echo "::error file=EventHub/backend/openapi.yaml::Out of date. In EventHub/backend run: python manage.py spectacular --file openapi.yaml --validate --fail-on-warn"
+            exit 1
+          }
       - name: Dependency audit
         run: pip-audit -r requirements.lock --progress-spinner off
 
@@ -67,6 +76,13 @@ jobs:
           cache: npm
           cache-dependency-path: EventHub/frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: API types match the backend schema
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/app/api/openapi.ts || {
+            echo "::error file=EventHub/frontend/src/app/api/openapi.ts::Out of date. In EventHub/frontend run: npm run api:types"
+            exit 1
+          }
       - name: Unit tests (Vitest)
         run: npm test
       - name: Production build (type-checks templates, enforces bundle budgets)

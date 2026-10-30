@@ -3,6 +3,9 @@ import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { authInterceptor } from './auth.interceptor';
+import { environment } from '../../environments/environment';
+
+const API = environment.apiUrl;
 
 describe('authInterceptor', () => {
   let client: HttpClient;
@@ -28,26 +31,26 @@ describe('authInterceptor', () => {
   afterEach(() => http.verify());
 
   it('sends the token only to our own API', () => {
-    client.get('/api/events/').subscribe();
+    client.get(`${API}/events/`).subscribe();
     client.get('https://evil.example/api/steal').subscribe();
 
-    expect(http.expectOne('/api/events/').request.headers.get('Authorization')).toBe('Bearer expired');
+    expect(http.expectOne(`${API}/events/`).request.headers.get('Authorization')).toBe('Bearer expired');
     expect(http.expectOne('https://evil.example/api/steal').request.headers.has('Authorization')).toBe(false);
   });
 
   it('refreshes once for parallel 401s and retries every request', () => {
     const done: string[] = [];
-    client.get<string>('/api/a/').subscribe(v => done.push(v));
-    client.get<string>('/api/b/').subscribe(v => done.push(v));
+    client.get<string>(`${API}/a/`).subscribe(v => done.push(v));
+    client.get<string>(`${API}/b/`).subscribe(v => done.push(v));
 
-    http.expectOne('/api/a/').flush(null, { status: 401, statusText: 'Unauthorized' });
-    http.expectOne('/api/b/').flush(null, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne(`${API}/a/`).flush(null, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne(`${API}/b/`).flush(null, { status: 401, statusText: 'Unauthorized' });
 
     // Exactly one refresh request for both failures.
-    http.expectOne('/api/auth/token/refresh/').flush({ access: 'fresh', refresh: 'refresh-2' });
+    http.expectOne(`${API}/auth/token/refresh/`).flush({ access: 'fresh', refresh: 'refresh-2' });
 
-    const retryA = http.expectOne('/api/a/');
-    const retryB = http.expectOne('/api/b/');
+    const retryA = http.expectOne(`${API}/a/`);
+    const retryB = http.expectOne(`${API}/b/`);
     expect(retryA.request.headers.get('Authorization')).toBe('Bearer fresh');
     expect(retryB.request.headers.get('Authorization')).toBe('Bearer fresh');
     retryA.flush('A');
@@ -58,9 +61,9 @@ describe('authInterceptor', () => {
 
   it('logs out and goes to login when the refresh fails', () => {
     let failed = false;
-    client.get('/api/a/').subscribe({ error: () => (failed = true) });
-    http.expectOne('/api/a/').flush(null, { status: 401, statusText: 'Unauthorized' });
-    http.expectOne('/api/auth/token/refresh/').flush(null, { status: 401, statusText: 'Unauthorized' });
+    client.get(`${API}/a/`).subscribe({ error: () => (failed = true) });
+    http.expectOne(`${API}/a/`).flush(null, { status: 401, statusText: 'Unauthorized' });
+    http.expectOne(`${API}/auth/token/refresh/`).flush(null, { status: 401, statusText: 'Unauthorized' });
 
     expect(failed).toBe(true);
     expect(localStorage.getItem('access_token')).toBeNull();
