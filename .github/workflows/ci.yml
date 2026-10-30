@@ -78,6 +78,10 @@ jobs:
           cache: npm
           cache-dependency-path: EventHub/frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Lint (ESLint, angular-eslint)
+        run: npm run lint
+      - name: Formatting (Prettier)
+        run: npm run format:check
       - name: API types match the backend schema
         run: |
           npm run api:types
@@ -162,7 +166,7 @@ jobs:
       - name: The worker sent the queued sign-up email
         # The worker polls every 2 s; give it a moment after the last test.
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker compose logs worker | grep -q "Your verification code is" && exit 0
             sleep 1
           done

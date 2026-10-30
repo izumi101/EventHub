@@ -3,3 +3,6 @@
 
 # style(backend): format with ruff
 19fe8454e59a1a1405154935b9a0c8cfe1f1fb69
+
+# style(frontend): format with prettier
+6fe8d24fddbaf14d7d768a9b31e5d1bd11786571
