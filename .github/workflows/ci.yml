@@ -34,8 +34,8 @@ jobs:
       POSTGRES_USER: eventhub_user
       POSTGRES_PASSWORD: eventhub_password
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
@@ -71,8 +71,8 @@ jobs:
       run:
         working-directory: EventHub/frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm
@@ -98,7 +98,7 @@ jobs:
       run:
         working-directory: EventHub
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: docker-compose files are valid
         run: |
           docker compose --env-file .env.example config -q
@@ -117,7 +117,7 @@ jobs:
     # in, so semantic search works without network access at runtime.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build backend image with semantic search
         run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=1 -t eventhub-backend-search EventHub/backend
       - name: CPU-only torch, model works offline
@@ -138,13 +138,13 @@ jobs:
       run:
         working-directory: EventHub
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start the stack
         run: |
           cp .env.example .env
           sed -i 's/^INSTALL_SEMANTIC_SEARCH=.*/INSTALL_SEMANTIC_SEARCH=0/' .env
           docker compose up -d --build --wait --wait-timeout 600
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm
@@ -171,7 +171,7 @@ jobs:
       - name: Stack logs
         if: failure()
         run: docker compose logs --tail 200
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report
