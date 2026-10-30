@@ -64,8 +64,8 @@ def _release_booking_seats(booking):
 @transaction.atomic
 def create_booking(*, user, event, seat_ids):
     """Hold a group of seats for a user. Returns the Booking."""
-    from events.services import ensure_attendee_can_buy, ensure_event_on_sale
     from events.models import WaitlistEntry
+    from events.services import ensure_attendee_can_buy, ensure_event_on_sale
 
     # Same lock order as single registrations (event → seats) so the two
     # flows serialise on capacity instead of overselling each other.
@@ -150,7 +150,7 @@ def claim_seat(*, booking, seat_id, attendee_name, user=None):
     try:
         bs = booking.seats.select_related('seat').get(seat_id=seat_id)
     except BookingSeat.DoesNotExist:
-        raise ValueError('That seat is not part of this booking.')
+        raise ValueError('That seat is not part of this booking.') from None
 
     is_auth = user is not None and user.is_authenticated
     is_owner = is_auth and user.id == booking.owner_id

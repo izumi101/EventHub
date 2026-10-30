@@ -1,17 +1,18 @@
+import contextlib
 import logging
 
 from django.conf import settings
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
-from rest_framework import status
-from rest_framework_simplejwt.views import TokenRefreshView
 from drf_spectacular.utils import extend_schema
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.views import TokenRefreshView
 
-from common.schema import ERROR, FORBIDDEN, MessageSerializer, UNAUTHENTICATED, VALIDATION_ERROR
+from common.schema import ERROR, FORBIDDEN, UNAUTHENTICATED, VALIDATION_ERROR, MessageSerializer
 
 from . import schema
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, OrganizerCreateSerializer
+from .serializers import LoginSerializer, OrganizerCreateSerializer, RegisterSerializer, UserSerializer
 from .services import (
     build_auth_payload,
     change_password,
@@ -164,10 +165,9 @@ class LogoutView(APIView):
 
         refresh_token = request.data.get('refresh')
         if refresh_token:
-            try:
+            # Already invalid or blacklisted: the user is logged out either way.
+            with contextlib.suppress(TokenError):
                 RefreshToken(refresh_token).blacklist()
-            except TokenError:
-                pass  # already invalid or blacklisted — the user is logged out either way
         return Response({'message': 'Successfully logged out'}, status=status.HTTP_200_OK)
 
 
@@ -260,8 +260,9 @@ class PasswordResetRequestView(APIView):
         try:
             request_password_reset(identifier)
         except Exception:
-            # We intentionally do not reveal whether the account exists.
-            pass
+            # Same answer either way — the response must not reveal whether
+            # the account exists — but the failure is logged.
+            logger.exception('Password reset request failed')
 
         return Response({'message': 'If an account exists, a reset code has been sent to the associated email.'})
 

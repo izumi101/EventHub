@@ -24,13 +24,13 @@ import {
 } from 'lucide-angular';
 
 type ScanState =
-  | 'requesting'   // запрашиваем доступ к камере
-  | 'scanning'     // активное сканирование
-  | 'checking'     // декодировали QR, обращаемся к API
-  | 'result'       // показываем результат check-in
-  | 'denied'       // пользователь отклонил доступ
-  | 'nocamera'     // камера не найдена
-  | 'insecure';    // getUserMedia недоступен (не https)
+  | 'requesting'   // asking for camera access
+  | 'scanning'     // scanning
+  | 'checking'     // QR decoded, calling the API
+  | 'result'       // showing the check-in result
+  | 'denied'       // the user denied access
+  | 'nocamera'     // no camera found
+  | 'insecure';    // getUserMedia unavailable (not https)
 
 @Component({
   selector: 'app-scan',
@@ -53,7 +53,7 @@ type ScanState =
 
           <!-- ── Camera viewport ── -->
           <div class="relative bg-gray-900 aspect-square" [class.hidden]="state === 'result'">
-            <!-- Video всегда в DOM, пока работает камера -->
+            <!-- The video stays in the DOM while the camera runs -->
             <video
               #video
               class="w-full h-full object-cover"
@@ -63,7 +63,7 @@ type ScanState =
             ></video>
             <canvas #canvas class="hidden"></canvas>
 
-            <!-- Рамка наведения -->
+            <!-- Aiming frame -->
             @if (state === 'scanning') {
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div class="w-2/3 aspect-square rounded-2xl border-2 border-[color:var(--ember-500)] shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"></div>
@@ -244,7 +244,7 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
     this.stream = null;
   }
 
-  /** Кадр-цикл декодирования — работает вне Angular зоны для производительности. */
+  /** Frame-by-frame decode loop — runs outside the Angular zone for performance. */
   private tick(): void {
     if (this.state !== 'scanning') return;
 
@@ -278,7 +278,7 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
     this.rafId = requestAnimationFrame(() => this.tick());
   }
 
-  /** Достаёт ticket uuid из строки QR (полный URL или сырой uuid). */
+  /** Extracts the ticket uuid from a QR payload (a full URL or a bare uuid). */
   private extractUuid(data: string): string | null {
     const urlMatch = data.match(/\/validate\/([0-9a-fA-F-]{6,})/);
     if (urlMatch) return urlMatch[1];

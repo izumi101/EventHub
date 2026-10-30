@@ -8,6 +8,7 @@ from django.urls import reverse
 # pyrefly: ignore [missing-import]
 from rest_framework import status
 from rest_framework.test import APITestCase
+
 from accounts.models import EmailVerificationCode, PasswordResetCode
 from jobs.queue import run_due_jobs
 

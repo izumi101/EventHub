@@ -3,18 +3,17 @@
 import uuid as uuid_lib
 
 from django.db import transaction
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, viewsets, status
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import generics, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from common.choices import RegistrationStatusChoices
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
-
-from django.db.models import Prefetch
 
 from .. import schema as api
 from ..models import Event, Registration
@@ -86,9 +85,10 @@ class RegistrationViewSet(viewsets.GenericViewSet):
 
     def _check_in_booking_seat(self, request, uuid):
         """Validate a group-booking seat ticket by its UUID."""
+        from django.utils import timezone as _tz
+
         from bookings.models import Booking, BookingSeat
         from common.permissions import can_check_in_event
-        from django.utils import timezone as _tz
 
         seat_ticket = get_object_or_404(
             BookingSeat.objects.select_related('booking__event', 'booking__owner', 'claimed_by', 'seat'),

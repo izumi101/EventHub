@@ -2,12 +2,13 @@
 Django settings for the EventHub REST API.
 """
 
-from datetime import timedelta
-from pathlib import Path
-from dotenv import load_dotenv
-from django.core.exceptions import ImproperlyConfigured
 import os
 import sys
+from datetime import timedelta
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -34,10 +35,11 @@ _default_key = 'django-insecure-dev-only-change-me'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _default_key)
 DEBUG = env_bool('DJANGO_DEBUG', False)
 
-if not DEBUG and not TESTING and SECRET_KEY == _default_key:
+if not DEBUG and not TESTING and _default_key == SECRET_KEY:
     raise RuntimeError(
         'You must set DJANGO_SECRET_KEY environment variable in production! '
-        'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
+        'Generate one with: python -c '
+        '"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
     )
 ALLOWED_HOSTS = env_list(
     'DJANGO_ALLOWED_HOSTS',

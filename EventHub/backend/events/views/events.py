@@ -6,17 +6,6 @@ from django.db import transaction
 from django.db.models import Count, Q
 from django.http import Http404
 from django.utils import timezone
-from rest_framework import generics, viewsets, status, filters
-from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import (
-    IsAuthenticated,
-    IsAuthenticatedOrReadOnly,
-    IsAdminUser,
-    AllowAny,
-)
-from rest_framework.pagination import PageNumberPagination
-from rest_framework.response import Response
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiParameter,
@@ -25,11 +14,22 @@ from drf_spectacular.utils import (
     extend_schema,
     extend_schema_view,
 )
+from rest_framework import filters, generics, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import (
+    AllowAny,
+    IsAdminUser,
+    IsAuthenticated,
+    IsAuthenticatedOrReadOnly,
+)
+from rest_framework.response import Response
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
-from common.permissions import can_manage_event
 from common.exceptions import error_response
-from common.schema import ERROR, MessageSerializer, NOT_FOUND, UNAUTHENTICATED
+from common.permissions import can_manage_event
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED, MessageSerializer
 
 from .. import schema as api
 from ..analytics import event_analytics, net_revenue
@@ -37,7 +37,7 @@ from ..exports import attendees_csv_response
 from ..messaging import broadcast_to_attendees
 from ..models import Category, Event, EventSeat, SeatMap, TicketType
 from ..pricing import get_dynamic_price
-from ..promo import quote, PromoError
+from ..promo import PromoError, quote
 from ..queue import get_queue_status, is_queue_active, join_queue
 from ..seat_pricing import seat_price
 from ..serializers import (
@@ -50,14 +50,24 @@ from ..serializers import (
 )
 from ..services import (
     approve_event as approve_event_service,
+)
+from ..services import (
     attendee_cancel,
-    cancel_event as cancel_event_service,
     clone_event,
-    register_for_event as register_for_event_service,
-    reject_event as reject_event_service,
     release_expired_seat_holds,
-    request_refund as request_refund_service,
     submit_event,
+)
+from ..services import (
+    cancel_event as cancel_event_service,
+)
+from ..services import (
+    register_for_event as register_for_event_service,
+)
+from ..services import (
+    reject_event as reject_event_service,
+)
+from ..services import (
+    request_refund as request_refund_service,
 )
 from ..waitlist import join_waitlist, leave_waitlist, position, promote_waitlist
 from .base import IsOrganizerOrReadOnly, event_queryset_for_user, restrict_status_list

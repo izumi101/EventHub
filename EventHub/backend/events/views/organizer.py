@@ -4,17 +4,16 @@ webhooks, affiliates, refund requests, waitlist overview."""
 from django.db import models
 from django.db.models import Case, IntegerField, When
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
 
 from common.permissions import can_manage_event
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 
 from .. import schema as api
-
 from ..models import (
     Affiliate,
     Event,

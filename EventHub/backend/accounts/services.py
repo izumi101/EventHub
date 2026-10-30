@@ -7,19 +7,43 @@ from django.db import transaction
 from django.db.models import F
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from jobs.handlers import enqueue_email
-
-from .models import MAX_CODE_ATTEMPTS, EmailVerificationCode, PasswordResetCode
 from common.auth import (
     email_in_use,
     get_user_by_identifier,
     password_meets_policy,
     revoke_all_refresh_tokens,
 )
+from jobs.handlers import enqueue_email
+
+from .models import MAX_CODE_ATTEMPTS, EmailVerificationCode, PasswordResetCode
 
 logger = logging.getLogger(__name__)
 
 INVALID_CODE_MESSAGE = 'Invalid or expired code.'
+
+WELCOME_EMAIL = (
+    'Hey there 👋\n\n'
+    'Welcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\n'
+    "We're really excited to have you here 🚀\n\n"
+    'From now on, you can explore events around you, join communities, and never miss something '
+    'interesting again.\n\n'
+    "This is just the beginning — let's build something awesome together 🔥\n\n"
+    'See you inside,\nEventHub Team'
+)
+
+ORGANIZER_ACCOUNT_EMAIL = (
+    'Hello!\n\n'
+    'An administrator created an organizer account for you on EventHub.\n\n'
+    'Username: {username}\n\n'
+    'Sign in and start creating events. Remember to change your password after the first login.\n\n'
+    'EventHub Team'
+)
+
+RESET_CODE_EMAIL = (
+    'Your password reset code is: {code}\n\n'
+    'This code expires in 15 minutes.\n\n'
+    'If you did not request this, please ignore this email.'
+)
 
 
 def _code_matches(model, entry, code) -> bool:
@@ -83,7 +107,7 @@ def register_user(validated_data):
 
     enqueue_email(
         'Welcome to EventHub 🎉',
-        "Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe're really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let's build something awesome together 🔥\n\nSee you inside,\nEventHub Team",
+        WELCOME_EMAIL,
         user.email,
     )
 
@@ -108,7 +132,7 @@ def create_organizer(validated_data):
 
     enqueue_email(
         'Your EventHub organizer account',
-        f'Hello!\n\nAn administrator created an organizer account for you on EventHub.\n\nUsername: {user.username}\n\nSign in and start creating events. Remember to change your password after the first login.\n\nEventHub Team',
+        ORGANIZER_ACCOUNT_EMAIL.format(username=user.username),
         user.email,
     )
 
@@ -167,7 +191,7 @@ def request_password_reset(identifier: str):
     reset_code = PasswordResetCode.create_for_user(user)
     enqueue_email(
         'EventHub — Password Reset Code',
-        f'Your password reset code is: {reset_code.code}\n\nThis code expires in 15 minutes.\n\nIf you did not request this, please ignore this email.',
+        RESET_CODE_EMAIL.format(code=reset_code.code),
         user.email,
     )
     return reset_code

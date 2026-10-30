@@ -2,15 +2,14 @@ import uuid
 from decimal import Decimal
 from typing import Literal
 
+from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
-from django.contrib.auth.models import User
 from django.utils import timezone
 from pgvector.django import VectorField
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
-
 
 INACTIVE_REGISTRATION_STATUSES = [
     RegistrationStatusChoices.CANCELLED,
@@ -24,6 +23,7 @@ class EventQuerySet(models.QuerySet):
         so list endpoints don't issue several queries per event."""
         from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery
         from django.db.models.functions import Coalesce
+
         from bookings.models import Booking, BookingSeat
 
         active_regs = (
@@ -132,7 +132,7 @@ class Event(models.Model):
         cached = getattr(self, '_booked_seats', None)
         if cached is not None:
             return cached
-        from bookings.models import BookingSeat, Booking
+        from bookings.models import Booking, BookingSeat
 
         return BookingSeat.objects.filter(
             booking__event=self,
@@ -172,7 +172,7 @@ class Event(models.Model):
 
 
 class SeatMap(models.Model):
-    """Схема посадочных мест для события."""
+    """Seating chart of an event."""
 
     event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name='seat_map')
     rows = models.PositiveIntegerField(default=6)
@@ -190,7 +190,7 @@ class SeatMap(models.Model):
 
 
 class EventSeat(models.Model):
-    """Индивидуальное место на схеме."""
+    """One seat on the chart."""
 
     PRICE_ZONE_CHOICES = [('standard', 'Standard'), ('vip', 'VIP'), ('premium', 'Premium')]
 
@@ -352,9 +352,7 @@ class TicketType(models.Model):
             return False
         if self.sale_start and now < self.sale_start:
             return False
-        if self.sale_end and now > self.sale_end:
-            return False
-        return True
+        return self.sale_end is None or now <= self.sale_end
 
     @property
     def sale_state(self) -> SaleState:
@@ -642,6 +640,9 @@ class WebhookDelivery(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.trigger} → {self.webhook.url}: {self.status_code or self.error or "no response"}'
 
 
 class Affiliate(models.Model):

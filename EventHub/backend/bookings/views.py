@@ -2,26 +2,25 @@ import logging
 
 import stripe
 from django.shortcuts import get_object_or_404
-from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.response import Response
-from rest_framework.views import APIView
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
-
 from events.models import Event
 
 from . import schema
 from .models import Booking
 from .payments import create_booking_checkout
 from .serializers import (
-    BookingSerializer,
     BookingCreateSerializer,
+    BookingSerializer,
     ClaimSeatSerializer,
 )
-from .services import create_booking, claim_seat, cancel_booking, refund_booking
+from .services import cancel_booking, claim_seat, create_booking, refund_booking
 
 logger = logging.getLogger(__name__)
 

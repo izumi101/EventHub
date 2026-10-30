@@ -53,11 +53,11 @@ class Command(BaseCommand):
 
         created_count = 0
         for event in events:
-            # Генерируем seat_map: 6 рядов × 7 мест
+            # Seat map: 6 rows × 7 seats
             rows, cols = 6, 7
 
-            # VIP зоны: ряды 1-2 (центр)
-            # Standard: ряды 3-6
+            # VIP: rows 1-2 (center)
+            # Standard: rows 3-6
             layout = {
                 'price_zones': {
                     'vip': [1, 2],
@@ -70,13 +70,9 @@ class Command(BaseCommand):
             )
 
             if created:
-                # Создаём места
+                # Create the seats
                 for row in range(1, rows + 1):
-                    # Определяем zone по ряду
-                    if row <= 2:
-                        zone = 'vip'
-                    else:
-                        zone = 'standard'
+                    zone = 'vip' if row <= 2 else 'standard'
 
                     for col in range(1, cols + 1):
                         EventSeat.objects.create(

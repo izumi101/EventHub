@@ -35,7 +35,7 @@ class PermanentJobError(Exception):
     """Raise from a handler when retrying can't help (e.g. URL blocked)."""
 
 
-def enqueue(kind: str, payload: dict, *, max_attempts: int = 5, delay: timedelta = None) -> Job:
+def enqueue(kind: str, payload: dict, *, max_attempts: int = 5, delay: timedelta | None = None) -> Job:
     if kind not in HANDLERS:
         raise ValueError(f'Unknown job kind: {kind}')
     job = Job.objects.create(

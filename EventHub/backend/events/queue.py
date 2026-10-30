@@ -15,9 +15,9 @@ placed in queue. A background task (or lazy drain on seat-map request)
 admits N users at a time by issuing them a short-lived access token.
 """
 
+import logging
 import time
 import uuid
-import logging
 
 logger = logging.getLogger(__name__)
 

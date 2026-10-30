@@ -87,6 +87,7 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _can_view(self):
         from common.choices import EventStatusChoices
+
         from .models import Event
 
         event = Event.objects.filter(pk=self.event_id).only('status', 'organizer_id').first()

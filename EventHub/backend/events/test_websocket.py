@@ -38,7 +38,7 @@ class SeatMapSocketTests(TransactionTestCase):
         return communicator, connected, subprotocol
 
     async def test_anonymous_cannot_watch_a_draft(self):
-        communicator, connected, _ = await self.connect()
+        _, connected, _ = await self.connect()
         self.assertFalse(connected)
 
     async def test_organizer_authenticates_with_the_jwt_subprotocol(self):
@@ -52,5 +52,5 @@ class SeatMapSocketTests(TransactionTestCase):
         await communicator.disconnect()
 
     async def test_invalid_token_is_anonymous(self):
-        communicator, connected, _ = await self.connect(['eventhub.jwt', 'not-a-jwt'])
+        _, connected, _ = await self.connect(['eventhub.jwt', 'not-a-jwt'])
         self.assertFalse(connected)

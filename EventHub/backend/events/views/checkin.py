@@ -4,15 +4,14 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
 
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 from common.permissions import can_check_in_event, can_manage_event
-
 from common.schema import FORBIDDEN, NOT_FOUND, UNAUTHENTICATED
 
 from .. import schema as api

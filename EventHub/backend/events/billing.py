@@ -13,7 +13,7 @@ Tax/fee are added on top when `fees_passed_to_buyer`, otherwise absorbed
 (shown for transparency but not added to the total).
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 # Stripe amounts are integers in the currency's minor unit; these currencies
 # have no minor unit (or a 3-digit one) and must not be multiplied by 100.

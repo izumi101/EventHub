@@ -1,28 +1,36 @@
-import stripe
 import logging
+
+import stripe
 from django.conf import settings
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.response import Response
-from rest_framework import status
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from common.permissions import can_manage_event
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 from events.models import Registration
+
 from . import schema
 from .models import Payment
 from .services import (
-    stripe_to_dict,
     confirm_stripe_checkout_session,
     create_checkout_session,
     create_mock_checkout_session,
-    verify_payment as verify_payment_service,
-    refund_payment as refund_payment_service,
+    stripe_to_dict,
+)
+from .services import (
     mark_offline_paid as mark_offline_paid_service,
 )
-from common.permissions import can_manage_event
-from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
+from .services import (
+    refund_payment as refund_payment_service,
+)
+from .services import (
+    verify_payment as verify_payment_service,
+)
 
 logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -89,8 +97,8 @@ class CreateCheckoutSessionView(APIView):
 
 class StripeWebhookView(APIView):
     """
-    Listens to Stripe webhooks.
-    When checkout.session.completed event is received, marks the corresponding payment as completed and confirms the registration.
+    Listens to Stripe webhooks. On checkout.session.completed it marks the
+    corresponding payment as completed and confirms the registration.
     """
 
     permission_classes = [AllowAny]

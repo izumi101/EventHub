@@ -1,16 +1,17 @@
 from django.contrib import admin
+
 from .models import (
+    Affiliate,
     Category,
     Event,
-    Registration,
-    PromoCode,
     EventQuestion,
-    WaitlistEntry,
-    TicketType,
     EventStaff,
-    Webhook,
-    Affiliate,
+    PromoCode,
     RefundRequest,
+    Registration,
+    TicketType,
+    WaitlistEntry,
+    Webhook,
 )
 
 

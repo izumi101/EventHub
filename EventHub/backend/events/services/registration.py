@@ -49,7 +49,7 @@ def _parse_amount(value):
     try:
         amount = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
-        raise ValueError('Enter a valid amount.')
+        raise ValueError('Enter a valid amount.') from None
     if not amount.is_finite():
         raise ValueError('Enter a valid amount.')
     return amount
@@ -63,7 +63,7 @@ def register_for_event(
     notes: str = '',
     seat_id=None,
     promo_code: str = '',
-    answers: dict = None,
+    answers: dict | None = None,
     ticket_type_id=None,
     donation_amount=None,
     affiliate_code: str = '',
@@ -210,13 +210,13 @@ def register_for_event(
     # we're inside the transaction, any later failure gives the use back.
     promo = None
     if promo_code and is_paid:
-        from ..promo import get_valid_promo, reserve_promo, PromoError
+        from ..promo import PromoError, get_valid_promo, reserve_promo
 
         try:
             promo = get_valid_promo(event, promo_code)
             reserve_promo(promo)
         except PromoError as exc:
-            raise ValueError(str(exc))
+            raise ValueError(str(exc)) from exc
 
     # Free → confirmed instantly; paid → pending until Stripe succeeds.
     if is_paid:
