@@ -37,4 +37,4 @@ allowed-confusables = ["—", "–", "’", "×"]
 "**/ws_testing.py" = ["S101"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["accounts", "bookings", "common", "eventhub_backend", "events", "jobs", "payments"]
+known-first-party = ["accounts", "bookings", "common", "eventhub_backend", "events", "featureflags", "jobs", "payments"]

@@ -21,6 +21,7 @@ api_patterns = [
     path('', include('events.urls')),
     path('payments/', include('payments.urls')),
     path('bookings/', include('bookings.urls')),
+    path('feature-flags/', include('featureflags.urls')),
 ]
 
 urlpatterns = [

@@ -3126,6 +3126,31 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: No such object (or not visible to you).
+  /api/v1/feature-flags/:
+    get:
+      operationId: feature_flags_retrieve
+      description: |-
+        The client-visible feature flags, evaluated server-side for the signed-in
+        user. The SPA reads this once after login instead of talking to Unleash:
+        no Unleash token reaches the browser.
+      summary: Feature flags for the current user
+      tags:
+      - feature-flags
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureFlagsResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
   /api/v1/my-events/:
     get:
       operationId: my_events_list
@@ -5604,6 +5629,30 @@ components:
           type: boolean
       required:
       - favorited
+    FeatureFlags:
+      type: object
+      description: 'Client-visible flags evaluated for the current user: flag key
+        → on/off.'
+      properties:
+        payments.freedompay:
+          type: boolean
+          description: 'Offer Freedom Pay as the payment method for KZT events (payment
+            provider layer, roadmap phase 1). Default when Unleash can''t answer:
+            off.'
+        checkin.offline_scanner:
+          type: boolean
+          description: 'Offline-capable ticket scanner for check-in staff (offline
+            PWA scanner, roadmap phase 8). Default when Unleash can''t answer: off.'
+      required:
+      - checkin.offline_scanner
+      - payments.freedompay
+    FeatureFlagsResponse:
+      type: object
+      properties:
+        flags:
+          $ref: '#/components/schemas/FeatureFlags'
+      required:
+      - flags
     IdentifierCodeRequestRequest:
       type: object
       properties:

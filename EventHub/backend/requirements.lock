@@ -2,6 +2,8 @@
 #    uv pip compile requirements.txt --python-version 3.12 --python-platform x86_64-manylinux_2_28 -o requirements.lock
 anyio==4.15.1
     # via watchfiles
+apscheduler==3.11.3
+    # via unleashclient
 asgiref==3.13.0
     # via
     #   channels
@@ -48,6 +50,8 @@ drf-spectacular-sidecar==2026.10.1
     # via -r requirements.txt
 et-xmlfile==2.0.0
     # via openpyxl
+fcache==0.6.0
+    # via unleashclient
 gunicorn==26.2.0
     # via
     #   -r requirements.txt
@@ -60,12 +64,18 @@ idna==3.20
     # via
     #   anyio
     #   requests
+importlib-metadata==9.0.1
+    # via unleashclient
 inflection==0.5.1
     # via drf-spectacular
 jsonschema==4.26.0
     # via drf-spectacular
 jsonschema-specifications==2025.9.1
     # via jsonschema
+launchdarkly-eventsource==1.7.3
+    # via unleashclient
+mmh3==5.3.1
+    # via unleashclient
 msgpack==1.2.3
     # via channels-redis
 openpyxl==3.1.5
@@ -74,12 +84,16 @@ pgvector==0.5.1
     # via -r requirements.txt
 pillow==13.0.0
     # via -r requirements.txt
+platformdirs==3.11.0
+    # via fcache
 psycopg==3.3.6
     # via -r requirements.txt
 psycopg-binary==3.3.6
     # via psycopg
 pyjwt==2.15.1
     # via djangorestframework-simplejwt
+python-dateutil==2.9.0.post0
+    # via unleashclient
 python-dotenv==1.2.4
     # via
     #   -r requirements.txt
@@ -97,11 +111,17 @@ referencing==0.37.0
     #   jsonschema
     #   jsonschema-specifications
 requests==2.34.2
-    # via stripe
+    # via
+    #   stripe
+    #   unleashclient
 rpds-py==2026.9.1
     # via
     #   jsonschema
     #   referencing
+semver==3.1.0
+    # via unleashclient
+six==1.17.0
+    # via python-dateutil
 sqlparse==0.6.0
     # via django
 stripe==16.0.0
@@ -112,10 +132,16 @@ typing-extensions==4.16.0
     #   psycopg
     #   referencing
     #   stripe
+tzlocal==5.4.4
+    # via apscheduler
+unleashclient==6.9.1
+    # via -r requirements.txt
 uritemplate==4.2.0
     # via drf-spectacular
 urllib3==2.8.0
-    # via requests
+    # via
+    #   launchdarkly-eventsource
+    #   requests
 uvicorn==0.54.0
     # via
     #   -r requirements.txt
@@ -130,3 +156,7 @@ websockets==17.3
     # via uvicorn
 whitenoise==6.12.0
     # via -r requirements.txt
+yggdrasil-engine==2.0.0
+    # via unleashclient
+zipp==4.1.1
+    # via importlib-metadata
