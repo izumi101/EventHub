@@ -19,7 +19,7 @@
 
 | Слой | Технологии |
 | --- | --- |
-| Backend | Django 5, Django REST Framework, Simple JWT, Django Channels (WebSocket), Daphne |
+| Backend | Django 5, Django REST Framework, Simple JWT, Django Channels (WebSocket), Gunicorn + Uvicorn |
 | База данных | PostgreSQL 16 + pgvector, Redis 7 |
 | Оплата | Stripe (Checkout, Webhooks) |
 | Поиск | sentence-transformers, pgvector |
@@ -87,7 +87,7 @@ admin / <пароль из DJANGO_SEED_ADMIN_PASSWORD или из лога backe
 
 Письма, вебхуки и индексация для семантического поиска не выполняются внутри запроса: они записываются в таблицу `jobs_job` в той же транзакции, что и бизнес-изменение (transactional outbox). Если транзакция откатилась, письма не будет; если SMTP или сервер вебхука недоступен, задача повторится с растущей паузой (30 с … 1 ч, 3–6 попыток в зависимости от типа). Задачи, которые так и не выполнились, видны в Django admin → Jobs, оттуда их можно перезапустить действием «Retry». Несколько воркеров можно запускать параллельно: задачи забираются через `SELECT … FOR UPDATE SKIP LOCKED`.
 
-Без воркера (например, `daphne` локально) задайте `JOBS_RUN_INLINE=1`: задачи будут выполняться сразу после коммита запроса.
+Без воркера (например, при локальном запуске) задайте `JOBS_RUN_INLINE=1`: задачи будут выполняться сразу после коммита запроса.
 
 ### Облегчённый образ без семантического поиска
 
@@ -122,7 +122,7 @@ pip install -r requirements.lock                 # + requirements-search.lock д
 export DJANGO_DEBUG=1 STRIPE_MOCK_MODE=1
 python manage.py migrate
 python manage.py seed_data --noinput
-daphne -p 8000 eventhub_backend.asgi:application # HTTP + WebSocket
+uvicorn eventhub_backend.asgi:application --reload --port 8000   # HTTP + WebSocket, перезапуск при изменениях
 python manage.py run_worker                      # в отдельном терминале (или JOBS_RUN_INLINE=1)
 
 # Frontend (dev-сервер проксирует /api, /ws и /media на backend)
@@ -176,6 +176,7 @@ cp EventHub/.env.example EventHub/.env
 | `STRIPE_MOCK_MODE` | `1` — оплата без Stripe (только для разработки, только с `DJANGO_DEBUG=1`) |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | SMTP для кодов подтверждения; при `DJANGO_DEBUG=0` обязательны |
 | `JOBS_RUN_INLINE` | `1` — выполнять фоновые задачи сразу после запроса, без воркера (только для локальной разработки) |
+| `WEB_CONCURRENCY` | число процессов backend (gunicorn + uvicorn) в контейнере, по умолчанию `2` |
 | `INSTALL_SEMANTIC_SEARCH` | `0` — собрать backend без PyTorch и семантического поиска (по умолчанию `1`) |
 | `DJANGO_NUM_PROXIES` | сколько прокси стоит перед Django (по умолчанию `1` — nginx); нужно для корректного rate limiting |
 | `GRAFANA_ADMIN_PASSWORD` | пароль Grafana для `docker-compose.monitoring.yml` (обязателен) |

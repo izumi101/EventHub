@@ -52,13 +52,7 @@ jobs:
       - name: Tests (PostgreSQL, real transactions)
         run: python manage.py test --noinput
       - name: Dependency audit
-        # twisted (via daphne) has no stable release with these fixes yet
-        # (only 26.10.0rc1); drop the ignores once it ships.
-        run: >-
-          pip-audit -r requirements.lock --progress-spinner off
-          --ignore-vuln CVE-2026-106454 --ignore-vuln CVE-2026-115778
-          --ignore-vuln CVE-2026-115774 --ignore-vuln CVE-2026-115775
-          --ignore-vuln CVE-2026-115776 --ignore-vuln CVE-2026-115877
+        run: pip-audit -r requirements.lock --progress-spinner off
 
   frontend:
     runs-on: ubuntu-latest
