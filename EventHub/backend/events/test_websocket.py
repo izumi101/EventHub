@@ -1,11 +1,11 @@
 from datetime import timedelta
 
-from channels.testing import WebsocketCommunicator
 from django.contrib.auth.models import User
 from django.test import TransactionTestCase, override_settings
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import AccessToken
 
+from common.ws_testing import WebsocketCommunicator
 from eventhub_backend.asgi import application
 from events.models import Event, EventSeat, SeatMap
 

@@ -39,8 +39,6 @@ services:
         INSTALL_SEMANTIC_SEARCH: ${INSTALL_SEMANTIC_SEARCH:-1}
     container_name: eventhub_backend
     restart: unless-stopped
-    # daphne = ASGI server needed for Django Channels / WebSocket
-    command: daphne -b 0.0.0.0 -p 8000 eventhub_backend.asgi:application
     environment: &backend-env
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env (see .env.example)}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
@@ -66,6 +64,9 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-EventHub <no-reply@eventhub.local>}
       JOBS_RUN_INLINE: ${JOBS_RUN_INLINE:-0}
+      # gunicorn worker processes per backend container (default: CPU count,
+      # which inside a container is the host's — so set it explicitly).
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
     # Only nginx (frontend container) should talk to Django. The port is
     # published on localhost for `npm start` development only.
     ports:

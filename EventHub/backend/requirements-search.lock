@@ -3,9 +3,13 @@
 annotated-doc==0.0.5
     # via typer
 anyio==4.15.1
-    # via httpx2
+    # via
+    #   -c requirements.lock
+    #   httpx2
 click==8.5.0
-    # via huggingface-hub
+    # via
+    #   -c requirements.lock
+    #   huggingface-hub
 cloudpickle==3.1.2
     # via joblib
 cuda-bindings==13.4.4
@@ -23,7 +27,9 @@ fsspec==2026.9.0
     #   huggingface-hub
     #   torch
 h11==0.16.0
-    # via httpcore2
+    # via
+    #   -c requirements.lock
+    #   httpcore2
 hf-xet==1.7.0
     # via huggingface-hub
 httpcore2==2.16.0
@@ -105,13 +111,13 @@ nvidia-nvtx==13.0.85
     # via cuda-toolkit
 packaging==26.3
     # via
-    #   -c requirements.lock
     #   huggingface-hub
     #   transformers
 pygments==2.21.0
     # via rich
 pyyaml==6.0.3
     # via
+    #   -c requirements.lock
     #   huggingface-hub
     #   transformers
 regex==2026.9.29
