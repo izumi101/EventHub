@@ -25,3 +25,5 @@ openpyxl>=3.1
 drf-spectacular>=0.28
 # Swagger UI assets served from our own origin (the CSP allows no CDNs)
 drf-spectacular-sidecar>=2025.1
+# Feature flags from the self-hosted Unleash server (featureflags app)
+UnleashClient>=6.9,<7

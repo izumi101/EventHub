@@ -1164,6 +1164,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/feature-flags/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Feature flags for the current user
+         * @description The client-visible feature flags, evaluated server-side for the signed-in
+         *     user. The SPA reads this once after login instead of talking to Unleash:
+         *     no Unleash token reaches the browser.
+         */
+        get: operations["feature_flags_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/my-events/": {
         parameters: {
             query?: never;
@@ -2075,6 +2097,16 @@ export interface components {
         };
         FavoriteState: {
             favorited: boolean;
+        };
+        /** @description Client-visible flags evaluated for the current user: flag key → on/off. */
+        FeatureFlags: {
+            /** @description Offer Freedom Pay as the payment method for KZT events (payment provider layer, roadmap phase 1). Default when Unleash can't answer: off. */
+            "payments.freedompay": boolean;
+            /** @description Offline-capable ticket scanner for check-in staff (offline PWA scanner, roadmap phase 8). Default when Unleash can't answer: off. */
+            "checkin.offline_scanner": boolean;
+        };
+        FeatureFlagsResponse: {
+            flags: components["schemas"]["FeatureFlags"];
         };
         IdentifierCodeRequestRequest: {
             /** @description Username or email. */
@@ -6297,6 +6329,34 @@ export interface operations {
             };
             /** @description No such object (or not visible to you). */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    feature_flags_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FeatureFlagsResponse"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
                 headers: {
                     [name: string]: unknown;
                 };

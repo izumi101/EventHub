@@ -67,6 +67,14 @@ services:
       # gunicorn worker processes per backend container (default: CPU count,
       # which inside a container is the host's — so set it explicitly).
       WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      # Feature flags. Off: every flag uses its default from
+      # featureflags/registry.py. On: polls the `unleash` service below
+      # (start it with the `flags` profile). The backend never waits for it.
+      UNLEASH_ENABLED: ${UNLEASH_ENABLED:-0}
+      UNLEASH_URL: ${UNLEASH_URL:-http://unleash:4242/api}
+      UNLEASH_API_TOKEN: ${UNLEASH_BACKEND_API_TOKEN}
+      UNLEASH_APP_NAME: ${UNLEASH_APP_NAME:-eventhub-backend}
+      UNLEASH_ENVIRONMENT: ${UNLEASH_ENVIRONMENT:-production}
     # Only nginx (frontend container) should talk to Django. The port is
     # published on localhost for `npm start` development only.
     ports:
@@ -125,7 +133,8 @@ services:
 
   # ---- Feature flags: self-hosted Unleash (docs/FEATURE_FLAGS.md) ---- #
   # Opt-in profile (`COMPOSE_PROFILES=flags` in .env, or `--profile flags`):
-  # the default stack and CI don't depend on it. Its own database: Unleash migrates its schema on every
+  # the backend runs on flag defaults without it, so the default stack and CI
+  # don't depend on it. Its own database: Unleash migrates its schema on every
   # start, and keeping it apart from the app's data keeps backups, restores,
   # credentials and upgrades independent.
   unleash-db:

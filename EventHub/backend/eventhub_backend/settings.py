@@ -66,6 +66,7 @@ INSTALLED_APPS = [
     'payments',
     'bookings',
     'jobs',
+    'featureflags',
 ]
 
 MIDDLEWARE = [
@@ -297,6 +298,28 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@ev
 # transaction commits instead — handy for local development without a worker.
 JOBS_RUN_INLINE = env_bool('JOBS_RUN_INLINE', False)
 
+# ---- Feature flags (self-hosted Unleash; featureflags app) ---- #
+# Off by default and always off in tests: every flag then answers with its
+# default from featureflags/registry.py. The client is created lazily in each
+# worker process and polls in the background, so Unleash being slow or down
+# never blocks or fails a request (docs/FEATURE_FLAGS.md).
+UNLEASH_ENABLED = env_bool('UNLEASH_ENABLED', False) and not TESTING
+# The client API base, e.g. http://unleash:4242/api
+UNLEASH_URL = os.environ.get('UNLEASH_URL', '').strip()
+# A backend token ("<project>:<environment>.<secret>"); its environment decides
+# which flag configuration this deployment gets. Never sent to the browser.
+UNLEASH_API_TOKEN = os.environ.get('UNLEASH_API_TOKEN', '').strip()
+UNLEASH_APP_NAME = os.environ.get('UNLEASH_APP_NAME', 'eventhub-backend')
+UNLEASH_ENVIRONMENT = os.environ.get('UNLEASH_ENVIRONMENT', 'development' if DEBUG else 'production')
+UNLEASH_REFRESH_INTERVAL = int(os.environ.get('UNLEASH_REFRESH_INTERVAL', '15'))
+UNLEASH_METRICS_INTERVAL = int(os.environ.get('UNLEASH_METRICS_INTERVAL', '60'))
+UNLEASH_REQUEST_TIMEOUT = int(os.environ.get('UNLEASH_REQUEST_TIMEOUT', '5'))
+if UNLEASH_ENABLED and not (UNLEASH_URL and UNLEASH_API_TOKEN):
+    raise ImproperlyConfigured(
+        'UNLEASH_ENABLED=1 needs UNLEASH_URL and UNLEASH_API_TOKEN (see .env.example); '
+        'set UNLEASH_ENABLED=0 to run with the flag defaults.'
+    )
+
 # ---- Logging ---- #
 LOGGING = {
     'version': 1,
@@ -305,6 +328,14 @@ LOGGING = {
         'verbose': {
             'format': '[{asctime}] {levelname} {name}: {message}',
             'style': '{',
+        },
+    },
+    'filters': {
+        # One copy of each Unleash SDK message per 5 minutes per process: an
+        # outage would otherwise log a traceback on every poll.
+        'unleash_rate_limit': {
+            '()': 'featureflags.log_filters.RateLimitFilter',
+            'interval': 300,
         },
     },
     'handlers': {
@@ -341,6 +372,23 @@ LOGGING = {
         'jobs': {
             'handlers': ['console'],
             'level': 'INFO',
+            'propagate': False,
+        },
+        'featureflags': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # The Unleash SDK and its scheduler log every poll at INFO.
+        'UnleashClient': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'filters': ['unleash_rate_limit'],
+            'propagate': False,
+        },
+        'apscheduler': {
+            'handlers': ['console'],
+            'level': 'WARNING',
             'propagate': False,
         },
     },
