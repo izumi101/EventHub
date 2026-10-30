@@ -154,12 +154,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticatedOrReadOnly',),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
     'EXCEPTION_HANDLER': 'common.exceptions.exception_handler',
@@ -356,11 +352,14 @@ if not DEBUG and not TESTING:
     if _is_placeholder(STRIPE_SECRET_KEY) or _is_placeholder(STRIPE_WEBHOOK_SECRET):
         _problems.append('STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set')
     if 'console' in EMAIL_BACKEND or 'locmem' in EMAIL_BACKEND:
-        _problems.append('EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
-                         'sign-up and password-reset codes are delivered by email')
+        _problems.append(
+            'EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
+            'sign-up and password-reset codes are delivered by email'
+        )
     if _problems:
         raise ImproperlyConfigured(
-            'Refusing to start with DJANGO_DEBUG=0: ' + '; '.join(_problems)
+            'Refusing to start with DJANGO_DEBUG=0: '
+            + '; '.join(_problems)
             + '. For local development set DJANGO_DEBUG=1 (see .env.example).'
         )
 

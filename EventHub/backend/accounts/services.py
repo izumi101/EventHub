@@ -29,7 +29,9 @@ def _code_matches(model, entry, code) -> bool:
     if entry is None or entry.is_used or entry.is_expired:
         return False
     counted = model.objects.filter(
-        pk=entry.pk, is_used=False, attempts__lt=MAX_CODE_ATTEMPTS,
+        pk=entry.pk,
+        is_used=False,
+        attempts__lt=MAX_CODE_ATTEMPTS,
     ).update(attempts=F('attempts') + 1)
     if not counted:
         return False
@@ -42,6 +44,7 @@ def _code_matches(model, entry, code) -> bool:
 def build_auth_payload(user):
     refresh = RefreshToken.for_user(user)
     from .serializers import UserSerializer
+
     return {
         'user': UserSerializer(user).data,
         'tokens': {
@@ -80,7 +83,7 @@ def register_user(validated_data):
 
     enqueue_email(
         'Welcome to EventHub 🎉',
-        'Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe\'re really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let\'s build something awesome together 🔥\n\nSee you inside,\nEventHub Team',
+        "Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe're really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let's build something awesome together 🔥\n\nSee you inside,\nEventHub Team",
         user.email,
     )
 
@@ -138,9 +141,9 @@ def send_registration_code(email: str):
 
 def verify_registration_code(email: str, code: str) -> EmailVerificationCode:
     verification = (
-        EmailVerificationCode.objects
-        .filter(email__iexact=(email or '').strip(), is_used=False)
-        .order_by('-created_at').first()
+        EmailVerificationCode.objects.filter(email__iexact=(email or '').strip(), is_used=False)
+        .order_by('-created_at')
+        .first()
     )
     if not _code_matches(EmailVerificationCode, verification, code):
         raise ValueError('Invalid or expired verification code.')
@@ -174,10 +177,7 @@ def verify_password_reset_code(identifier: str, code: str):
     user = get_user_by_identifier(identifier)
     reset_entry = None
     if user is not None:
-        reset_entry = (
-            PasswordResetCode.objects.filter(user=user, is_used=False)
-            .order_by('-created_at').first()
-        )
+        reset_entry = PasswordResetCode.objects.filter(user=user, is_used=False).order_by('-created_at').first()
     # Same answer for "no such account" and "wrong code" (no enumeration).
     if not _code_matches(PasswordResetCode, reset_entry, code):
         raise ValueError(INVALID_CODE_MESSAGE)
@@ -194,9 +194,10 @@ def confirm_password_reset(reset_token: str, new_password: str, new_password2: s
         raise ValueError('Passwords do not match.')
 
     reset_entry = (
-        PasswordResetCode.objects.select_for_update()
-        .filter(reset_token=reset_token, is_used=False).first()
-    ) if reset_token else None
+        (PasswordResetCode.objects.select_for_update().filter(reset_token=reset_token, is_used=False).first())
+        if reset_token
+        else None
+    )
 
     if not reset_entry or reset_entry.is_expired:
         raise ValueError('Invalid or expired reset token.')

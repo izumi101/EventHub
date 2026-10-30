@@ -17,15 +17,20 @@ class SeatMapSocketTests(TransactionTestCase):
     def setUp(self):
         self.organizer = User.objects.create_user('org', 'org@example.com', 'Str0ng-pass!')
         self.draft = Event.objects.create(
-            title='Draft', description='d', organizer=self.organizer, location='x',
-            date=timezone.now() + timedelta(days=3), status='draft',
+            title='Draft',
+            description='d',
+            organizer=self.organizer,
+            location='x',
+            date=timezone.now() + timedelta(days=3),
+            status='draft',
         )
         seat_map = SeatMap.objects.create(event=self.draft, rows=1, cols=1)
         EventSeat.objects.create(seat_map=seat_map, row=1, col=1)
 
     async def connect(self, protocols=None):
         communicator = WebsocketCommunicator(
-            application, f'/ws/seats/{self.draft.id}/',
+            application,
+            f'/ws/seats/{self.draft.id}/',
             headers=[(b'origin', b'http://localhost'), (b'host', b'localhost')],
             subprotocols=protocols,
         )

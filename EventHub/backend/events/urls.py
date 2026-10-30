@@ -33,7 +33,9 @@ urlpatterns = [
     # Waitlist (organizer view)
     path('events/<int:event_id>/waitlist-entries/', views.EventWaitlistView.as_view(), name='event-waitlist'),
     # Refund requests
-    path('events/<int:event_id>/refund-requests/', views.EventRefundRequestsView.as_view(), name='event-refund-requests'),
+    path(
+        'events/<int:event_id>/refund-requests/', views.EventRefundRequestsView.as_view(), name='event-refund-requests'
+    ),
     path('refund-requests/<int:pk>/resolve/', views.ResolveRefundRequestView.as_view(), name='resolve-refund-request'),
     # Team / roles
     path('events/<int:event_id>/staff/', views.EventStaffView.as_view(), name='event-staff'),

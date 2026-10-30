@@ -1,5 +1,6 @@
 """Domain errors, and a DRF exception handler that turns leftover database
 conflicts into a 409 response instead of a 500 with a stack trace."""
+
 import logging
 
 from django.db import IntegrityError

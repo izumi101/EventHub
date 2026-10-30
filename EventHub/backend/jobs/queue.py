@@ -6,6 +6,7 @@
 Delivery is at-least-once: a handler may run again if the worker dies after
 the side effect but before recording success, so handlers must tolerate it.
 """
+
 import logging
 from datetime import timedelta
 
@@ -62,7 +63,9 @@ def _claim(limit: int) -> list:
     # with it (OOM, kill). Once it has used up its attempts, stop handing it
     # out — otherwise a job that crashes the worker would cycle forever.
     Job.objects.filter(
-        status=Job.STATUS_RUNNING, run_after__lte=now, attempts__gte=F('max_attempts'),
+        status=Job.STATUS_RUNNING,
+        run_after__lte=now,
+        attempts__gte=F('max_attempts'),
     ).update(status=Job.STATUS_FAILED, last_error='The worker stopped while running this job.')
     with transaction.atomic():
         jobs = list(
@@ -72,7 +75,9 @@ def _claim(limit: int) -> list:
         )
         if jobs:
             Job.objects.filter(pk__in=[j.pk for j in jobs]).update(
-                status=Job.STATUS_RUNNING, run_after=now + LEASE, attempts=F('attempts') + 1,
+                status=Job.STATUS_RUNNING,
+                run_after=now + LEASE,
+                attempts=F('attempts') + 1,
             )
     for job in jobs:
         job.attempts += 1
@@ -90,8 +95,15 @@ def _execute(job: Job) -> bool:
             last_error=f'{type(exc).__name__}: {exc}'[:2000],
         )
         log = logger.error if permanent else logger.warning
-        log('Job %s (%s) attempt %s/%s failed%s: %s', job.pk, job.kind, job.attempts,
-            job.max_attempts, ' permanently' if permanent else '', exc)
+        log(
+            'Job %s (%s) attempt %s/%s failed%s: %s',
+            job.pk,
+            job.kind,
+            job.attempts,
+            job.max_attempts,
+            ' permanently' if permanent else '',
+            exc,
+        )
         return False
     Job.objects.filter(pk=job.pk).update(status=Job.STATUS_DONE, last_error='')
     return True
@@ -108,13 +120,20 @@ def run_due_jobs(limit: int = 50) -> int:
 def run_job(job_id: int) -> None:
     """Run one specific job now if it is still pending (inline mode)."""
     with transaction.atomic():
-        job = Job.objects.select_for_update(skip_locked=True).filter(
-            pk=job_id, status=Job.STATUS_PENDING,
-        ).first()
+        job = (
+            Job.objects.select_for_update(skip_locked=True)
+            .filter(
+                pk=job_id,
+                status=Job.STATUS_PENDING,
+            )
+            .first()
+        )
         if job is None:
             return
         Job.objects.filter(pk=job.pk).update(
-            status=Job.STATUS_RUNNING, run_after=timezone.now() + LEASE, attempts=F('attempts') + 1,
+            status=Job.STATUS_RUNNING,
+            run_after=timezone.now() + LEASE,
+            attempts=F('attempts') + 1,
         )
     job.attempts += 1
     _execute(job)

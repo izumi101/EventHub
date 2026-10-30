@@ -4,6 +4,7 @@ Real Excel format (not CSV) so it opens with proper columns regardless of the
 user's locale/delimiter settings, with a bold frozen header, auto-sized
 columns, and an auto-filter.
 """
+
 from io import BytesIO
 
 from django.http import HttpResponse
@@ -11,8 +12,18 @@ from django.http import HttpResponse
 from common.choices import RegistrationStatusChoices
 
 HEADERS = [
-    'Name', 'Username', 'Email', 'Ticket type', 'Status', 'Checked in',
-    'Seat', 'Zone', 'Promo code', 'Amount paid', 'Registered at', 'Ticket ID',
+    'Name',
+    'Username',
+    'Email',
+    'Ticket type',
+    'Status',
+    'Checked in',
+    'Seat',
+    'Zone',
+    'Promo code',
+    'Amount paid',
+    'Registered at',
+    'Ticket ID',
 ]
 
 
@@ -30,8 +41,7 @@ def _safe(value):
 
 def _rows(event):
     regs = (
-        event.registrations
-        .exclude(status=RegistrationStatusChoices.CANCELLED)
+        event.registrations.exclude(status=RegistrationStatusChoices.CANCELLED)
         .select_related('user', 'seat', 'promo_code', 'payment', 'ticket_type')
         .order_by('registered_at')
     )
@@ -46,11 +56,23 @@ def _rows(event):
         pay = getattr(r, 'payment', None)
         if pay:
             amount = float(pay.net_amount)
-        yield [_safe(v) for v in [
-            full_name, u.username, u.email, tier, r.status,
-            'Yes' if r.is_checked_in else 'No', seat, zone, promo, amount,
-            r.registered_at.strftime('%Y-%m-%d %H:%M'), str(r.ticket_uuid),
-        ]]
+        yield [
+            _safe(v)
+            for v in [
+                full_name,
+                u.username,
+                u.email,
+                tier,
+                r.status,
+                'Yes' if r.is_checked_in else 'No',
+                seat,
+                zone,
+                promo,
+                amount,
+                r.registered_at.strftime('%Y-%m-%d %H:%M'),
+                str(r.ticket_uuid),
+            ]
+        ]
 
 
 def attendees_csv_response(event) -> HttpResponse:

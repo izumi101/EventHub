@@ -1,0 +1,40 @@
+# Tooling configuration for the backend (the app itself is not packaged).
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["*/migrations/*", "staticfiles"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import order
+    "B",        # bugbear: likely bugs
+    "UP",       # pyupgrade: modern syntax for the target Python
+    "DJ",       # Django conventions
+    "C4",       # comprehensions
+    "SIM",      # simplifications
+    "PIE",
+    "RUF",      # ruff-specific
+    "S",        # bandit: security
+]
+ignore = [
+    # DRF/Django declare configuration as mutable class attributes
+    # (permission_classes = [...], Meta.fields = [...]); annotating each with
+    # ClassVar adds noise without catching anything.
+    "RUF012",
+]
+# Typography in user-facing strings is intentional.
+allowed-confusables = ["—", "–", "’", "×"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use fixed passwords and plain asserts on purpose.
+"**/test*.py" = ["S101", "S105", "S106"]
+"**/ws_testing.py" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["accounts", "bookings", "common", "eventhub_backend", "events", "jobs", "payments"]

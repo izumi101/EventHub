@@ -56,9 +56,11 @@ def revoke_all_refresh_tokens(user) -> None:
     """Sign the user out everywhere: blacklist every refresh token issued to
     them (after a password change or reset a stolen token must stop working)."""
     from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
+
     tokens = OutstandingToken.objects.filter(user=user, blacklistedtoken__isnull=True)
     BlacklistedToken.objects.bulk_create(
-        [BlacklistedToken(token=t) for t in tokens], ignore_conflicts=True,
+        [BlacklistedToken(token=t) for t in tokens],
+        ignore_conflicts=True,
     )
 
 

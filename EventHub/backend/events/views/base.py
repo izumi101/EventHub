@@ -57,6 +57,7 @@ def restrict_status_list(queryset, user, status_value):
 
 class ManagedEventListCreate(generics.ListCreateAPIView):
     """Base for event-scoped collections only managers may list+create."""
+
     permission_classes = [IsAuthenticated]
     model = None  # set in subclass
 
@@ -83,6 +84,7 @@ class ManagedEventListCreate(generics.ListCreateAPIView):
 
 class ManagedDetail(generics.RetrieveUpdateDestroyAPIView):
     """Base for detail views restricted to the event's managers."""
+
     permission_classes = [IsAuthenticated]
     model = None
 

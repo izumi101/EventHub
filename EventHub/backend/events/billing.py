@@ -12,14 +12,29 @@ Pricing dimensions, in order:
 Tax/fee are added on top when `fees_passed_to_buyer`, otherwise absorbed
 (shown for transparency but not added to the total).
 """
+
 from decimal import Decimal, ROUND_HALF_UP
 
 # Stripe amounts are integers in the currency's minor unit; these currencies
 # have no minor unit (or a 3-digit one) and must not be multiplied by 100.
 # https://docs.stripe.com/currencies#zero-decimal
 ZERO_DECIMAL_CURRENCIES = {
-    'BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF',
-    'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF',
+    'BIF',
+    'CLP',
+    'DJF',
+    'GNF',
+    'JPY',
+    'KMF',
+    'KRW',
+    'MGA',
+    'PYG',
+    'RWF',
+    'UGX',
+    'VND',
+    'VUV',
+    'XAF',
+    'XOF',
+    'XPF',
 }
 THREE_DECIMAL_CURRENCIES = {'BHD', 'JOD', 'KWD', 'OMR', 'TND'}
 
@@ -49,6 +64,7 @@ def to_minor_units(amount, currency: str) -> int:
 def _base_price(registration) -> Decimal:
     """Price after tier/seat selection and promo, before tax & fees."""
     from .models import TicketType
+
     event = registration.event
     tt = registration.ticket_type if registration.ticket_type_id else None
 
@@ -70,12 +86,14 @@ def _base_price(registration) -> Decimal:
         return Decimal('0.00')
     elif registration.seat_id and registration.seat:
         from .seat_pricing import seat_price
+
         base = Decimal(str(seat_price(event, registration.seat)))
     else:
         base = _q(event.price)
 
     if registration.promo_code_id and registration.promo_code:
         from .promo import apply_discount
+
         base = apply_discount(base, registration.promo_code)
 
     return _q(base)
@@ -121,6 +139,7 @@ def quote_breakdown(event, base_price, promo=None) -> dict:
     base = _q(base_price)
     if promo is not None:
         from .promo import apply_discount
+
         base = apply_discount(base, promo)
 
     tax_pct = Decimal(str(event.tax_percent or 0))
@@ -132,8 +151,11 @@ def quote_breakdown(event, base_price, promo=None) -> dict:
 
     return {
         'subtotal': str(base),
-        'tax_percent': str(tax_pct), 'tax': str(tax),
-        'fee_percent': str(fee_pct), 'fee': str(fee),
+        'tax_percent': str(tax_pct),
+        'tax': str(tax),
+        'fee_percent': str(fee_pct),
+        'fee': str(fee),
         'fees_passed_to_buyer': passed,
-        'total': str(total), 'currency': event_currency(event),
+        'total': str(total),
+        'currency': event_currency(event),
     }

@@ -1,4 +1,5 @@
 """Request/response shapes of the booking endpoints, for the OpenAPI schema."""
+
 from rest_framework import serializers
 
 from .models import Booking

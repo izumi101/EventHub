@@ -42,6 +42,7 @@ from .base import ManagedDetail, ManagedEventListCreate, is_event_owner
 
 class EventPromoCodesView(generics.ListCreateAPIView):
     """List + create promo codes for an event the user manages."""
+
     serializer_class = PromoCodeSerializer
     permission_classes = [IsAuthenticated]
 
@@ -84,6 +85,7 @@ class EventQuestionsView(generics.ListCreateAPIView):
 
     GET is public (the checkout form needs them); POST requires management.
     """
+
     serializer_class = EventQuestionSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
@@ -118,6 +120,7 @@ class EventTicketTypesView(generics.ListCreateAPIView):
 
     GET is public (the buy box needs them); POST requires management.
     """
+
     serializer_class = TicketTypeSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
@@ -151,6 +154,7 @@ class TicketTypeDetailView(generics.RetrieveUpdateDestroyAPIView):
 class EventStaffView(ManagedEventListCreate):
     """Co-organizers can see the team; only the owner can change it (a
     co-organizer must not be able to appoint more co-organizers)."""
+
     model = EventStaff
     serializer_class = EventStaffSerializer
 
@@ -195,6 +199,7 @@ class AffiliateDetailView(ManagedDetail):
 
 class AffiliateClickView(generics.GenericAPIView):
     """Public: record a click when someone opens an event via ?ref=CODE."""
+
     permission_classes = [AllowAny]
     throttle_scope = 'affiliate_click'
 
@@ -203,13 +208,16 @@ class AffiliateClickView(generics.GenericAPIView):
         code = (request.data.get('code') or '').strip()
         if code:
             Affiliate.objects.filter(
-                event_id=event_id, code__iexact=code, is_active=True,
+                event_id=event_id,
+                code__iexact=code,
+                is_active=True,
             ).update(clicks=models.F('clicks') + 1)
         return Response({'ok': True})
 
 
 class EventRefundRequestsView(generics.ListAPIView):
     """Organizer lists refund requests for their event (pending first)."""
+
     serializer_class = RefundRequestSerializer
     permission_classes = [IsAuthenticated]
 
@@ -228,15 +236,21 @@ class EventRefundRequestsView(generics.ListAPIView):
 
 class ResolveRefundRequestView(generics.GenericAPIView):
     """Organizer approves or rejects a refund request."""
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=api.RefundResolutionRequestSerializer, responses={200: api.RefundResolutionSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
+    @extend_schema(
+        request=api.RefundResolutionRequestSerializer,
+        responses={200: api.RefundResolutionSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND},
+    )
     def post(self, request, pk):
         rr = get_object_or_404(RefundRequest.objects.select_related('registration__event', 'registration__user'), pk=pk)
         approve = request.data.get('approve') in (True, 'true', 'True', '1', 1)
         try:
             rr = resolve_refund_request(
-                refund_request=rr, actor=request.user, approve=approve,
+                refund_request=rr,
+                actor=request.user,
+                approve=approve,
                 note=str(request.data.get('note', '') or '')[:300],
             )
         except PermissionError as exc:
@@ -248,6 +262,7 @@ class ResolveRefundRequestView(generics.GenericAPIView):
 
 class EventWaitlistView(generics.ListAPIView):
     """Organizer views everyone on the waitlist for their event."""
+
     serializer_class = WaitlistEntrySerializer
     permission_classes = [IsAuthenticated]
 

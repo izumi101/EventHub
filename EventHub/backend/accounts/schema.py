@@ -1,4 +1,5 @@
 """Request/response shapes of the auth endpoints, for the OpenAPI schema."""
+
 from rest_framework import serializers
 
 from .serializers import UserSerializer

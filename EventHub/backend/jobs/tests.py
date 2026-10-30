@@ -50,7 +50,8 @@ class QueueTests(TestCase):
     def test_job_of_a_crashed_worker_is_picked_up_after_its_lease(self):
         job = enqueue_email('Hi', 'body', 'a@example.com')
         Job.objects.filter(pk=job.pk).update(
-            status=Job.STATUS_RUNNING, run_after=timezone.now() - timedelta(seconds=1),
+            status=Job.STATUS_RUNNING,
+            run_after=timezone.now() - timedelta(seconds=1),
         )
         self.assertEqual(run_due_jobs(), 1)
         job.refresh_from_db()
@@ -59,7 +60,8 @@ class QueueTests(TestCase):
     def test_job_that_keeps_killing_the_worker_is_given_up(self):
         job = enqueue_email('Hi', 'body', 'a@example.com')
         Job.objects.filter(pk=job.pk).update(
-            status=Job.STATUS_RUNNING, attempts=job.max_attempts,
+            status=Job.STATUS_RUNNING,
+            attempts=job.max_attempts,
             run_after=timezone.now() - timedelta(seconds=1),
         )
         self.assertEqual(run_due_jobs(), 0)
@@ -76,13 +78,16 @@ class WebhookJobTests(TestCase):
     def setUp(self):
         organizer = User.objects.create_user('org', 'org@example.com', 'Str0ng-pass!')
         self.event = Event.objects.create(
-            title='E', description='d', organizer=organizer, location='x',
-            date=timezone.now() + timedelta(days=2), status='published',
+            title='E',
+            description='d',
+            organizer=organizer,
+            location='x',
+            date=timezone.now() + timedelta(days=2),
+            status='published',
         )
 
     def hook(self, url):
-        return Webhook.objects.create(event=self.event, url=url, secret='s3cret',
-                                      triggers=['ticket_sold'])
+        return Webhook.objects.create(event=self.event, url=url, secret='s3cret', triggers=['ticket_sold'])
 
     def test_failed_delivery_is_retried(self):
         hook = self.hook('https://hooks.example.com/eventhub')
@@ -98,8 +103,10 @@ class WebhookJobTests(TestCase):
         self.assertEqual(job.status, Job.STATUS_DONE)
         # Signed body is exactly what was queued.
         self.assertIn('"trigger": "ticket_sold"', post.call_args.args[1].decode())
-        self.assertEqual(list(WebhookDelivery.objects.filter(webhook=hook).values_list('success', flat=True)
-                              .order_by('created_at')), [False, True])
+        self.assertEqual(
+            list(WebhookDelivery.objects.filter(webhook=hook).values_list('success', flat=True).order_by('created_at')),
+            [False, True],
+        )
 
     def test_ssrf_blocked_delivery_is_not_retried(self):
         self.hook('http://127.0.0.1:8000/admin/')

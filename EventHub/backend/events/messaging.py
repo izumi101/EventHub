@@ -4,6 +4,7 @@ Delivery is dual: an in-app Notification (always) plus an email (when an SMTP
 backend is configured). Audience can be narrowed to a status or a ticket tier
 so organizers can, say, email only VIPs or only confirmed buyers.
 """
+
 import logging
 
 from django.conf import settings
@@ -51,13 +52,18 @@ def broadcast_to_attendees(*, event, subject: str, body: str, audience: str = 'a
     users = list(seen_users.values())
 
     # 1. In-app notifications (bulk insert).
-    Notification.objects.bulk_create([
-        Notification(
-            user=u, type='event_updated',
-            title=f'📣 {event.title}: {subject}',
-            body=body, event=event,
-        ) for u in users
-    ])
+    Notification.objects.bulk_create(
+        [
+            Notification(
+                user=u,
+                type='event_updated',
+                title=f'📣 {event.title}: {subject}',
+                body=body,
+                event=event,
+            )
+            for u in users
+        ]
+    )
 
     # 2. Email — best-effort, and only when SMTP is genuinely configured.
     # Without a real EMAIL_HOST the smtp backend would block on connection

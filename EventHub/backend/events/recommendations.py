@@ -20,11 +20,15 @@ def get_recommendations(user, limit: int = 10):
     from .models import Event, Registration
     from common.choices import RegistrationStatusChoices, EventStatusChoices
 
-    published = Event.objects.filter(
-        status=EventStatusChoices.PUBLISHED,
-        embedding__isnull=False,
-        date__gte=timezone.now(),  # never recommend something that already happened
-    ).select_related('category', 'organizer').with_capacity()
+    published = (
+        Event.objects.filter(
+            status=EventStatusChoices.PUBLISHED,
+            embedding__isnull=False,
+            date__gte=timezone.now(),  # never recommend something that already happened
+        )
+        .select_related('category', 'organizer')
+        .with_capacity()
+    )
 
     # Events the user has already interacted with
     registered_ids = set(
@@ -60,9 +64,5 @@ def get_recommendations(user, limit: int = 10):
     embeddings = [list(e.embedding) for e in confirmed_events]
     centroid = np.mean(embeddings, axis=0).tolist()
 
-    recs = (
-        candidates
-        .annotate(distance=CosineDistance('embedding', centroid))
-        .order_by('distance')[:limit]
-    )
+    recs = candidates.annotate(distance=CosineDistance('embedding', centroid)).order_by('distance')[:limit]
     return list(recs)

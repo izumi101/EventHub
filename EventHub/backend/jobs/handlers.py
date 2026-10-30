@@ -1,5 +1,6 @@
 """Generic job handlers. App-specific ones live next to their code
 (events.webhooks.deliver_job, events.search.index_event_job)."""
+
 from django.conf import settings
 from django.core.mail import send_mail as django_send_mail
 
@@ -12,7 +13,14 @@ def send_email(*, subject: str, body: str, to: list, from_email: str = None):
 def enqueue_email(subject: str, body: str, to, from_email: str = None):
     """Send an email from the worker — never from the HTTP request."""
     from .queue import enqueue
+
     recipients = [to] if isinstance(to, str) else list(to)
-    return enqueue('send_email', {
-        'subject': subject, 'body': body, 'to': recipients, 'from_email': from_email,
-    })
+    return enqueue(
+        'send_email',
+        {
+            'subject': subject,
+            'body': body,
+            'to': recipients,
+            'from_email': from_email,
+        },
+    )

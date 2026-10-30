@@ -1,4 +1,5 @@
 """OpenAPI generation tweaks."""
+
 from drf_spectacular.openapi import AutoSchema as SpectacularAutoSchema
 from rest_framework import serializers
 

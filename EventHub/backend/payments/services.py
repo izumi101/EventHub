@@ -27,8 +27,7 @@ def stripe_to_dict(obj) -> dict:
 
 def _lock_registration(registration_id, **filters):
     return (
-        Registration.objects
-        .select_for_update(of=('self',))
+        Registration.objects.select_for_update(of=('self',))
         .select_related('event', 'user', 'payment', 'ticket_type', 'seat', 'promo_code')
         .get(pk=registration_id, **filters)
     )
@@ -59,6 +58,7 @@ def _parse_money(value, field='amount') -> Decimal:
 
 def _currency_of(registration) -> str:
     from events.billing import event_currency
+
     return event_currency(registration.event)
 
 
@@ -71,6 +71,7 @@ def _confirm_paid_registration(registration, payment):
     # Webhook job + in-app notification are rows in this same transaction.
     _fire_ticket_sold(registration, payment.amount)
     from events.notify import notify_ticket_purchased
+
     notify_ticket_purchased(registration.user, registration.event)
 
 
@@ -88,6 +89,7 @@ def create_mock_checkout_session(*, registration):
     mock_session_id = f'mock_sess_{registration.id}_{int(time.time())}'
 
     from events.billing import registration_amount
+
     amount = registration_amount(registration)
 
     payment, _ = Payment.objects.get_or_create(
@@ -113,13 +115,18 @@ def create_mock_checkout_session(*, registration):
 def _fire_ticket_sold(registration, amount):
     """Notify webhooks that a paid ticket completed."""
     from events.webhooks import fire
-    fire(registration.event, 'ticket_sold', {
-        'registration_id': registration.id,
-        'user': registration.user.username,
-        'amount': str(amount),
-        'currency': _currency_of(registration),
-        'ticket_type': registration.ticket_type.name if registration.ticket_type_id else None,
-    })
+
+    fire(
+        registration.event,
+        'ticket_sold',
+        {
+            'registration_id': registration.id,
+            'user': registration.user.username,
+            'amount': str(amount),
+            'currency': _currency_of(registration),
+            'ticket_type': registration.ticket_type.name if registration.ticket_type_id else None,
+        },
+    )
 
 
 @transaction.atomic
@@ -145,17 +152,19 @@ def create_checkout_session(*, registration):
 
     params = dict(
         payment_method_types=['card'],
-        line_items=[{
-            'price_data': {
-                'currency': currency.lower(),
-                'product_data': {
-                    'name': label,
-                    'description': f'Registration for {registration.event.title}',
+        line_items=[
+            {
+                'price_data': {
+                    'currency': currency.lower(),
+                    'product_data': {
+                        'name': label,
+                        'description': f'Registration for {registration.event.title}',
+                    },
+                    'unit_amount': to_minor_units(amount, currency),
                 },
-                'unit_amount': to_minor_units(amount, currency),
-            },
-            'quantity': 1,
-        }],
+                'quantity': 1,
+            }
+        ],
         mode='payment',
         expires_at=int(expires_at.timestamp()),
         success_url=f'{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}',
@@ -235,15 +244,17 @@ def confirm_stripe_checkout_session(session):
 
     if payment.status == PaymentStatusChoices.COMPLETED:
         if intent and payment.stripe_payment_intent_id and intent != payment.stripe_payment_intent_id:
-            logger.warning('Second paid session %s for registration %s — refunding the duplicate',
-                           session_id, registration.id)
+            logger.warning(
+                'Second paid session %s for registration %s — refunding the duplicate', session_id, registration.id
+            )
             _refund_payment_intent(intent, key=f'duplicate-refund-{session_id}')
         return payment
 
     if registration.status != RegistrationStatusChoices.PENDING:
         logger.warning(
             'Payment for registration %s arrived in status %s — refunding automatically',
-            registration.id, registration.status,
+            registration.id,
+            registration.status,
         )
         _refund_payment_intent(intent, key=f'late-refund-{session_id}')
         payment.status = PaymentStatusChoices.REFUNDED
@@ -252,14 +263,25 @@ def confirm_stripe_checkout_session(session):
         payment.refunded_amount = payment.amount
         payment.refunded_at = timezone.now()
         payment.refund_reason = 'Automatic refund: the ticket hold had ended before the payment arrived.'
-        payment.save(update_fields=[
-            'status', 'stripe_payment_intent_id', 'stripe_checkout_session_id',
-            'refunded_amount', 'refunded_at', 'refund_reason',
-        ])
+        payment.save(
+            update_fields=[
+                'status',
+                'stripe_payment_intent_id',
+                'stripe_checkout_session_id',
+                'refunded_amount',
+                'refunded_at',
+                'refund_reason',
+            ]
+        )
         from events.notify import notify
-        notify(registration.user, 'payment_failed', f'💸 Payment refunded: {registration.event.title}',
-               'Your payment arrived after the ticket hold expired, so it was refunded '
-               'automatically. Please book again.', event=registration.event)
+
+        notify(
+            registration.user,
+            'payment_failed',
+            f'💸 Payment refunded: {registration.event.title}',
+            'Your payment arrived after the ticket hold expired, so it was refunded automatically. Please book again.',
+            event=registration.event,
+        )
         return payment
 
     payment.status = PaymentStatusChoices.COMPLETED
@@ -330,25 +352,33 @@ def refund_payment(*, payment, amount=None, reason='', notify_user=True):
     if is_full:
         # Release the seat and cancel the registration on a full refund.
         from events.services import cancel_registration
+
         cancel_registration(registration=registration)
 
     event, user = registration.event, registration.user
     if notify_user:
         from events.notify import notify
+
         notify(
-            user, 'payment_failed',
+            user,
+            'payment_failed',
             f'💸 Refund issued: {event.title}',
             f'You were refunded {refund_amount} {currency}.' + (f' Reason: {reason}' if reason else ''),
             event=event,
         )
     from events.webhooks import fire
-    fire(event, 'refund_issued', {
-        'registration_id': registration.id,
-        'user': user.username,
-        'refunded_amount': str(refund_amount),
-        'currency': currency,
-        'full_refund': is_full,
-    })
+
+    fire(
+        event,
+        'refund_issued',
+        {
+            'registration_id': registration.id,
+            'user': user.username,
+            'refunded_amount': str(refund_amount),
+            'currency': currency,
+            'full_refund': is_full,
+        },
+    )
 
     logger.info('Refunded %s %s on payment %s (full=%s)', refund_amount, currency, payment.id, is_full)
     return payment
@@ -368,6 +398,7 @@ def mark_offline_paid(*, registration, amount=None):
         # The real amount owed — tier / seat zone / promo / tax & fees —
         # not the bare event price.
         from events.billing import registration_amount
+
         amt = registration_amount(registration)
     else:
         amt = _parse_money(amount)
@@ -396,11 +427,13 @@ def verify_payment(session_id: str, user):
     session here lets the success page confirm the registration on its own.
     """
     payment = Payment.objects.select_related('registration__event').get(
-        stripe_checkout_session_id=session_id, registration__user=user,
+        stripe_checkout_session_id=session_id,
+        registration__user=user,
     )
 
-    if payment.status not in (PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED) \
-            and not getattr(settings, 'STRIPE_MOCK_MODE', False):
+    if payment.status not in (PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED) and not getattr(
+        settings, 'STRIPE_MOCK_MODE', False
+    ):
         try:
             session = stripe_to_dict(stripe.checkout.Session.retrieve(session_id))
             if session.get('payment_status') == 'paid':

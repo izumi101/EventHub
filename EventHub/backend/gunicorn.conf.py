@@ -6,10 +6,11 @@ and a deploy (SIGTERM) lets in-flight requests finish within
 restart"); the SPA reconnects with backoff. Broadcasts reach every worker
 through the Redis channel layer, so any number of workers can serve sockets.
 """
+
 import multiprocessing
 import os
 
-bind = f"0.0.0.0:{os.environ.get('PORT', '8000')}"
+bind = f'0.0.0.0:{os.environ.get("PORT", "8000")}'
 worker_class = 'eventhub_backend.uvicorn_worker.EventHubUvicornWorker'
 
 # One async worker per CPU handles many concurrent connections; scale out

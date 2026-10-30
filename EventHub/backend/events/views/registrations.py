@@ -29,18 +29,28 @@ class RegistrationViewSet(viewsets.GenericViewSet):
 
     @extend_schema(
         request=None,
-        parameters=[OpenApiParameter('uuid', OpenApiTypes.UUID, OpenApiParameter.PATH,
-                                     description='Ticket code from the QR (single or group-booking seat).')],
-        responses={200: api.TicketCheckInResultSerializer, 400: api.TicketRefusedSerializer,
-                   401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND},
+        parameters=[
+            OpenApiParameter(
+                'uuid',
+                OpenApiTypes.UUID,
+                OpenApiParameter.PATH,
+                description='Ticket code from the QR (single or group-booking seat).',
+            )
+        ],
+        responses={
+            200: api.TicketCheckInResultSerializer,
+            400: api.TicketRefusedSerializer,
+            401: UNAUTHENTICATED,
+            403: ERROR,
+            404: NOT_FOUND,
+        },
     )
     @action(detail=False, methods=['post'], url_path='check-in/(?P<uuid>[^/.]+)')
     def check_in(self, request, uuid=None):
         try:
             uuid = uuid_lib.UUID(str(uuid))
         except ValueError:
-            return Response({'error': 'Invalid ticket code.', 'status': 'invalid'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid ticket code.', 'status': 'invalid'}, status=status.HTTP_400_BAD_REQUEST)
         registration = Registration.objects.select_related('event').filter(ticket_uuid=uuid).first()
         if registration is None:
             # Group-booking tickets live in BookingSeat, not Registration.
@@ -59,17 +69,20 @@ class RegistrationViewSet(viewsets.GenericViewSet):
                     'message': 'Ticket already checked in!',
                     'status': 'used',
                     'attendee': registration.user.username,
-                    'checked_in_at': registration.checked_in_at
+                    'checked_in_at': registration.checked_in_at,
                 },
-                status=status.HTTP_200_OK
+                status=status.HTTP_200_OK,
             )
 
-        return Response({
-            'message': 'Ticket valid! Welcome to the event.',
-            'status': 'success',
-            'attendee': registration.user.username,
-            'event': registration.event.title
-        }, status=status.HTTP_200_OK)
+        return Response(
+            {
+                'message': 'Ticket valid! Welcome to the event.',
+                'status': 'success',
+                'attendee': registration.user.username,
+                'event': registration.event.title,
+            },
+            status=status.HTTP_200_OK,
+        )
 
     def _check_in_booking_seat(self, request, uuid):
         """Validate a group-booking seat ticket by its UUID."""
@@ -83,11 +96,14 @@ class RegistrationViewSet(viewsets.GenericViewSet):
         )
         booking = seat_ticket.booking
         if not can_check_in_event(booking.event, request.user):
-            return Response({'error': 'You do not have check-in rights for this event.'},
-                            status=status.HTTP_403_FORBIDDEN)
+            return Response(
+                {'error': 'You do not have check-in rights for this event.'}, status=status.HTTP_403_FORBIDDEN
+            )
         if booking.status != Booking.Status.CONFIRMED:
-            return Response({'error': 'Ticket is NOT paid — the group booking was never completed.',
-                             'status': 'invalid'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Ticket is NOT paid — the group booking was never completed.', 'status': 'invalid'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         attendee = (
             seat_ticket.attendee_name
@@ -97,23 +113,28 @@ class RegistrationViewSet(viewsets.GenericViewSet):
         # Conditional UPDATE: of two simultaneous scans only one flips the flag.
         with transaction.atomic():
             admitted = BookingSeat.objects.filter(pk=seat_ticket.pk, is_checked_in=False).update(
-                is_checked_in=True, checked_in_at=_tz.now(),
+                is_checked_in=True,
+                checked_in_at=_tz.now(),
             )
         if not admitted:
             seat_ticket.refresh_from_db(fields=['checked_in_at'])
-            return Response({
-                'message': 'Ticket already checked in!',
-                'status': 'used',
-                'attendee': attendee,
-                'checked_in_at': seat_ticket.checked_in_at,
-            })
+            return Response(
+                {
+                    'message': 'Ticket already checked in!',
+                    'status': 'used',
+                    'attendee': attendee,
+                    'checked_in_at': seat_ticket.checked_in_at,
+                }
+            )
 
-        return Response({
-            'message': f'Ticket valid! Group seat {seat_ticket.seat.row}-{seat_ticket.seat.col}.',
-            'status': 'success',
-            'attendee': attendee,
-            'event': booking.event.title,
-        })
+        return Response(
+            {
+                'message': f'Ticket valid! Group seat {seat_ticket.seat.row}-{seat_ticket.seat.col}.',
+                'status': 'success',
+                'attendee': attendee,
+                'event': booking.event.title,
+            }
+        )
 
 
 class MyRegistrationsView(generics.ListAPIView):
@@ -122,11 +143,16 @@ class MyRegistrationsView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = (
-            Registration.objects
-            .filter(user=self.request.user)
+            Registration.objects.filter(user=self.request.user)
             .exclude(status=RegistrationStatusChoices.CANCELLED)
             .select_related(
-                'user', 'seat', 'seat__seat_map', 'payment', 'promo_code', 'ticket_type', 'refund_request',
+                'user',
+                'seat',
+                'seat__seat_map',
+                'payment',
+                'promo_code',
+                'ticket_type',
+                'refund_request',
             )
             .prefetch_related(
                 # Events come with their capacity counts annotated, so the

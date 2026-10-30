@@ -22,6 +22,7 @@ from ..serializers import CheckInListSerializer, CheckInLogSerializer
 
 class EventCheckInListsView(generics.ListCreateAPIView):
     """GET list (check-in staff and managers) / POST create (managers)."""
+
     serializer_class = CheckInListSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None  # lists are few; frontend expects a bare array
@@ -49,6 +50,7 @@ class EventCheckInListsView(generics.ListCreateAPIView):
 
 class CheckInListDetailView(generics.RetrieveUpdateDestroyAPIView):
     """GET / PUT / DELETE a single check-in list."""
+
     serializer_class = CheckInListSerializer
     permission_classes = [IsAuthenticated]
     queryset = CheckInList.objects.all()
@@ -67,18 +69,25 @@ class CheckInListDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class CheckInListAttendeesView(generics.ListAPIView):
     """Return all registrations for an event with their check-in status for a specific list."""
+
     permission_classes = [IsAuthenticated]
     pagination_class = None  # the scanner needs the whole list
 
-    @extend_schema(responses={200: api.CheckInListAttendeeSerializer(many=True), 401: UNAUTHENTICATED, 403: FORBIDDEN, 404: NOT_FOUND})
+    @extend_schema(
+        responses={
+            200: api.CheckInListAttendeeSerializer(many=True),
+            401: UNAUTHENTICATED,
+            403: FORBIDDEN,
+            404: NOT_FOUND,
+        }
+    )
     def get(self, request, pk, **kwargs):
         checkin_list = get_object_or_404(CheckInList.objects.select_related('event'), pk=pk)
         if not can_check_in_event(checkin_list.event, request.user):
             raise PermissionDenied
 
         regs = (
-            Registration.objects
-            .filter(event=checkin_list.event)
+            Registration.objects.filter(event=checkin_list.event)
             .exclude(status__in=INACTIVE_REGISTRATION_STATUSES)
             .select_related('user')
         )
@@ -93,26 +102,41 @@ class CheckInListAttendeesView(generics.ListAPIView):
         for reg in regs:
             u = reg.user
             last_log = log_map.get(reg.id)
-            result.append({
-                'id': reg.id,
-                'ticket_uuid': str(reg.ticket_uuid),
-                'username': u.username,
-                'full_name': f'{u.first_name} {u.last_name}'.strip() or u.username,
-                'email': u.email,
-                'status': reg.status,
-                'is_checked_in': last_log.action == CheckInLog.ACTION_CHECK_IN if last_log else False,
-                'checked_in_at': last_log.created_at if (last_log and last_log.action == CheckInLog.ACTION_CHECK_IN) else None,
-                'scanned_by': last_log.scanned_by.username if (last_log and last_log.scanned_by) else None,
-            })
+            result.append(
+                {
+                    'id': reg.id,
+                    'ticket_uuid': str(reg.ticket_uuid),
+                    'username': u.username,
+                    'full_name': f'{u.first_name} {u.last_name}'.strip() or u.username,
+                    'email': u.email,
+                    'status': reg.status,
+                    'is_checked_in': last_log.action == CheckInLog.ACTION_CHECK_IN if last_log else False,
+                    'checked_in_at': last_log.created_at
+                    if (last_log and last_log.action == CheckInLog.ACTION_CHECK_IN)
+                    else None,
+                    'scanned_by': last_log.scanned_by.username if (last_log and last_log.scanned_by) else None,
+                }
+            )
 
         return Response(result)
 
 
 class CheckInListCheckInView(generics.GenericAPIView):
     """POST ticket_uuid to check in (or undo) within a specific list."""
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=api.CheckInScanRequestSerializer, responses={200: api.CheckInScanResultSerializer, 201: api.CheckInScanResultSerializer, 400: api.TicketRefusedSerializer, 401: UNAUTHENTICATED, 403: FORBIDDEN, 404: api.TicketRefusedSerializer})
+    @extend_schema(
+        request=api.CheckInScanRequestSerializer,
+        responses={
+            200: api.CheckInScanResultSerializer,
+            201: api.CheckInScanResultSerializer,
+            400: api.TicketRefusedSerializer,
+            401: UNAUTHENTICATED,
+            403: FORBIDDEN,
+            404: api.TicketRefusedSerializer,
+        },
+    )
     def post(self, request, pk, **kwargs):
         checkin_list = get_object_or_404(CheckInList.objects.select_related('event'), pk=pk)
         if not can_check_in_event(checkin_list.event, request.user):
@@ -132,19 +156,18 @@ class CheckInListCheckInView(generics.GenericAPIView):
         except ValidationError:  # malformed UUID
             reg_exists = False
         if not reg_exists:
-            return Response({'error': 'Ticket not found for this event.', 'status': 'invalid'},
-                            status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {'error': 'Ticket not found for this event.', 'status': 'invalid'}, status=status.HTTP_404_NOT_FOUND
+            )
 
         with transaction.atomic():
             # Row lock: the same QR scanned at two gates at once is serialised.
-            reg = (
-                reg_lookup.select_for_update(of=('self',))
-                .select_related('user', 'payment')
-                .get()
-            )
+            reg = reg_lookup.select_for_update(of=('self',)).select_related('user', 'payment').get()
             last = (
                 CheckInLog.objects.filter(checkin_list=checkin_list, registration=reg)
-                .order_by('-created_at', '-id').values_list('action', flat=True).first()
+                .order_by('-created_at', '-id')
+                .values_list('action', flat=True)
+                .first()
             )
             is_in = last == CheckInLog.ACTION_CHECK_IN
 
@@ -153,15 +176,18 @@ class CheckInListCheckInView(generics.GenericAPIView):
                 if error:
                     return Response({'error': error, 'status': 'invalid'}, status=status.HTTP_400_BAD_REQUEST)
                 if is_in:
-                    return Response({
-                        'message': 'Ticket already checked in!',
-                        'status': 'used',
-                        'attendee': self._name(reg.user),
-                        'action': action_type,
-                    })
+                    return Response(
+                        {
+                            'message': 'Ticket already checked in!',
+                            'status': 'used',
+                            'attendee': self._name(reg.user),
+                            'action': action_type,
+                        }
+                    )
             elif not is_in:
-                return Response({'error': 'This ticket is not checked in on this list.'},
-                                status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {'error': 'This ticket is not checked in on this list.'}, status=status.HTTP_400_BAD_REQUEST
+                )
 
             log = CheckInLog.objects.create(
                 checkin_list=checkin_list,
@@ -172,17 +198,19 @@ class CheckInListCheckInView(generics.GenericAPIView):
             )
             # Keep global is_checked_in in sync with the default list
             if checkin_list.is_default:
-                reg.is_checked_in = (action_type == CheckInLog.ACTION_CHECK_IN)
+                reg.is_checked_in = action_type == CheckInLog.ACTION_CHECK_IN
                 reg.checked_in_at = timezone.now() if reg.is_checked_in else None
                 reg.save(update_fields=['is_checked_in', 'checked_in_at'])
 
-        return Response({
-            'message': 'Checked in' if action_type == CheckInLog.ACTION_CHECK_IN else 'Undone',
-            'status': 'success',
-            'attendee': self._name(reg.user),
-            'action': action_type,
-            'log_id': log.id,
-        })
+        return Response(
+            {
+                'message': 'Checked in' if action_type == CheckInLog.ACTION_CHECK_IN else 'Undone',
+                'status': 'success',
+                'attendee': self._name(reg.user),
+                'action': action_type,
+                'log_id': log.id,
+            }
+        )
 
     @staticmethod
     def _name(user):
@@ -208,6 +236,7 @@ class CheckInListCheckInView(generics.GenericAPIView):
 
 class EventCheckInLogsView(generics.ListAPIView):
     """GET recent check-in log entries for an event (staff, newest first)."""
+
     serializer_class = CheckInLogSerializer
     permission_classes = [IsAuthenticated]
     pagination_class = None  # frontend expects a bare array; capped below
@@ -217,7 +246,7 @@ class EventCheckInLogsView(generics.ListAPIView):
         if not can_check_in_event(event, self.request.user):
             raise PermissionDenied
         return (
-            CheckInLog.objects
-            .filter(checkin_list__event=event)
-            .select_related('checkin_list', 'registration__user', 'scanned_by')
+            CheckInLog.objects.filter(checkin_list__event=event).select_related(
+                'checkin_list', 'registration__user', 'scanned_by'
+            )
         )[:200]

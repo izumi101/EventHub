@@ -5,6 +5,7 @@ channels.testing provides one, but importing that package pulls in daphne
 longer ships. This is the same small client on top of asgiref's
 ApplicationCommunicator.
 """
+
 import json
 from unittest import mock
 from urllib.parse import unquote, urlparse
@@ -19,13 +20,16 @@ def _no_op():
 class WebsocketCommunicator(ApplicationCommunicator):
     def __init__(self, application, path, headers=None, subprotocols=None):
         parsed = urlparse(path)
-        super().__init__(application, {
-            'type': 'websocket',
-            'path': unquote(parsed.path),
-            'query_string': parsed.query.encode('utf-8'),
-            'headers': headers or [],
-            'subprotocols': subprotocols or [],
-        })
+        super().__init__(
+            application,
+            {
+                'type': 'websocket',
+                'path': unquote(parsed.path),
+                'query_string': parsed.query.encode('utf-8'),
+                'headers': headers or [],
+                'subprotocols': subprotocols or [],
+            },
+        )
 
     # As in channels.testing: the test's database connection must survive the
     # consumer's close_old_connections() calls.

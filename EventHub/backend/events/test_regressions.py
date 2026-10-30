@@ -1,4 +1,5 @@
 """Regression tests for the issues listed in REVIEW.md (events app)."""
+
 from datetime import timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -12,7 +13,13 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from events.models import (
-    CheckInList, Event, EventStaff, PromoCode, Registration, Review, TicketType,
+    CheckInList,
+    Event,
+    EventStaff,
+    PromoCode,
+    Registration,
+    Review,
+    TicketType,
 )
 from payments.models import Payment
 
@@ -33,9 +40,14 @@ class Base(APITestCase):
 
     def make_event(self, **kw):
         data = dict(
-            title='Conf', description='d', organizer=self.organizer,
-            date=timezone.now() + timedelta(days=5), location='Hall',
-            price=Decimal('100.00'), max_participants=10, status='published',
+            title='Conf',
+            description='d',
+            organizer=self.organizer,
+            date=timezone.now() + timedelta(days=5),
+            location='Hall',
+            price=Decimal('100.00'),
+            max_participants=10,
+            status='published',
         )
         data.update(kw)
         return Event.objects.create(**data)
@@ -97,8 +109,9 @@ class PermissionTests(Base):
     def test_co_organizer_cannot_appoint_more_staff(self):
         EventStaff.objects.create(event=self.event, user=self.other, role=EventStaff.ROLE_CO_ORGANIZER)
         self.client.force_authenticate(self.other)
-        response = self.client.post(f'/api/v1/events/{self.event.id}/staff/',
-                                    {'invite_username': 'attendee', 'role': 'co_organizer'})
+        response = self.client.post(
+            f'/api/v1/events/{self.event.id}/staff/', {'invite_username': 'attendee', 'role': 'co_organizer'}
+        )
         self.assertEqual(response.status_code, 403)
 
     def test_co_organizer_can_edit_but_not_delete(self):
@@ -139,8 +152,7 @@ class PermissionTests(Base):
 class MoneyTests(Base):
     def test_promo_use_is_reserved_and_released(self):
         # Important #12: max_uses was checked without reserving the use.
-        PromoCode.objects.create(event=self.event, code='HALF', discount_type='percent',
-                                 discount_value=50, max_uses=1)
+        PromoCode.objects.create(event=self.event, code='HALF', discount_type='percent', discount_value=50, max_uses=1)
         self.assertEqual(self.register(promo_code='half').status_code, 201)
         self.assertEqual(PromoCode.objects.get().times_used, 1)
         response = self.register(user=self.other, promo_code='HALF')
@@ -153,6 +165,7 @@ class MoneyTests(Base):
     def test_tier_price_is_locked_at_registration(self):
         # Important #13: only GA prices used to be locked.
         from events.billing import registration_amount
+
         tier = TicketType.objects.create(event=self.event, name='VIP', kind='paid', price=Decimal('80'))
         response = self.register(ticket_type_id=tier.id)
         self.assertEqual(response.status_code, 201)
@@ -187,6 +200,7 @@ class MoneyTests(Base):
 class AnalyticsTests(Base):
     def test_full_refunds_are_reported(self):
         from events.analytics import event_analytics
+
         kept = Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
         Payment.objects.create(registration=kept, amount=100, status='completed')
         gone = Registration.objects.create(user=self.other, event=self.event, status='cancelled')
@@ -205,9 +219,13 @@ class AdminDashboardTests(Base):
         admin = User.objects.create_superuser('root', 'root@example.com', 'Str0ng-pass!')
         self.client.force_authenticate(admin)
         data = self.client.get('/api/v1/admin-dashboard/').data
-        self.assertEqual(data['revenue_by_currency'], [
-            {'currency': 'KZT', 'amount': '5000.00'}, {'currency': 'USD', 'amount': '60.00'},
-        ])
+        self.assertEqual(
+            data['revenue_by_currency'],
+            [
+                {'currency': 'KZT', 'amount': '5000.00'},
+                {'currency': 'USD', 'amount': '60.00'},
+            ],
+        )
 
 
 class ValidationTests(Base):
@@ -231,13 +249,21 @@ class ValidationTests(Base):
         # Important #20.
         self.client.force_authenticate(self.organizer)
         base = {
-            'title': 'X', 'description': 'd', 'location': 'L',
-            'category_id': None, 'date': (timezone.now() + timedelta(days=3)).isoformat(),
+            'title': 'X',
+            'description': 'd',
+            'location': 'L',
+            'category_id': None,
+            'date': (timezone.now() + timedelta(days=3)).isoformat(),
         }
         from events.models import Category
+
         base['category_id'] = Category.objects.create(name='Tech').id
-        for bad in ({'price': -1}, {'tax_percent': 150}, {'currency': 'dollars'},
-                    {'end_date': (timezone.now() + timedelta(days=1)).isoformat()}):
+        for bad in (
+            {'price': -1},
+            {'tax_percent': 150},
+            {'currency': 'dollars'},
+            {'end_date': (timezone.now() + timedelta(days=1)).isoformat()},
+        ):
             response = self.client.post('/api/v1/events/', {**base, **bad}, format='json')
             self.assertEqual(response.status_code, 400, bad)
 
@@ -260,21 +286,24 @@ class BookingRuleTests(Base):
         response = self.client.post('/api/v1/bookings/', {'event': draft.id, 'seat_ids': seat_ids}, format='json')
         self.assertEqual(response.status_code, 400)
 
-
     def test_waiting_room_refusal_carries_a_stable_code(self):
         # The SPA branches on `code`, not on the human-readable message.
-        with patch('events.queue.is_queue_active', return_value=True), \
-                patch('events.queue.validate_queue_token', return_value=False):
+        with (
+            patch('events.queue.is_queue_active', return_value=True),
+            patch('events.queue.validate_queue_token', return_value=False),
+        ):
             response = self.register()
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data['code'], 'QUEUE_REQUIRED')
         self.assertNotEqual(response.data['error'], 'QUEUE_REQUIRED')
         self.assertFalse(Registration.objects.filter(event=self.event).exists())
 
+
 class ExportTests(Base):
     def test_formula_injection_is_neutralised(self):
         # Important #3.
         from openpyxl import load_workbook
+
         evil = self.make_user('evil')
         evil.first_name = '=HYPERLINK("http://evil.example","click")'
         evil.save()
@@ -310,14 +339,14 @@ class QueryCountTests(Base):
         Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
         one = count()
         for i in range(5):
-            Registration.objects.create(user=self.attendee, event=self.make_event(title=f'R{i}'),
-                                        status='confirmed')
+            Registration.objects.create(user=self.attendee, event=self.make_event(title=f'R{i}'), status='confirmed')
         self.assertEqual(count(), one)
 
 
 class WaitlistTests(Base):
     def test_cancelling_an_event_does_not_offer_spots_to_the_waitlist(self):
         from events.models import WaitlistEntry
+
         self.event.max_participants = 1
         self.event.save()
         Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
@@ -344,14 +373,17 @@ class AttendeeListTests(Base):
 class CommandTests(Base):
     def test_run_maintenance_releases_holds_and_completes_past_events(self):
         # Important #23: this work moved out of GET requests into a scheduler.
-        promo = PromoCode.objects.create(event=self.event, code='P', discount_type='percent',
-                                         discount_value=10, times_used=1)
+        promo = PromoCode.objects.create(
+            event=self.event, code='P', discount_type='percent', discount_value=10, times_used=1
+        )
         stale = Registration.objects.create(
-            user=self.attendee, event=self.event, status='pending', promo_code=promo,
+            user=self.attendee,
+            event=self.event,
+            status='pending',
+            promo_code=promo,
             seat_held_until=timezone.now() - timedelta(minutes=1),
         )
-        past = self.make_event(date=timezone.now() - timedelta(days=2),
-                               end_date=timezone.now() - timedelta(days=1))
+        past = self.make_event(date=timezone.now() - timedelta(days=2), end_date=timezone.now() - timedelta(days=1))
         call_command('run_maintenance')
         stale.refresh_from_db()
         past.refresh_from_db()
@@ -361,14 +393,20 @@ class CommandTests(Base):
         self.assertEqual(past.status, 'completed')
 
     def test_seat_map_read_does_not_write(self):
-        Registration.objects.create(user=self.attendee, event=self.event, status='pending',
-                                    seat_held_until=timezone.now() - timedelta(minutes=1))
+        Registration.objects.create(
+            user=self.attendee,
+            event=self.event,
+            status='pending',
+            seat_held_until=timezone.now() - timedelta(minutes=1),
+        )
         self.client.force_authenticate(self.organizer)
         self.client.post(f'/api/v1/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 1}, format='json')
         self.client.force_authenticate(None)
         with CaptureQueriesContext(connection) as ctx:
             self.client.get(f'/api/v1/events/{self.event.id}/seat_map/')
-        writes = [q for q in ctx.captured_queries if q['sql'].lstrip().upper().startswith(('UPDATE', 'INSERT', 'DELETE'))]
+        writes = [
+            q for q in ctx.captured_queries if q['sql'].lstrip().upper().startswith(('UPDATE', 'INSERT', 'DELETE'))
+        ]
         self.assertEqual(writes, [])
 
     def test_generate_seat_maps_force_needs_an_event(self):

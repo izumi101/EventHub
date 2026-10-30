@@ -1,4 +1,5 @@
 """Regression tests for the auth issues listed in REVIEW.md."""
+
 from django.contrib.auth.models import User
 from django.test import RequestFactory, override_settings
 from rest_framework.test import APITestCase
@@ -14,11 +15,13 @@ class CodeBruteForceTests(APITestCase):
         verification = EmailVerificationCode.create_for_email('new@example.com')
         wrong = '000000' if verification.code != '000000' else '111111'
         for _ in range(5):
-            response = self.client.post('/api/v1/auth/register/verify-code/',
-                                        {'email': 'new@example.com', 'code': wrong})
+            response = self.client.post(
+                '/api/v1/auth/register/verify-code/', {'email': 'new@example.com', 'code': wrong}
+            )
             self.assertEqual(response.status_code, 400)
-        response = self.client.post('/api/v1/auth/register/verify-code/',
-                                    {'email': 'new@example.com', 'code': verification.code})
+        response = self.client.post(
+            '/api/v1/auth/register/verify-code/', {'email': 'new@example.com', 'code': verification.code}
+        )
         self.assertEqual(response.status_code, 400)
 
     def test_reset_code_has_the_same_budget(self):
@@ -27,8 +30,7 @@ class CodeBruteForceTests(APITestCase):
         wrong = '000000' if entry.code != '000000' else '111111'
         for _ in range(5):
             self.client.post('/api/v1/auth/password-reset/verify/', {'identifier': 'victim', 'code': wrong})
-        response = self.client.post('/api/v1/auth/password-reset/verify/',
-                                    {'identifier': 'victim', 'code': entry.code})
+        response = self.client.post('/api/v1/auth/password-reset/verify/', {'identifier': 'victim', 'code': entry.code})
         self.assertEqual(response.status_code, 400)
 
     def test_unknown_account_and_wrong_code_look_the_same(self):
@@ -40,8 +42,7 @@ class CodeBruteForceTests(APITestCase):
 
     def test_throttle_identity_ignores_spoofed_forwarded_for(self):
         # K7: DRF used the whole client-supplied X-Forwarded-For as identity.
-        request = RequestFactory().get('/', HTTP_X_FORWARDED_FOR='6.6.6.6, 203.0.113.7',
-                                       REMOTE_ADDR='172.18.0.5')
+        request = RequestFactory().get('/', HTTP_X_FORWARDED_FOR='6.6.6.6, 203.0.113.7', REMOTE_ADDR='172.18.0.5')
         self.assertEqual(BaseThrottle().get_ident(request), '203.0.113.7')
 
 
@@ -59,10 +60,16 @@ class LoginIdentifierTests(APITestCase):
         # Important #4.
         EmailVerificationCode.create_for_email('real@example.com')
         code = EmailVerificationCode.objects.get().code
-        response = self.client.post('/api/v1/auth/register/', {
-            'username': 'victim@example.com', 'email': 'real@example.com',
-            'password': 'Str0ng-pass!', 'password2': 'Str0ng-pass!', 'verification_code': code,
-        })
+        response = self.client.post(
+            '/api/v1/auth/register/',
+            {
+                'username': 'victim@example.com',
+                'email': 'real@example.com',
+                'password': 'Str0ng-pass!',
+                'password2': 'Str0ng-pass!',
+                'verification_code': code,
+            },
+        )
         self.assertEqual(response.status_code, 400)
         self.assertIn('username', response.data)
 
@@ -70,8 +77,9 @@ class LoginIdentifierTests(APITestCase):
         # A legacy account whose *username* is someone else's email address.
         User.objects.create_user('victim@example.com', 'attacker@example.com', 'Attacker-pass1')
         User.objects.create_user('victim', 'victim@example.com', 'Victim-pass1')
-        response = self.client.post('/api/v1/auth/login/', {'username': 'victim@example.com',
-                                                         'password': 'Victim-pass1'})
+        response = self.client.post(
+            '/api/v1/auth/login/', {'username': 'victim@example.com', 'password': 'Victim-pass1'}
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['user']['username'], 'victim')
 
@@ -87,9 +95,14 @@ class PasswordChangeTests(APITestCase):
         # Important #5: a stolen refresh token kept working for 7 days.
         stolen = self.login()['tokens']['refresh']
         self.client.force_authenticate(self.user)
-        response = self.client.post('/api/v1/auth/change-password/', {
-            'old_password': 'Old-pass-123', 'new_password': 'Brand-new-pass-9', 'new_password2': 'Brand-new-pass-9',
-        })
+        response = self.client.post(
+            '/api/v1/auth/change-password/',
+            {
+                'old_password': 'Old-pass-123',
+                'new_password': 'Brand-new-pass-9',
+                'new_password2': 'Brand-new-pass-9',
+            },
+        )
         self.assertEqual(response.status_code, 200)
         self.assertIn('refresh', response.data['tokens'])
         self.client.force_authenticate(None)
@@ -99,15 +112,21 @@ class PasswordChangeTests(APITestCase):
 
     def test_change_applies_password_validators(self):
         self.client.force_authenticate(self.user)
-        response = self.client.post('/api/v1/auth/change-password/', {
-            'old_password': 'Old-pass-123', 'new_password': 'password123', 'new_password2': 'password123',
-        })
+        response = self.client.post(
+            '/api/v1/auth/change-password/',
+            {
+                'old_password': 'Old-pass-123',
+                'new_password': 'password123',
+                'new_password2': 'password123',
+            },
+        )
         self.assertEqual(response.status_code, 400)  # too common
 
 
 class UniqueEmailTests(APITestCase):
     def test_database_refuses_a_second_account_with_the_same_email(self):
         from django.db import IntegrityError, transaction
+
         User.objects.create_user('first', 'Same@Example.com', 'Str0ng-pass!')
         with self.assertRaises(IntegrityError), transaction.atomic():
             User.objects.create_user('second', 'same@example.com', 'Str0ng-pass!')
