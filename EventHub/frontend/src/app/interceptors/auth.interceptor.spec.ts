@@ -34,14 +34,18 @@ describe('authInterceptor', () => {
     client.get(`${API}/events/`).subscribe();
     client.get('https://evil.example/api/steal').subscribe();
 
-    expect(http.expectOne(`${API}/events/`).request.headers.get('Authorization')).toBe('Bearer expired');
-    expect(http.expectOne('https://evil.example/api/steal').request.headers.has('Authorization')).toBe(false);
+    expect(http.expectOne(`${API}/events/`).request.headers.get('Authorization')).toBe(
+      'Bearer expired',
+    );
+    expect(
+      http.expectOne('https://evil.example/api/steal').request.headers.has('Authorization'),
+    ).toBe(false);
   });
 
   it('refreshes once for parallel 401s and retries every request', () => {
     const done: string[] = [];
-    client.get<string>(`${API}/a/`).subscribe(v => done.push(v));
-    client.get<string>(`${API}/b/`).subscribe(v => done.push(v));
+    client.get<string>(`${API}/a/`).subscribe((v) => done.push(v));
+    client.get<string>(`${API}/b/`).subscribe((v) => done.push(v));
 
     http.expectOne(`${API}/a/`).flush(null, { status: 401, statusText: 'Unauthorized' });
     http.expectOne(`${API}/b/`).flush(null, { status: 401, statusText: 'Unauthorized' });
@@ -63,10 +67,14 @@ describe('authInterceptor', () => {
     let failed = false;
     client.get(`${API}/a/`).subscribe({ error: () => (failed = true) });
     http.expectOne(`${API}/a/`).flush(null, { status: 401, statusText: 'Unauthorized' });
-    http.expectOne(`${API}/auth/token/refresh/`).flush(null, { status: 401, statusText: 'Unauthorized' });
+    http
+      .expectOne(`${API}/auth/token/refresh/`)
+      .flush(null, { status: 401, statusText: 'Unauthorized' });
 
     expect(failed).toBe(true);
     expect(localStorage.getItem('access_token')).toBeNull();
-    expect(router.navigate).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/my-registrations' } });
+    expect(router.navigate).toHaveBeenCalledWith(['/login'], {
+      queryParams: { returnUrl: '/my-registrations' },
+    });
   });
 });

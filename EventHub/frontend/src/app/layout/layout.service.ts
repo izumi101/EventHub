@@ -17,33 +17,37 @@ export class LayoutService {
 
   private cachedEventId: string | null = null;
 
-  constructor(private router: Router, private eventService: EventService) {
+  constructor(
+    private router: Router,
+    private eventService: EventService,
+  ) {
     const saved = localStorage.getItem('sidebar_collapsed');
     if (saved !== null) this.collapsed.set(saved === 'true');
 
     try {
       const savedGroups = localStorage.getItem('sidebar_groups');
       if (savedGroups) this.groupOpen.set(JSON.parse(savedGroups));
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
 
     this.router.events
-      .pipe(filter(e => e instanceof NavigationEnd))
-      .subscribe(e => this.onNavigation((e as NavigationEnd).urlAfterRedirects));
+      .pipe(filter((e) => e instanceof NavigationEnd))
+      .subscribe((e) => this.onNavigation((e as NavigationEnd).urlAfterRedirects));
 
     this.onNavigation(this.router.url);
   }
 
   private onNavigation(url: string): void {
     const match =
-      url.match(/\/organizer\/events\/([^/?#]+)/) ||
-      url.match(/\/edit-event\/([^/?#]+)/);
+      url.match(/\/organizer\/events\/([^/?#]+)/) || url.match(/\/edit-event\/([^/?#]+)/);
 
     if (match) {
       const id = match[1];
       if (id !== this.cachedEventId) {
         this.cachedEventId = id;
         this.eventService.getEvent(+id).subscribe({
-          next: event => this.eventContext.set({ id, title: event.title }),
+          next: (event) => this.eventContext.set({ id, title: event.title }),
           error: () => this.eventContext.set({ id, title: 'Event' }),
         });
       }

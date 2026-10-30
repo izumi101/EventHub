@@ -12,13 +12,14 @@ export class PaymentService {
 
   createCheckoutSession(registrationId: number): Observable<CheckoutSessionResponse> {
     return this.http.post<CheckoutSessionResponse>(
-      `${this.apiUrl}/create-checkout/${registrationId}/`, {}
+      `${this.apiUrl}/create-checkout/${registrationId}/`,
+      {},
     );
   }
 
   verifyPayment(sessionId: string): Observable<PaymentVerificationResponse> {
-    return this.http.get<PaymentVerificationResponse>(
-      `${this.apiUrl}/verify/`, { params: { session_id: sessionId } }
-    );
+    return this.http.get<PaymentVerificationResponse>(`${this.apiUrl}/verify/`, {
+      params: { session_id: sessionId },
+    });
   }
 }

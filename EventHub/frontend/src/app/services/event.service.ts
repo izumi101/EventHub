@@ -25,13 +25,13 @@ export class EventService {
   getCategories(): Observable<Category[]> {
     return this.http
       .get<Category[] | PaginatedResponse<Category>>(`${this.apiUrl}/categories/`)
-      .pipe(map(response => Array.isArray(response) ? response : response.results));
+      .pipe(map((response) => (Array.isArray(response) ? response : response.results)));
   }
 
   getEvents(params?: {
     category?: number;
     search?: string;
-    q?: string;          // semantic search query
+    q?: string; // semantic search query
     location?: string;
     ordering?: string;
     is_free?: boolean;
@@ -53,7 +53,9 @@ export class EventService {
       if (params.page) httpParams = httpParams.set('page', params.page.toString());
       if (params.upcoming) httpParams = httpParams.set('upcoming', 'true');
     }
-    return this.http.get<PaginatedResponse<Event>>(`${this.apiUrl}/events/`, { params: httpParams });
+    return this.http.get<PaginatedResponse<Event>>(`${this.apiUrl}/events/`, {
+      params: httpParams,
+    });
   }
 
   getEvent(id: number): Observable<Event> {
@@ -97,7 +99,9 @@ export class EventService {
   getMyRegistrations(params?: { event?: number }): Observable<PaginatedResponse<Registration>> {
     let httpParams = new HttpParams();
     if (params?.event) httpParams = httpParams.set('event', params.event.toString());
-    return this.http.get<PaginatedResponse<Registration>>(`${this.apiUrl}/my-registrations/`, { params: httpParams });
+    return this.http.get<PaginatedResponse<Registration>>(`${this.apiUrl}/my-registrations/`, {
+      params: httpParams,
+    });
   }
 
   getSeatMap(eventId: number): Observable<any> {
@@ -138,7 +142,9 @@ export class EventService {
 
   // ── Favorites ──
   getFavorites(): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/favorites/`).pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/favorites/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   toggleFavorite(eventId: number): Observable<{ favorited: boolean }> {
     return this.http.post<{ favorited: boolean }>(`${this.apiUrl}/favorites/${eventId}/`, {});
@@ -149,7 +155,9 @@ export class EventService {
 
   // ── Reviews ──
   getEventReviews(eventId: number): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/reviews/`).pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/reviews/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   createReview(eventId: number, rating: number, comment: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/events/${eventId}/reviews/`, { rating, comment });
@@ -157,10 +165,14 @@ export class EventService {
 
   // ── Notifications ──
   getNotifications(): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/notifications/`).pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/notifications/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   markNotificationRead(id?: number): Observable<any> {
-    const url = id ? `${this.apiUrl}/notifications/${id}/read/` : `${this.apiUrl}/notifications/read/`;
+    const url = id
+      ? `${this.apiUrl}/notifications/${id}/read/`
+      : `${this.apiUrl}/notifications/read/`;
     return this.http.post<any>(url, {});
   }
 
@@ -170,14 +182,22 @@ export class EventService {
   }
 
   // ── Promo codes (public validate) ──
-  validatePromo(eventId: number, code: string, ctx?: { ticket_type_id?: number; seat_id?: number }): Observable<PromoQuote> {
-    return this.http.post<PromoQuote>(`${this.apiUrl}/events/${eventId}/validate-promo/`, { code, ...(ctx ?? {}) });
+  validatePromo(
+    eventId: number,
+    code: string,
+    ctx?: { ticket_type_id?: number; seat_id?: number },
+  ): Observable<PromoQuote> {
+    return this.http.post<PromoQuote>(`${this.apiUrl}/events/${eventId}/validate-promo/`, {
+      code,
+      ...(ctx ?? {}),
+    });
   }
 
   // ── Promo codes (organizer CRUD) ──
   getPromoCodes(eventId: number): Observable<PromoCode[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/promo-codes/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/promo-codes/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   createPromoCode(eventId: number, data: Partial<PromoCode>): Observable<PromoCode> {
     return this.http.post<PromoCode>(`${this.apiUrl}/events/${eventId}/promo-codes/`, data);
@@ -196,12 +216,26 @@ export class EventService {
   submitEvent(eventId: number): Observable<EventActionResponse> {
     return this.http.post<EventActionResponse>(`${this.apiUrl}/events/${eventId}/submit/`, {});
   }
-  cancelEvent(eventId: number): Observable<EventActionResponse & { notified?: number; refunded?: number }> {
-    return this.http.post<EventActionResponse & { notified?: number; refunded?: number }>(`${this.apiUrl}/events/${eventId}/cancel-event/`, {});
+  cancelEvent(
+    eventId: number,
+  ): Observable<EventActionResponse & { notified?: number; refunded?: number }> {
+    return this.http.post<EventActionResponse & { notified?: number; refunded?: number }>(
+      `${this.apiUrl}/events/${eventId}/cancel-event/`,
+      {},
+    );
   }
 
   // ── Seat map management (organizer) ──
-  createSeatMap(eventId: number, data: { rows: number; cols: number; vip_rows?: number; premium_rows?: number; sync_capacity?: boolean }): Observable<any> {
+  createSeatMap(
+    eventId: number,
+    data: {
+      rows: number;
+      cols: number;
+      vip_rows?: number;
+      premium_rows?: number;
+      sync_capacity?: boolean;
+    },
+  ): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/events/${eventId}/seat-map/create/`, data);
   }
 
@@ -220,8 +254,9 @@ export class EventService {
 
   // ── Ticket types ──
   getTicketTypes(eventId: number): Observable<TicketType[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/ticket-types/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/ticket-types/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   createTicketType(eventId: number, data: Partial<TicketType>): Observable<TicketType> {
     return this.http.post<TicketType>(`${this.apiUrl}/events/${eventId}/ticket-types/`, data);
@@ -235,8 +270,9 @@ export class EventService {
 
   // ── Custom questions ──
   getEventQuestions(eventId: number): Observable<EventQuestion[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/questions/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/questions/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   createQuestion(eventId: number, data: Partial<EventQuestion>): Observable<EventQuestion> {
     return this.http.post<EventQuestion>(`${this.apiUrl}/events/${eventId}/questions/`, data);
@@ -259,8 +295,9 @@ export class EventService {
     return this.http.delete<any>(`${this.apiUrl}/events/${eventId}/waitlist/`);
   }
   getEventWaitlist(eventId: number): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/waitlist-entries/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/waitlist-entries/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
 
   // ── Attendee CSV export (returns a Blob to trigger a download) ──
@@ -272,11 +309,16 @@ export class EventService {
   }
 
   // ── Refunds & offline payments (organizer) ──
-  refundRegistration(registrationId: number, body: { amount?: string; reason?: string }): Observable<any> {
+  refundRegistration(
+    registrationId: number,
+    body: { amount?: string; reason?: string },
+  ): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/payments/refund/${registrationId}/`, body);
   }
   markOfflinePaid(registrationId: number, amount?: string): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/payments/mark-offline/${registrationId}/`, { amount });
+    return this.http.post<any>(`${this.apiUrl}/payments/mark-offline/${registrationId}/`, {
+      amount,
+    });
   }
 
   // ── Refund requests ──
@@ -284,8 +326,9 @@ export class EventService {
     return this.http.post<any>(`${this.apiUrl}/events/${eventId}/request-refund/`, { reason });
   }
   getRefundRequests(eventId: number): Observable<RefundRequest[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/refund-requests/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/refund-requests/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   resolveRefundRequest(id: number, approve: boolean, note = ''): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/refund-requests/${id}/resolve/`, { approve, note });
@@ -293,11 +336,15 @@ export class EventService {
 
   // ── Team / roles ──
   getStaff(eventId: number): Observable<EventStaff[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/staff/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/staff/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   addStaff(eventId: number, invite_username: string, role: string): Observable<EventStaff> {
-    return this.http.post<EventStaff>(`${this.apiUrl}/events/${eventId}/staff/`, { invite_username, role });
+    return this.http.post<EventStaff>(`${this.apiUrl}/events/${eventId}/staff/`, {
+      invite_username,
+      role,
+    });
   }
   removeStaff(id: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/staff/${id}/`);
@@ -305,8 +352,9 @@ export class EventService {
 
   // ── Webhooks ──
   getWebhooks(eventId: number): Observable<Webhook[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/webhooks/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/webhooks/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   createWebhook(eventId: number, data: Partial<Webhook>): Observable<Webhook> {
     return this.http.post<Webhook>(`${this.apiUrl}/events/${eventId}/webhooks/`, data);
@@ -320,8 +368,9 @@ export class EventService {
 
   // ── Affiliates ──
   getAffiliates(eventId: number): Observable<Affiliate[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/affiliates/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/affiliates/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
   createAffiliate(eventId: number, data: Partial<Affiliate>): Observable<Affiliate> {
     return this.http.post<Affiliate>(`${this.apiUrl}/events/${eventId}/affiliates/`, data);
@@ -334,39 +383,62 @@ export class EventService {
   }
 
   // ── Broadcast message to attendees ──
-  broadcast(eventId: number, body: { subject: string; body: string; audience: string }): Observable<BroadcastResult> {
+  broadcast(
+    eventId: number,
+    body: { subject: string; body: string; audience: string },
+  ): Observable<BroadcastResult> {
     return this.http.post<BroadcastResult>(`${this.apiUrl}/events/${eventId}/broadcast/`, body);
   }
 
   // ── Invoice (fetched with the auth header, opened as a blob — no JWT in the URL) ──
   getInvoiceBlob(registrationId: number): Observable<Blob> {
-    return this.http.get(`${this.apiUrl}/payments/invoice/${registrationId}/`, { responseType: 'blob' });
+    return this.http.get(`${this.apiUrl}/payments/invoice/${registrationId}/`, {
+      responseType: 'blob',
+    });
   }
 
   // ── Check-in Lists ──
   getCheckInLists(eventId: number): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/checkin-lists/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/checkin-lists/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
-  createCheckInList(eventId: number, data: { name: string; description?: string; color?: string }): Observable<any> {
+  createCheckInList(
+    eventId: number,
+    data: { name: string; description?: string; color?: string },
+  ): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/events/${eventId}/checkin-lists/`, data);
   }
-  updateCheckInList(listId: number, data: Partial<{ name: string; description: string; color: string; is_default: boolean }>): Observable<any> {
+  updateCheckInList(
+    listId: number,
+    data: Partial<{ name: string; description: string; color: string; is_default: boolean }>,
+  ): Observable<any> {
     return this.http.patch<any>(`${this.apiUrl}/checkin-lists/${listId}/`, data);
   }
   deleteCheckInList(listId: number): Observable<any> {
     return this.http.delete<any>(`${this.apiUrl}/checkin-lists/${listId}/`);
   }
   getCheckInListAttendees(listId: number): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/checkin-lists/${listId}/attendees/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/checkin-lists/${listId}/attendees/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
-  checkInByList(listId: number, ticketUuid: string, action: 'check_in' | 'undo' = 'check_in', note = ''): Observable<any> {
-    return this.http.post<any>(`${this.apiUrl}/checkin-lists/${listId}/check-in/`, { ticket_uuid: ticketUuid, action, note });
+  checkInByList(
+    listId: number,
+    ticketUuid: string,
+    action: 'check_in' | 'undo' = 'check_in',
+    note = '',
+  ): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/checkin-lists/${listId}/check-in/`, {
+      ticket_uuid: ticketUuid,
+      action,
+      note,
+    });
   }
   getCheckInLogs(eventId: number): Observable<any[]> {
-    return this.http.get<any>(`${this.apiUrl}/events/${eventId}/checkin-logs/`)
-      .pipe(map((r: any) => Array.isArray(r) ? r : r.results ?? []));
+    return this.http
+      .get<any>(`${this.apiUrl}/events/${eventId}/checkin-logs/`)
+      .pipe(map((r: any) => (Array.isArray(r) ? r : (r.results ?? []))));
   }
 }
 

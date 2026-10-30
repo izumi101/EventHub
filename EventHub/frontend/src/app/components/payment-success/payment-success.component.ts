@@ -42,23 +42,29 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
   template: `
     <div class="min-h-screen bg-muted flex items-center justify-center px-4 py-12 pt-20">
       <div class="card w-full max-w-sm p-8 shadow-md text-center animate-scale-in">
-
         @if (loading) {
           <div class="flex flex-col items-center gap-4 py-8">
             <span class="spinner spinner-lg"></span>
             <p class="text-sm text-muted-foreground">Confirming your payment...</p>
           </div>
-
         } @else if (data && data.outcome === 'paid') {
           <div class="flex flex-col items-center gap-3 mb-6">
-            <div class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center">
-              <lucide-icon [img]="icons.CheckCircle" class="w-8 h-8 text-[color:var(--pine-600)]" aria-hidden="true"></lucide-icon>
+            <div
+              class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center"
+            >
+              <lucide-icon
+                [img]="icons.CheckCircle"
+                class="w-8 h-8 text-[color:var(--pine-600)]"
+                aria-hidden="true"
+              ></lucide-icon>
             </div>
             <h1 class="text-xl font-bold text-foreground">Payment confirmed</h1>
             <p class="text-sm text-muted-foreground">Your registration is complete</p>
           </div>
 
-          <div class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-6 text-left">
+          <div
+            class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-6 text-left"
+          >
             <div class="px-4 py-3 flex justify-between gap-3">
               <span class="text-muted-foreground flex-shrink-0">Event</span>
               <span class="font-medium text-foreground text-right">{{ data.event_title }}</span>
@@ -66,7 +72,9 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             @if (data.amount) {
               <div class="px-4 py-3 flex justify-between gap-3">
                 <span class="text-muted-foreground flex-shrink-0">Amount</span>
-                <span class="font-semibold text-foreground">{{ data.amount }} {{ data.currency || '' }}</span>
+                <span class="font-semibold text-foreground"
+                  >{{ data.amount }} {{ data.currency || '' }}</span
+                >
               </div>
             }
             <div class="px-4 py-3 flex justify-between gap-3">
@@ -89,41 +97,59 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               Back to events
             </a>
           </div>
-
         } @else if (data) {
           <!-- Not (yet) paid: still processing, or refunded because the hold had ended -->
           <div class="flex flex-col items-center gap-3 mb-6">
-            <div class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center">
-              <lucide-icon [img]="icons.AlertCircle" class="w-8 h-8 text-[color:var(--destructive)]" aria-hidden="true"></lucide-icon>
+            <div
+              class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
+            >
+              <lucide-icon
+                [img]="icons.AlertCircle"
+                class="w-8 h-8 text-[color:var(--destructive)]"
+                aria-hidden="true"
+              ></lucide-icon>
             </div>
             @if (data.outcome === 'refunded') {
               <h1 class="text-xl font-bold text-foreground">Payment refunded</h1>
               <p class="text-sm text-muted-foreground">
-                Your seat hold had ended before the payment arrived, so the money was returned automatically.
-                Please book again.
+                Your seat hold had ended before the payment arrived, so the money was returned
+                automatically. Please book again.
               </p>
             } @else {
               <h1 class="text-xl font-bold text-foreground">Payment is processing</h1>
               <p class="text-sm text-muted-foreground">
-                We haven't received the confirmation yet. Your ticket will appear in your account as soon as it does.
+                We haven't received the confirmation yet. Your ticket will appear in your account as
+                soon as it does.
               </p>
             }
           </div>
           <div class="flex flex-col gap-2">
-            <a [routerLink]="isBooking ? '/my-bookings' : '/my-registrations'" class="btn btn-secondary btn-full">
+            <a
+              [routerLink]="isBooking ? '/my-bookings' : '/my-registrations'"
+              class="btn btn-secondary btn-full"
+            >
               {{ isBooking ? 'View my bookings' : 'View my tickets' }}
             </a>
-            <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">Back to events</a>
+            <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground"
+              >Back to events</a
+            >
           </div>
-
         } @else {
           <!-- Error -->
           <div class="flex flex-col items-center gap-3 mb-6">
-            <div class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center">
-              <lucide-icon [img]="icons.AlertCircle" class="w-8 h-8 text-[color:var(--destructive)]" aria-hidden="true"></lucide-icon>
+            <div
+              class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
+            >
+              <lucide-icon
+                [img]="icons.AlertCircle"
+                class="w-8 h-8 text-[color:var(--destructive)]"
+                aria-hidden="true"
+              ></lucide-icon>
             </div>
             <h1 class="text-xl font-bold text-foreground">Verification failed</h1>
-            <p class="text-sm text-muted-foreground">{{ error || 'Could not verify your payment. Please contact support.' }}</p>
+            <p class="text-sm text-muted-foreground">
+              {{ error || 'Could not verify your payment. Please contact support.' }}
+            </p>
           </div>
 
           <div class="flex flex-col gap-2">
@@ -154,7 +180,7 @@ export class PaymentSuccessComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.route.queryParams.subscribe(params => {
+    this.route.queryParams.subscribe((params) => {
       const sessionId = params['session_id'];
       const bookingId = params['booking_id'];
 
@@ -164,9 +190,11 @@ export class PaymentSuccessComponent implements OnInit {
         this.isBooking = true;
         // With a Stripe session: verify (confirms even when the webhook is
         // not forwarded). Mock flow: read the booking's real state.
-        const booking$ = sessionId ? this.bookingService.verify(sessionId) : this.bookingService.get(bookingId);
+        const booking$ = sessionId
+          ? this.bookingService.verify(sessionId)
+          : this.bookingService.get(bookingId);
         booking$.subscribe({
-          next: b => {
+          next: (b) => {
             this.data = {
               outcome: BOOKING_OUTCOME[b.status],
               event_title: b.event_title,
@@ -175,9 +203,10 @@ export class PaymentSuccessComponent implements OnInit {
             };
             this.loading = false;
           },
-          error: err => {
+          error: (err) => {
             // Never claim success we couldn't verify.
-            this.error = err.error?.error || err.error?.detail || 'We could not verify this payment yet.';
+            this.error =
+              err.error?.error || err.error?.detail || 'We could not verify this payment yet.';
             this.loading = false;
           },
         });
@@ -190,7 +219,7 @@ export class PaymentSuccessComponent implements OnInit {
         return;
       }
       this.paymentService.verifyPayment(sessionId).subscribe({
-        next: d => {
+        next: (d) => {
           this.data = {
             outcome: PAYMENT_OUTCOME[d.status],
             event_title: d.event_title,
@@ -199,7 +228,10 @@ export class PaymentSuccessComponent implements OnInit {
           };
           this.loading = false;
         },
-        error: err => { this.error = err.error?.error || err.error?.detail || 'Verification failed.'; this.loading = false; },
+        error: (err) => {
+          this.error = err.error?.error || err.error?.detail || 'Verification failed.';
+          this.loading = false;
+        },
       });
     });
   }

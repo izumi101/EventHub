@@ -24,13 +24,13 @@ import {
 } from 'lucide-angular';
 
 type ScanState =
-  | 'requesting'   // asking for camera access
-  | 'scanning'     // scanning
-  | 'checking'     // QR decoded, calling the API
-  | 'result'       // showing the check-in result
-  | 'denied'       // the user denied access
-  | 'nocamera'     // no camera found
-  | 'insecure';    // getUserMedia unavailable (not https)
+  | 'requesting' // asking for camera access
+  | 'scanning' // scanning
+  | 'checking' // QR decoded, calling the API
+  | 'result' // showing the check-in result
+  | 'denied' // the user denied access
+  | 'nocamera' // no camera found
+  | 'insecure'; // getUserMedia unavailable (not https)
 
 @Component({
   selector: 'app-scan',
@@ -39,18 +39,25 @@ type ScanState =
   template: `
     <div class="page-root">
       <div class="container max-w-md py-8">
-
         <!-- Back -->
-        <a routerLink="/organizer/dashboard" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5">
-          <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+        <a
+          routerLink="/organizer/dashboard"
+          class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5"
+        >
+          <lucide-icon
+            [img]="icons.ChevronLeft"
+            class="w-3.5 h-3.5"
+            aria-hidden="true"
+          ></lucide-icon>
           Dashboard
         </a>
 
         <h1 class="text-2xl font-bold text-foreground mb-1">Scan tickets</h1>
-        <p class="text-sm text-muted-foreground mb-6">Point the camera at an attendee's QR code to check them in.</p>
+        <p class="text-sm text-muted-foreground mb-6">
+          Point the camera at an attendee's QR code to check them in.
+        </p>
 
         <div class="card overflow-hidden shadow-card">
-
           <!-- ── Camera viewport ── -->
           <div class="relative bg-gray-900 aspect-square" [class.hidden]="state === 'result'">
             <!-- The video stays in the DOM while the camera runs -->
@@ -66,7 +73,9 @@ type ScanState =
             <!-- Aiming frame -->
             @if (state === 'scanning') {
               <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div class="w-2/3 aspect-square rounded-2xl border-2 border-[color:var(--ember-500)] shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"></div>
+                <div
+                  class="w-2/3 aspect-square rounded-2xl border-2 border-[color:var(--ember-500)] shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]"
+                ></div>
               </div>
               <p class="absolute bottom-4 inset-x-0 text-center text-white/90 text-sm font-medium">
                 Searching for QR code...
@@ -75,13 +84,18 @@ type ScanState =
 
             @if (state === 'checking') {
               <div class="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                <span class="spinner spinner-lg" style="border-top-color:#fff;border-color:rgba(255,255,255,0.3)"></span>
+                <span
+                  class="spinner spinner-lg"
+                  style="border-top-color:#fff;border-color:rgba(255,255,255,0.3)"
+                ></span>
                 <p class="text-white text-sm font-medium">Verifying ticket...</p>
               </div>
             }
 
             @if (state === 'requesting') {
-              <div class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/90">
+              <div
+                class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/90"
+              >
                 <lucide-icon [img]="icons.Camera" class="w-8 h-8" aria-hidden="true"></lucide-icon>
                 <p class="text-sm font-medium">Requesting camera access...</p>
               </div>
@@ -91,25 +105,47 @@ type ScanState =
           <!-- ── Camera error states ── -->
           @if (state === 'denied' || state === 'nocamera' || state === 'insecure') {
             <div class="p-8 text-center">
-              <div class="w-14 h-14 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4">
-                <lucide-icon [img]="icons.XCircle" class="w-7 h-7 text-[color:var(--destructive)]" aria-hidden="true"></lucide-icon>
+              <div
+                class="w-14 h-14 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4"
+              >
+                <lucide-icon
+                  [img]="icons.XCircle"
+                  class="w-7 h-7 text-[color:var(--destructive)]"
+                  aria-hidden="true"
+                ></lucide-icon>
               </div>
               <h2 class="text-base font-semibold text-foreground mb-1">
                 @switch (state) {
-                  @case ('denied') { Camera access denied }
-                  @case ('nocamera') { No camera found }
-                  @case ('insecure') { Camera unavailable }
+                  @case ('denied') {
+                    Camera access denied
+                  }
+                  @case ('nocamera') {
+                    No camera found
+                  }
+                  @case ('insecure') {
+                    Camera unavailable
+                  }
                 }
               </h2>
               <p class="text-sm text-muted-foreground mb-5">
                 @switch (state) {
-                  @case ('denied') { Allow camera access in your browser settings and try again. }
-                  @case ('nocamera') { This device doesn't have an available camera. }
-                  @case ('insecure') { The camera requires a secure connection (HTTPS or localhost). }
+                  @case ('denied') {
+                    Allow camera access in your browser settings and try again.
+                  }
+                  @case ('nocamera') {
+                    This device doesn't have an available camera.
+                  }
+                  @case ('insecure') {
+                    The camera requires a secure connection (HTTPS or localhost).
+                  }
                 }
               </p>
               <button (click)="startCamera()" class="btn btn-secondary btn-sm">
-                <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                <lucide-icon
+                  [img]="icons.RefreshCw"
+                  class="w-4 h-4"
+                  aria-hidden="true"
+                ></lucide-icon>
                 Try again
               </button>
             </div>
@@ -119,20 +155,38 @@ type ScanState =
           @if (state === 'result') {
             <div class="p-8 text-center">
               @if (resultStatus === 'success') {
-                <div class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center mx-auto mb-4">
-                  <lucide-icon [img]="icons.CheckCircle" class="w-8 h-8 text-[color:var(--pine-600)]" aria-hidden="true"></lucide-icon>
+                <div
+                  class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center mx-auto mb-4"
+                >
+                  <lucide-icon
+                    [img]="icons.CheckCircle"
+                    class="w-8 h-8 text-[color:var(--pine-600)]"
+                    aria-hidden="true"
+                  ></lucide-icon>
                 </div>
                 <h2 class="text-xl font-bold text-foreground mb-1">Access granted</h2>
                 <p class="text-sm text-muted-foreground mb-5">Ticket valid · checked in</p>
               } @else if (resultStatus === 'used') {
-                <div class="w-16 h-16 rounded-full bg-[color:var(--warning-50)] flex items-center justify-center mx-auto mb-4">
-                  <lucide-icon [img]="icons.AlertTriangle" class="w-8 h-8 text-warning" aria-hidden="true"></lucide-icon>
+                <div
+                  class="w-16 h-16 rounded-full bg-[color:var(--warning-50)] flex items-center justify-center mx-auto mb-4"
+                >
+                  <lucide-icon
+                    [img]="icons.AlertTriangle"
+                    class="w-8 h-8 text-warning"
+                    aria-hidden="true"
+                  ></lucide-icon>
                 </div>
                 <h2 class="text-xl font-bold text-foreground mb-1">Already scanned</h2>
                 <p class="text-sm text-muted-foreground mb-5">This ticket has been used</p>
               } @else {
-                <div class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4">
-                  <lucide-icon [img]="icons.XCircle" class="w-8 h-8 text-[color:var(--destructive)]" aria-hidden="true"></lucide-icon>
+                <div
+                  class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4"
+                >
+                  <lucide-icon
+                    [img]="icons.XCircle"
+                    class="w-8 h-8 text-[color:var(--destructive)]"
+                    aria-hidden="true"
+                  ></lucide-icon>
                 </div>
                 <h2 class="text-xl font-bold text-foreground mb-1">Invalid ticket</h2>
                 <p class="text-sm text-muted-foreground mb-5">{{ errorMessage }}</p>
@@ -140,10 +194,14 @@ type ScanState =
 
               <!-- Details -->
               @if (result && resultStatus !== 'error') {
-                <div class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-5 text-left">
+                <div
+                  class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-5 text-left"
+                >
                   <div class="px-4 py-3 flex justify-between gap-3">
                     <span class="text-muted-foreground flex-shrink-0">Attendee</span>
-                    <span class="font-medium text-foreground text-right">{{ result.attendee }}</span>
+                    <span class="font-medium text-foreground text-right">{{
+                      result.attendee
+                    }}</span>
                   </div>
                   @if (result.event) {
                     <div class="px-4 py-3 flex justify-between gap-3">
@@ -154,7 +212,9 @@ type ScanState =
                   @if (resultStatus === 'used' && result.checked_in_at) {
                     <div class="px-4 py-3 flex justify-between gap-3">
                       <span class="text-muted-foreground flex-shrink-0">First scan</span>
-                      <span class="font-medium text-foreground">{{ result.checked_in_at | date:'HH:mm, MMM d' }}</span>
+                      <span class="font-medium text-foreground">{{
+                        result.checked_in_at | date: 'HH:mm, MMM d'
+                      }}</span>
                     </div>
                   }
                 </div>
@@ -190,7 +250,10 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
   private rafId: number | null = null;
   private readonly platformId = inject(PLATFORM_ID);
 
-  constructor(private eventService: EventService, private zone: NgZone) {}
+  constructor(
+    private eventService: EventService,
+    private zone: NgZone,
+  ) {}
 
   ngAfterViewInit(): void {
     if (isPlatformBrowser(this.platformId)) {
@@ -240,7 +303,7 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
       cancelAnimationFrame(this.rafId);
       this.rafId = null;
     }
-    this.stream?.getTracks().forEach(t => t.stop());
+    this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
   }
 
@@ -295,13 +358,13 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
     }
 
     this.eventService.checkIn(uuid).subscribe({
-      next: res => {
+      next: (res) => {
         this.result = res;
         this.resultStatus = res.status === 'used' ? 'used' : 'success';
         this.vibrate(res.status === 'used' ? [60, 40, 60] : [120]);
         this.state = 'result';
       },
-      error: err => {
+      error: (err) => {
         this.result = null;
         this.resultStatus = 'error';
         this.errorMessage = err.error?.error || 'Invalid ticket or insufficient permissions.';

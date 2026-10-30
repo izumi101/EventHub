@@ -19,7 +19,11 @@ import { LucideAngularModule, CheckCircle, XCircle, AlertTriangle, Info, X } fro
           [class]="toastClass(toast.type)"
           role="alert"
         >
-          <lucide-icon [img]="getIcon(toast.type)" class="w-4 h-4 flex-shrink-0" aria-hidden="true"></lucide-icon>
+          <lucide-icon
+            [img]="getIcon(toast.type)"
+            class="w-4 h-4 flex-shrink-0"
+            aria-hidden="true"
+          ></lucide-icon>
           <span class="flex-1">{{ toast.message }}</span>
           <button
             (click)="toastService.dismiss(toast.id)"
@@ -41,9 +45,9 @@ export class ToastContainerComponent {
   toastClass(type: string): string {
     const map: Record<string, string> = {
       success: 'bg-white border-transparent text-[color:var(--pine-600)]',
-      error:   'bg-white border-transparent text-[color:var(--destructive)]',
+      error: 'bg-white border-transparent text-[color:var(--destructive)]',
       warning: 'bg-white border-transparent text-warning',
-      info:    'bg-white border-blue-200 text-blue-700',
+      info: 'bg-white border-blue-200 text-blue-700',
     };
     return map[type] ?? 'bg-white border-border text-foreground';
   }

@@ -12,20 +12,22 @@ import { Category } from '../../models/models';
   template: `
     <div class="page-root">
       <div class="container max-w-2xl py-8">
-
         <!-- Header -->
         <div class="mb-7">
           <h1 class="text-2xl font-bold text-foreground">
             {{ editMode ? 'Edit event' : 'Create event' }}
           </h1>
           <p class="text-sm text-muted-foreground mt-1">
-            {{ editMode ? 'Update your event details' : 'Fill in the details below — your event will be reviewed before publishing' }}
+            {{
+              editMode
+                ? 'Update your event details'
+                : 'Fill in the details below — your event will be reviewed before publishing'
+            }}
           </p>
         </div>
 
         <form (ngSubmit)="onSubmit()" novalidate>
           <div class="card divide-y divide-border">
-
             <!-- Core details -->
             <div class="p-5 space-y-4">
               <h2 class="text-sm font-semibold text-foreground">Event details</h2>
@@ -63,19 +65,35 @@ import { Category } from '../../models/models';
               <!-- Cover image -->
               <div>
                 <label for="cover-image" class="block text-sm font-medium text-foreground mb-1.5">
-                  Cover image <span class="text-muted-foreground font-normal">(optional, up to 5 MB)</span>
+                  Cover image
+                  <span class="text-muted-foreground font-normal">(optional, up to 5 MB)</span>
                 </label>
                 @if (imagePreview) {
-                  <div class="relative rounded-lg overflow-hidden border border-border mb-2" style="aspect-ratio:16/7">
-                    <img [src]="imagePreview" alt="Event cover preview" class="w-full h-full object-cover" />
-                    <button type="button" (click)="clearImage()"
-                      class="absolute top-2 right-2 btn btn-sm bg-black/60 text-white border-transparent hover:bg-black/80">
+                  <div
+                    class="relative rounded-lg overflow-hidden border border-border mb-2"
+                    style="aspect-ratio:16/7"
+                  >
+                    <img
+                      [src]="imagePreview"
+                      alt="Event cover preview"
+                      class="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      (click)="clearImage()"
+                      class="absolute top-2 right-2 btn btn-sm bg-black/60 text-white border-transparent hover:bg-black/80"
+                    >
                       Remove
                     </button>
                   </div>
                 }
-                <input id="cover-image" type="file" accept="image/*" (change)="onImageSelected($event)"
-                  class="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:cursor-pointer hover:file:bg-muted/70" />
+                <input
+                  id="cover-image"
+                  type="file"
+                  accept="image/*"
+                  (change)="onImageSelected($event)"
+                  class="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:cursor-pointer hover:file:bg-muted/70"
+                />
               </div>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -98,7 +116,10 @@ import { Category } from '../../models/models';
                 </div>
 
                 <div>
-                  <label for="max_participants" class="block text-sm font-medium text-foreground mb-1.5">
+                  <label
+                    for="max_participants"
+                    class="block text-sm font-medium text-foreground mb-1.5"
+                  >
                     Max participants <span class="text-destructive">*</span>
                   </label>
                   <input
@@ -135,7 +156,8 @@ import { Category } from '../../models/models';
 
                 <div>
                   <label for="end_date" class="block text-sm font-medium text-foreground mb-1.5">
-                    End date & time <span class="text-muted-foreground font-normal">(optional)</span>
+                    End date & time
+                    <span class="text-muted-foreground font-normal">(optional)</span>
                   </label>
                   <input
                     id="end_date"
@@ -162,8 +184,15 @@ import { Category } from '../../models/models';
                 </div>
 
                 <div>
-                  <label for="currency" class="block text-sm font-medium text-foreground mb-1.5">Currency</label>
-                  <select id="currency" [(ngModel)]="formData.currency" name="currency" class="input">
+                  <label for="currency" class="block text-sm font-medium text-foreground mb-1.5"
+                    >Currency</label
+                  >
+                  <select
+                    id="currency"
+                    [(ngModel)]="formData.currency"
+                    name="currency"
+                    class="input"
+                  >
                     <option value="USD">USD — US Dollar</option>
                     <option value="EUR">EUR — Euro</option>
                     <option value="GBP">GBP — British Pound</option>
@@ -174,13 +203,23 @@ import { Category } from '../../models/models';
               </div>
 
               <!-- Ticket tiers hint -->
-              <div class="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+              <div
+                class="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm"
+              >
                 <p class="text-foreground/80">
-                  This sets a single price. Want <strong>multiple tiers</strong> (VIP, Early Bird, Student, Donation)?
+                  This sets a single price. Want <strong>multiple tiers</strong> (VIP, Early Bird,
+                  Student, Donation)?
                   @if (editMode && eventId) {
-                    <a [routerLink]="['/organizer/events', eventId, 'ticket-types']" class="text-primary font-medium hover:underline">Add ticket types →</a>
+                    <a
+                      [routerLink]="['/organizer/events', eventId, 'ticket-types']"
+                      class="text-primary font-medium hover:underline"
+                      >Add ticket types →</a
+                    >
                   } @else {
-                    <span class="text-muted-foreground">Create the event first, then open <strong>Tickets</strong> on the event to add tiers.</span>
+                    <span class="text-muted-foreground"
+                      >Create the event first, then open <strong>Tickets</strong> on the event to
+                      add tiers.</span
+                    >
                   }
                 </p>
               </div>
@@ -188,24 +227,60 @@ import { Category } from '../../models/models';
               <!-- Tax & fees -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>
-                  <label for="tax" class="block text-sm font-medium text-foreground mb-1.5">Tax / VAT (%)</label>
-                  <input id="tax" type="number" [(ngModel)]="formData.tax_percent" name="tax_percent" class="input" step="0.01" min="0" max="100" placeholder="0" />
+                  <label for="tax" class="block text-sm font-medium text-foreground mb-1.5"
+                    >Tax / VAT (%)</label
+                  >
+                  <input
+                    id="tax"
+                    type="number"
+                    [(ngModel)]="formData.tax_percent"
+                    name="tax_percent"
+                    class="input"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                  />
                 </div>
                 <div>
-                  <label for="fee" class="block text-sm font-medium text-foreground mb-1.5">Service fee (%)</label>
-                  <input id="fee" type="number" [(ngModel)]="formData.service_fee_percent" name="service_fee_percent" class="input" step="0.01" min="0" max="100" placeholder="0" />
+                  <label for="fee" class="block text-sm font-medium text-foreground mb-1.5"
+                    >Service fee (%)</label
+                  >
+                  <input
+                    id="fee"
+                    type="number"
+                    [(ngModel)]="formData.service_fee_percent"
+                    name="service_fee_percent"
+                    class="input"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    placeholder="0"
+                  />
                 </div>
               </div>
               <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input type="checkbox" [(ngModel)]="formData.fees_passed_to_buyer" name="fees_passed_to_buyer" class="w-4 h-4 rounded" />
+                <input
+                  type="checkbox"
+                  [(ngModel)]="formData.fees_passed_to_buyer"
+                  name="fees_passed_to_buyer"
+                  class="w-4 h-4 rounded"
+                />
                 Pass tax &amp; fees on to the buyer
                 <span class="text-xs text-muted-foreground">(unchecked = you absorb them)</span>
               </label>
 
               <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input type="checkbox" [(ngModel)]="formData.refundable" name="refundable" class="w-4 h-4 rounded" />
+                <input
+                  type="checkbox"
+                  [(ngModel)]="formData.refundable"
+                  name="refundable"
+                  class="w-4 h-4 rounded"
+                />
                 Allow refund requests
-                <span class="text-xs text-muted-foreground">(unchecked = tickets are non-refundable)</span>
+                <span class="text-xs text-muted-foreground"
+                  >(unchecked = tickets are non-refundable)</span
+                >
               </label>
             </div>
 
@@ -243,10 +318,14 @@ import { Category } from '../../models/models';
               </div>
 
               <!-- Online toggle -->
-              <div class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30">
+              <div
+                class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30"
+              >
                 <div>
                   <p class="text-sm font-medium text-foreground">Online event</p>
-                  <p class="text-xs text-muted-foreground">Provide a meeting link for remote attendees</p>
+                  <p class="text-xs text-muted-foreground">
+                    Provide a meeting link for remote attendees
+                  </p>
                 </div>
                 <input
                   type="checkbox"
@@ -277,38 +356,63 @@ import { Category } from '../../models/models';
 
             <!-- SEO (optional) -->
             <div class="p-5 space-y-4">
-              <h2 class="text-sm font-semibold text-foreground">Search & social preview <span class="text-muted-foreground font-normal">(optional)</span></h2>
+              <h2 class="text-sm font-semibold text-foreground">
+                Search & social preview
+                <span class="text-muted-foreground font-normal">(optional)</span>
+              </h2>
               <div>
-                <label for="seo_title" class="block text-sm font-medium text-foreground mb-1.5">SEO title</label>
-                <input id="seo_title" type="text" [(ngModel)]="formData.seo_title" name="seo_title"
-                  maxlength="200" placeholder="Defaults to the event title" class="input" />
+                <label for="seo_title" class="block text-sm font-medium text-foreground mb-1.5"
+                  >SEO title</label
+                >
+                <input
+                  id="seo_title"
+                  type="text"
+                  [(ngModel)]="formData.seo_title"
+                  name="seo_title"
+                  maxlength="200"
+                  placeholder="Defaults to the event title"
+                  class="input"
+                />
               </div>
               <div>
-                <label for="seo_description" class="block text-sm font-medium text-foreground mb-1.5">SEO description</label>
-                <textarea id="seo_description" [(ngModel)]="formData.seo_description" name="seo_description"
-                  maxlength="500" rows="2" placeholder="Shown in search results and link previews" class="input resize-none"></textarea>
+                <label
+                  for="seo_description"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >SEO description</label
+                >
+                <textarea
+                  id="seo_description"
+                  [(ngModel)]="formData.seo_description"
+                  name="seo_description"
+                  maxlength="500"
+                  rows="2"
+                  placeholder="Shown in search results and link previews"
+                  class="input resize-none"
+                ></textarea>
               </div>
             </div>
 
             <!-- Feedback + actions -->
             <div class="p-5">
               @if (error) {
-                <div role="alert" class="p-3 rounded-lg bg-[color:var(--destructive-50)] border border-transparent text-sm text-[color:var(--destructive)] mb-4">
+                <div
+                  role="alert"
+                  class="p-3 rounded-lg bg-[color:var(--destructive-50)] border border-transparent text-sm text-[color:var(--destructive)] mb-4"
+                >
                   {{ error }}
                 </div>
               }
               @if (success) {
-                <div role="status" class="p-3 rounded-lg bg-[color:var(--pine-50)] border border-transparent text-sm text-[color:var(--pine-600)] mb-4">
+                <div
+                  role="status"
+                  class="p-3 rounded-lg bg-[color:var(--pine-50)] border border-transparent text-sm text-[color:var(--pine-600)] mb-4"
+                >
                   {{ success }}
                 </div>
               }
 
               <div class="flex items-center gap-3">
-                <button
-                  type="submit"
-                  [disabled]="submitting"
-                  class="btn btn-primary"
-                >
+                <button type="submit" [disabled]="submitting" class="btn btn-primary">
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
                     Saving...
@@ -319,7 +423,6 @@ import { Category } from '../../models/models';
                 <a routerLink="/" class="btn btn-ghost text-muted-foreground">Cancel</a>
               </div>
             </div>
-
           </div>
         </form>
       </div>
@@ -367,8 +470,12 @@ export class EventFormComponent implements OnInit {
 
   ngOnInit(): void {
     this.eventService.getCategories().subscribe({
-      next: cats => { this.categories = cats; },
-      error: () => { this.error = 'Failed to load categories.'; },
+      next: (cats) => {
+        this.categories = cats;
+      },
+      error: () => {
+        this.error = 'Failed to load categories.';
+      },
     });
 
     const id = this.route.snapshot.paramMap.get('id');
@@ -376,7 +483,7 @@ export class EventFormComponent implements OnInit {
       this.editMode = true;
       this.eventId = Number(id);
       this.eventService.getEvent(this.eventId).subscribe({
-        next: ev => {
+        next: (ev) => {
           this.formData = {
             title: ev.title,
             description: ev.description,
@@ -399,7 +506,9 @@ export class EventFormComponent implements OnInit {
           };
           this.imagePreview = ev.image;
         },
-        error: () => { this.error = 'Failed to load event.'; },
+        error: () => {
+          this.error = 'Failed to load event.';
+        },
       });
     }
   }
@@ -417,7 +526,9 @@ export class EventFormComponent implements OnInit {
     this.imageFile = file;
     this.imageCleared = false;
     const reader = new FileReader();
-    reader.onload = () => { this.imagePreview = reader.result as string; };
+    reader.onload = () => {
+      this.imagePreview = reader.result as string;
+    };
     reader.readAsDataURL(file);
   }
 
@@ -428,22 +539,47 @@ export class EventFormComponent implements OnInit {
   }
 
   onSubmit(): void {
-    this.error = ''; this.success = '';
+    this.error = '';
+    this.success = '';
 
-    if (!this.formData.title.trim()) { this.error = 'Title is required.'; return; }
-    if (!this.formData.description.trim()) { this.error = 'Description is required.'; return; }
-    if (!this.formData.category) { this.error = 'Please select a category.'; return; }
-    if (!this.formData.date) { this.error = 'Start date is required.'; return; }
+    if (!this.formData.title.trim()) {
+      this.error = 'Title is required.';
+      return;
+    }
+    if (!this.formData.description.trim()) {
+      this.error = 'Description is required.';
+      return;
+    }
+    if (!this.formData.category) {
+      this.error = 'Please select a category.';
+      return;
+    }
+    if (!this.formData.date) {
+      this.error = 'Start date is required.';
+      return;
+    }
     if (!this.editMode && new Date(this.formData.date).getTime() < Date.now()) {
-      this.error = 'The start date is in the past.'; return;
+      this.error = 'The start date is in the past.';
+      return;
     }
-    if (this.formData.end_date && new Date(this.formData.end_date) <= new Date(this.formData.date)) {
-      this.error = 'The end date must be after the start date.'; return;
+    if (
+      this.formData.end_date &&
+      new Date(this.formData.end_date) <= new Date(this.formData.date)
+    ) {
+      this.error = 'The end date must be after the start date.';
+      return;
     }
-    if (!this.formData.location.trim()) { this.error = 'Venue name is required.'; return; }
-    if (this.formData.max_participants < 1) { this.error = 'Max participants must be at least 1.'; return; }
+    if (!this.formData.location.trim()) {
+      this.error = 'Venue name is required.';
+      return;
+    }
+    if (this.formData.max_participants < 1) {
+      this.error = 'Max participants must be at least 1.';
+      return;
+    }
     if (this.formData.is_online && !this.formData.online_link.trim()) {
-      this.error = 'Meeting link is required for online events.'; return;
+      this.error = 'Meeting link is required for online events.';
+      return;
     }
 
     this.submitting = true;
@@ -481,17 +617,18 @@ export class EventFormComponent implements OnInit {
       body = fd;
     }
 
-    const req = this.editMode && this.eventId
-      ? this.eventService.updateEvent(this.eventId, body)
-      : this.eventService.createEvent(body);
+    const req =
+      this.editMode && this.eventId
+        ? this.eventService.updateEvent(this.eventId, body)
+        : this.eventService.createEvent(body);
 
     req.subscribe({
-      next: ev => {
+      next: (ev) => {
         this.success = this.editMode ? 'Event updated!' : 'Event created and submitted for review.';
         this.submitting = false;
         setTimeout(() => this.router.navigate(['/events', ev.id]), 1000);
       },
-      error: err => {
+      error: (err) => {
         if (err.error && typeof err.error === 'object') {
           this.error = Object.values(err.error).flat().join(' ');
         } else {

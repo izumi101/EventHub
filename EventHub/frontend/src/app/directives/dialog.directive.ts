@@ -1,8 +1,21 @@
-import { AfterViewInit, Directive, ElementRef, EventEmitter, HostListener, OnDestroy, Output, inject } from '@angular/core';
+import {
+  AfterViewInit,
+  Directive,
+  ElementRef,
+  EventEmitter,
+  HostListener,
+  OnDestroy,
+  Output,
+  inject,
+} from '@angular/core';
 
 const FOCUSABLE = [
-  'a[href]', 'button:not([disabled])', 'input:not([disabled])', 'select:not([disabled])',
-  'textarea:not([disabled])', '[tabindex]:not([tabindex="-1"])',
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
 ].join(',');
 
 let nextId = 0;
@@ -63,7 +76,8 @@ export class DialogDirective implements AfterViewInit, OnDestroy {
   }
 
   private focusables(): HTMLElement[] {
-    return Array.from(this.el.querySelectorAll<HTMLElement>(FOCUSABLE))
-      .filter(e => e.offsetParent !== null || e === document.activeElement);
+    return Array.from(this.el.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+      (e) => e.offsetParent !== null || e === document.activeElement,
+    );
   }
 }

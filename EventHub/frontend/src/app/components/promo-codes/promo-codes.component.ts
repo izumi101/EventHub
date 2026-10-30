@@ -5,7 +5,16 @@ import { ActivatedRoute, RouterModule } from '@angular/router';
 import { EventService, PromoCode } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
-import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  Tag,
+  Plus,
+  Trash2,
+  Check,
+  X,
+  Percent,
+  DollarSign,
+} from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
@@ -15,13 +24,18 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
-
         <!-- Breadcrumb -->
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">Dashboard</a>
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
+            >Dashboard</a
+          >
           <span>/</span>
           @if (eventId) {
-            <a [routerLink]="['/organizer/events', eventId, 'attendees']" class="hover:text-foreground transition-colors truncate max-w-[180px]">{{ event?.title || 'Event' }}</a>
+            <a
+              [routerLink]="['/organizer/events', eventId, 'attendees']"
+              class="hover:text-foreground transition-colors truncate max-w-[180px]"
+              >{{ event?.title || 'Event' }}</a
+            >
           }
           <span>/</span>
           <span class="text-foreground font-medium">Promo codes</span>
@@ -36,7 +50,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             </h1>
             <p class="text-sm text-muted-foreground mt-1">{{ event?.title }}</p>
           </div>
-          <button (click)="showForm = !showForm" class="btn btn-primary btn-sm flex items-center gap-1.5">
+          <button
+            (click)="showForm = !showForm"
+            class="btn btn-primary btn-sm flex items-center gap-1.5"
+          >
             <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon>
             New code
           </button>
@@ -48,42 +65,104 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             <h2 class="font-semibold text-foreground mb-4">Create a promo code</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label for="promo-codes-code" class="block text-sm font-medium text-foreground mb-1.5">Code</label>
-                <input id="promo-codes-code" [(ngModel)]="form.code" placeholder="SAVE20" class="input w-full uppercase" />
+                <label
+                  for="promo-codes-code"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >Code</label
+                >
+                <input
+                  id="promo-codes-code"
+                  [(ngModel)]="form.code"
+                  placeholder="SAVE20"
+                  class="input w-full uppercase"
+                />
               </div>
               <div>
-                <p id="promo-type-caption" class="block text-sm font-medium text-foreground mb-1.5">Type</p>
+                <p id="promo-type-caption" class="block text-sm font-medium text-foreground mb-1.5">
+                  Type
+                </p>
                 <div class="flex gap-2" role="group" aria-labelledby="promo-type-caption">
-                  <button type="button" (click)="form.discount_type = 'percent'" [attr.aria-pressed]="form.discount_type === 'percent'"
+                  <button
+                    type="button"
+                    (click)="form.discount_type = 'percent'"
+                    [attr.aria-pressed]="form.discount_type === 'percent'"
                     class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm font-medium transition-colors"
-                    [class]="form.discount_type === 'percent' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'">
+                    [class]="
+                      form.discount_type === 'percent'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground'
+                    "
+                  >
                     <lucide-icon [img]="icons.Percent" class="w-4 h-4"></lucide-icon> Percent
                   </button>
-                  <button type="button" (click)="form.discount_type = 'fixed'" [attr.aria-pressed]="form.discount_type === 'fixed'"
+                  <button
+                    type="button"
+                    (click)="form.discount_type = 'fixed'"
+                    [attr.aria-pressed]="form.discount_type === 'fixed'"
                     class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm font-medium transition-colors"
-                    [class]="form.discount_type === 'fixed' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'">
+                    [class]="
+                      form.discount_type === 'fixed'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border text-muted-foreground'
+                    "
+                  >
                     <lucide-icon [img]="icons.DollarSign" class="w-4 h-4"></lucide-icon> Fixed
                   </button>
                 </div>
               </div>
               <div>
-                <label for="promo-codes-discount-value" class="block text-sm font-medium text-foreground mb-1.5">
+                <label
+                  for="promo-codes-discount-value"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                >
                   {{ form.discount_type === 'percent' ? 'Discount (%)' : 'Discount ($)' }}
                 </label>
-                <input id="promo-codes-discount-value" type="number" [(ngModel)]="form.discount_value" min="0" step="0.01" class="input w-full" />
+                <input
+                  id="promo-codes-discount-value"
+                  type="number"
+                  [(ngModel)]="form.discount_value"
+                  min="0"
+                  step="0.01"
+                  class="input w-full"
+                />
               </div>
               <div>
-                <label for="promo-codes-max-uses" class="block text-sm font-medium text-foreground mb-1.5">Max uses <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
-                <input id="promo-codes-max-uses" type="number" [(ngModel)]="form.max_uses" min="1" placeholder="Unlimited" class="input w-full" />
+                <label
+                  for="promo-codes-max-uses"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >Max uses
+                  <span class="text-muted-foreground font-normal">(blank = ∞)</span></label
+                >
+                <input
+                  id="promo-codes-max-uses"
+                  type="number"
+                  [(ngModel)]="form.max_uses"
+                  min="1"
+                  placeholder="Unlimited"
+                  class="input w-full"
+                />
               </div>
               <div class="sm:col-span-2">
-                <label for="promo-codes-expires-at" class="block text-sm font-medium text-foreground mb-1.5">Expires <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input id="promo-codes-expires-at" type="datetime-local" [(ngModel)]="form.expires_at" class="input w-full" />
+                <label
+                  for="promo-codes-expires-at"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >Expires <span class="text-muted-foreground font-normal">(optional)</span></label
+                >
+                <input
+                  id="promo-codes-expires-at"
+                  type="datetime-local"
+                  [(ngModel)]="form.expires_at"
+                  class="input w-full"
+                />
               </div>
             </div>
             <div class="flex gap-2 mt-4">
               <button (click)="showForm = false" class="btn btn-secondary flex-1">Cancel</button>
-              <button (click)="create()" [disabled]="!canSubmit() || saving" class="btn btn-primary flex-1">
+              <button
+                (click)="create()"
+                [disabled]="!canSubmit() || saving"
+                class="btn btn-primary flex-1"
+              >
                 {{ saving ? 'Creating…' : 'Create code' }}
               </button>
             </div>
@@ -99,39 +178,76 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               <lucide-icon [img]="icons.Tag" class="w-7 h-7 text-muted-foreground/50"></lucide-icon>
             </div>
             <h3 class="font-semibold text-foreground mb-1">No promo codes yet</h3>
-            <p class="text-sm text-muted-foreground">Create a code to offer discounts at checkout.</p>
+            <p class="text-sm text-muted-foreground">
+              Create a code to offer discounts at checkout.
+            </p>
           </div>
         } @else {
           <div class="space-y-3">
             @for (c of codes; track c.id) {
               <div class="card p-4 flex items-center gap-4" [class.opacity-60]="!c.is_valid">
-                <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
-                     [class]="c.discount_type === 'percent' ? 'bg-ember/10 text-ember' : 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]'">
-                  @if (c.discount_type === 'percent') { {{ c.discount_value }}% }
-                  @else { {{ c.discount_value | money: event?.currency }} }
+                <div
+                  class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
+                  [class]="
+                    c.discount_type === 'percent'
+                      ? 'bg-ember/10 text-ember'
+                      : 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]'
+                  "
+                >
+                  @if (c.discount_type === 'percent') {
+                    {{ c.discount_value }}%
+                  } @else {
+                    {{ c.discount_value | money: event?.currency }}
+                  }
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
-                    <span class="font-mono font-bold text-foreground tracking-wide">{{ c.code }}</span>
+                    <span class="font-mono font-bold text-foreground tracking-wide">{{
+                      c.code
+                    }}</span>
                     @if (c.is_valid) {
-                      <span class="text-[10px] font-bold uppercase text-[color:var(--pine-600)] bg-[color:var(--pine-50)] px-1.5 py-0.5 rounded">Active</span>
+                      <span
+                        class="text-[10px] font-bold uppercase text-[color:var(--pine-600)] bg-[color:var(--pine-50)] px-1.5 py-0.5 rounded"
+                        >Active</span
+                      >
                     } @else if (c.is_expired) {
-                      <span class="text-[10px] font-bold uppercase text-ember bg-[color:var(--destructive-50)] px-1.5 py-0.5 rounded">Expired</span>
+                      <span
+                        class="text-[10px] font-bold uppercase text-ember bg-[color:var(--destructive-50)] px-1.5 py-0.5 rounded"
+                        >Expired</span
+                      >
                     } @else if (c.is_exhausted) {
-                      <span class="text-[10px] font-bold uppercase text-warning bg-[color:var(--warning-50)] px-1.5 py-0.5 rounded">Used up</span>
+                      <span
+                        class="text-[10px] font-bold uppercase text-warning bg-[color:var(--warning-50)] px-1.5 py-0.5 rounded"
+                        >Used up</span
+                      >
                     } @else {
-                      <span class="text-[10px] font-bold uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded">Disabled</span>
+                      <span
+                        class="text-[10px] font-bold uppercase text-muted-foreground bg-muted px-1.5 py-0.5 rounded"
+                        >Disabled</span
+                      >
                     }
                   </div>
                   <p class="text-xs text-muted-foreground mt-0.5">
                     Used {{ c.times_used }}{{ c.max_uses ? ' / ' + c.max_uses : '' }} times
-                    @if (c.expires_at) { · expires {{ c.expires_at | date:'MMM d, y' }} }
+                    @if (c.expires_at) {
+                      · expires {{ c.expires_at | date: 'MMM d, y' }}
+                    }
                   </p>
                 </div>
-                <button (click)="toggleActive(c)" class="btn btn-ghost btn-sm text-xs" [title]="c.is_active ? 'Disable' : 'Enable'">
-                  <lucide-icon [img]="c.is_active ? icons.X : icons.Check" class="w-4 h-4"></lucide-icon>
+                <button
+                  (click)="toggleActive(c)"
+                  class="btn btn-ghost btn-sm text-xs"
+                  [title]="c.is_active ? 'Disable' : 'Enable'"
+                >
+                  <lucide-icon
+                    [img]="c.is_active ? icons.X : icons.Check"
+                    class="w-4 h-4"
+                  ></lucide-icon>
                 </button>
-                <button (click)="remove(c)" class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]">
+                <button
+                  (click)="remove(c)"
+                  class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
+                >
                   <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
                 </button>
               </div>
@@ -150,7 +266,13 @@ export class PromoCodesComponent implements OnInit {
   showForm = false;
   saving = false;
 
-  form: any = { code: '', discount_type: 'percent', discount_value: null, max_uses: null, expires_at: '' };
+  form: any = {
+    code: '',
+    discount_type: 'percent',
+    discount_value: null,
+    max_uses: null,
+    expires_at: '',
+  };
 
   readonly icons = { Tag, Plus, Trash2, Check, X, Percent, DollarSign };
 
@@ -162,15 +284,21 @@ export class PromoCodesComponent implements OnInit {
 
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
-    this.eventService.getEvent(this.eventId).subscribe(e => this.event = e);
+    this.eventService.getEvent(this.eventId).subscribe((e) => (this.event = e));
     this.load();
   }
 
   load(): void {
     this.loading = true;
     this.eventService.getPromoCodes(this.eventId).subscribe({
-      next: c => { this.codes = c; this.loading = false; },
-      error: () => { this.loading = false; this.toast.error('Failed to load promo codes.'); },
+      next: (c) => {
+        this.codes = c;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+        this.toast.error('Failed to load promo codes.');
+      },
     });
   }
 
@@ -194,27 +322,40 @@ export class PromoCodesComponent implements OnInit {
         this.toast.success('Promo code created.');
         this.saving = false;
         this.showForm = false;
-        this.form = { code: '', discount_type: 'percent', discount_value: null, max_uses: null, expires_at: '' };
+        this.form = {
+          code: '',
+          discount_type: 'percent',
+          discount_value: null,
+          max_uses: null,
+          expires_at: '',
+        };
         this.load();
       },
-      error: err => {
+      error: (err) => {
         this.saving = false;
         const e = err.error;
-        this.toast.error(e?.code?.[0] || e?.detail || 'Could not create code (is it a duplicate?).');
+        this.toast.error(
+          e?.code?.[0] || e?.detail || 'Could not create code (is it a duplicate?).',
+        );
       },
     });
   }
 
   toggleActive(c: PromoCode): void {
     this.eventService.updatePromoCode(c.id, { is_active: !c.is_active }).subscribe({
-      next: updated => { Object.assign(c, updated); },
+      next: (updated) => {
+        Object.assign(c, updated);
+      },
       error: () => this.toast.error('Update failed.'),
     });
   }
 
   remove(c: PromoCode): void {
     this.eventService.deletePromoCode(c.id).subscribe({
-      next: () => { this.codes = this.codes.filter(x => x.id !== c.id); this.toast.success('Deleted.'); },
+      next: () => {
+        this.codes = this.codes.filter((x) => x.id !== c.id);
+        this.toast.success('Deleted.');
+      },
       error: () => this.toast.error('Delete failed.'),
     });
   }
