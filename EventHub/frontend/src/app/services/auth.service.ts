@@ -16,6 +16,14 @@ import type { components } from '../api/openapi';
 /** PUT /auth/profile/: the editable name fields and profile details. */
 export type ProfileUpdate = components['schemas']['PatchedUserRequest'];
 
+function isCachedUser(value: unknown): value is User {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const { profile } = value as { profile?: unknown };
+  return typeof profile === 'object' && profile !== null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private http = inject(HttpClient);
@@ -31,11 +39,28 @@ export class AuthService {
     this.loadUser();
   }
 
+  /**
+   * Restores the signed-in user cached by a previous visit. The cache may be
+   * stale (saved by an older build whose user had a different shape) or
+   * corrupted, and the rest of the app relies on `profile` being present, so
+   * anything that does not look like a user is dropped; the next profile fetch
+   * or sign-in repopulates it.
+   */
   private loadUser(): void {
     const userData = localStorage.getItem(this.userKey);
-    if (userData) {
-      this.currentUserSubject.next(JSON.parse(userData) as User);
+    if (!userData) {
+      return;
     }
+    try {
+      const user: unknown = JSON.parse(userData);
+      if (isCachedUser(user)) {
+        this.currentUserSubject.next(user);
+        return;
+      }
+    } catch {
+      // Corrupted JSON: handled the same way as an unusable shape.
+    }
+    localStorage.removeItem(this.userKey);
   }
 
   get currentUser(): User | null {
