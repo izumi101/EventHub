@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { EventService } from '../../services/event.service';
@@ -10,7 +10,7 @@ import {
   Plus,
   Calendar,
   MapPin,
-  Edit,
+  SquarePen,
   Trash2,
   Users,
   Eye,
@@ -31,7 +31,7 @@ import {
             <p class="text-sm text-muted-foreground mt-1">Events you have created</p>
           </div>
           <a routerLink="/create-event" class="btn btn-primary flex items-center gap-1.5">
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true" />
             Create event
           </a>
         </div>
@@ -50,14 +50,14 @@ import {
                 [img]="icons.Calendar"
                 class="w-6 h-6 text-muted-foreground"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">No events yet</h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
               Create your first event to start managing attendees.
             </p>
             <a routerLink="/create-event" class="btn btn-primary btn-sm flex items-center gap-1.5">
-              <lucide-icon [img]="icons.Plus" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.Plus" class="w-3.5 h-3.5" aria-hidden="true" />
               Create event
             </a>
           </div>
@@ -92,19 +92,11 @@ import {
                   <p class="text-sm font-semibold text-foreground truncate">{{ event.title }}</p>
                   <div class="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                     <span class="flex items-center gap-1">
-                      <lucide-icon
-                        [img]="icons.Calendar"
-                        class="w-3 h-3"
-                        aria-hidden="true"
-                      ></lucide-icon>
+                      <lucide-icon [img]="icons.Calendar" class="w-3 h-3" aria-hidden="true" />
                       {{ event.date | date: 'MMM d, y' }}
                     </span>
                     <span class="flex items-center gap-1 truncate">
-                      <lucide-icon
-                        [img]="icons.MapPin"
-                        class="w-3 h-3"
-                        aria-hidden="true"
-                      ></lucide-icon>
+                      <lucide-icon [img]="icons.MapPin" class="w-3 h-3" aria-hidden="true" />
                       {{ event.location }}
                     </span>
                   </div>
@@ -118,7 +110,7 @@ import {
                     title="Preview event"
                     aria-label="Preview event"
                   >
-                    <lucide-icon [img]="icons.Eye" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                    <lucide-icon [img]="icons.Eye" class="w-4 h-4" aria-hidden="true" />
                   </a>
                   <a
                     [routerLink]="['/organizer/events', event.id, 'attendees']"
@@ -126,11 +118,7 @@ import {
                     title="Manage attendees"
                     aria-label="Manage attendees"
                   >
-                    <lucide-icon
-                      [img]="icons.Users"
-                      class="w-4 h-4"
-                      aria-hidden="true"
-                    ></lucide-icon>
+                    <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
                   </a>
                   <a
                     [routerLink]="['/edit-event', event.id]"
@@ -138,11 +126,7 @@ import {
                     title="Edit event"
                     aria-label="Edit event"
                   >
-                    <lucide-icon
-                      [img]="icons.Edit"
-                      class="w-4 h-4"
-                      aria-hidden="true"
-                    ></lucide-icon>
+                    <lucide-icon [img]="icons.SquarePen" class="w-4 h-4" aria-hidden="true" />
                   </a>
                   <button
                     (click)="cloneEvent(event.id)"
@@ -154,11 +138,7 @@ import {
                     @if (cloningId === event.id) {
                       <span class="spinner spinner-sm"></span>
                     } @else {
-                      <lucide-icon
-                        [img]="icons.Copy"
-                        class="w-4 h-4"
-                        aria-hidden="true"
-                      ></lucide-icon>
+                      <lucide-icon [img]="icons.Copy" class="w-4 h-4" aria-hidden="true" />
                     }
                   </button>
                   <button
@@ -167,11 +147,7 @@ import {
                     title="Delete event"
                     aria-label="Delete event"
                   >
-                    <lucide-icon
-                      [img]="icons.Trash2"
-                      class="w-4 h-4"
-                      aria-hidden="true"
-                    ></lucide-icon>
+                    <lucide-icon [img]="icons.Trash2" class="w-4 h-4" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -183,17 +159,15 @@ import {
   `,
 })
 export class MyEventsComponent implements OnInit {
+  private eventService = inject(EventService);
+  private modalService = inject(ModalService);
+  private toastService = inject(ToastService);
+
   events: Event[] = [];
   loading = false;
   cloningId: number | null = null;
 
-  readonly icons = { Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, Copy };
-
-  constructor(
-    private eventService: EventService,
-    private modalService: ModalService,
-    private toastService: ToastService,
-  ) {}
+  readonly icons = { Plus, Calendar, MapPin, SquarePen, Trash2, Users, Eye, Copy };
 
   ngOnInit(): void {
     this.loadEvents();

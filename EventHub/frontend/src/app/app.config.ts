@@ -1,4 +1,9 @@
-import { ApplicationConfig, provideZoneChangeDetection, APP_INITIALIZER } from '@angular/core';
+import {
+  ApplicationConfig,
+  inject,
+  provideAppInitializer,
+  provideZoneChangeDetection,
+} from '@angular/core';
 import {
   provideRouter,
   withComponentInputBinding,
@@ -21,11 +26,8 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
     // Eagerly instantiate SeoService so its router subscription starts at boot
-    {
-      provide: APP_INITIALIZER,
-      useFactory: (seo: SeoService) => () => {},
-      deps: [SeoService],
-      multi: true,
-    },
+    provideAppInitializer(() => {
+      inject(SeoService);
+    }),
   ],
 };

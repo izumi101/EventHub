@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { EventService } from '../services/event.service';
@@ -10,37 +10,38 @@ export interface EventContext {
 
 @Injectable({ providedIn: 'root' })
 export class LayoutService {
+  private router = inject(Router);
+  private eventService = inject(EventService);
+
   collapsed = signal(false);
   mobileOpen = signal(false);
-  groupOpen = signal<Record<string, boolean>>({});
+  /** Sidebar groups the visitor toggled; untouched groups are absent. */
+  groupOpen = signal<Partial<Record<string, boolean>>>({});
   eventContext = signal<EventContext | null>(null);
 
   private cachedEventId: string | null = null;
 
-  constructor(
-    private router: Router,
-    private eventService: EventService,
-  ) {
+  constructor() {
     const saved = localStorage.getItem('sidebar_collapsed');
     if (saved !== null) this.collapsed.set(saved === 'true');
 
     try {
       const savedGroups = localStorage.getItem('sidebar_groups');
-      if (savedGroups) this.groupOpen.set(JSON.parse(savedGroups));
+      if (savedGroups)
+        this.groupOpen.set(JSON.parse(savedGroups) as Partial<Record<string, boolean>>);
     } catch {
       /* ignore */
     }
 
     this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd))
-      .subscribe((e) => this.onNavigation((e as NavigationEnd).urlAfterRedirects));
+      .subscribe((e) => this.onNavigation(e.urlAfterRedirects));
 
     this.onNavigation(this.router.url);
   }
 
   private onNavigation(url: string): void {
-    const match =
-      url.match(/\/organizer\/events\/([^/?#]+)/) || url.match(/\/edit-event\/([^/?#]+)/);
+    const match = /\/organizer\/events\/([^/?#]+)/.exec(url) ?? /\/edit-event\/([^/?#]+)/.exec(url);
 
     if (match) {
       const id = match[1];
@@ -83,7 +84,6 @@ export class LayoutService {
   }
 
   isGroupOpen(id: string, defaultVal = true): boolean {
-    const val = this.groupOpen()[id];
-    return val !== undefined ? val : defaultVal;
+    return this.groupOpen()[id] ?? defaultVal;
   }
 }

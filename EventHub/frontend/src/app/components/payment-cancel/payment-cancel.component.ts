@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
-import { LucideAngularModule, XCircle } from 'lucide-angular';
+import { LucideAngularModule, CircleX } from 'lucide-angular';
 
 @Component({
   selector: 'app-payment-cancel',
@@ -15,10 +15,10 @@ import { LucideAngularModule, XCircle } from 'lucide-angular';
             class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
           >
             <lucide-icon
-              [img]="icons.XCircle"
+              [img]="icons.CircleX"
               class="w-8 h-8 text-[color:var(--destructive)]"
               aria-hidden="true"
-            ></lucide-icon>
+            />
           </div>
           <h1 class="text-xl font-bold text-foreground">Payment cancelled</h1>
           <p class="text-sm text-muted-foreground max-w-xs">
@@ -40,5 +40,5 @@ import { LucideAngularModule, XCircle } from 'lucide-angular';
   `,
 })
 export class PaymentCancelComponent {
-  readonly icons = { XCircle };
+  readonly icons = { CircleX };
 }

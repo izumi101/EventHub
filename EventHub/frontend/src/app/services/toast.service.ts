@@ -14,7 +14,7 @@ export class ToastService {
   toasts = signal<Toast[]>([]);
   private nextId = 0;
 
-  show(message: string, type: ToastType = 'info', duration: number = 4000): void {
+  show(message: string, type: ToastType = 'info', duration = 4000): void {
     const id = this.nextId++;
     const toast: Toast = { id, message, type, duration };
 

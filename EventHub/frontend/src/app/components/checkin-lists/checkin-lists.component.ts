@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -9,8 +9,8 @@ import {
   LucideAngularModule,
   Plus,
   Trash2,
-  CheckCircle2,
-  XCircle,
+  CircleCheck,
+  CircleX,
   Users,
   ClipboardList,
   Clock,
@@ -21,6 +21,7 @@ import {
   Check,
   X,
 } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-checkin-lists',
@@ -52,7 +53,7 @@ import {
             </p>
           </div>
           <button (click)="showCreateForm = true" class="btn btn-primary flex items-center gap-2">
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon>
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
             New list
           </button>
         </div>
@@ -107,13 +108,13 @@ import {
             <lucide-icon
               [img]="icons.ClipboardList"
               class="w-10 h-10 text-muted-foreground/30 mb-4"
-            ></lucide-icon>
+            />
             <p class="text-foreground font-semibold mb-1">No check-in lists yet</p>
             <p class="text-sm text-muted-foreground mb-4">
               Create your first list to start scanning tickets by entrance.
             </p>
             <button (click)="showCreateForm = true" class="btn btn-primary">
-              <lucide-icon [img]="icons.Plus" class="w-4 h-4 mr-1.5"></lucide-icon>
+              <lucide-icon [img]="icons.Plus" class="w-4 h-4 mr-1.5" />
               Create a list
             </button>
           </div>
@@ -127,7 +128,10 @@ import {
                   [class.ring-2]="selectedList?.id === list.id"
                   [style.--ring-color]="list.color"
                   [style.border-color]="selectedList?.id === list.id ? list.color : ''"
+                  tabindex="0"
                   (click)="selectList(list)"
+                  (keydown.enter)="onListKeydown($event, list)"
+                  (keydown.space)="onListKeydown($event, list)"
                 >
                   <div class="flex items-center gap-3">
                     <div
@@ -158,19 +162,24 @@ import {
                         {{ list.checked_in_count }} checked in · {{ list.log_count }} scans
                       </p>
                     </div>
-                    <div class="flex items-center gap-1 ml-auto" (click)="$event.stopPropagation()">
+                    <!-- Keeps clicks on the row actions from also selecting the list. -->
+                    <div
+                      class="flex items-center gap-1 ml-auto"
+                      role="presentation"
+                      (click)="$event.stopPropagation()"
+                    >
                       @if (editingListId === list.id) {
                         <button
                           (click)="saveEdit(list)"
                           class="p-1 text-[color:var(--pine-600)] hover:text-[color:var(--pine-600)]"
                         >
-                          <lucide-icon [img]="icons.Check" class="w-4 h-4"></lucide-icon>
+                          <lucide-icon [img]="icons.Check" class="w-4 h-4" />
                         </button>
                         <button
                           (click)="editingListId = null"
                           class="p-1 text-muted-foreground hover:text-foreground"
                         >
-                          <lucide-icon [img]="icons.X" class="w-4 h-4"></lucide-icon>
+                          <lucide-icon [img]="icons.X" class="w-4 h-4" />
                         </button>
                       } @else {
                         <button
@@ -178,7 +187,7 @@ import {
                           class="p-1 text-muted-foreground hover:text-foreground"
                           title="Rename"
                         >
-                          <lucide-icon [img]="icons.Pencil" class="w-3.5 h-3.5"></lucide-icon>
+                          <lucide-icon [img]="icons.Pencil" class="w-3.5 h-3.5" />
                         </button>
                         @if (!list.is_default) {
                           <button
@@ -186,14 +195,14 @@ import {
                             class="p-1 text-muted-foreground hover:text-primary"
                             title="Set as default"
                           >
-                            <lucide-icon [img]="icons.Check" class="w-3.5 h-3.5"></lucide-icon>
+                            <lucide-icon [img]="icons.Check" class="w-3.5 h-3.5" />
                           </button>
                           <button
                             (click)="deleteList(list)"
                             class="p-1 text-muted-foreground hover:text-[color:var(--destructive)]"
                             title="Delete"
                           >
-                            <lucide-icon [img]="icons.Trash2" class="w-3.5 h-3.5"></lucide-icon>
+                            <lucide-icon [img]="icons.Trash2" class="w-3.5 h-3.5" />
                           </button>
                         }
                       }
@@ -206,17 +215,14 @@ import {
               <div class="card p-4 mt-4">
                 <div class="flex items-center justify-between mb-3">
                   <h3 class="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <lucide-icon
-                      [img]="icons.Clock"
-                      class="w-4 h-4 text-muted-foreground"
-                    ></lucide-icon>
+                    <lucide-icon [img]="icons.Clock" class="w-4 h-4 text-muted-foreground" />
                     Scan log
                   </h3>
                   <button
                     (click)="loadLogs()"
                     class="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                   >
-                    <lucide-icon [img]="icons.RefreshCw" class="w-3 h-3"></lucide-icon> Refresh
+                    <lucide-icon [img]="icons.RefreshCw" class="w-3 h-3" /> Refresh
                   </button>
                 </div>
                 @if (logsLoading) {
@@ -230,11 +236,11 @@ import {
                     @for (log of logs; track log.id) {
                       <div class="flex items-start gap-2 text-xs">
                         <lucide-icon
-                          [img]="log.action === 'check_in' ? icons.CheckCircle2 : icons.XCircle"
+                          [img]="log.action === 'check_in' ? icons.CircleCheck : icons.CircleX"
                           class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"
                           [class.text-[color:var(--pine-600)]]="log.action === 'check_in'"
                           [class.text-ember]="log.action === 'undo'"
-                        ></lucide-icon>
+                        />
                         <div>
                           <span class="font-medium text-foreground">{{
                             log.attendee.full_name
@@ -262,7 +268,7 @@ import {
                   <lucide-icon
                     [img]="icons.ChevronRight"
                     class="w-8 h-8 text-muted-foreground/30 mb-3"
-                  ></lucide-icon>
+                  />
                   <p class="text-sm text-muted-foreground">
                     Select a list on the left to see attendees
                   </p>
@@ -280,7 +286,7 @@ import {
                     <div class="flex items-center gap-3 text-sm text-muted-foreground">
                       <span>{{ checkedInCount }} / {{ attendees.length }} checked in</span>
                       <button (click)="loadAttendees()" class="hover:text-foreground">
-                        <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4"></lucide-icon>
+                        <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -305,7 +311,7 @@ import {
                         [disabled]="!scanUuid.trim() || scanning"
                         class="btn btn-primary btn-sm"
                       >
-                        <lucide-icon [img]="icons.ScanLine" class="w-4 h-4"></lucide-icon>
+                        <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -318,10 +324,7 @@ import {
                     </div>
                   } @else if (attendees.length === 0) {
                     <div class="flex flex-col items-center py-12 text-muted-foreground">
-                      <lucide-icon
-                        [img]="icons.Users"
-                        class="w-8 h-8 mb-3 opacity-30"
-                      ></lucide-icon>
+                      <lucide-icon [img]="icons.Users" class="w-8 h-8 mb-3 opacity-30" />
                       <p class="text-sm">No attendees yet</p>
                     </div>
                   } @else {
@@ -353,9 +356,9 @@ import {
                           <div class="flex items-center gap-2">
                             @if (att.is_checked_in) {
                               <lucide-icon
-                                [img]="icons.CheckCircle2"
+                                [img]="icons.CircleCheck"
                                 class="w-5 h-5 text-[color:var(--pine-500)]"
-                              ></lucide-icon>
+                              />
                               <button
                                 (click)="undoCheckIn(att)"
                                 class="btn btn-secondary btn-sm text-xs"
@@ -364,9 +367,9 @@ import {
                               </button>
                             } @else {
                               <lucide-icon
-                                [img]="icons.XCircle"
+                                [img]="icons.CircleX"
                                 class="w-5 h-5 text-muted-foreground/40"
-                              ></lucide-icon>
+                              />
                               <button
                                 (click)="doCheckIn(att)"
                                 class="btn btn-primary btn-sm text-xs"
@@ -389,6 +392,10 @@ import {
   `,
 })
 export class CheckinListsComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toastService = inject(ToastService);
+
   eventId: number | null = null;
   lists: CheckInList[] = [];
   selectedList: CheckInList | null = null;
@@ -413,8 +420,8 @@ export class CheckinListsComponent implements OnInit {
   readonly icons = {
     Plus,
     Trash2,
-    CheckCircle2,
-    XCircle,
+    CircleCheck,
+    CircleX,
     Users,
     ClipboardList,
     Clock,
@@ -429,12 +436,6 @@ export class CheckinListsComponent implements OnInit {
   get checkedInCount(): number {
     return this.attendees.filter((a) => a.is_checked_in).length;
   }
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toastService: ToastService,
-  ) {}
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
@@ -454,7 +455,8 @@ export class CheckinListsComponent implements OnInit {
         this.loading = false;
         if (!this.selectedList && lists.length > 0) this.selectList(lists[0]);
         else if (this.selectedList) {
-          const updated = lists.find((l) => l.id === this.selectedList!.id);
+          const selectedId = this.selectedList.id;
+          const updated = lists.find((l) => l.id === selectedId);
           if (updated) this.selectedList = updated;
         }
       },
@@ -482,6 +484,13 @@ export class CheckinListsComponent implements OnInit {
   selectList(list: CheckInList): void {
     this.selectedList = list;
     this.loadAttendees();
+  }
+
+  /** Keyboard selection of a list card; keys pressed in its inputs/buttons are theirs. */
+  onListKeydown(event: Event, list: CheckInList): void {
+    if (event.target !== event.currentTarget) return;
+    event.preventDefault();
+    this.selectList(list);
   }
 
   loadAttendees(): void {
@@ -584,7 +593,7 @@ export class CheckinListsComponent implements OnInit {
       },
       error: (err) => {
         this.scanning = false;
-        this.toastService.error(err.error?.error || 'Scan failed.');
+        this.toastService.error(apiErrorMessage(err, 'Scan failed.', 'error'));
       },
     });
   }
@@ -598,7 +607,7 @@ export class CheckinListsComponent implements OnInit {
         this.loadLogs();
         this.loadLists();
       },
-      error: (err) => this.toastService.error(err.error?.error || 'Check-in failed.'),
+      error: (err) => this.toastService.error(apiErrorMessage(err, 'Check-in failed.', 'error')),
     });
   }
 
@@ -611,7 +620,7 @@ export class CheckinListsComponent implements OnInit {
         this.loadLogs();
         this.loadLists();
       },
-      error: (err) => this.toastService.error(err.error?.error || 'Undo failed.'),
+      error: (err) => this.toastService.error(apiErrorMessage(err, 'Undo failed.', 'error')),
     });
   }
 }

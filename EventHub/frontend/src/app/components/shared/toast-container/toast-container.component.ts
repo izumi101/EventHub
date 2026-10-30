@@ -1,7 +1,15 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ToastService } from '../../../services/toast.service';
-import { LucideAngularModule, CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  CircleCheckBig,
+  CircleX,
+  TriangleAlert,
+  Info,
+  X,
+  type LucideIconData,
+} from 'lucide-angular';
 
 @Component({
   selector: 'app-toast-container',
@@ -23,14 +31,14 @@ import { LucideAngularModule, CheckCircle, XCircle, AlertTriangle, Info, X } fro
             [img]="getIcon(toast.type)"
             class="w-4 h-4 flex-shrink-0"
             aria-hidden="true"
-          ></lucide-icon>
+          />
           <span class="flex-1">{{ toast.message }}</span>
           <button
             (click)="toastService.dismiss(toast.id)"
             class="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded"
             aria-label="Dismiss"
           >
-            <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true" />
           </button>
         </div>
       }
@@ -38,9 +46,9 @@ import { LucideAngularModule, CheckCircle, XCircle, AlertTriangle, Info, X } fro
   `,
 })
 export class ToastContainerComponent {
-  readonly icons = { X };
+  toastService = inject(ToastService);
 
-  constructor(public toastService: ToastService) {}
+  readonly icons = { X };
 
   toastClass(type: string): string {
     const map: Record<string, string> = {
@@ -52,12 +60,11 @@ export class ToastContainerComponent {
     return map[type] ?? 'bg-white border-border text-foreground';
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getIcon(type: string): any {
-    const map: Record<string, any> = {
-      success: CheckCircle,
-      error: XCircle,
-      warning: AlertTriangle,
+  getIcon(type: string): LucideIconData {
+    const map: Record<string, LucideIconData> = {
+      success: CircleCheckBig,
+      error: CircleX,
+      warning: TriangleAlert,
       info: Info,
     };
     return map[type] ?? Info;

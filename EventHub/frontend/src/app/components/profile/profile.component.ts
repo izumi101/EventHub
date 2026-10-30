@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { User } from '../../models/models';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-profile',
@@ -295,6 +296,9 @@ import { User } from '../../models/models';
   `,
 })
 export class ProfileComponent implements OnInit {
+  private authService = inject(AuthService);
+  private toastService = inject(ToastService);
+
   user: User | null = null;
   loading = false;
   submitting = false;
@@ -315,11 +319,6 @@ export class ProfileComponent implements OnInit {
   changingPw = false;
   pwError = '';
   pwSuccess = '';
-
-  constructor(
-    private authService: AuthService,
-    private toastService: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.loading = true;
@@ -349,7 +348,7 @@ export class ProfileComponent implements OnInit {
     this.error = '';
     this.success = '';
     this.submitting = true;
-    this.authService.updateProfile(this.formData as any).subscribe({
+    this.authService.updateProfile(this.formData).subscribe({
       next: (user) => {
         this.user = user;
         this.success = 'Profile updated.';
@@ -359,7 +358,7 @@ export class ProfileComponent implements OnInit {
         }, 3000);
       },
       error: (err) => {
-        this.error = err.error?.detail || 'Failed to update profile.';
+        this.error = apiErrorMessage(err, 'Failed to update profile.', 'detail');
         this.submitting = false;
       },
     });
@@ -383,7 +382,7 @@ export class ProfileComponent implements OnInit {
       },
       error: (err) => {
         this.uploadingAvatar = false;
-        this.toastService.error(err.error?.error || 'Could not upload the avatar.');
+        this.toastService.error(apiErrorMessage(err, 'Could not upload the avatar.', 'error'));
       },
     });
     input.value = '';
@@ -422,7 +421,7 @@ export class ProfileComponent implements OnInit {
       },
       error: (err) => {
         this.changingPw = false;
-        this.pwError = err.error?.error || 'Could not change the password.';
+        this.pwError = apiErrorMessage(err, 'Could not change the password.', 'error');
       },
     });
   }

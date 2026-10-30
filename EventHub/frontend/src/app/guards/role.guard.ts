@@ -23,6 +23,6 @@ export const roleGuard =
     const allowed =
       role === 'admin'
         ? !!user?.is_superuser
-        : !!(user?.is_staff || user?.is_superuser || user?.profile?.role === 'organizer');
+        : user?.is_staff || user?.is_superuser || user?.profile.role === 'organizer';
     return allowed ? true : router.createUrlTree(['/']);
   };

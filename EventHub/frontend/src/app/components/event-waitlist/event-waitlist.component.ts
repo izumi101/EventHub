@@ -1,9 +1,9 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { EventService } from '../../services/event.service';
 import { Event as EventModel } from '../../models/models';
-import { LucideAngularModule, Users, Clock, CheckCircle, XCircle, Ticket } from 'lucide-angular';
+import { LucideAngularModule, Users, Clock, CircleCheckBig, CircleX, Ticket } from 'lucide-angular';
 
 interface WaitlistEntry {
   id: number;
@@ -54,14 +54,14 @@ interface WaitlistEntry {
               <span
                 class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"
               >
-                <lucide-icon [img]="icons.Clock" class="w-3.5 h-3.5"></lucide-icon>
+                <lucide-icon [img]="icons.Clock" class="w-3.5 h-3.5" />
                 {{ countByStatus('waiting') }} waiting
               </span>
               @if (countByStatus('offered') > 0) {
                 <span
                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900"
                 >
-                  <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5"></lucide-icon>
+                  <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5" />
                   {{ countByStatus('offered') }} offered
                 </span>
               }
@@ -69,7 +69,7 @@ interface WaitlistEntry {
                 <span
                   class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"
                 >
-                  <lucide-icon [img]="icons.CheckCircle" class="w-3.5 h-3.5"></lucide-icon>
+                  <lucide-icon [img]="icons.CircleCheckBig" class="w-3.5 h-3.5" />
                   {{ countByStatus('converted') }} converted
                 </span>
               }
@@ -84,10 +84,7 @@ interface WaitlistEntry {
           </div>
         } @else if (entries.length === 0) {
           <div class="card p-12 flex flex-col items-center justify-center text-center">
-            <lucide-icon
-              [img]="icons.Users"
-              class="w-10 h-10 text-muted-foreground/40 mb-3"
-            ></lucide-icon>
+            <lucide-icon [img]="icons.Users" class="w-10 h-10 text-muted-foreground/40 mb-3" />
             <p class="text-base font-medium text-foreground mb-1">No one on the waitlist</p>
             <p class="text-sm text-muted-foreground">
               People join automatically when the event sells out.
@@ -172,17 +169,15 @@ interface WaitlistEntry {
   `,
 })
 export class EventWaitlistComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+
   eventId: number | null = null;
   event: EventModel | null = null;
   entries: WaitlistEntry[] = [];
   loading = true;
 
-  readonly icons = { Users, Clock, CheckCircle, XCircle, Ticket };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-  ) {}
+  readonly icons = { Users, Clock, CircleCheckBig, CircleX, Ticket };
 
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');

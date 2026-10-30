@@ -8,6 +8,7 @@ import {
   OnChanges,
   ElementRef,
   ViewChild,
+  inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { LucideAngularModule, Plus, Minus, Maximize, Wifi } from 'lucide-angular';
@@ -57,13 +58,13 @@ const STAGE_H = 46;
         </div>
         <div class="flex items-center gap-1">
           <button (click)="zoomBy(0.8)" class="zoom-btn" title="Zoom out">
-            <lucide-icon [img]="icons.Minus" class="w-4 h-4"></lucide-icon>
+            <lucide-icon [img]="icons.Minus" class="w-4 h-4" />
           </button>
           <button (click)="resetView()" class="zoom-btn" title="Reset">
-            <lucide-icon [img]="icons.Maximize" class="w-3.5 h-3.5"></lucide-icon>
+            <lucide-icon [img]="icons.Maximize" class="w-3.5 h-3.5" />
           </button>
           <button (click)="zoomBy(1.25)" class="zoom-btn" title="Zoom in">
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon>
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
           </button>
         </div>
       </div>
@@ -255,13 +256,15 @@ const STAGE_H = 46;
   ],
 })
 export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
+  private seatWs = inject(SeatWsService);
+
   @Input() seats: Seat[] = [];
   @Input() maxSelection = 1;
   @Input() eventId: number | null = null;
   @Input() zonePrices: ZonePrice[] = [];
   /** ISO code of the event's currency, for price labels. */
   @Input() currency = 'USD';
-  @Output() selectionChange = new EventEmitter<Seat[]>();
+  @Output() readonly selectionChange = new EventEmitter<Seat[]>();
 
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLDivElement>;
 
@@ -293,8 +296,6 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
 
   wsConnected = false;
   private subs = new Subscription();
-
-  constructor(private seatWs: SeatWsService) {}
 
   ngOnInit(): void {
     this.build();
@@ -416,12 +417,13 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
       this.select(s);
       return;
     }
-    const step = (
-      { ArrowRight: [0, 1], ArrowLeft: [0, -1], ArrowDown: [1, 0], ArrowUp: [-1, 0] } as Record<
-        string,
-        [number, number]
-      >
-    )[e.key];
+    const steps: Partial<Record<string, [number, number]>> = {
+      ArrowRight: [0, 1],
+      ArrowLeft: [0, -1],
+      ArrowDown: [1, 0],
+      ArrowUp: [-1, 0],
+    };
+    const step = steps[e.key];
     if (!step) return;
     e.preventDefault();
     const next = this.neighbour(s, step[0], step[1]);
@@ -450,9 +452,9 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
     this.hovered = { ...s, zone: s.price_zone };
     // Place the tooltip once the (possibly panned) view has rendered.
     requestAnimationFrame(() => {
-      const el = this.canvasRef?.nativeElement.querySelector(`[data-seat-id="${s.id}"]`);
-      const canvas = this.canvasRef?.nativeElement.getBoundingClientRect();
-      if (!el || !canvas) return;
+      const el = this.canvasRef.nativeElement.querySelector(`[data-seat-id="${s.id}"]`);
+      if (!el) return;
+      const canvas = this.canvasRef.nativeElement.getBoundingClientRect();
       const rect = el.getBoundingClientRect();
       this.tipX = rect.right - canvas.left + 4;
       this.tipY = rect.bottom - canvas.top + 4;
@@ -557,8 +559,7 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
     this.moveTip(e);
   }
   moveTip(e: MouseEvent): void {
-    const rect = this.canvasRef?.nativeElement.getBoundingClientRect();
-    if (!rect) return;
+    const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     this.tipX = e.clientX - rect.left + 12;
     this.tipY = e.clientY - rect.top + 12;
   }
@@ -573,9 +574,10 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
         this.wsConnected = true;
         // merge availability without losing local geometry
         const byId = new Map(msg.seats.map((s) => [s.id, s]));
-        this.seats = this.seats.map((s) =>
-          byId.has(s.id) ? { ...s, is_available: byId.get(s.id)!.is_available } : s,
-        );
+        this.seats = this.seats.map((s) => {
+          const live = byId.get(s.id);
+          return live ? { ...s, is_available: live.is_available } : s;
+        });
         this.dropTakenSelections();
       }),
     );

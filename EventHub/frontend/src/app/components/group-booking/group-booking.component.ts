@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { EventService } from '../../services/event.service';
@@ -16,6 +16,7 @@ import {
   Clock,
   Ticket,
 } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-group-booking',
@@ -28,7 +29,7 @@ import {
           [routerLink]="['/events', eventId]"
           class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
         >
-          <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4"></lucide-icon> Back to event
+          <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4" /> Back to event
         </a>
 
         @if (loading) {
@@ -36,7 +37,7 @@ import {
         } @else if (event) {
           <div class="flex items-center gap-3 mb-6">
             <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <lucide-icon [img]="icons.Users" class="w-5 h-5 text-primary"></lucide-icon>
+              <lucide-icon [img]="icons.Users" class="w-5 h-5 text-primary" />
             </div>
             <div>
               <h1 class="text-xl font-bold text-foreground">Group booking</h1>
@@ -55,7 +56,7 @@ import {
                   [zonePrices]="zonePrices"
                   [currency]="currency"
                   (selectionChange)="onSelection($event)"
-                ></app-seat-map-svg>
+                />
               } @else {
                 <p class="text-sm text-muted-foreground py-10 text-center">
                   No seat map for this event.
@@ -113,7 +114,7 @@ import {
                       class="flex items-center gap-1 text-sm font-mono font-semibold"
                       [class]="secondsLeft < 60 ? 'text-ember' : 'text-warning'"
                     >
-                      <lucide-icon [img]="icons.Clock" class="w-4 h-4"></lucide-icon>
+                      <lucide-icon [img]="icons.Clock" class="w-4 h-4" />
                       {{ countdown }}
                     </span>
                   </div>
@@ -167,10 +168,7 @@ import {
                         class="input flex-1 text-xs"
                       />
                       <button (click)="copyLink()" class="btn btn-secondary btn-sm flex-shrink-0">
-                        <lucide-icon
-                          [img]="copied ? icons.Check : icons.Copy"
-                          class="w-4 h-4"
-                        ></lucide-icon>
+                        <lucide-icon [img]="copied ? icons.Check : icons.Copy" class="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -198,6 +196,13 @@ import {
   `,
 })
 export class GroupBookingComponent implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private eventService = inject(EventService);
+  private bookingService = inject(BookingService);
+  private toast = inject(ToastService);
+  authService = inject(AuthService);
+
   eventId = 0;
   event: Event | null = null;
   seats: Seat[] = [];
@@ -217,15 +222,6 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
 
   readonly icons = { ChevronLeft, Users, Copy, Check, Clock, Ticket };
 
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private eventService: EventService,
-    private bookingService: BookingService,
-    private toast: ToastService,
-    public authService: AuthService,
-  ) {}
-
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
     this.loading = true;
@@ -240,10 +236,12 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
     });
     this.eventService.getSeatMap(this.eventId).subscribe({
       next: (sm) => {
-        this.seats = sm.seats || [];
-        this.zonePrices = sm.zone_prices || [];
+        this.seats = sm.seats;
+        this.zonePrices = sm.zone_prices;
       },
-      error: () => {},
+      error: () => {
+        // No seat map: the picker stays empty and nothing can be held.
+      },
     });
   }
 
@@ -279,10 +277,10 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.holding = false;
-        this.toast.error(err.error?.error || 'Could not hold seats. Some may be taken.');
+        this.toast.error(apiErrorMessage(err, 'Could not hold seats. Some may be taken.', 'error'));
         // refresh map
         this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
-          this.seats = sm.seats || [];
+          this.seats = sm.seats;
         });
       },
     });
@@ -311,7 +309,7 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
         if (this.timer) clearInterval(this.timer);
         this.toast.success('Seats released');
         this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
-          this.seats = sm.seats || [];
+          this.seats = sm.seats;
         });
       },
       error: () => this.toast.error('Could not release seats'),
@@ -319,7 +317,7 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
   }
 
   copyLink(): void {
-    navigator.clipboard.writeText(this.shareUrl).then(() => {
+    void navigator.clipboard.writeText(this.shareUrl).then(() => {
       this.copied = true;
       setTimeout(() => (this.copied = false), 2000);
     });
@@ -339,7 +337,7 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
         this.booking = null;
         this.selected = [];
         this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
-          this.seats = sm.seats || [];
+          this.seats = sm.seats;
         });
       }
     };

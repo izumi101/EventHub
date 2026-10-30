@@ -1,6 +1,7 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { apiErrorStatus } from '../../api/api-error';
 import { FormsModule } from '@angular/forms';
 import { EventService } from '../../services/event.service';
 import { SearchService } from '../../services/search.service';
@@ -58,7 +59,7 @@ import {
                 class="w-4 h-4 flex-shrink-0"
                 [class]="semanticMode ? 'text-ember' : 'text-muted-foreground'"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
               <input
                 type="search"
                 [(ngModel)]="searchQuery"
@@ -92,7 +93,7 @@ import {
                 [img]="icons.MapPin"
                 class="w-4 h-4 text-muted-foreground flex-shrink-0"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
               <input
                 type="text"
                 [(ngModel)]="searchLocation"
@@ -111,7 +112,7 @@ import {
                 class="btn btn-ghost btn-sm h-10 flex items-center gap-1.5 text-muted-foreground"
                 aria-label="Clear all filters"
               >
-                <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+                <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true" />
                 Clear
               </button>
             }
@@ -127,7 +128,7 @@ import {
                 [img]="icons.SlidersHorizontal"
                 class="w-3.5 h-3.5 text-muted-foreground"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
               <select
                 [(ngModel)]="ordering"
                 (change)="applyFilters()"
@@ -202,7 +203,7 @@ import {
             <div class="flex gap-5 overflow-x-auto pb-2 no-scrollbar">
               @for (event of recommended; track event.id) {
                 <div class="w-72 flex-shrink-0">
-                  <app-event-card [event]="event"></app-event-card>
+                  <app-event-card [event]="event" />
                 </div>
               }
             </div>
@@ -244,7 +245,7 @@ import {
                 [img]="icons.Search"
                 class="w-6 h-6 text-muted-foreground"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">No events found</h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
@@ -256,13 +257,13 @@ import {
           <!-- Grid -->
         } @else {
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            @for (event of events; track event.id; let i = $index) {
+            @for (event of events; track event.id) {
               <app-event-card
                 [event]="event"
-                [featured]="i === 0"
-                [class.sm:col-span-2]="i === 0"
-                [class.lg:col-span-2]="i === 0"
-              ></app-event-card>
+                [featured]="$first"
+                [class.sm:col-span-2]="$first"
+                [class.lg:col-span-2]="$first"
+              />
             }
           </div>
 
@@ -275,11 +276,7 @@ import {
                   Loading...
                 } @else {
                   Load more events
-                  <lucide-icon
-                    [img]="icons.ChevronRight"
-                    class="w-4 h-4"
-                    aria-hidden="true"
-                  ></lucide-icon>
+                  <lucide-icon [img]="icons.ChevronRight" class="w-4 h-4" aria-hidden="true" />
                 }
               </button>
             </div>
@@ -290,6 +287,11 @@ import {
   `,
 })
 export class HomeComponent implements OnInit, OnDestroy {
+  private eventService = inject(EventService);
+  private searchService = inject(SearchService);
+  private toastService = inject(ToastService);
+  private authService = inject(AuthService);
+
   events: Event[] = [];
   categories: Category[] = [];
   recommended: Event[] = [];
@@ -313,13 +315,6 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   private searchSub?: Subscription;
   private locationSub?: Subscription;
-
-  constructor(
-    private eventService: EventService,
-    private searchService: SearchService,
-    private toastService: ToastService,
-    private authService: AuthService,
-  ) {}
 
   ngOnInit(): void {
     this.loadCategories();
@@ -365,7 +360,9 @@ export class HomeComponent implements OnInit, OnDestroy {
       next: (cats) => {
         this.categories = cats;
       },
-      error: () => {},
+      error: () => {
+        // Without categories the filter chips are just not shown.
+      },
     });
   }
 
@@ -373,9 +370,11 @@ export class HomeComponent implements OnInit, OnDestroy {
     if (!this.authService.isLoggedIn) return;
     this.eventService.getRecommendations().subscribe({
       next: (res) => {
-        this.recommended = (res.results ?? []).slice(0, 8);
+        this.recommended = res.results.slice(0, 8);
       },
-      error: () => {},
+      error: () => {
+        // The "For you" row is optional; the main listing is unaffected.
+      },
     });
   }
 
@@ -394,7 +393,8 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.loading = false;
       },
       error: (err) => {
-        if (err.status !== 0) {
+        // Status 0 = offline / aborted request: no toast for that.
+        if (apiErrorStatus(err) !== 0) {
           this.toastService.error('Failed to load events. Please try again.');
         }
         this.loading = false;

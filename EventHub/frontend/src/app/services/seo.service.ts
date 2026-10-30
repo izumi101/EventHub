@@ -77,12 +77,10 @@ export class SeoService {
       },
       offers: {
         '@type': 'Offer',
-        price: event.price_from ?? event.price,
-        priceCurrency: event.currency ?? 'USD',
+        price: event.price_from,
+        priceCurrency: event.currency,
         availability:
-          (event.available_spots ?? 1) > 0
-            ? 'https://schema.org/InStock'
-            : 'https://schema.org/SoldOut',
+          event.available_spots > 0 ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
         url,
       },
     });
@@ -97,7 +95,7 @@ export class SeoService {
   }): void {
     this.title.setTitle(opts.title);
 
-    const tags: { [key: string]: string } = {
+    const tags: Record<string, string> = {
       description: opts.description,
       'og:title': opts.title,
       'og:description': opts.description,

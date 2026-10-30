@@ -20,8 +20,8 @@ describe('SeatMapSvgComponent keyboard access', () => {
         {
           provide: SeatWsService,
           useValue: {
-            connect() {},
-            disconnect() {},
+            connect: () => undefined,
+            disconnect: () => undefined,
             snapshots$: new Subject(),
             seatUpdates$: new Subject(),
           },
@@ -42,7 +42,7 @@ describe('SeatMapSvgComponent keyboard access', () => {
 
   it('exposes seats as labelled checkboxes with a single tab stop', () => {
     const fixture = render([seat(1, 1, 1, false), seat(2, 1, 2), seat(3, 2, 1)]);
-    const root: HTMLElement = fixture.nativeElement;
+    const root = fixture.nativeElement as HTMLElement;
     expect(el(root, 1).getAttribute('aria-label')).toBe('Row 1, seat 1, standard, €10.00, taken');
     expect(el(root, 1).getAttribute('aria-disabled')).toBe('true');
     // The first available seat is the tab stop.
@@ -51,7 +51,7 @@ describe('SeatMapSvgComponent keyboard access', () => {
 
   it('moves with arrows and selects with Space', () => {
     const fixture = render([seat(1, 1, 1), seat(2, 1, 2), seat(3, 2, 2)]);
-    const root: HTMLElement = fixture.nativeElement;
+    const root = fixture.nativeElement as HTMLElement;
     const picked: number[][] = [];
     fixture.componentInstance.selectionChange.subscribe((s) => picked.push(s.map((x) => x.id)));
 

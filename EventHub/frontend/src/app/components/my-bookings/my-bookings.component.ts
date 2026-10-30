@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { BookingService, BookingDto, BookingSeatDto } from '../../services/booking.service';
@@ -31,11 +31,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <div
               class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4"
             >
-              <lucide-icon
-                [img]="icons.Users"
-                class="w-8 h-8 text-primary/50"
-                aria-hidden="true"
-              ></lucide-icon>
+              <lucide-icon [img]="icons.Users" class="w-8 h-8 text-primary/50" aria-hidden="true" />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">No group bookings</h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
@@ -80,7 +76,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                     <div
                       class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] text-warning text-xs mb-3"
                     >
-                      <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0"></lucide-icon>
+                      <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
                       Seats are held until {{ b.hold_expires_at | date: 'h:mm a' }} — complete the
                       payment from the event page.
                     </div>
@@ -100,7 +96,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                         <lucide-icon
                           [img]="copiedId === b.id ? icons.Check : icons.Copy"
                           class="w-4 h-4"
-                        ></lucide-icon>
+                        />
                       </button>
                     </div>
                   </div>
@@ -113,10 +109,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       <div
                         class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"
                       >
-                        <lucide-icon
-                          [img]="icons.Armchair"
-                          class="w-4 h-4 text-muted-foreground"
-                        ></lucide-icon>
+                        <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-foreground">
@@ -161,7 +154,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 @if (b.status === 'confirmed') {
                   <div class="px-5 py-3 border-t border-border bg-muted/30">
                     <p class="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5"></lucide-icon>
+                      <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5" />
                       Each seat has its own QR ticket — share the invite link and friends see theirs
                       too.
                     </p>
@@ -176,7 +169,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                         <lucide-icon
                           [img]="copiedId === b.id ? icons.Check : icons.Copy"
                           class="w-4 h-4"
-                        ></lucide-icon>
+                        />
                       </button>
                     </div>
                   </div>
@@ -192,12 +185,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
     @if (zoomSeat) {
       <div
         class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
-        (click)="zoomSeat = null"
       >
         <div
           class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
-          (click)="$event.stopPropagation()"
           appDialog
+          dismissOnBackdrop
           (dismiss)="zoomSeat = null"
         >
           <h3 class="text-base font-bold text-foreground leading-tight">
@@ -221,6 +213,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class MyBookingsComponent implements OnInit {
+  private bookingService = inject(BookingService);
+  private toast = inject(ToastService);
+
   bookings: BookingDto[] = [];
   loading = false;
   copiedId: string | null = null;
@@ -228,11 +223,6 @@ export class MyBookingsComponent implements OnInit {
   qrCodes: Record<string, string> = {};
 
   readonly icons = { Users, Copy, Check, Clock, Armchair, Ticket };
-
-  constructor(
-    private bookingService: BookingService,
-    private toast: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.loading = true;
@@ -260,7 +250,9 @@ export class MyBookingsComponent implements OnInit {
           .then((dataUrl) => {
             this.qrCodes[uuid] = dataUrl;
           })
-          .catch(() => {});
+          .catch(() => {
+            // The seat still shows its ticket number; the QR is only a convenience.
+          });
       }
     }
   }
@@ -270,7 +262,7 @@ export class MyBookingsComponent implements OnInit {
   }
 
   copyLink(b: BookingDto): void {
-    navigator.clipboard.writeText(this.shareUrl(b)).then(() => {
+    void navigator.clipboard.writeText(this.shareUrl(b)).then(() => {
       this.copiedId = b.id;
       setTimeout(() => (this.copiedId = null), 2000);
     });

@@ -4,8 +4,11 @@ import {
   ElementRef,
   EventEmitter,
   HostListener,
+  Input,
   OnDestroy,
   Output,
+  Renderer2,
+  booleanAttribute,
   inject,
 } from '@angular/core';
 
@@ -26,6 +29,14 @@ let nextId = 0;
  * emits (dismiss), and focus returns to the opener on close.
  *
  *   <div class="card" appDialog (dismiss)="close()">…</div>
+ *
+ * With `dismissOnBackdrop`, a click on the overlay around the panel (its parent
+ * element) emits (dismiss) too, while clicks inside the panel stay inside it.
+ * The pointer gesture mirrors Escape, so the backdrop itself needs no handler:
+ *
+ *   <div class="fixed inset-0 bg-black/50">
+ *     <div class="card" appDialog dismissOnBackdrop (dismiss)="close()">…</div>
+ *   </div>
  */
 @Directive({
   selector: '[appDialog]',
@@ -33,10 +44,13 @@ let nextId = 0;
   host: { role: 'dialog', 'aria-modal': 'true', tabindex: '-1' },
 })
 export class DialogDirective implements AfterViewInit, OnDestroy {
-  @Output() dismiss = new EventEmitter<void>();
+  @Input({ transform: booleanAttribute }) dismissOnBackdrop = false;
+  @Output() readonly dismiss = new EventEmitter<void>();
 
-  private readonly el: HTMLElement = inject(ElementRef).nativeElement;
+  private readonly el: HTMLElement = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
+  private readonly renderer = inject(Renderer2);
   private readonly opener = document.activeElement as HTMLElement | null;
+  private unlistenBackdrop?: () => void;
 
   ngAfterViewInit(): void {
     const heading = this.el.querySelector<HTMLElement>('h1, h2, h3');
@@ -44,16 +58,29 @@ export class DialogDirective implements AfterViewInit, OnDestroy {
       heading.id ||= `dialog-title-${++nextId}`;
       this.el.setAttribute('aria-labelledby', heading.id);
     }
+    const backdrop = this.el.parentElement;
+    if (this.dismissOnBackdrop && backdrop) {
+      this.unlistenBackdrop = this.renderer.listen(backdrop, 'click', () => {
+        this.dismiss.emit();
+      });
+    }
     (this.focusables()[0] ?? this.el).focus();
   }
 
   ngOnDestroy(): void {
-    this.opener?.focus?.();
+    this.unlistenBackdrop?.();
+    this.opener?.focus();
   }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
     this.dismiss.emit();
+  }
+
+  /** Clicks inside the panel must not reach the backdrop (and close the dialog). */
+  @HostListener('click', ['$event'])
+  keepClickInside(event: MouseEvent): void {
+    if (this.dismissOnBackdrop) event.stopPropagation();
   }
 
   @HostListener('keydown', ['$event'])

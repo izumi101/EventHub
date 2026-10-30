@@ -26,9 +26,20 @@ export type Event = Schemas['EventList'];
 export type EventActionResponse = Schemas['EventStatusResult'];
 export type EventStatsResponse = Schemas['EventStats'];
 
+/**
+ * A request body whose DRF DecimalFields (typed as strings in the schema) may
+ * also be sent as JSON numbers, which DRF accepts. Forms bind numeric inputs.
+ */
+export type AcceptsNumericDecimals<T, K extends keyof T> = {
+  [P in keyof T]: P extends K ? T[P] | number : T[P];
+};
+
 /** Multipart body for creating/updating an event; `image` is a File when
  *  uploading a new cover. */
-export type EventFormPayload = Omit<Schemas['EventCreateRequest'], 'image'> & {
+export type EventFormPayload = AcceptsNumericDecimals<
+  Omit<Schemas['EventCreateRequest'], 'image'>,
+  'price' | 'tax_percent' | 'service_fee_percent'
+> & {
   image?: File | string | null;
 };
 

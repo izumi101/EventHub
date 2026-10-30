@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -11,7 +11,7 @@ import {
   LucideAngularModule,
   Search,
   Users,
-  CheckCircle,
+  CircleCheckBig,
   ScanLine,
   Download,
   RotateCcw,
@@ -19,6 +19,7 @@ import {
   Mail,
 } from 'lucide-angular';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-attendee-list',
@@ -59,7 +60,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
               (click)="showMessage = true"
               class="btn btn-secondary btn-sm flex items-center gap-1.5"
             >
-              <lucide-icon [img]="icons.Mail" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.Mail" class="w-4 h-4" aria-hidden="true" />
               Message
             </button>
             <button
@@ -67,11 +68,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
               [disabled]="exporting"
               class="btn btn-secondary btn-sm flex items-center gap-1.5"
             >
-              <lucide-icon [img]="icons.Download" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.Download" class="w-4 h-4" aria-hidden="true" />
               {{ exporting ? 'Exporting…' : 'Export Excel' }}
             </button>
             <a routerLink="/scan" class="btn btn-primary btn-sm flex items-center gap-1.5">
-              <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true" />
               Scan tickets
             </a>
 
@@ -105,7 +106,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
             [img]="icons.Search"
             class="w-4 h-4 text-muted-foreground flex-shrink-0"
             aria-hidden="true"
-          ></lucide-icon>
+          />
           <input
             type="search"
             [(ngModel)]="searchQuery"
@@ -128,7 +129,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
               [img]="icons.Users"
               class="w-8 h-8 text-muted-foreground/40 mb-3"
               aria-hidden="true"
-            ></lucide-icon>
+            />
             <p class="text-sm text-muted-foreground">
               {{ searchQuery ? 'No attendees match your search.' : 'No attendees yet.' }}
             </p>
@@ -178,7 +179,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                           class="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0"
                         >
                           {{
-                            reg.full_name?.charAt(0)?.toUpperCase() ||
+                            reg.full_name.charAt(0).toUpperCase() ||
                               reg.username.charAt(0).toUpperCase()
                           }}
                         </div>
@@ -189,7 +190,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                           <p class="text-xs text-muted-foreground truncate">
                             {{ reg.email || '@' + reg.username }}
                           </p>
-                          @if (reg.answers?.length) {
+                          @if (reg.answers.length) {
                             <div class="flex flex-wrap gap-1 mt-1">
                               @for (a of reg.answers; track a.label) {
                                 <span
@@ -249,10 +250,10 @@ import { DialogDirective } from '../../directives/dialog.directive';
                           class="flex items-center gap-1 text-xs text-[color:var(--pine-600)] font-medium"
                         >
                           <lucide-icon
-                            [img]="icons.CheckCircle"
+                            [img]="icons.CircleCheckBig"
                             class="w-3.5 h-3.5"
                             aria-hidden="true"
-                          ></lucide-icon>
+                          />
                           {{ reg.checked_in_at | date: 'HH:mm' }}
                         </span>
                       } @else if (reg.status === 'confirmed') {
@@ -268,7 +269,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                           [disabled]="actingId === reg.id"
                           class="text-xs font-medium text-[color:var(--pine-600)] hover:text-[color:var(--pine-600)] inline-flex items-center gap-1"
                         >
-                          <lucide-icon [img]="icons.DollarSign" class="w-3.5 h-3.5"></lucide-icon>
+                          <lucide-icon [img]="icons.DollarSign" class="w-3.5 h-3.5" />
                           Mark paid
                         </button>
                       } @else if (reg.payment?.is_refundable) {
@@ -276,7 +277,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                           (click)="openRefund(reg)"
                           class="text-xs font-medium text-[color:var(--destructive)] hover:text-[color:var(--destructive)] inline-flex items-center gap-1"
                         >
-                          <lucide-icon [img]="icons.RotateCcw" class="w-3.5 h-3.5"></lucide-icon>
+                          <lucide-icon [img]="icons.RotateCcw" class="w-3.5 h-3.5" />
                           Refund
                         </button>
                       }
@@ -300,8 +301,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                     class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary"
                   >
                     {{
-                      reg.full_name?.charAt(0)?.toUpperCase() ||
-                        reg.username.charAt(0).toUpperCase()
+                      reg.full_name.charAt(0).toUpperCase() || reg.username.charAt(0).toUpperCase()
                     }}
                   </div>
                   <div class="flex-1 min-w-0">
@@ -399,12 +399,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
     @if (refundReg) {
       <div
         class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in"
-        (click)="refundReg = null"
       >
         <div
           class="card w-full max-w-sm p-6 animate-slide-up"
-          (click)="$event.stopPropagation()"
           appDialog
+          dismissOnBackdrop
           (dismiss)="refundReg = null"
         >
           <h3 class="text-lg font-bold text-foreground mb-1">Refund ticket</h3>
@@ -467,16 +466,15 @@ import { DialogDirective } from '../../directives/dialog.directive';
     @if (showMessage) {
       <div
         class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4 animate-fade-in"
-        (click)="showMessage = false"
       >
         <div
           class="card w-full max-w-md p-6 animate-slide-up"
-          (click)="$event.stopPropagation()"
           appDialog
+          dismissOnBackdrop
           (dismiss)="showMessage = false"
         >
           <h3 class="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
-            <lucide-icon [img]="icons.Mail" class="w-5 h-5 text-primary"></lucide-icon>
+            <lucide-icon [img]="icons.Mail" class="w-5 h-5 text-primary" />
             Message attendees
           </h3>
           <p class="text-sm text-muted-foreground mb-4">
@@ -540,6 +538,12 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class AttendeeListComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toastService = inject(ToastService);
+  private bookingService = inject(BookingService);
+  private modalService = inject(ModalService);
+
   eventId: number | null = null;
   event: EventModel | null = null;
   registrations: EventAttendee[] = [];
@@ -567,15 +571,16 @@ export class AttendeeListComponent implements OnInit {
   msgBody = '';
   sending = false;
 
-  readonly icons = { Search, Users, CheckCircle, ScanLine, Download, RotateCcw, DollarSign, Mail };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toastService: ToastService,
-    private bookingService: BookingService,
-    private modalService: ModalService,
-  ) {}
+  readonly icons = {
+    Search,
+    Users,
+    CircleCheckBig,
+    ScanLine,
+    Download,
+    RotateCcw,
+    DollarSign,
+    Mail,
+  };
 
   get currency(): string {
     return this.event?.currency || 'USD';
@@ -703,7 +708,7 @@ export class AttendeeListComponent implements OnInit {
         },
         error: (err) => {
           this.refunding = false;
-          this.toastService.error(err.error?.error || 'Refund failed.');
+          this.toastService.error(apiErrorMessage(err, 'Refund failed.', 'error'));
         },
       });
   }
@@ -727,7 +732,7 @@ export class AttendeeListComponent implements OnInit {
       },
       error: (err) => {
         this.refundingBookingId = null;
-        this.toastService.error(err.error?.error || 'Refund failed.');
+        this.toastService.error(apiErrorMessage(err, 'Refund failed.', 'error'));
       },
     });
   }
@@ -752,7 +757,7 @@ export class AttendeeListComponent implements OnInit {
         },
         error: (err) => {
           this.sending = false;
-          this.toastService.error(err.error?.error || 'Could not send message.');
+          this.toastService.error(apiErrorMessage(err, 'Could not send message.', 'error'));
         },
       });
   }

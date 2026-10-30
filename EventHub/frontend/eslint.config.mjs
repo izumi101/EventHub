@@ -93,6 +93,16 @@ export default defineConfig(
     },
   },
 
+  // Unit tests.
+  {
+    files: ['src/**/*.spec.ts'],
+    rules: {
+      // `querySelector(...)!` on a fixture: if the element is missing the test
+      // fails right there, which is exactly what an assertion would do.
+      '@typescript-eslint/no-non-null-assertion': 'off',
+    },
+  },
+
   // Angular templates: inline ones (extracted by processInlineTemplates) and .html files.
   {
     files: ['**/*.html'],

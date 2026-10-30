@@ -1,15 +1,15 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
-import { LucideAngularModule, Twitter, Linkedin, Github, ChevronUp, X } from 'lucide-angular';
+import { LucideAngularModule, ChevronUp, X } from 'lucide-angular';
 import { AuthService } from '../../services/auth.service';
 import { SearchService } from '../../services/search.service';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [DialogDirective, CommonModule, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, RouterModule, LucideAngularModule],
   template: `
     <footer class="bg-card border-t border-border mt-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -36,7 +36,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[#1DA1F2] transition-all"
                 aria-label="Twitter"
               >
-                <lucide-icon [img]="icons.Twitter" class="w-5 h-5"></lucide-icon>
+                <lucide-icon [img]="icons.Twitter" class="w-5 h-5" />
               </a>
               <a
                 href="https://linkedin.com"
@@ -45,7 +45,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[#0A66C2] transition-all"
                 aria-label="LinkedIn"
               >
-                <lucide-icon [img]="icons.Linkedin" class="w-5 h-5"></lucide-icon>
+                <lucide-icon [img]="icons.Linkedin" class="w-5 h-5" />
               </a>
               <a
                 href="https://github.com"
@@ -54,7 +54,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[#333] transition-all"
                 aria-label="GitHub"
               >
-                <lucide-icon [img]="icons.Github" class="w-5 h-5"></lucide-icon>
+                <lucide-icon [img]="icons.Github" class="w-5 h-5" />
               </a>
             </div>
           </div>
@@ -64,32 +64,40 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <h3 class="text-foreground font-semibold mb-4">Discover</h3>
             <ul class="space-y-3">
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateToCategory('Concert')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                  >Concerts</a
                 >
+                  Concerts
+                </button>
               </li>
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateToCategory('Festival')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                  >Festivals</a
                 >
+                  Festivals
+                </button>
               </li>
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateToCategory('Conference')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                  >Conferences</a
                 >
+                  Conferences
+                </button>
               </li>
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateToCategory('Workshop')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                  >Workshops</a
                 >
+                  Workshops
+                </button>
               </li>
             </ul>
           </div>
@@ -99,25 +107,31 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <h3 class="text-sm font-semibold text-foreground mb-4">Organizer</h3>
             <ul class="space-y-3">
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateAuthenticated('/organizer/dashboard')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                  >Dashboard</a
                 >
+                  Dashboard
+                </button>
               </li>
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateAuthenticated('/create-event')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                  >Create Event</a
                 >
+                  Create Event
+                </button>
               </li>
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="navigateAuthenticated('/my-events')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                  >My Events</a
                 >
+                  My Events
+                </button>
               </li>
             </ul>
           </div>
@@ -148,11 +162,13 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 >
               </li>
               <li>
-                <a
+                <button
+                  type="button"
                   (click)="openModal('faq')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                  >FAQ</a
                 >
+                  FAQ
+                </button>
               </li>
             </ul>
           </div>
@@ -164,16 +180,20 @@ import { DialogDirective } from '../../directives/dialog.directive';
         >
           <p class="text-sm text-muted-foreground">© 2026 EventHub. All rights reserved.</p>
           <div class="flex items-center gap-6">
-            <a
+            <button
+              type="button"
               (click)="openModal('terms')"
               class="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >Terms of Service</a
             >
-            <a
+              Terms of Service
+            </button>
+            <button
+              type="button"
               (click)="openModal('privacy')"
               class="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >Privacy Policy</a
             >
+              Privacy Policy
+            </button>
             <span class="text-xs text-muted-foreground opacity-50">|</span>
             <span class="text-xs text-primary font-medium tracking-wide"
               >Made with ♥ in Almaty</span
@@ -183,210 +203,216 @@ import { DialogDirective } from '../../directives/dialog.directive';
       </div>
 
       <!-- Back to Top Button -->
-      <button
-        *ngIf="showBackToTop"
-        (click)="scrollToTop()"
-        class="fixed bottom-6 right-6 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all z-40 animate-fade-in"
-        aria-label="Back to top"
-      >
-        <lucide-icon [img]="icons.ChevronUp" class="w-5 h-5"></lucide-icon>
-      </button>
+      @if (showBackToTop) {
+        <button
+          (click)="scrollToTop()"
+          class="fixed bottom-6 right-6 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all z-40 animate-fade-in"
+          aria-label="Back to top"
+        >
+          <lucide-icon [img]="icons.ChevronUp" class="w-5 h-5" />
+        </button>
+      }
 
       <!-- Modal Overlay (Terms / Privacy / FAQ) -->
-      <div
-        *ngIf="activeModal"
-        class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
-        (click)="closeModal()"
-      >
+      @if (activeModal) {
         <div
-          class="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
-          (click)="$event.stopPropagation()"
-          appDialog
-          (dismiss)="closeModal()"
+          class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in"
         >
-          <!-- Modal Header -->
           <div
-            class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-2xl z-10"
+            class="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
+            appDialog
+            dismissOnBackdrop
+            (dismiss)="closeModal()"
           >
-            <h2 class="text-lg font-semibold text-foreground">{{ modalTitle }}</h2>
-            <button
-              (click)="closeModal()"
-              class="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+            <!-- Modal Header -->
+            <div
+              class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-2xl z-10"
             >
-              <lucide-icon [img]="icons.X" class="w-4 h-4"></lucide-icon>
-            </button>
-          </div>
-
-          <!-- Terms of Service Content -->
-          <div
-            *ngIf="activeModal === 'terms'"
-            class="px-6 py-6 space-y-6 text-sm text-muted-foreground leading-relaxed"
-          >
-            <p class="text-foreground font-medium">Last updated: April 15, 2026</p>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">1. Acceptance of Terms</h3>
-              <p>
-                By accessing and using EventHub, you agree to be bound by these Terms of Service and
-                all applicable laws and regulations. If you do not agree with any of these terms,
-                you are prohibited from using or accessing this site.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">2. Use License</h3>
-              <p>
-                Permission is granted to temporarily access the materials on EventHub for personal,
-                non-commercial transitory viewing only. This license shall automatically terminate
-                if you violate any of these restrictions.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">3. Event Listings</h3>
-              <p>
-                EventHub acts as a marketplace connecting event organizers with attendees. We do not
-                guarantee the accuracy, completeness, or usefulness of any event listing. Event
-                organizers are solely responsible for the accuracy of their listings.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">4. Ticket Purchases</h3>
-              <p>
-                All ticket sales are final unless the event is cancelled by the organizer. Refund
-                policies are set by individual event organizers. EventHub facilitates the
-                transaction but is not responsible for refund disputes between buyers and
-                organizers.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">5. Account Responsibility</h3>
-              <p>
-                You are responsible for maintaining the confidentiality of your account credentials
-                and for all activities that occur under your account. You must notify EventHub
-                immediately of any unauthorized use of your account.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">6. Limitation of Liability</h3>
-              <p>
-                EventHub shall not be held liable for any damages arising from the use or inability
-                to use the materials on the platform, even if EventHub has been notified orally or
-                in writing of the possibility of such damage.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">7. Contact</h3>
-              <p>
-                For questions about these Terms, contact us at
-                <a href="mailto:eventhub.supporting@gmail.com" class="text-primary hover:underline"
-                  >eventhub.supporting@gmail.com</a
-                >.
-              </p>
-            </div>
-          </div>
-
-          <!-- Privacy Policy Content -->
-          <div
-            *ngIf="activeModal === 'privacy'"
-            class="px-6 py-6 space-y-6 text-sm text-muted-foreground leading-relaxed"
-          >
-            <p class="text-foreground font-medium">Last updated: April 15, 2026</p>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">1. Information We Collect</h3>
-              <p>
-                We collect information you provide directly to us, such as when you create an
-                account, purchase tickets, or contact us for support. This includes your name, email
-                address, and payment information.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">2. How We Use Your Information</h3>
-              <p>
-                We use the information we collect to provide, maintain, and improve our services,
-                process transactions, send you confirmations and updates about events you're
-                registered for, and respond to your comments and questions.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">3. Information Sharing</h3>
-              <p>
-                We do not sell, trade, or otherwise transfer your personal information to outside
-                parties. This does not include trusted third parties who assist us in operating our
-                platform, conducting our business, or serving you, as long as those parties agree to
-                keep this information confidential.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">4. Data Security</h3>
-              <p>
-                We implement industry-standard security measures to protect your personal
-                information. All sensitive data is encrypted using SSL technology. However, no
-                method of transmission over the Internet is 100% secure.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">5. Cookies</h3>
-              <p>
-                We use cookies to enhance your experience on our platform. You can choose to disable
-                cookies through your browser settings, but this may affect the functionality of
-                certain features.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">6. Your Rights</h3>
-              <p>
-                You have the right to access, correct, or delete your personal data at any time. You
-                can manage your account information from your profile settings or by contacting our
-                support team.
-              </p>
-            </div>
-
-            <div>
-              <h3 class="text-foreground font-semibold mb-2">7. Contact</h3>
-              <p>
-                For privacy-related inquiries, contact us at
-                <a href="mailto:eventhub.supporting@gmail.com" class="text-primary hover:underline"
-                  >eventhub.supporting@gmail.com</a
-                >.
-              </p>
-            </div>
-          </div>
-
-          <!-- FAQ Content -->
-          <div
-            *ngIf="activeModal === 'faq'"
-            class="px-6 py-6 space-y-5 text-sm text-muted-foreground leading-relaxed"
-          >
-            <div *ngFor="let faq of faqItems" class="border-b border-border pb-5 last:border-b-0">
+              <h2 class="text-lg font-semibold text-foreground">{{ modalTitle }}</h2>
               <button
-                (click)="faq.open = !faq.open"
-                class="w-full flex items-center justify-between text-foreground font-semibold text-left gap-4"
+                (click)="closeModal()"
+                class="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               >
-                <span>{{ faq.question }}</span>
-                <span
-                  class="text-primary text-lg flex-shrink-0 transition-transform"
-                  [class.rotate-45]="faq.open"
-                  >+</span
-                >
+                <lucide-icon [img]="icons.X" class="w-4 h-4" />
               </button>
-              <p *ngIf="faq.open" class="mt-3 text-muted-foreground animate-fade-in">
-                {{ faq.answer }}
-              </p>
             </div>
+
+            <!-- Terms of Service Content -->
+            @if (activeModal === 'terms') {
+              <div class="px-6 py-6 space-y-6 text-sm text-muted-foreground leading-relaxed">
+                <p class="text-foreground font-medium">Last updated: April 15, 2026</p>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">1. Acceptance of Terms</h3>
+                  <p>
+                    By accessing and using EventHub, you agree to be bound by these Terms of Service
+                    and all applicable laws and regulations. If you do not agree with any of these
+                    terms, you are prohibited from using or accessing this site.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">2. Use License</h3>
+                  <p>
+                    Permission is granted to temporarily access the materials on EventHub for
+                    personal, non-commercial transitory viewing only. This license shall
+                    automatically terminate if you violate any of these restrictions.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">3. Event Listings</h3>
+                  <p>
+                    EventHub acts as a marketplace connecting event organizers with attendees. We do
+                    not guarantee the accuracy, completeness, or usefulness of any event listing.
+                    Event organizers are solely responsible for the accuracy of their listings.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">4. Ticket Purchases</h3>
+                  <p>
+                    All ticket sales are final unless the event is cancelled by the organizer.
+                    Refund policies are set by individual event organizers. EventHub facilitates the
+                    transaction but is not responsible for refund disputes between buyers and
+                    organizers.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">5. Account Responsibility</h3>
+                  <p>
+                    You are responsible for maintaining the confidentiality of your account
+                    credentials and for all activities that occur under your account. You must
+                    notify EventHub immediately of any unauthorized use of your account.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">6. Limitation of Liability</h3>
+                  <p>
+                    EventHub shall not be held liable for any damages arising from the use or
+                    inability to use the materials on the platform, even if EventHub has been
+                    notified orally or in writing of the possibility of such damage.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">7. Contact</h3>
+                  <p>
+                    For questions about these Terms, contact us at
+                    <a
+                      href="mailto:eventhub.supporting@gmail.com"
+                      class="text-primary hover:underline"
+                      >eventhub.supporting@gmail.com</a
+                    >.
+                  </p>
+                </div>
+              </div>
+            }
+
+            <!-- Privacy Policy Content -->
+            @if (activeModal === 'privacy') {
+              <div class="px-6 py-6 space-y-6 text-sm text-muted-foreground leading-relaxed">
+                <p class="text-foreground font-medium">Last updated: April 15, 2026</p>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">1. Information We Collect</h3>
+                  <p>
+                    We collect information you provide directly to us, such as when you create an
+                    account, purchase tickets, or contact us for support. This includes your name,
+                    email address, and payment information.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">2. How We Use Your Information</h3>
+                  <p>
+                    We use the information we collect to provide, maintain, and improve our
+                    services, process transactions, send you confirmations and updates about events
+                    you're registered for, and respond to your comments and questions.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">3. Information Sharing</h3>
+                  <p>
+                    We do not sell, trade, or otherwise transfer your personal information to
+                    outside parties. This does not include trusted third parties who assist us in
+                    operating our platform, conducting our business, or serving you, as long as
+                    those parties agree to keep this information confidential.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">4. Data Security</h3>
+                  <p>
+                    We implement industry-standard security measures to protect your personal
+                    information. All sensitive data is encrypted using SSL technology. However, no
+                    method of transmission over the Internet is 100% secure.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">5. Cookies</h3>
+                  <p>
+                    We use cookies to enhance your experience on our platform. You can choose to
+                    disable cookies through your browser settings, but this may affect the
+                    functionality of certain features.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">6. Your Rights</h3>
+                  <p>
+                    You have the right to access, correct, or delete your personal data at any time.
+                    You can manage your account information from your profile settings or by
+                    contacting our support team.
+                  </p>
+                </div>
+
+                <div>
+                  <h3 class="text-foreground font-semibold mb-2">7. Contact</h3>
+                  <p>
+                    For privacy-related inquiries, contact us at
+                    <a
+                      href="mailto:eventhub.supporting@gmail.com"
+                      class="text-primary hover:underline"
+                      >eventhub.supporting@gmail.com</a
+                    >.
+                  </p>
+                </div>
+              </div>
+            }
+
+            <!-- FAQ Content -->
+            @if (activeModal === 'faq') {
+              <div class="px-6 py-6 space-y-5 text-sm text-muted-foreground leading-relaxed">
+                @for (faq of faqItems; track faq) {
+                  <div class="border-b border-border pb-5 last:border-b-0">
+                    <button
+                      (click)="faq.open = !faq.open"
+                      class="w-full flex items-center justify-between text-foreground font-semibold text-left gap-4"
+                    >
+                      <span>{{ faq.question }}</span>
+                      <span
+                        class="text-primary text-lg flex-shrink-0 transition-transform"
+                        [class.rotate-45]="faq.open"
+                        >+</span
+                      >
+                    </button>
+                    @if (faq.open) {
+                      <p class="mt-3 text-muted-foreground animate-fade-in">
+                        {{ faq.answer }}
+                      </p>
+                    }
+                  </div>
+                }
+              </div>
+            }
           </div>
         </div>
-      </div>
+      }
     </footer>
   `,
   styles: [
@@ -411,7 +437,17 @@ import { DialogDirective } from '../../directives/dialog.directive';
   ],
 })
 export class FooterComponent {
-  readonly icons = { Twitter, Linkedin, Github, ChevronUp, X };
+  private router = inject(Router);
+  private authService = inject(AuthService);
+  private searchService = inject(SearchService);
+
+  readonly icons = {
+    Twitter: TwitterIcon,
+    Linkedin: LinkedinIcon,
+    Github: GithubIcon,
+    ChevronUp,
+    X,
+  };
 
   activeModal: 'terms' | 'privacy' | 'faq' | null = null;
   modalTitle = '';
@@ -456,11 +492,7 @@ export class FooterComponent {
     },
   ];
 
-  constructor(
-    private router: Router,
-    private authService: AuthService,
-    private searchService: SearchService,
-  ) {
+  constructor() {
     if (typeof window !== 'undefined') {
       window.addEventListener('scroll', () => {
         this.showBackToTop = window.scrollY > 400;
@@ -472,7 +504,7 @@ export class FooterComponent {
   navigateToCategory(categoryName: string): void {
     this.searchService.setSearchQuery(categoryName);
     this.searchService.setSearchLocation('');
-    this.router.navigate(['/']).then(() => {
+    void this.router.navigate(['/']).then(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
   }
@@ -480,9 +512,9 @@ export class FooterComponent {
   /** Navigate to authenticated route, redirect to login if not logged in */
   navigateAuthenticated(path: string): void {
     if (this.authService.isLoggedIn) {
-      this.router.navigate([path]);
+      void this.router.navigate([path]);
     } else {
-      this.router.navigate(['/login']);
+      void this.router.navigate(['/login']);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { EventService, EventAnalytics } from '../../services/event.service';
@@ -9,7 +9,7 @@ import {
   Ticket,
   UserCheck,
   Wallet,
-  BarChart3,
+  ChartColumn,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
 
@@ -46,7 +46,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
-                <lucide-icon [img]="icons.Wallet" class="w-4 h-4"></lucide-icon>
+                <lucide-icon [img]="icons.Wallet" class="w-4 h-4" />
                 <span class="text-xs font-medium uppercase tracking-wide">Net revenue</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">
@@ -60,7 +60,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             </div>
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
-                <lucide-icon [img]="icons.Ticket" class="w-4 h-4"></lucide-icon>
+                <lucide-icon [img]="icons.Ticket" class="w-4 h-4" />
                 <span class="text-xs font-medium uppercase tracking-wide">Tickets sold</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">{{ data.kpis.tickets_sold }}</p>
@@ -70,7 +70,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             </div>
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
-                <lucide-icon [img]="icons.UserCheck" class="w-4 h-4"></lucide-icon>
+                <lucide-icon [img]="icons.UserCheck" class="w-4 h-4" />
                 <span class="text-xs font-medium uppercase tracking-wide">Checked in</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">{{ data.kpis.checked_in }}</p>
@@ -80,7 +80,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             </div>
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
-                <lucide-icon [img]="icons.TrendingUp" class="w-4 h-4"></lucide-icon>
+                <lucide-icon [img]="icons.TrendingUp" class="w-4 h-4" />
                 <span class="text-xs font-medium uppercase tracking-wide">Avg order</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">
@@ -95,10 +95,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           <!-- 30-day timeline -->
           <div class="card p-5 mb-8">
             <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
-              <lucide-icon
-                [img]="icons.BarChart3"
-                class="w-4 h-4 text-muted-foreground"
-              ></lucide-icon>
+              <lucide-icon [img]="icons.ChartColumn" class="w-4 h-4 text-muted-foreground" />
               Registrations — last 30 days
             </h2>
             @if (maxTickets === 0) {
@@ -190,17 +187,15 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   `,
 })
 export class EventAnalyticsComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+
   eventId = 0;
   event: EventModel | null = null;
   data: EventAnalytics | null = null;
   loading = false;
 
-  readonly icons = { TrendingUp, Ticket, UserCheck, Wallet, BarChart3 };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-  ) {}
+  readonly icons = { TrendingUp, Ticket, UserCheck, Wallet, ChartColumn };
 
   get maxTickets(): number {
     if (!this.data) return 0;
@@ -214,7 +209,9 @@ export class EventAnalyticsComponent implements OnInit {
       next: (ev) => {
         this.event = ev;
       },
-      error: () => {},
+      error: () => {
+        // Only the page title needs the event; the analytics call reports its own errors.
+      },
     });
     this.eventService.getEventAnalytics(this.eventId).subscribe({
       next: (d) => {

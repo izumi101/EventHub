@@ -1,9 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-login',
@@ -116,7 +117,7 @@ import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
                     [img]="showPassword ? icons.EyeOff : icons.Eye"
                     class="w-4 h-4"
                     aria-hidden="true"
-                  ></lucide-icon>
+                  />
                 </button>
               </div>
             </div>
@@ -151,6 +152,9 @@ import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
   `,
 })
 export class LoginComponent {
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
   username = '';
   password = '';
   error = '';
@@ -160,12 +164,10 @@ export class LoginComponent {
   readonly icons = { Eye, EyeOff };
   private returnUrl = '/';
 
-  constructor(
-    private authService: AuthService,
-    private router: Router,
-    route: ActivatedRoute,
-  ) {
-    this.returnUrl = route.snapshot.queryParams['returnUrl'] || '/';
+  constructor() {
+    const route = inject(ActivatedRoute);
+
+    this.returnUrl = route.snapshot.queryParamMap.get('returnUrl') || '/';
   }
 
   onSubmit(): void {
@@ -179,10 +181,10 @@ export class LoginComponent {
     this.authService.login(this.username.trim(), this.password).subscribe({
       next: () => {
         this.submitting = false;
-        this.router.navigateByUrl(this.returnUrl);
+        void this.router.navigateByUrl(this.returnUrl);
       },
       error: (err) => {
-        this.error = err.error?.detail || 'Invalid username or password.';
+        this.error = apiErrorMessage(err, 'Invalid username or password.', 'detail');
         this.submitting = false;
       },
     });

@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
@@ -14,14 +14,14 @@ import {
   Calendar,
   MapPin,
   Users,
-  CheckCircle,
-  BarChart2,
+  CircleCheckBig,
+  ChartNoAxesColumn,
   ScanLine,
   Search,
-  Edit3,
+  PenLine,
   Copy,
   Trash2,
-  MoreHorizontal,
+  Ellipsis,
   TrendingUp,
   DollarSign,
 } from 'lucide-angular';
@@ -67,15 +67,11 @@ interface EventWithStats extends Event {
             @if (!isAdmin) {
               <div class="flex items-center gap-2 flex-shrink-0">
                 <a routerLink="/scan" class="btn btn-secondary flex items-center gap-1.5">
-                  <lucide-icon
-                    [img]="icons.ScanLine"
-                    class="w-4 h-4"
-                    aria-hidden="true"
-                  ></lucide-icon>
+                  <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true" />
                   Scan
                 </a>
                 <a routerLink="/create-event" class="btn btn-primary flex items-center gap-1.5">
-                  <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                  <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true" />
                   New event
                 </a>
               </div>
@@ -89,34 +85,24 @@ interface EventWithStats extends Event {
                 <p class="text-xs text-muted-foreground font-medium mb-1">Events</p>
                 <div class="flex items-baseline gap-2">
                   <p class="text-2xl font-bold text-foreground num">{{ filteredEvents.length }}</p>
-                  <span
-                    class="text-xs text-[color:var(--pine-600)] flex items-center gap-0.5"
-                    *ngIf="eventsTrend"
-                  >
-                    <lucide-icon
-                      [img]="icons.TrendingUp"
-                      class="w-3 h-3"
-                      aria-hidden="true"
-                    ></lucide-icon>
-                    {{ eventsTrend }}
-                  </span>
+                  @if (eventsTrend) {
+                    <span class="text-xs text-[color:var(--pine-600)] flex items-center gap-0.5">
+                      <lucide-icon [img]="icons.TrendingUp" class="w-3 h-3" aria-hidden="true" />
+                      {{ eventsTrend }}
+                    </span>
+                  }
                 </div>
               </div>
               <div class="card p-4">
                 <p class="text-xs text-muted-foreground font-medium mb-1">Registrations</p>
                 <div class="flex items-baseline gap-2">
                   <p class="text-2xl font-bold text-foreground num">{{ totalRegistrations }}</p>
-                  <span
-                    class="text-xs text-[color:var(--pine-600)] flex items-center gap-0.5"
-                    *ngIf="regTrend"
-                  >
-                    <lucide-icon
-                      [img]="icons.TrendingUp"
-                      class="w-3 h-3"
-                      aria-hidden="true"
-                    ></lucide-icon>
-                    {{ regTrend }}
-                  </span>
+                  @if (regTrend) {
+                    <span class="text-xs text-[color:var(--pine-600)] flex items-center gap-0.5">
+                      <lucide-icon [img]="icons.TrendingUp" class="w-3 h-3" aria-hidden="true" />
+                      {{ regTrend }}
+                    </span>
+                  }
                 </div>
               </div>
               <div class="card p-4">
@@ -149,7 +135,7 @@ interface EventWithStats extends Event {
                   [img]="icons.Search"
                   class="w-4 h-4 text-muted-foreground flex-shrink-0"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
                 <input
                   type="search"
                   [(ngModel)]="searchQuery"
@@ -229,11 +215,7 @@ interface EventWithStats extends Event {
                   title="Calendar view"
                   aria-label="Calendar view"
                 >
-                  <lucide-icon
-                    [img]="icons.Calendar"
-                    class="w-4 h-4"
-                    aria-hidden="true"
-                  ></lucide-icon>
+                  <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true" />
                 </button>
               </div>
             </div>
@@ -250,10 +232,10 @@ interface EventWithStats extends Event {
           <div class="card p-12 flex flex-col items-center text-center">
             <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
               <lucide-icon
-                [img]="icons.BarChart2"
+                [img]="icons.ChartNoAxesColumn"
                 class="w-5 h-5 text-muted-foreground"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">
               {{ isAdmin ? 'No pending events' : tabEmptyLabel }}
@@ -266,11 +248,7 @@ interface EventWithStats extends Event {
                 routerLink="/create-event"
                 class="btn btn-primary btn-sm flex items-center gap-1.5"
               >
-                <lucide-icon
-                  [img]="icons.Plus"
-                  class="w-3.5 h-3.5"
-                  aria-hidden="true"
-                ></lucide-icon>
+                <lucide-icon [img]="icons.Plus" class="w-3.5 h-3.5" aria-hidden="true" />
                 Create event
               </a>
             }
@@ -305,7 +283,7 @@ interface EventWithStats extends Event {
                             [img]="icons.Calendar"
                             class="w-3.5 h-3.5"
                             aria-hidden="true"
-                          ></lucide-icon>
+                          />
                           {{ event.date | date: 'MMM d, y · HH:mm' }}
                         </span>
                         <span class="flex items-center gap-1 truncate">
@@ -313,7 +291,7 @@ interface EventWithStats extends Event {
                             [img]="icons.MapPin"
                             class="w-3.5 h-3.5"
                             aria-hidden="true"
-                          ></lucide-icon>
+                          />
                           {{ event.location }}
                         </span>
                       </div>
@@ -326,11 +304,7 @@ interface EventWithStats extends Event {
                           [routerLink]="['/organizer/events', event.id, 'attendees']"
                           class="btn btn-sm btn-secondary flex items-center gap-1"
                         >
-                          <lucide-icon
-                            [img]="icons.Users"
-                            class="w-3.5 h-3.5"
-                            aria-hidden="true"
-                          ></lucide-icon>
+                          <lucide-icon [img]="icons.Users" class="w-3.5 h-3.5" aria-hidden="true" />
                           Attendees
                         </a>
                         <!-- Quick actions menu (·××) -->
@@ -341,10 +315,10 @@ interface EventWithStats extends Event {
                             [attr.aria-label]="'Menu for ' + event.title"
                           >
                             <lucide-icon
-                              [img]="icons.MoreHorizontal"
+                              [img]="icons.Ellipsis"
                               class="w-4 h-4"
                               aria-hidden="true"
-                            ></lucide-icon>
+                            />
                           </button>
                           @if (openMenuId === event.id) {
                             <div
@@ -356,10 +330,10 @@ interface EventWithStats extends Event {
                                 class="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
                               >
                                 <lucide-icon
-                                  [img]="icons.Edit3"
+                                  [img]="icons.PenLine"
                                   class="w-4 h-4"
                                   aria-hidden="true"
-                                ></lucide-icon>
+                                />
                                 Edit event
                               </a>
                               <button
@@ -370,7 +344,7 @@ interface EventWithStats extends Event {
                                   [img]="icons.Copy"
                                   class="w-4 h-4"
                                   aria-hidden="true"
-                                ></lucide-icon>
+                                />
                                 Duplicate
                               </button>
                               <button
@@ -381,7 +355,7 @@ interface EventWithStats extends Event {
                                   [img]="icons.Trash2"
                                   class="w-4 h-4"
                                   aria-hidden="true"
-                                ></lucide-icon>
+                                />
                                 Delete
                               </button>
                             </div>
@@ -448,7 +422,7 @@ interface EventWithStats extends Event {
                             [img]="icons.DollarSign"
                             class="w-3 h-3"
                             aria-hidden="true"
-                          ></lucide-icon>
+                          />
                           <span>Revenue</span>
                         </div>
                         <p class="text-lg font-bold text-foreground">
@@ -500,6 +474,11 @@ interface EventWithStats extends Event {
   `,
 })
 export class DashboardComponent implements OnInit {
+  private eventService = inject(EventService);
+  private authService = inject(AuthService);
+  private modalService = inject(ModalService);
+  private toastService = inject(ToastService);
+
   events: EventWithStats[] = [];
   filteredEvents: EventWithStats[] = [];
   activityFeed: ActivityItem[] = [];
@@ -533,30 +512,24 @@ export class DashboardComponent implements OnInit {
     Calendar,
     MapPin,
     Users,
-    CheckCircle,
-    BarChart2,
+    CircleCheckBig,
+    ChartNoAxesColumn,
     ScanLine,
     Search,
-    Edit3,
+    PenLine,
     Copy,
     Trash2,
-    MoreHorizontal,
+    Ellipsis,
     TrendingUp,
     DollarSign,
   };
 
-  constructor(
-    private eventService: EventService,
-    private authService: AuthService,
-    private modalService: ModalService,
-    private toastService: ToastService,
-  ) {}
-
   ngOnInit(): void {
     this.authService.getProfile().subscribe({
       next: (user) => {
-        this.isAdmin = !!user?.is_superuser;
-        this.isAdmin ? this.loadPendingEvents() : this.loadMyEvents();
+        this.isAdmin = user.is_superuser;
+        if (this.isAdmin) this.loadPendingEvents();
+        else this.loadMyEvents();
       },
       error: () => {
         this.isAdmin = !!this.authService.currentUser?.is_superuser;
@@ -580,7 +553,7 @@ export class DashboardComponent implements OnInit {
   private loadMyEvents(): void {
     this.eventService.getMyEvents().subscribe({
       next: (res) => {
-        this.events = (res.results ?? (res as any)) || [];
+        this.events = res.results;
         this.loadStats();
       },
       error: () => {
@@ -633,10 +606,10 @@ export class DashboardComponent implements OnInit {
     this.draftCount = drafts.length;
 
     // Get current tab events
-    let tabEvents: EventWithStats[] = [];
+    let tabEvents: EventWithStats[];
     if (this.currentTab === 'upcoming') tabEvents = upcoming;
     else if (this.currentTab === 'past') tabEvents = past;
-    else if (this.currentTab === 'drafts') tabEvents = drafts;
+    else tabEvents = drafts;
 
     // Apply search
     if (this.searchQuery.trim()) {

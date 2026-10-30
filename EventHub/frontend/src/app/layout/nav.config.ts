@@ -11,12 +11,13 @@ import {
   MessageSquare,
   ClipboardList,
   Settings,
-  Edit,
+  SquarePen,
   Shield,
   ChevronLeft,
   Clock,
-  BarChart3,
+  ChartColumn,
   Armchair,
+  type LucideIconData,
 } from 'lucide-angular';
 
 // attendee = logged-in && NOT organizer (pure attendees only)
@@ -24,8 +25,7 @@ import {
 // admin     = is_superuser
 export type Role = 'public' | 'auth' | 'attendee' | 'organizer' | 'admin';
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type LucideIcon = any;
+export type LucideIcon = LucideIconData;
 
 export interface NavItem {
   label: string;
@@ -90,7 +90,7 @@ export const NAV: NavSection[] = [
       },
       {
         label: 'Analytics',
-        icon: BarChart3,
+        icon: ChartColumn,
         routeFn: (id) => `/organizer/events/${id}/analytics`,
         roles: ['organizer'],
       },
@@ -132,7 +132,7 @@ export const NAV: NavSection[] = [
       },
       {
         label: 'Edit Event',
-        icon: Edit,
+        icon: SquarePen,
         routeFn: (id) => `/edit-event/${id}`,
         roles: ['organizer'],
       },

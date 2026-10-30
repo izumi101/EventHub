@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
@@ -19,6 +19,8 @@ import {
 import * as QRCode from 'qrcode';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { apiErrorMessage } from '../../api/api-error';
+import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
 
 @Component({
   selector: 'app-my-registrations',
@@ -54,7 +56,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
             "
           >
             <span class="flex items-center gap-1.5">
-              <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true" />
               Upcoming ({{ upcomingRegs.length }})
             </span>
           </button>
@@ -68,7 +70,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
             "
           >
             <span class="flex items-center gap-1.5">
-              <lucide-icon [img]="icons.Clock" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.Clock" class="w-4 h-4" aria-hidden="true" />
               Past ({{ pastRegs.length }})
             </span>
           </button>
@@ -91,7 +93,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                     [img]="icons.Ticket"
                     class="w-8 h-8 text-primary/50"
                     aria-hidden="true"
-                  ></lucide-icon>
+                  />
                 </div>
                 <h3 class="text-base font-semibold text-foreground mb-1">No tickets yet</h3>
                 <p class="text-sm text-muted-foreground mb-5 max-w-xs">
@@ -108,7 +110,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                     [img]="icons.Clock"
                     class="w-8 h-8 text-muted-foreground/50"
                     aria-hidden="true"
-                  ></lucide-icon>
+                  />
                 </div>
                 <h3 class="text-base font-semibold text-foreground mb-1">No past tickets</h3>
                 <p class="text-sm text-muted-foreground">
@@ -289,7 +291,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                               (click)="openInvoice(reg)"
                               class="btn btn-sm btn-ghost text-xs flex items-center gap-1 text-muted-foreground"
                             >
-                              <lucide-icon [img]="icons.FileText" class="w-3.5 h-3.5"></lucide-icon>
+                              <lucide-icon [img]="icons.FileText" class="w-3.5 h-3.5" />
                               Invoice
                             </button>
                           }
@@ -304,7 +306,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                               <lucide-icon
                                 [img]="isMobile ? icons.Share2 : icons.Download"
                                 class="w-3.5 h-3.5"
-                              ></lucide-icon>
+                              />
                             }
                             {{ isMobile ? 'Share' : 'Download PDF' }}
                           </button>
@@ -362,12 +364,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
     @if (qrModalReg) {
       <div
         class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
-        (click)="qrModalReg = null"
       >
         <div
           class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
-          (click)="$event.stopPropagation()"
           appDialog
+          dismissOnBackdrop
           (dismiss)="qrModalReg = null"
         >
           <span class="badge badge-confirmed mb-3">Confirmed</span>
@@ -409,12 +410,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
     @if (refundReg) {
       <div
         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
-        (click)="refundReg = null"
       >
         <div
           class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up"
-          (click)="$event.stopPropagation()"
           appDialog
+          dismissOnBackdrop
           (dismiss)="refundReg = null"
         >
           <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
@@ -451,6 +451,10 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class MyRegistrationsComponent implements OnInit {
+  private eventService = inject(EventService);
+  private toastService = inject(ToastService);
+  private paymentService = inject(PaymentService);
+
   registrations: Registration[] = [];
   loading = false;
   activeTab: 'upcoming' | 'past' = 'upcoming';
@@ -480,12 +484,6 @@ export class MyRegistrationsComponent implements OnInit {
   }
 
   readonly icons = { Calendar, MapPin, Clock, Download, Share2, Ticket, FileText };
-
-  constructor(
-    private eventService: EventService,
-    private toastService: ToastService,
-    private paymentService: PaymentService,
-  ) {}
 
   ngOnInit(): void {
     this.loadRegistrations();
@@ -520,7 +518,9 @@ export class MyRegistrationsComponent implements OnInit {
         .then((dataUrl) => {
           this.qrCodes[reg.ticket_uuid] = dataUrl;
         })
-        .catch(() => {});
+        .catch(() => {
+          // The ticket still lists its UUID; the QR is only a convenience.
+        });
     }
   }
 
@@ -622,7 +622,7 @@ export class MyRegistrationsComponent implements OnInit {
       },
       error: (err) => {
         this.submittingRefund = false;
-        this.toastService.error(err.error?.error || 'Could not submit request.');
+        this.toastService.error(apiErrorMessage(err, 'Could not submit request.', 'error'));
       },
     });
   }
@@ -631,10 +631,10 @@ export class MyRegistrationsComponent implements OnInit {
     evt.stopPropagation();
     this.exportingId = reg.id;
     try {
-      const el = (evt.currentTarget as HTMLElement).closest('.ticket') as HTMLElement;
+      const el = (evt.currentTarget as HTMLElement).closest<HTMLElement>('.ticket');
       if (!el) throw new Error('Element not found');
 
-      const actions = el.querySelector('.js-ticket-actions') as HTMLElement | null;
+      const actions = el.querySelector<HTMLElement>('.js-ticket-actions');
       if (actions) actions.style.display = 'none';
 
       // Heavy PDF libraries are loaded on demand, not in the initial bundle.
@@ -656,10 +656,10 @@ export class MyRegistrationsComponent implements OnInit {
       pdf.addImage(img, 'PNG', 0, 0, w, h);
       const fileName = `Ticket-${reg.event.title.replace(/\s+/g, '-')}.pdf`;
 
-      if (this.isMobile && navigator.share) {
+      if (this.isMobile && supportsWebShare()) {
         const blob = pdf.output('blob');
         const file = new File([blob], fileName, { type: 'application/pdf' });
-        if (navigator.canShare?.({ files: [file] })) {
+        if (canShareFiles([file])) {
           await navigator.share({ files: [file], title: `Ticket: ${reg.event.title}` });
           this.toastService.success('Ticket shared.');
           return;

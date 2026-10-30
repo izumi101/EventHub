@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { EventService } from '../../services/event.service';
-import { Category } from '../../models/models';
+import { Category, EventFormPayload } from '../../models/models';
+import { apiErrorBody } from '../../api/api-error';
 
 @Component({
   selector: 'app-event-form',
@@ -430,6 +431,10 @@ import { Category } from '../../models/models';
   `,
 })
 export class EventFormComponent implements OnInit {
+  private eventService = inject(EventService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+
   formData = {
     title: '',
     description: '',
@@ -462,12 +467,6 @@ export class EventFormComponent implements OnInit {
   imagePreview: string | null = null;
   imageCleared = false;
 
-  constructor(
-    private eventService: EventService,
-    private route: ActivatedRoute,
-    private router: Router,
-  ) {}
-
   ngOnInit(): void {
     this.eventService.getCategories().subscribe({
       next: (cats) => {
@@ -496,13 +495,13 @@ export class EventFormComponent implements OnInit {
             max_participants: ev.max_participants,
             is_online: ev.is_online,
             online_link: ev.online_link,
-            tax_percent: parseFloat(ev.tax_percent ?? '0') || 0,
-            service_fee_percent: parseFloat(ev.service_fee_percent ?? '0') || 0,
-            fees_passed_to_buyer: ev.fees_passed_to_buyer ?? true,
-            refundable: ev.refundable ?? true,
-            currency: ev.currency ?? 'USD',
-            seo_title: ev.seo_title ?? '',
-            seo_description: ev.seo_description ?? '',
+            tax_percent: parseFloat(ev.tax_percent) || 0,
+            service_fee_percent: parseFloat(ev.service_fee_percent) || 0,
+            fees_passed_to_buyer: ev.fees_passed_to_buyer,
+            refundable: ev.refundable,
+            currency: ev.currency,
+            seo_title: ev.seo_title,
+            seo_description: ev.seo_description,
           };
           this.imagePreview = ev.image;
         },
@@ -584,7 +583,7 @@ export class EventFormComponent implements OnInit {
 
     this.submitting = true;
 
-    const payload: Record<string, unknown> = {
+    const payload: Omit<EventFormPayload, 'image'> = {
       title: this.formData.title,
       description: this.formData.description,
       category_id: Number(this.formData.category),
@@ -602,13 +601,13 @@ export class EventFormComponent implements OnInit {
       seo_title: this.formData.seo_title || '',
       seo_description: this.formData.seo_description || '',
     };
-    if (this.formData.end_date) payload['end_date'] = this.formData.end_date;
+    if (this.formData.end_date) payload.end_date = this.formData.end_date;
     if (this.formData.is_online && this.formData.online_link) {
-      payload['online_link'] = this.formData.online_link;
+      payload.online_link = this.formData.online_link;
     }
 
     // A cover image upload switches the request to multipart form-data.
-    let body: any = payload;
+    let body: EventFormPayload | FormData = payload;
     if (this.imageFile || this.imageCleared) {
       const fd = new FormData();
       for (const [k, v] of Object.entries(payload)) fd.append(k, String(v));
@@ -626,14 +625,14 @@ export class EventFormComponent implements OnInit {
       next: (ev) => {
         this.success = this.editMode ? 'Event updated!' : 'Event created and submitted for review.';
         this.submitting = false;
-        setTimeout(() => this.router.navigate(['/events', ev.id]), 1000);
+        setTimeout(() => {
+          void this.router.navigate(['/events', ev.id]);
+        }, 1000);
       },
       error: (err) => {
-        if (err.error && typeof err.error === 'object') {
-          this.error = Object.values(err.error).flat().join(' ');
-        } else {
-          this.error = err.error?.detail || 'Failed to save event.';
-        }
+        const body = apiErrorBody(err);
+        // DRF validation errors: { field: ["message", …], … }
+        this.error = body ? Object.values(body).flat().join(' ') : 'Failed to save event.';
         this.submitting = false;
       },
     });

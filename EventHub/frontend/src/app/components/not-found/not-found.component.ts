@@ -1,6 +1,6 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { LucideAngularModule, Home, ArrowLeft } from 'lucide-angular';
+import { LucideAngularModule, House, ArrowLeft } from 'lucide-angular';
 
 @Component({
   selector: 'app-not-found',
@@ -24,11 +24,11 @@ import { LucideAngularModule, Home, ArrowLeft } from 'lucide-angular';
         </p>
         <div class="flex flex-wrap items-center justify-center gap-3">
           <a routerLink="/" class="btn btn-primary flex items-center gap-1.5">
-            <lucide-icon [img]="icons.Home" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.House" class="w-4 h-4" aria-hidden="true" />
             Back to home
           </a>
           <button (click)="goBack()" class="btn btn-secondary flex items-center gap-1.5">
-            <lucide-icon [img]="icons.ArrowLeft" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.ArrowLeft" class="w-4 h-4" aria-hidden="true" />
             Go back
           </button>
         </div>
@@ -37,7 +37,7 @@ import { LucideAngularModule, Home, ArrowLeft } from 'lucide-angular';
   `,
 })
 export class NotFoundComponent {
-  readonly icons = { Home, ArrowLeft };
+  readonly icons = { House, ArrowLeft };
   goBack(): void {
     window.history.back();
   }

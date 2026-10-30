@@ -26,10 +26,11 @@ export class ModalService {
       this.responseSubject.complete();
     }
 
-    this.responseSubject = new Subject<boolean>();
+    const response = new Subject<boolean>();
+    this.responseSubject = response;
 
     return new Promise<boolean>((resolve) => {
-      const sub = this.responseSubject!.subscribe((result) => {
+      const sub = response.subscribe((result) => {
         sub.unsubscribe();
         this.isOpen.set(false);
         resolve(result);

@@ -1,15 +1,19 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-forgot-password',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
   template: `
+    <!-- Each step of this multi-step form shows the one field to fill next, which
+         takes focus on purpose: a deliberate exception to no-autofocus. -->
+    <!-- eslint-disable @angular-eslint/template/no-autofocus -->
     <div class="min-h-dvh flex bg-background">
       <!-- Left: editorial brand panel -->
       <aside
@@ -189,7 +193,7 @@ import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
                       [img]="showPw ? icons.EyeOff : icons.Eye"
                       class="w-4 h-4"
                       aria-hidden="true"
-                    ></lucide-icon>
+                    />
                   </button>
                 </div>
               </div>
@@ -242,6 +246,9 @@ import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
   `,
 })
 export class ForgotPasswordComponent {
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
   step = 1;
 
   identifier = '';
@@ -257,11 +264,6 @@ export class ForgotPasswordComponent {
 
   readonly icons = { Eye, EyeOff };
 
-  constructor(
-    private authService: AuthService,
-    private router: Router,
-  ) {}
-
   requestReset(): void {
     if (!this.identifier.trim()) {
       this.error = 'Please enter your username or email.';
@@ -276,13 +278,13 @@ export class ForgotPasswordComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = err.error?.detail || 'Request failed. Please try again.';
+        this.error = apiErrorMessage(err, 'Request failed. Please try again.', 'detail');
       },
     });
   }
 
   verifyCode(): void {
-    if (!this.code || this.code.length !== 6) {
+    if (this.code.length !== 6) {
       this.error = 'Enter the 6-digit code.';
       return;
     }
@@ -296,7 +298,7 @@ export class ForgotPasswordComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = err.error?.detail || 'Invalid or expired code.';
+        this.error = apiErrorMessage(err, 'Invalid or expired code.', 'detail');
       },
     });
   }
@@ -318,11 +320,13 @@ export class ForgotPasswordComponent {
         next: () => {
           this.loading = false;
           this.success = 'Password updated! Redirecting to sign in...';
-          setTimeout(() => this.router.navigate(['/login']), 1800);
+          setTimeout(() => {
+            void this.router.navigate(['/login']);
+          }, 1800);
         },
         error: (err) => {
           this.loading = false;
-          this.error = err.error?.detail || 'Failed to set new password.';
+          this.error = apiErrorMessage(err, 'Failed to set new password.', 'detail');
         },
       });
   }

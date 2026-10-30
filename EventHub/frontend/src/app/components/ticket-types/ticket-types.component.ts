@@ -1,12 +1,39 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { EventService, TicketType, TicketKind } from '../../services/event.service';
+import {
+  EventService,
+  TicketType,
+  TicketKind,
+  type TicketTypeInput,
+} from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { apiErrorMessage } from '../../api/api-error';
+
+/** The "new tier" form; numeric inputs are null while empty. */
+interface TierForm {
+  name: string;
+  description: string;
+  kind: TicketKind;
+  price: number | null;
+  quantity: number | null;
+  sale_start: string;
+  sale_end: string;
+}
+
+const emptyTierForm = (): TierForm => ({
+  name: '',
+  description: '',
+  kind: 'paid',
+  price: null,
+  quantity: null,
+  sale_start: '',
+  sale_end: '',
+});
 
 @Component({
   selector: 'app-ticket-types',
@@ -33,14 +60,14 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 
         <div class="flex items-center justify-between mb-2">
           <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
-            <lucide-icon [img]="icons.Ticket" class="w-6 h-6 text-primary"></lucide-icon>
+            <lucide-icon [img]="icons.Ticket" class="w-6 h-6 text-primary" />
             Ticket types
           </h1>
           <button
             (click)="showForm = !showForm"
             class="btn btn-primary btn-sm flex items-center gap-1.5"
           >
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon> New tier
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" /> New tier
           </button>
         </div>
         <p class="text-sm text-muted-foreground mb-6">
@@ -172,10 +199,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         } @else if (tiers.length === 0) {
           <div class="flex flex-col items-center justify-center py-16 text-center">
             <div class="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <lucide-icon
-                [img]="icons.Ticket"
-                class="w-7 h-7 text-muted-foreground/50"
-              ></lucide-icon>
+              <lucide-icon [img]="icons.Ticket" class="w-7 h-7 text-muted-foreground/50" />
             </div>
             <h3 class="font-semibold text-foreground mb-1">No ticket tiers</h3>
             <p class="text-sm text-muted-foreground">
@@ -230,16 +254,13 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   class="btn btn-ghost btn-sm"
                   [title]="t.is_active ? 'Disable' : 'Enable'"
                 >
-                  <lucide-icon
-                    [img]="t.is_active ? icons.X : icons.Check"
-                    class="w-4 h-4"
-                  ></lucide-icon>
+                  <lucide-icon [img]="t.is_active ? icons.X : icons.Check" class="w-4 h-4" />
                 </button>
                 <button
                   (click)="remove(t)"
                   class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
                 >
-                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                 </button>
               </div>
             }
@@ -250,6 +271,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   `,
 })
 export class TicketTypesComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toast = inject(ToastService);
+
   eventId = 0;
   event: EventModel | null = null;
   tiers: TicketType[] = [];
@@ -257,23 +282,9 @@ export class TicketTypesComponent implements OnInit {
   showForm = false;
   saving = false;
 
-  form: any = {
-    name: '',
-    description: '',
-    kind: 'paid' as TicketKind,
-    price: null,
-    quantity: null,
-    sale_start: '',
-    sale_end: '',
-  };
+  form: TierForm = emptyTierForm();
 
   readonly icons = { Ticket, Plus, Trash2, Check, X };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toast: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
@@ -298,7 +309,7 @@ export class TicketTypesComponent implements OnInit {
   create(): void {
     if (!this.form.name.trim()) return;
     this.saving = true;
-    const payload: any = {
+    const payload: TicketTypeInput = {
       name: this.form.name.trim(),
       description: this.form.description.trim(),
       kind: this.form.kind,
@@ -314,20 +325,12 @@ export class TicketTypesComponent implements OnInit {
         this.toast.success('Ticket tier created.');
         this.saving = false;
         this.showForm = false;
-        this.form = {
-          name: '',
-          description: '',
-          kind: 'paid',
-          price: null,
-          quantity: null,
-          sale_start: '',
-          sale_end: '',
-        };
+        this.form = emptyTierForm();
         this.load();
       },
       error: (err) => {
         this.saving = false;
-        this.toast.error(err.error?.price?.[0] || err.error?.detail || 'Could not create tier.');
+        this.toast.error(apiErrorMessage(err, 'Could not create tier.', 'price', 'detail'));
       },
     });
   }
