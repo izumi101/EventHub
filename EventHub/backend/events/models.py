@@ -1,4 +1,7 @@
 import uuid
+from decimal import Decimal
+from typing import Literal
+
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
@@ -130,7 +133,7 @@ class Event(models.Model):
         ).count()
 
     @property
-    def available_spots(self):
+    def available_spots(self) -> int:
         return max(self.max_participants - self.active_registration_count - self.booked_seat_count, 0)
 
     def _ticket_types_list(self):
@@ -139,11 +142,11 @@ class Event(models.Model):
         return list(self.ticket_types.all())
 
     @property
-    def has_ticket_types(self):
+    def has_ticket_types(self) -> bool:
         return bool(self._ticket_types_list())
 
     @property
-    def is_free(self):
+    def is_free(self) -> bool:
         # With ticket tiers, the event is free only if every tier is free.
         types = self._ticket_types_list()
         if types:
@@ -151,7 +154,7 @@ class Event(models.Model):
         return self.price == 0
 
     @property
-    def price_from(self):
+    def price_from(self) -> Decimal:
         """Lowest purchasable price across tiers (for 'from $X' display)."""
         prices = [t.price for t in self._ticket_types_list() if t.is_active]
         return min(prices) if prices else self.price
@@ -264,6 +267,9 @@ class TicketTypeQuerySet(models.QuerySet):
         ))
 
 
+SaleState = Literal['inactive', 'scheduled', 'ended', 'sold_out', 'on_sale']
+
+
 class TicketType(models.Model):
     """A purchasable tier for an event: General, VIP, Early Bird, Donation…
 
@@ -306,24 +312,24 @@ class TicketType(models.Model):
         return f'{self.name} — {self.event.title}'
 
     @property
-    def sold(self):
+    def sold(self) -> int:
         cached = getattr(self, '_sold', None)
         if cached is not None:
             return cached
         return self.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES).count()
 
     @property
-    def available(self):
+    def available(self) -> int | None:
         if self.quantity is None:
             return None  # unlimited
         return max(self.quantity - self.sold, 0)
 
     @property
-    def is_sold_out(self):
+    def is_sold_out(self) -> bool:
         return self.quantity is not None and self.sold >= self.quantity
 
     @property
-    def on_sale(self):
+    def on_sale(self) -> bool:
         now = timezone.now()
         if not self.is_active:
             return False
@@ -334,7 +340,7 @@ class TicketType(models.Model):
         return True
 
     @property
-    def sale_state(self):
+    def sale_state(self) -> SaleState:
         """Human label for why a tier can/can't be bought right now."""
         now = timezone.now()
         if not self.is_active:
@@ -382,15 +388,15 @@ class PromoCode(models.Model):
         return f'{self.code} ({self.event.title})'
 
     @property
-    def is_expired(self):
+    def is_expired(self) -> bool:
         return bool(self.expires_at and timezone.now() > self.expires_at)
 
     @property
-    def is_exhausted(self):
+    def is_exhausted(self) -> bool:
         return self.max_uses is not None and self.times_used >= self.max_uses
 
     @property
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return self.is_active and not self.is_expired and not self.is_exhausted
 
 
@@ -635,7 +641,7 @@ class Affiliate(models.Model):
         return f'{self.name} ({self.code}) @ {self.event.title}'
 
     @property
-    def sales(self):
+    def sales(self) -> int:
         return self.registrations.exclude(status__in=[
             RegistrationStatusChoices.CANCELLED, RegistrationStatusChoices.REJECTED,
         ]).count()

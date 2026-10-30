@@ -27,6 +27,7 @@ from .engagement import (
     EventReviewsView,
     FavoritesListView,
     FavoriteToggleView,
+    NotificationMarkAllReadView,
     NotificationMarkReadView,
     NotificationsListView,
 )
@@ -68,6 +69,7 @@ __all__ = [
     'EventReviewsView',
     'FavoritesListView',
     'FavoriteToggleView',
+    'NotificationMarkAllReadView',
     'NotificationMarkReadView',
     'NotificationsListView',
     'AffiliateClickView',

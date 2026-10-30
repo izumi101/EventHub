@@ -19,7 +19,7 @@ urlpatterns = [
     path('events/<int:event_id>/reviews/', views.EventReviewsView.as_view(), name='event-reviews'),
     # Notifications
     path('notifications/', views.NotificationsListView.as_view(), name='notifications-list'),
-    path('notifications/read/', views.NotificationMarkReadView.as_view(), name='notifications-read-all'),
+    path('notifications/read/', views.NotificationMarkAllReadView.as_view(), name='notifications-read-all'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(), name='notification-read'),
     # Promo codes (organizer)
     path('events/<int:event_id>/promo-codes/', views.EventPromoCodesView.as_view(), name='event-promo-codes'),

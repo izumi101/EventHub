@@ -42,14 +42,14 @@ class Base(APITestCase):
 
     def register(self, user=None, event=None, **data):
         self.client.force_authenticate(user or self.attendee)
-        return self.client.post(f'/api/events/{(event or self.event).id}/register/', data, format='json')
+        return self.client.post(f'/api/v1/events/{(event or self.event).id}/register/', data, format='json')
 
 
 class CheckInListTests(Base):
     def setUp(self):
         super().setUp()
         self.lst = CheckInList.objects.create(event=self.event, name='Main', is_default=True)
-        self.url = f'/api/checkin-lists/{self.lst.id}/check-in/'
+        self.url = f'/api/v1/checkin-lists/{self.lst.id}/check-in/'
 
     def scan(self, reg, action='check_in', user=None):
         self.client.force_authenticate(user or self.organizer)
@@ -81,7 +81,7 @@ class CheckInListTests(Base):
     def test_lists_are_not_readable_by_strangers(self):
         # Important #1: GET used to skip the permission check (IDOR).
         self.client.force_authenticate(self.other)
-        response = self.client.get(f'/api/events/{self.event.id}/checkin-lists/')
+        response = self.client.get(f'/api/v1/events/{self.event.id}/checkin-lists/')
         self.assertEqual(response.status_code, 403)
 
     def test_check_in_staff_can_scan_but_not_edit_lists(self):
@@ -89,7 +89,7 @@ class CheckInListTests(Base):
         EventStaff.objects.create(event=self.event, user=self.other, role=EventStaff.ROLE_CHECK_IN)
         reg = Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
         self.assertEqual(self.scan(reg, user=self.other).status_code, 200)
-        response = self.client.post(f'/api/events/{self.event.id}/checkin-lists/', {'name': 'VIP'})
+        response = self.client.post(f'/api/v1/events/{self.event.id}/checkin-lists/', {'name': 'VIP'})
         self.assertEqual(response.status_code, 403)
 
 
@@ -97,14 +97,14 @@ class PermissionTests(Base):
     def test_co_organizer_cannot_appoint_more_staff(self):
         EventStaff.objects.create(event=self.event, user=self.other, role=EventStaff.ROLE_CO_ORGANIZER)
         self.client.force_authenticate(self.other)
-        response = self.client.post(f'/api/events/{self.event.id}/staff/',
+        response = self.client.post(f'/api/v1/events/{self.event.id}/staff/',
                                     {'invite_username': 'attendee', 'role': 'co_organizer'})
         self.assertEqual(response.status_code, 403)
 
     def test_co_organizer_can_edit_but_not_delete(self):
         EventStaff.objects.create(event=self.event, user=self.other, role=EventStaff.ROLE_CO_ORGANIZER)
         self.client.force_authenticate(self.other)
-        url = f'/api/events/{self.event.id}/'
+        url = f'/api/v1/events/{self.event.id}/'
         self.assertEqual(self.client.patch(url, {'title': 'New'}, format='json').status_code, 200)
         self.assertEqual(self.client.delete(url).status_code, 403)
 
@@ -113,7 +113,7 @@ class PermissionTests(Base):
         reg = Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
         Payment.objects.create(registration=reg, amount=100, status='completed')
         self.client.force_authenticate(self.organizer)
-        response = self.client.delete(f'/api/events/{self.event.id}/')
+        response = self.client.delete(f'/api/v1/events/{self.event.id}/')
         self.assertEqual(response.status_code, 409)
         self.assertTrue(Payment.objects.filter(registration=reg).exists())
 
@@ -122,7 +122,7 @@ class PermissionTests(Base):
         self.event.is_online = True
         self.event.online_link = 'https://meet.example.com/secret'
         self.event.save()
-        url = f'/api/events/{self.event.id}/'
+        url = f'/api/v1/events/{self.event.id}/'
         self.assertEqual(self.client.get(url).data['online_link'], '')
         self.client.force_authenticate(self.other)
         self.assertEqual(self.client.get(url).data['online_link'], '')
@@ -132,7 +132,7 @@ class PermissionTests(Base):
     def test_staff_create_without_username_is_a_400(self):
         # Important #19: used to be an AttributeError → 500.
         self.client.force_authenticate(self.organizer)
-        response = self.client.post(f'/api/events/{self.event.id}/staff/', {'role': 'check_in'})
+        response = self.client.post(f'/api/v1/events/{self.event.id}/staff/', {'role': 'check_in'})
         self.assertEqual(response.status_code, 400)
 
 
@@ -147,7 +147,7 @@ class MoneyTests(Base):
         self.assertEqual(response.status_code, 400)
         # Releasing the unpaid hold gives the use back.
         self.client.force_authenticate(self.attendee)
-        self.client.post(f'/api/events/{self.event.id}/cancel/')
+        self.client.post(f'/api/v1/events/{self.event.id}/cancel/')
         self.assertEqual(PromoCode.objects.get().times_used, 0)
 
     def test_tier_price_is_locked_at_registration(self):
@@ -174,7 +174,7 @@ class MoneyTests(Base):
         free = Registration.objects.create(user=self.other, event=self.event, status='confirmed')
         with patch('payments.services.refund_payment', side_effect=RuntimeError('stripe down')):
             self.client.force_authenticate(self.organizer)
-            response = self.client.post(f'/api/events/{self.event.id}/cancel-event/')
+            response = self.client.post(f'/api/v1/events/{self.event.id}/cancel-event/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['refund_failed'], 1)
         free.refresh_from_db()
@@ -204,7 +204,7 @@ class AdminDashboardTests(Base):
         Payment.objects.create(registration=kzt, amount=5000, currency='kzt', status='completed')
         admin = User.objects.create_superuser('root', 'root@example.com', 'Str0ng-pass!')
         self.client.force_authenticate(admin)
-        data = self.client.get('/api/admin-dashboard/').data
+        data = self.client.get('/api/v1/admin-dashboard/').data
         self.assertEqual(data['revenue_by_currency'], [
             {'currency': 'KZT', 'amount': '5000.00'}, {'currency': 'USD', 'amount': '60.00'},
         ])
@@ -213,7 +213,7 @@ class AdminDashboardTests(Base):
 class ValidationTests(Base):
     def test_duplicate_promo_code_is_a_400_not_a_500(self):
         self.client.force_authenticate(self.organizer)
-        url = f'/api/events/{self.event.id}/promo-codes/'
+        url = f'/api/v1/events/{self.event.id}/promo-codes/'
         data = {'code': 'save10', 'discount_type': 'percent', 'discount_value': 10}
         self.assertEqual(self.client.post(url, data).status_code, 201)
         data['code'] = 'SAVE10'
@@ -224,7 +224,7 @@ class ValidationTests(Base):
         Registration.objects.create(user=self.attendee, event=past, status='confirmed')
         Review.objects.create(user=self.attendee, event=past, rating=5)
         self.client.force_authenticate(self.attendee)
-        response = self.client.post(f'/api/events/{past.id}/reviews/', {'rating': 4})
+        response = self.client.post(f'/api/v1/events/{past.id}/reviews/', {'rating': 4})
         self.assertEqual(response.status_code, 400)
 
     def test_event_fields_are_validated(self):
@@ -238,14 +238,14 @@ class ValidationTests(Base):
         base['category_id'] = Category.objects.create(name='Tech').id
         for bad in ({'price': -1}, {'tax_percent': 150}, {'currency': 'dollars'},
                     {'end_date': (timezone.now() + timedelta(days=1)).isoformat()}):
-            response = self.client.post('/api/events/', {**base, **bad}, format='json')
+            response = self.client.post('/api/v1/events/', {**base, **bad}, format='json')
             self.assertEqual(response.status_code, 400, bad)
 
     def test_capacity_cannot_drop_below_tickets_sold(self):
         for i in range(3):
             Registration.objects.create(user=self.make_user(f'u{i}'), event=self.event, status='confirmed')
         self.client.force_authenticate(self.organizer)
-        response = self.client.patch(f'/api/events/{self.event.id}/', {'max_participants': 2}, format='json')
+        response = self.client.patch(f'/api/v1/events/{self.event.id}/', {'max_participants': 2}, format='json')
         self.assertEqual(response.status_code, 400)
 
 
@@ -254,10 +254,10 @@ class BookingRuleTests(Base):
         # Important #11: group bookings skipped the event-state checks.
         draft = self.make_event(status='draft')
         self.client.force_authenticate(self.organizer)
-        self.client.post(f'/api/events/{draft.id}/seat-map/create/', {'rows': 2, 'cols': 2}, format='json')
+        self.client.post(f'/api/v1/events/{draft.id}/seat-map/create/', {'rows': 2, 'cols': 2}, format='json')
         seat_ids = list(draft.seat_map.seats.values_list('id', flat=True)[:2])
         self.client.force_authenticate(self.attendee)
-        response = self.client.post('/api/bookings/', {'event': draft.id, 'seat_ids': seat_ids}, format='json')
+        response = self.client.post('/api/v1/bookings/', {'event': draft.id, 'seat_ids': seat_ids}, format='json')
         self.assertEqual(response.status_code, 400)
 
 
@@ -280,7 +280,7 @@ class ExportTests(Base):
         evil.save()
         Registration.objects.create(user=evil, event=self.event, status='confirmed')
         self.client.force_authenticate(self.organizer)
-        response = self.client.get(f'/api/events/{self.event.id}/export-attendees/')
+        response = self.client.get(f'/api/v1/events/{self.event.id}/export-attendees/')
         sheet = load_workbook(BytesIO(response.content)).active
         self.assertTrue(sheet['A2'].value.startswith("'="))
 
@@ -290,7 +290,7 @@ class QueryCountTests(Base):
         # Important #22: ~10 queries per event card before.
         def count():
             with CaptureQueriesContext(connection) as ctx:
-                self.assertEqual(self.client.get('/api/events/').status_code, 200)
+                self.assertEqual(self.client.get('/api/v1/events/').status_code, 200)
             return len(ctx.captured_queries)
 
         few = count()
@@ -304,7 +304,7 @@ class QueryCountTests(Base):
 
         def count():
             with CaptureQueriesContext(connection) as ctx:
-                self.assertEqual(self.client.get('/api/my-registrations/').status_code, 200)
+                self.assertEqual(self.client.get('/api/v1/my-registrations/').status_code, 200)
             return len(ctx.captured_queries)
 
         Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
@@ -323,7 +323,7 @@ class WaitlistTests(Base):
         Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
         WaitlistEntry.objects.create(user=self.other, event=self.event)
         self.client.force_authenticate(self.organizer)
-        self.client.post(f'/api/events/{self.event.id}/cancel-event/')
+        self.client.post(f'/api/v1/events/{self.event.id}/cancel-event/')
         self.assertEqual(WaitlistEntry.objects.get(user=self.other).status, 'waiting')
         self.assertFalse(self.other.notifications.filter(type='seat_available').exists())
 
@@ -333,7 +333,7 @@ class AttendeeListTests(Base):
         for i in range(3):
             Registration.objects.create(user=self.make_user(f'p{i}'), event=self.event, status='confirmed')
         self.client.force_authenticate(self.organizer)
-        url = f'/api/events/{self.event.id}/registrations/'
+        url = f'/api/v1/events/{self.event.id}/registrations/'
         plain = self.client.get(url).data
         self.assertEqual(len(plain), 3)
         self.assertNotIn('event', plain[0])  # not re-serialised per row
@@ -364,10 +364,10 @@ class CommandTests(Base):
         Registration.objects.create(user=self.attendee, event=self.event, status='pending',
                                     seat_held_until=timezone.now() - timedelta(minutes=1))
         self.client.force_authenticate(self.organizer)
-        self.client.post(f'/api/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 1}, format='json')
+        self.client.post(f'/api/v1/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 1}, format='json')
         self.client.force_authenticate(None)
         with CaptureQueriesContext(connection) as ctx:
-            self.client.get(f'/api/events/{self.event.id}/seat_map/')
+            self.client.get(f'/api/v1/events/{self.event.id}/seat_map/')
         writes = [q for q in ctx.captured_queries if q['sql'].lstrip().upper().startswith(('UPDATE', 'INSERT', 'DELETE'))]
         self.assertEqual(writes, [])
 

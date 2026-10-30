@@ -57,7 +57,7 @@ class RegistrationConcurrencyTests(TransactionTestCase):
         # K1: used to raise TransactionManagementError → HTTP 500.
         client = APIClient()
         client.force_authenticate(self.buyers[0])
-        response = client.post(f'/api/events/{self.event.id}/register/', {}, format='json')
+        response = client.post(f'/api/v1/events/{self.event.id}/register/', {}, format='json')
         self.assertEqual(response.status_code, 201, response.content)
 
     def test_two_buyers_cannot_both_take_the_last_spot(self):

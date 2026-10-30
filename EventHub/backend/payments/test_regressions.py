@@ -40,7 +40,7 @@ class PaymentBase(APITestCase):
 
     def checkout(self, reg):
         self.client.force_authenticate(self.buyer)
-        return self.client.post(f'/api/payments/create-checkout/{reg.id}/')
+        return self.client.post(f'/api/v1/payments/create-checkout/{reg.id}/')
 
     def webhook(self, session):
         # A real stripe.Event, not a dict: since stripe-python 15 Stripe
@@ -123,7 +123,7 @@ class LatePaymentTests(PaymentBase):
              'metadata': {'registration_id': str(reg.id)}}, 'sk_test_x')
         self.client.force_authenticate(self.buyer)
         with patch('stripe.checkout.Session.retrieve', return_value=session):
-            response = self.client.get('/api/payments/verify/?session_id=cs_v')
+            response = self.client.get('/api/v1/payments/verify/?session_id=cs_v')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'completed')
 
@@ -156,19 +156,19 @@ class OrganizerMoneyTests(PaymentBase):
 
     def test_garbage_refund_amount_is_a_400(self):
         # Important #14: Decimal('abc') raised InvalidOperation → 500.
-        response = self.client.post(f'/api/payments/refund/{self.reg.id}/', {'amount': 'abc'})
+        response = self.client.post(f'/api/v1/payments/refund/{self.reg.id}/', {'amount': 'abc'})
         self.assertEqual(response.status_code, 400)
 
     def test_second_full_refund_is_refused(self):
-        self.assertEqual(self.client.post(f'/api/payments/refund/{self.reg.id}/').status_code, 200)
-        self.assertEqual(self.client.post(f'/api/payments/refund/{self.reg.id}/').status_code, 400)
+        self.assertEqual(self.client.post(f'/api/v1/payments/refund/{self.reg.id}/').status_code, 200)
+        self.assertEqual(self.client.post(f'/api/v1/payments/refund/{self.reg.id}/').status_code, 400)
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.refunded_amount, Decimal('100'))
 
     def test_offline_payment_is_validated(self):
         # Important #15.
         pending = self.pending(user=User.objects.create_user('cash', 'c@example.com', 'Str0ng-pass!'))
-        url = f'/api/payments/mark-offline/{pending.id}/'
+        url = f'/api/v1/payments/mark-offline/{pending.id}/'
         self.assertEqual(self.client.post(url, {'amount': '-5'}).status_code, 400)
         self.assertEqual(self.client.post(url, {'amount': 'lots'}).status_code, 400)
         pending.status = 'cancelled'
@@ -178,7 +178,7 @@ class OrganizerMoneyTests(PaymentBase):
     def test_verify_is_owner_only(self):
         self.payment.stripe_checkout_session_id = 'cs_mine'
         self.payment.save()
-        response = self.client.get('/api/payments/verify/?session_id=cs_mine')
+        response = self.client.get('/api/v1/payments/verify/?session_id=cs_mine')
         self.assertEqual(response.status_code, 404)
 
 
@@ -186,12 +186,12 @@ class SharedBookingTests(PaymentBase):
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(self.organizer)
-        self.client.post(f'/api/events/{self.event.id}/seat-map/create/', {'rows': 2, 'cols': 2}, format='json')
+        self.client.post(f'/api/v1/events/{self.event.id}/seat-map/create/', {'rows': 2, 'cols': 2}, format='json')
         seats = list(self.event.seat_map.seats.all()[:2])
         self.booking = Booking.objects.create(owner=self.buyer, event=self.event, status=Booking.Status.CONFIRMED)
         for seat in seats:
             BookingSeat.objects.create(booking=self.booking, seat=seat, price=10)
-        self.url = f'/api/bookings/shared/{self.booking.share_token}/'
+        self.url = f'/api/v1/bookings/shared/{self.booking.share_token}/'
         self.friend = User.objects.create_user('friend', 'f@example.com', 'Str0ng-pass!')
         self.stranger = User.objects.create_user('stranger', 's@example.com', 'Str0ng-pass!')
         self.client.force_authenticate(None)
@@ -215,7 +215,7 @@ class SharedBookingTests(PaymentBase):
 
     def test_owner_still_sees_all_tickets(self):
         self.client.force_authenticate(self.buyer)
-        data = self.client.get(f'/api/bookings/{self.booking.id}/').data
+        data = self.client.get(f'/api/v1/bookings/{self.booking.id}/').data
         self.assertTrue(all(s['ticket_uuid'] for s in data['seats']))
 
 
@@ -224,7 +224,7 @@ class OrganizerBookingRefundTests(PaymentBase):
     def setUp(self):
         super().setUp()
         self.client.force_authenticate(self.organizer)
-        self.client.post(f'/api/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 3}, format='json')
+        self.client.post(f'/api/v1/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 3}, format='json')
         self.seats = list(self.event.seat_map.seats.all()[:2])
         self.booking = Booking.objects.create(
             owner=self.buyer, event=self.event, status=Booking.Status.CONFIRMED,
@@ -237,7 +237,7 @@ class OrganizerBookingRefundTests(PaymentBase):
 
     def test_organizer_refunds_a_group_booking(self):
         with patch('stripe.Refund.create') as refund:
-            response = self.client.post(f'/api/bookings/{self.booking.id}/refund/', {'reason': 'Venue change'})
+            response = self.client.post(f'/api/v1/bookings/{self.booking.id}/refund/', {'reason': 'Venue change'})
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(refund.call_args.kwargs['payment_intent'], 'pi_group')
         self.booking.refresh_from_db()
@@ -246,16 +246,16 @@ class OrganizerBookingRefundTests(PaymentBase):
         self.assertTrue(all(s.is_available for s in self.event.seat_map.seats.filter(id__in=[x.id for x in self.seats])))
         self.assertFalse(self.booking.seats.exists())
         # Refunding twice is refused.
-        response = self.client.post(f'/api/bookings/{self.booking.id}/refund/')
+        response = self.client.post(f'/api/v1/bookings/{self.booking.id}/refund/')
         self.assertEqual(response.status_code, 400)
 
     def test_only_the_event_team_can_refund_or_list(self):
         self.client.force_authenticate(self.buyer)
-        self.assertEqual(self.client.post(f'/api/bookings/{self.booking.id}/refund/').status_code, 403)
-        self.assertEqual(self.client.get(f'/api/bookings/event/{self.event.id}/').status_code, 403)
+        self.assertEqual(self.client.post(f'/api/v1/bookings/{self.booking.id}/refund/').status_code, 403)
+        self.assertEqual(self.client.get(f'/api/v1/bookings/event/{self.event.id}/').status_code, 403)
 
     def test_team_list_hides_tickets(self):
-        data = self.client.get(f'/api/bookings/event/{self.event.id}/').data
+        data = self.client.get(f'/api/v1/bookings/event/{self.event.id}/').data
         self.assertEqual(len(data), 1)
         self.assertTrue(all(s['ticket_uuid'] is None for s in data[0]['seats']))
 
@@ -265,13 +265,13 @@ class OrganizerBookingRefundTests(PaymentBase):
         self.assertEqual((kpis['group_bookings'], kpis['group_seats'], kpis['tickets_sold']), (1, 2, 2))
         self.assertEqual(kpis['gross_revenue'], 2000.0)
         with patch('stripe.Refund.create'):
-            self.client.post(f'/api/bookings/{self.booking.id}/refund/')
+            self.client.post(f'/api/v1/bookings/{self.booking.id}/refund/')
         kpis = event_analytics(self.event)['kpis']
         self.assertEqual((kpis['refunded'], kpis['net_revenue'], kpis['tickets_sold']), (2000.0, 0.0, 0))
 
     def test_dashboard_stats_report_money_taken_not_price_times_registrations(self):
-        stats = self.client.get(f'/api/events/{self.event.id}/stats/').data
+        stats = self.client.get(f'/api/v1/events/{self.event.id}/stats/').data
         self.assertEqual((stats['net_revenue'], stats['currency']), ('2000.00', self.event.currency))
         with patch('stripe.Refund.create'):
-            self.client.post(f'/api/bookings/{self.booking.id}/refund/')
-        self.assertEqual(self.client.get(f'/api/events/{self.event.id}/stats/').data['net_revenue'], '0.00')
+            self.client.post(f'/api/v1/bookings/{self.booking.id}/refund/')
+        self.assertEqual(self.client.get(f'/api/v1/events/{self.event.id}/stats/').data['net_revenue'], '0.00')

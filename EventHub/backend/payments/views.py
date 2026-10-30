@@ -6,8 +6,11 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework import status
 from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 
 from events.models import Registration
+from . import schema
 from .models import Payment
 from .services import (
     stripe_to_dict,
@@ -19,6 +22,7 @@ from .services import (
     mark_offline_paid as mark_offline_paid_service,
 )
 from common.permissions import can_manage_event
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 
 logger = logging.getLogger(__name__)
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -31,6 +35,7 @@ class CreateCheckoutSessionView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=None, responses={200: schema.CheckoutSessionResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND, 502: ERROR})
     def post(self, request, registration_id):
         registration = get_object_or_404(
             Registration, id=registration_id, user=request.user
@@ -79,6 +84,7 @@ class StripeWebhookView(APIView):
     # anonymous rate limit (a 429 just delays every confirmation).
     throttle_classes = []
 
+    @extend_schema(exclude=True)  # called by Stripe, not by API clients
     def post(self, request):
         payload = request.body
         sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
@@ -115,6 +121,7 @@ class VerifyPaymentView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(parameters=[OpenApiParameter('session_id', OpenApiTypes.STR, required=True, description='Payment provider session id from the success redirect.')], responses={200: schema.PaymentVerificationSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: ERROR})
     def get(self, request):
         session_id = request.query_params.get('session_id')
         if not session_id:
@@ -136,6 +143,7 @@ class RefundPaymentView(APIView):
     """Organizer refunds a registration's payment (full or partial)."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=schema.RefundRequestSerializer, responses={200: schema.RefundResultSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: ERROR})
     def post(self, request, registration_id):
         registration = get_object_or_404(Registration, id=registration_id)
         if not can_manage_event(registration.event, request.user):
@@ -165,6 +173,7 @@ class MarkOfflinePaidView(APIView):
     """Organizer manually marks a registration as paid (cash / bank transfer)."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=schema.OfflinePaymentRequestSerializer, responses={200: schema.OfflinePaymentResultSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
     def post(self, request, registration_id):
         registration = get_object_or_404(Registration, id=registration_id)
         if not can_manage_event(registration.event, request.user):
@@ -189,6 +198,7 @@ class InvoiceView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={(200, 'text/html'): OpenApiResponse(OpenApiTypes.STR, description='Printable HTML invoice.'), 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
     def get(self, request, registration_id):
         registration = get_object_or_404(
             Registration.objects.select_related('event', 'user', 'ticket_type', 'seat', 'promo_code', 'payment'),

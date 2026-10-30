@@ -6,7 +6,11 @@ from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.views import TokenRefreshView
+from drf_spectacular.utils import extend_schema
 
+from common.schema import ERROR, FORBIDDEN, MessageSerializer, UNAUTHENTICATED, VALIDATION_ERROR
+
+from . import schema
 from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, OrganizerCreateSerializer
 from .services import (
     build_auth_payload,
@@ -30,6 +34,7 @@ class RegisterView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'register'
 
+    @extend_schema(request=RegisterSerializer, responses={201: schema.AuthPayloadSerializer, 400: VALIDATION_ERROR})
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -44,6 +49,7 @@ class AdminCreateOrganizerView(APIView):
     """
     permission_classes = [IsAdminUser]
 
+    @extend_schema(request=OrganizerCreateSerializer, responses={201: UserSerializer, 400: VALIDATION_ERROR, 401: UNAUTHENTICATED, 403: FORBIDDEN})
     def post(self, request):
         serializer = OrganizerCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -58,6 +64,7 @@ class RegisterSendCodeView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'register'
 
+    @extend_schema(request=schema.EmailRequestSerializer, responses={200: schema.SendCodeResponseSerializer, 400: ERROR, 503: ERROR})
     def post(self, request):
         email = request.data.get('email', '').strip()
 
@@ -88,6 +95,7 @@ class VerifyRegistrationCodeView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'register'
 
+    @extend_schema(request=schema.EmailCodeRequestSerializer, responses={200: MessageSerializer, 400: ERROR})
     def post(self, request):
         email = request.data.get('email', '').strip()
         code = request.data.get('code', '').strip()
@@ -111,6 +119,7 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'login'
 
+    @extend_schema(request=LoginSerializer, responses={200: schema.AuthPayloadSerializer, 400: VALIDATION_ERROR, 401: ERROR})
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
@@ -131,6 +140,7 @@ class LogoutView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=schema.LogoutRequestSerializer, responses={200: MessageSerializer, 401: UNAUTHENTICATED})
     def post(self, request):
         from rest_framework_simplejwt.exceptions import TokenError
         from rest_framework_simplejwt.tokens import RefreshToken
@@ -150,10 +160,12 @@ class ProfileView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: UserSerializer, 401: UNAUTHENTICATED})
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
+    @extend_schema(request=UserSerializer(partial=True), responses={200: UserSerializer, 400: VALIDATION_ERROR, 401: UNAUTHENTICATED})
     def put(self, request):
         serializer = UserSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
@@ -166,6 +178,7 @@ class AvatarUploadView(APIView):
     """Upload (or clear) the authenticated user's profile avatar."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request={'multipart/form-data': schema.AvatarUploadSerializer}, responses={200: UserSerializer, 400: ERROR, 401: UNAUTHENTICATED})
     def post(self, request):
         avatar = request.FILES.get('avatar')
         if not avatar:
@@ -192,6 +205,7 @@ class AvatarUploadView(APIView):
         profile.save(update_fields=['avatar'])
         return Response(UserSerializer(request.user).data)
 
+    @extend_schema(responses={200: UserSerializer, 401: UNAUTHENTICATED})
     def delete(self, request):
         profile = request.user.profile
         if profile.avatar:
@@ -208,6 +222,7 @@ class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'password_reset'
 
+    @extend_schema(request=schema.IdentifierRequestSerializer, responses={200: MessageSerializer, 400: ERROR})
     def post(self, request):
         identifier = request.data.get('identifier', '').strip()
         if not identifier:
@@ -229,6 +244,7 @@ class PasswordResetVerifyView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'password_reset'
 
+    @extend_schema(request=schema.IdentifierCodeRequestSerializer, responses={200: schema.ResetTokenResponseSerializer, 400: ERROR})
     def post(self, request):
         identifier = request.data.get('identifier', '').strip()
         code = request.data.get('code', '').strip()
@@ -251,6 +267,7 @@ class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'password_reset'
 
+    @extend_schema(request=schema.PasswordResetConfirmSerializer, responses={200: MessageSerializer, 400: ERROR})
     def post(self, request):
         reset_token = str(request.data.get('reset_token', '')).strip()
         # Passwords are taken verbatim: stripping would silently change them.
@@ -280,6 +297,7 @@ class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
     throttle_scope = 'change_password'
 
+    @extend_schema(request=schema.ChangePasswordRequestSerializer, responses={200: schema.ChangePasswordResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED})
     def post(self, request):
         old_password = str(request.data.get('old_password', ''))
         new_password = str(request.data.get('new_password', ''))

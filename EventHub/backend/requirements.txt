@@ -21,3 +21,7 @@ redis>=5.0
 # pgvector column type (always needed: it's part of the schema)
 pgvector>=0.3
 openpyxl>=3.1
+# OpenAPI schema generated from the code (served at /api/v1/schema/)
+drf-spectacular>=0.28
+# Swagger UI assets served from our own origin (the CSP allows no CDNs)
+drf-spectacular-sidecar>=2025.1
