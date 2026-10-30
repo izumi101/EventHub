@@ -12,7 +12,7 @@ from decimal import Decimal
 
 from django.utils import timezone
 
-from common.choices import RegistrationStatusChoices, PaymentStatusChoices
+from common.choices import PaymentStatusChoices, RegistrationStatusChoices
 
 
 def _active_regs(event):

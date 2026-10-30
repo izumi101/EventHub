@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from common.choices import PaymentStatusChoices, RegistrationStatusChoices
 from events.models import Registration
+
 from .models import Payment
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def _parse_money(value, field='amount') -> Decimal:
     try:
         amount = Decimal(str(value))
     except (InvalidOperation, TypeError, ValueError):
-        raise ValueError(f'Invalid {field}.')
+        raise ValueError(f'Invalid {field}.') from None
     if not amount.is_finite():
         raise ValueError(f'Invalid {field}.')
     return amount.quantize(Decimal('0.01'))
@@ -150,9 +151,9 @@ def create_checkout_session(*, registration):
         registration.seat_held_until = expires_at + timedelta(minutes=1)
         registration.save(update_fields=['seat_held_until'])
 
-    params = dict(
-        payment_method_types=['card'],
-        line_items=[
+    params = {
+        'payment_method_types': ['card'],
+        'line_items': [
             {
                 'price_data': {
                     'currency': currency.lower(),
@@ -165,13 +166,13 @@ def create_checkout_session(*, registration):
                 'quantity': 1,
             }
         ],
-        mode='payment',
-        expires_at=int(expires_at.timestamp()),
-        success_url=f'{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}',
-        cancel_url=f'{settings.FRONTEND_URL}/payment/cancel',
-        client_reference_id=str(registration.id),
-        metadata={'registration_id': str(registration.id)},
-    )
+        'mode': 'payment',
+        'expires_at': int(expires_at.timestamp()),
+        'success_url': f'{settings.FRONTEND_URL}/payment/success?session_id={{CHECKOUT_SESSION_ID}}',
+        'cancel_url': f'{settings.FRONTEND_URL}/payment/cancel',
+        'client_reference_id': str(registration.id),
+        'metadata': {'registration_id': str(registration.id)},
+    }
     if registration.user.email:
         params['customer_email'] = registration.user.email
     checkout_session = stripe.checkout.Session.create(**params)
@@ -338,7 +339,7 @@ def refund_payment(*, payment, amount=None, reason='', notify_user=True):
             )
         except stripe.error.StripeError as exc:
             logger.error('Stripe refund failed for payment %s: %s', payment.id, exc)
-            raise ValueError(f'Stripe refund failed: {exc.user_message or exc}')
+            raise ValueError(f'Stripe refund failed: {exc.user_message or exc}') from exc
 
     payment.refunded_amount = payment.refunded_amount + refund_amount
     payment.refund_reason = (reason or payment.refund_reason)[:255]

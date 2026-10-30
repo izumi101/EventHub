@@ -27,7 +27,7 @@ def _run_concurrently(fn, args_list):
         try:
             barrier.wait()
             results[i] = ('ok', fn(*args))
-        except Exception as exc:  # noqa: BLE001 — the test inspects it
+        except Exception as exc:
             results[i] = ('error', exc)
         finally:
             connection.close()

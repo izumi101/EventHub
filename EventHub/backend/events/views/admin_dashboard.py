@@ -1,12 +1,11 @@
 """Platform-wide stats for the admin dashboard."""
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
-
 from common.schema import ERROR, UNAUTHENTICATED
 
 from .. import schema as api

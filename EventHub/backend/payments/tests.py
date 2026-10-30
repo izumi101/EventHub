@@ -1,11 +1,12 @@
+from datetime import timedelta
 from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.utils import timezone
-from datetime import timedelta
 
 from events.models import Category, Event, Registration
 from payments.models import Payment

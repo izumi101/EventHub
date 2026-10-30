@@ -39,16 +39,16 @@ class Base(APITestCase):
         return user
 
     def make_event(self, **kw):
-        data = dict(
-            title='Conf',
-            description='d',
-            organizer=self.organizer,
-            date=timezone.now() + timedelta(days=5),
-            location='Hall',
-            price=Decimal('100.00'),
-            max_participants=10,
-            status='published',
-        )
+        data = {
+            'title': 'Conf',
+            'description': 'd',
+            'organizer': self.organizer,
+            'date': timezone.now() + timedelta(days=5),
+            'location': 'Hall',
+            'price': Decimal('100.00'),
+            'max_participants': 10,
+            'status': 'published',
+        }
         data.update(kw)
         return Event.objects.create(**data)
 

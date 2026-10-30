@@ -2,22 +2,22 @@
 
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
 
 from common.schema import NOT_FOUND, UNAUTHENTICATED
 
 from .. import schema as api
 from ..models import Event, Favorite, Notification, Review
-from .base import event_queryset_for_user
 from ..serializers import (
     FavoriteSerializer,
     NotificationSerializer,
     ReviewCreateSerializer,
     ReviewSerializer,
 )
+from .base import event_queryset_for_user
 
 
 class FavoritesListView(generics.ListAPIView):

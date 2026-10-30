@@ -1,33 +1,35 @@
 import logging
 import re
 
-from drf_spectacular.utils import extend_schema_field
-from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.utils import timezone
-from .models import (
-    Category,
-    Event,
-    Registration,
-    SeatMap,
-    EventSeat,
-    Favorite,
-    Review,
-    Notification,
-    PromoCode,
-    EventQuestion,
-    QuestionAnswer,
-    WaitlistEntry,
-    TicketType,
-    EventStaff,
-    Webhook,
-    Affiliate,
-    RefundRequest,
-    CheckInList,
-    CheckInLog,
-)
+from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 from payments.models import Payment
+
+from .models import (
+    Affiliate,
+    Category,
+    CheckInList,
+    CheckInLog,
+    Event,
+    EventQuestion,
+    EventSeat,
+    EventStaff,
+    Favorite,
+    Notification,
+    PromoCode,
+    QuestionAnswer,
+    RefundRequest,
+    Registration,
+    Review,
+    SeatMap,
+    TicketType,
+    WaitlistEntry,
+    Webhook,
+)
 from .services import create_event, update_event
 
 CURRENCY_RE = re.compile(r'^[A-Z]{3}$')

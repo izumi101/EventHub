@@ -81,7 +81,7 @@ def attendees_csv_response(event) -> HttpResponse:
     (Name kept for backwards compatibility with the existing view import.)
     """
     from openpyxl import Workbook
-    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
 
     wb = Workbook()

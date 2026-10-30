@@ -12,6 +12,7 @@ from django.db import transaction
 
 from common.choices import RegistrationStatusChoices
 from jobs.handlers import enqueue_email
+
 from .models import Notification
 
 logger = logging.getLogger(__name__)

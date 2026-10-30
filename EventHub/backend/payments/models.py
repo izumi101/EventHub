@@ -1,6 +1,7 @@
 from django.db import models
-from events.models import Registration
+
 from common.choices import PaymentStatusChoices
+from events.models import Registration
 
 
 class Payment(models.Model):

@@ -40,9 +40,12 @@ class PaymentBase(APITestCase):
         )
 
     def pending(self, **kw):
-        data = dict(
-            user=self.buyer, event=self.event, status='pending', seat_held_until=timezone.now() + timedelta(minutes=10)
-        )
+        data = {
+            'user': self.buyer,
+            'event': self.event,
+            'status': 'pending',
+            'seat_held_until': timezone.now() + timedelta(minutes=10),
+        }
         data.update(kw)
         return Registration.objects.create(**data)
 

@@ -5,7 +5,7 @@ computing the final price. Used by both the public "validate" endpoint and the
 checkout flow so the number the attendee sees equals the number they pay.
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db.models import F, Q
 

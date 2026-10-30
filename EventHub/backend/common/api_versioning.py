@@ -7,7 +7,7 @@ move from every response. Paths that third parties call at a fixed address
 are never marked deprecated.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from django.conf import settings
 from django.utils.http import http_date
@@ -24,7 +24,7 @@ STABLE_PATHS = (
 
 
 def _timestamp(iso_date: str) -> int:
-    return int(datetime.fromisoformat(iso_date).replace(tzinfo=timezone.utc).timestamp())
+    return int(datetime.fromisoformat(iso_date).replace(tzinfo=UTC).timestamp())
 
 
 def is_legacy_api_path(path: str) -> bool:

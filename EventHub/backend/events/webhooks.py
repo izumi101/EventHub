@@ -37,7 +37,7 @@ def _public_ips(host: str, port: int) -> list:
     try:
         infos = socket.getaddrinfo(host, port, proto=socket.IPPROTO_TCP)
     except OSError as exc:
-        raise UnsafeWebhookURL(f'Cannot resolve {host}: {exc}')
+        raise UnsafeWebhookURL(f'Cannot resolve {host}: {exc}') from exc
     ips = []
     for info in infos:
         ip = ipaddress.ip_address(info[4][0].split('%', 1)[0])

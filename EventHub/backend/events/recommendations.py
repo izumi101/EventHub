@@ -17,8 +17,10 @@ logger = logging.getLogger(__name__)
 def get_recommendations(user, limit: int = 10):
     """Return a list of Event objects recommended for *user*."""
     from django.utils import timezone
+
+    from common.choices import EventStatusChoices, RegistrationStatusChoices
+
     from .models import Event, Registration
-    from common.choices import RegistrationStatusChoices, EventStatusChoices
 
     published = (
         Event.objects.filter(

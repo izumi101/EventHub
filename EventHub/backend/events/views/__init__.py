@@ -12,16 +12,14 @@
 - ``admin_dashboard`` — platform-wide admin stats
 """
 
+from .admin_dashboard import AdminDashboardView
 from .base import IsOrganizerOrReadOnly
-from .events import (
-    CategoryListCreateView,
-    EventViewSet,
-    MyEventsView,
-    RecommendationsView,
-)
-from .registrations import (
-    MyRegistrationsView,
-    RegistrationViewSet,
+from .checkin import (
+    CheckInListAttendeesView,
+    CheckInListCheckInView,
+    CheckInListDetailView,
+    EventCheckInListsView,
+    EventCheckInLogsView,
 )
 from .engagement import (
     EventReviewsView,
@@ -30,6 +28,12 @@ from .engagement import (
     NotificationMarkAllReadView,
     NotificationMarkReadView,
     NotificationsListView,
+)
+from .events import (
+    CategoryListCreateView,
+    EventViewSet,
+    MyEventsView,
+    RecommendationsView,
 )
 from .organizer import (
     AffiliateClickView,
@@ -49,49 +53,45 @@ from .organizer import (
     TicketTypeDetailView,
     WebhookDetailView,
 )
-from .checkin import (
-    CheckInListAttendeesView,
-    CheckInListCheckInView,
-    CheckInListDetailView,
-    EventCheckInListsView,
-    EventCheckInLogsView,
+from .registrations import (
+    MyRegistrationsView,
+    RegistrationViewSet,
 )
-from .admin_dashboard import AdminDashboardView
 
 __all__ = [
-    'IsOrganizerOrReadOnly',
-    'CategoryListCreateView',
-    'EventViewSet',
-    'MyEventsView',
-    'RecommendationsView',
-    'MyRegistrationsView',
-    'RegistrationViewSet',
-    'EventReviewsView',
-    'FavoritesListView',
-    'FavoriteToggleView',
-    'NotificationMarkAllReadView',
-    'NotificationMarkReadView',
-    'NotificationsListView',
+    'AdminDashboardView',
     'AffiliateClickView',
     'AffiliateDetailView',
+    'CategoryListCreateView',
+    'CheckInListAttendeesView',
+    'CheckInListCheckInView',
+    'CheckInListDetailView',
     'EventAffiliatesView',
+    'EventCheckInListsView',
+    'EventCheckInLogsView',
     'EventPromoCodesView',
     'EventQuestionDetailView',
     'EventQuestionsView',
     'EventRefundRequestsView',
+    'EventReviewsView',
     'EventStaffDetailView',
     'EventStaffView',
     'EventTicketTypesView',
+    'EventViewSet',
     'EventWaitlistView',
     'EventWebhooksView',
+    'FavoriteToggleView',
+    'FavoritesListView',
+    'IsOrganizerOrReadOnly',
+    'MyEventsView',
+    'MyRegistrationsView',
+    'NotificationMarkAllReadView',
+    'NotificationMarkReadView',
+    'NotificationsListView',
     'PromoCodeDetailView',
+    'RecommendationsView',
+    'RegistrationViewSet',
     'ResolveRefundRequestView',
     'TicketTypeDetailView',
     'WebhookDetailView',
-    'CheckInListAttendeesView',
-    'CheckInListCheckInView',
-    'CheckInListDetailView',
-    'EventCheckInListsView',
-    'EventCheckInLogsView',
-    'AdminDashboardView',
 ]

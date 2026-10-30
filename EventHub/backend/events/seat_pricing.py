@@ -6,7 +6,7 @@ Multipliers can be overridden per seat map via `SeatMap.layout['zone_prices']`,
 otherwise the platform defaults apply.
 """
 
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 DEFAULT_ZONE_MULTIPLIERS = {
     'standard': Decimal('1.0'),

@@ -60,12 +60,13 @@ def index_event_job(*, event_id: int) -> None:
     """Job handler. Without sentence-transformers installed (slim image)
     there is nothing to retry: search falls back to keywords."""
     from jobs.queue import PermanentJobError
+
     from .models import Event
 
     try:
         import sentence_transformers  # noqa: F401
     except ImportError:
-        raise PermanentJobError('sentence-transformers is not installed (keyword search only)')
+        raise PermanentJobError('sentence-transformers is not installed (keyword search only)') from None
     event = Event.objects.filter(pk=event_id).select_related('category').first()
     if event is None:
         return
@@ -82,8 +83,9 @@ def semantic_search(query: str, limit: int = 20, extra_qs=None, max_distance: fl
     pagination and OrderingFilter can keep working on it — re-ordering a
     sliced queryset raises TypeError.
     """
-    from .models import Event
     from pgvector.django import CosineDistance
+
+    from .models import Event
 
     qs = extra_qs if extra_qs is not None else Event.objects.filter(status='published', embedding__isnull=False)
 

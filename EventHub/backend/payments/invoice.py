@@ -33,7 +33,8 @@ def _row(label, value, bold=False, muted=False):
     color = f'color:{MUTED};' if muted else f'color:{INK};'
     return (
         f'<tr><td style="padding:9px 0;{color}">{label}</td>'
-        f'<td style="padding:9px 0;text-align:right;font-variant-numeric:tabular-nums;{weight}{color}">{value}</td></tr>'
+        f'<td style="padding:9px 0;text-align:right;font-variant-numeric:tabular-nums;{weight}{color}">'
+        f'{value}</td></tr>'
     )
 
 
@@ -43,7 +44,7 @@ def invoice_html(registration) -> str:
     event = registration.event
     user = registration.user
     payment = getattr(registration, 'payment', None)
-    bd = price_breakdown(registration) if (event and not event.is_free or registration.ticket_type_id) else None
+    bd = price_breakdown(registration) if ((event and not event.is_free) or registration.ticket_type_id) else None
 
     cur = (bd or {}).get('currency', 'USD')
     sym = {'USD': '$', 'EUR': '€', 'GBP': '£', 'KZT': '₸'}.get(cur, '')

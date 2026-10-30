@@ -29,7 +29,7 @@ def clone_event(*, event: Event, actor):
     Copies core fields, the seat map (all seats reset to available) and any
     promo codes (usage counters reset). Registrations/payments are NOT copied.
     """
-    from ..models import SeatMap, EventSeat, PromoCode
+    from ..models import EventSeat, PromoCode, SeatMap
 
     clone = Event.objects.create(
         title=f'{event.title} (Copy)',
@@ -174,6 +174,7 @@ def cancel_event(*, event: Event, actor):
     """
     from common.permissions import can_manage_event
     from payments.services import refund_payment
+
     from ..notify import notify
     from .registration import cancel_registration
 

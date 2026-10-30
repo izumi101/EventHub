@@ -41,9 +41,11 @@ jobs:
           cache: pip
           cache-dependency-path: EventHub/backend/requirements.lock
       - name: Install dependencies
-        run: pip install -r requirements.lock ruff pip-audit
-      - name: Lint (pyflakes rules)
-        run: ruff check --select F,E9 --exclude "*/migrations/*" .
+        run: pip install -r requirements.lock ruff==0.17.1 pip-audit
+      - name: Format and lint (ruff, rules in pyproject.toml)
+        run: |
+          ruff format --check .
+          ruff check .
       - name: Migrations are up to date
         # Not a test run: without DEBUG the settings refuse the dev secret key.
         env:
