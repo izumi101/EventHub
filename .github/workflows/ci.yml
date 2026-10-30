@@ -106,11 +106,26 @@ jobs:
       - name: docker-compose files are valid
         run: |
           docker compose --env-file .env.example config -q
+          docker compose --env-file .env.example --profile flags config -q
           GRAFANA_ADMIN_PASSWORD=ci docker compose -f docker-compose.monitoring.yml config -q
       - name: Build backend image (without the PyTorch layer)
         run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=0 -t eventhub-backend ./backend
       - name: Build frontend image
         run: docker build -t eventhub-frontend ./frontend
+      - name: Unleash starts and serves flags to the backend token
+        # Feature flags are opt-in (compose profile `flags`), so the e2e job
+        # does not start Unleash; this proves the image, its database and the
+        # dev tokens from .env.example still work together.
+        run: |
+          docker compose --env-file .env.example --profile flags up -d --wait --wait-timeout 180 unleash
+          curl -fsS http://localhost:4242/health
+          curl -fsS -H 'Authorization: *:development.dev-only-backend-token' http://localhost:4242/api/client/features > /dev/null
+      - name: Unleash logs
+        if: failure()
+        run: docker compose --env-file .env.example --profile flags logs --tail 100 unleash unleash-db
+      - name: Stop Unleash
+        if: always()
+        run: docker compose --env-file .env.example --profile flags down -v
       - name: nginx config is valid in the image
         run: >-
           docker run --rm --add-host backend:127.0.0.1 eventhub-frontend
