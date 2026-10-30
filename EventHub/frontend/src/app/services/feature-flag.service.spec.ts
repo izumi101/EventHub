@@ -10,7 +10,9 @@ const LOGIN_URL = `${environment.apiUrl}/auth/login/`;
 
 function signIn(id: number): void {
   localStorage.setItem('access_token', 't');
-  localStorage.setItem('user', JSON.stringify({ id, username: `user${id}` }));
+  // AuthService only restores a cached user that has a profile.
+  const user = { id, username: `user${id}`, profile: { role: 'attendee' } };
+  localStorage.setItem('user', JSON.stringify(user));
 }
 
 describe('FeatureFlagService', () => {
@@ -57,7 +59,9 @@ describe('FeatureFlagService', () => {
   it('keeps every flag off when the request fails', () => {
     signIn(1);
     const flags = setUp();
-    http.expectOne(FLAGS_URL).flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
+    http
+      .expectOne(FLAGS_URL)
+      .flush({ detail: 'boom' }, { status: 500, statusText: 'Server Error' });
     expect(flags.isEnabled('payments.freedompay')).toBe(false);
     expect(flags.isEnabled('checkin.offline_scanner')).toBe(false);
     expect(flags.loaded()).toBe(false);
@@ -75,7 +79,9 @@ describe('FeatureFlagService', () => {
     const flags = setUp();
     const auth = TestBed.inject(AuthService);
     const freedomPay = flags.flag('payments.freedompay');
-    http.expectOne(FLAGS_URL).flush({ flags: { 'payments.freedompay': true, 'checkin.offline_scanner': true } });
+    http
+      .expectOne(FLAGS_URL)
+      .flush({ flags: { 'payments.freedompay': true, 'checkin.offline_scanner': true } });
     expect(freedomPay()).toBe(true);
 
     auth.forceLogout();
@@ -88,7 +94,9 @@ describe('FeatureFlagService', () => {
       user: { id: 2, username: 'user2' },
       tokens: { access: 'a2', refresh: 'r2' },
     });
-    http.expectOne(FLAGS_URL).flush({ flags: { 'payments.freedompay': false, 'checkin.offline_scanner': true } });
+    http
+      .expectOne(FLAGS_URL)
+      .flush({ flags: { 'payments.freedompay': false, 'checkin.offline_scanner': true } });
     expect(freedomPay()).toBe(false);
     expect(flags.isEnabled('checkin.offline_scanner')).toBe(true);
   });
@@ -96,10 +104,14 @@ describe('FeatureFlagService', () => {
   it('refresh() re-reads the flags and keeps them when that fails', () => {
     signIn(1);
     const flags = setUp();
-    http.expectOne(FLAGS_URL).flush({ flags: { 'payments.freedompay': true, 'checkin.offline_scanner': false } });
+    http
+      .expectOne(FLAGS_URL)
+      .flush({ flags: { 'payments.freedompay': true, 'checkin.offline_scanner': false } });
 
     flags.refresh();
-    http.expectOne(FLAGS_URL).flush({ flags: { 'payments.freedompay': true, 'checkin.offline_scanner': true } });
+    http
+      .expectOne(FLAGS_URL)
+      .flush({ flags: { 'payments.freedompay': true, 'checkin.offline_scanner': true } });
     expect(flags.isEnabled('checkin.offline_scanner')).toBe(true);
 
     flags.refresh();

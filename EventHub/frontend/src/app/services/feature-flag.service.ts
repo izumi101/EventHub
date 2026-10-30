@@ -37,12 +37,12 @@ export class FeatureFlagService {
   constructor() {
     this.auth.currentUser$
       .pipe(
-        map(user => user?.id ?? null),
+        map((user) => user?.id ?? null),
         distinctUntilChanged(),
-        switchMap(userId => (userId === null ? of(null) : this.fetch())),
+        switchMap((userId) => (userId === null ? of(null) : this.fetch())),
         takeUntilDestroyed(),
       )
-      .subscribe(flags => {
+      .subscribe((flags) => {
         this.state.set(flags ?? {});
         this.loadedState.set(flags !== null);
       });
@@ -62,7 +62,7 @@ export class FeatureFlagService {
   /** Re-read the flags (e.g. after a role change). Failures keep the current values. */
   refresh(): void {
     if (!this.auth.currentUser) return;
-    this.fetch().subscribe(flags => {
+    this.fetch().subscribe((flags) => {
       if (flags !== null) {
         this.state.set(flags);
         this.loadedState.set(true);
@@ -72,7 +72,9 @@ export class FeatureFlagService {
 
   private fetch(): Observable<Partial<FeatureFlags> | null> {
     return this.http.get<FeatureFlagsResponse>(this.url).pipe(
-      map(res => res.flags ?? {}),
+      // Spread rather than `res.flags ?? {}`: the schema says `flags` is
+      // always present, but a malformed answer must still not break lookups.
+      map((res) => ({ ...res.flags })),
       catchError(() => of(null)),
     );
   }
