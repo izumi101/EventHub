@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, finalize, shareReplay, tap } from 'rxjs';
 import {
@@ -11,9 +11,23 @@ import {
   User,
 } from '../models/models';
 import { environment } from '../../environments/environment';
+import type { components } from '../api/openapi';
+
+/** PUT /auth/profile/: the editable name fields and profile details. */
+export type ProfileUpdate = components['schemas']['PatchedUserRequest'];
+
+function isCachedUser(value: unknown): value is User {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+  const { profile } = value as { profile?: unknown };
+  return typeof profile === 'object' && profile !== null;
+}
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private http = inject(HttpClient);
+
   private apiUrl = `${environment.apiUrl}/auth`;
   private readonly accessTokenKey = 'access_token';
   private readonly refreshTokenKey = 'refresh_token';
@@ -21,15 +35,32 @@ export class AuthService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor() {
     this.loadUser();
   }
 
+  /**
+   * Restores the signed-in user cached by a previous visit. The cache may be
+   * stale (saved by an older build whose user had a different shape) or
+   * corrupted, and the rest of the app relies on `profile` being present, so
+   * anything that does not look like a user is dropped; the next profile fetch
+   * or sign-in repopulates it.
+   */
   private loadUser(): void {
     const userData = localStorage.getItem(this.userKey);
-    if (userData) {
-      this.currentUserSubject.next(JSON.parse(userData));
+    if (!userData) {
+      return;
     }
+    try {
+      const user: unknown = JSON.parse(userData);
+      if (isCachedUser(user)) {
+        this.currentUserSubject.next(user);
+        return;
+      }
+    } catch {
+      // Corrupted JSON: handled the same way as an unusable shape.
+    }
+    localStorage.removeItem(this.userKey);
   }
 
   get currentUser(): User | null {
@@ -50,32 +81,44 @@ export class AuthService {
     password: string,
     password2: string,
     verification_code: string,
-    first_name: string = '',
-    last_name: string = '',
-    phone: string = ''
+    first_name = '',
+    last_name = '',
+    phone = '',
   ): Observable<AuthResponse> {
     // Always registers an attendee — organizer accounts are created by admins.
-    return this.http.post<AuthResponse>(`${this.apiUrl}/register/`, {
-      username, email, password, password2, verification_code, first_name, last_name, phone
-    }).pipe(
-      tap(res => this.handleAuth(res))
-    );
+    return this.http
+      .post<AuthResponse>(`${this.apiUrl}/register/`, {
+        username,
+        email,
+        password,
+        password2,
+        verification_code,
+        first_name,
+        last_name,
+        phone,
+      })
+      .pipe(tap((res) => this.handleAuth(res)));
   }
 
   /** Admin-only: provision a new organizer account. */
   adminCreateOrganizer(payload: {
-    username: string; email: string; password: string;
-    first_name?: string; last_name?: string; phone?: string;
+    username: string;
+    email: string;
+    password: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
   }): Observable<User> {
     return this.http.post<User>(`${this.apiUrl}/admin/organizers/`, payload);
   }
 
   login(username: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login/`, {
-      username, password
-    }).pipe(
-      tap(res => this.handleAuth(res))
-    );
+    return this.http
+      .post<AuthResponse>(`${this.apiUrl}/login/`, {
+        username,
+        password,
+      })
+      .pipe(tap((res) => this.handleAuth(res)));
   }
 
   logout(): void {
@@ -94,49 +137,58 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/profile/`).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
-  updateProfile(data: Partial<User>): Observable<User> {
+  updateProfile(data: ProfileUpdate): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/profile/`, data).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
-  changePassword(oldPassword: string, newPassword: string, newPassword2: string): Observable<ChangePasswordResponse> {
-    return this.http.post<ChangePasswordResponse>(
-      `${this.apiUrl}/change-password/`,
-      { old_password: oldPassword, new_password: newPassword, new_password2: newPassword2 },
-    ).pipe(
-      // The backend signs out every other session; keep this one with the new pair.
-      tap(res => { if (res.tokens) this.storeTokens(res.tokens.access, res.tokens.refresh); })
-    );
+  changePassword(
+    oldPassword: string,
+    newPassword: string,
+    newPassword2: string,
+  ): Observable<ChangePasswordResponse> {
+    return this.http
+      .post<ChangePasswordResponse>(`${this.apiUrl}/change-password/`, {
+        old_password: oldPassword,
+        new_password: newPassword,
+        new_password2: newPassword2,
+      })
+      .pipe(
+        // The backend signs out every other session; keep this one with the new pair.
+        tap((res) => {
+          this.storeTokens(res.tokens.access, res.tokens.refresh);
+        }),
+      );
   }
 
   uploadAvatar(file: File): Observable<User> {
     const fd = new FormData();
     fd.append('avatar', file);
     return this.http.post<User>(`${this.apiUrl}/profile/avatar/`, fd).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
   deleteAvatar(): Observable<User> {
     return this.http.delete<User>(`${this.apiUrl}/profile/avatar/`).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
@@ -150,12 +202,16 @@ export class AuthService {
   refreshToken(): Observable<RefreshTokenResponse> {
     if (!this.refreshInFlight$) {
       const refresh = localStorage.getItem(this.refreshTokenKey);
-      this.refreshInFlight$ = this.http.post<RefreshTokenResponse>(`${this.apiUrl}/token/refresh/`, { refresh }).pipe(
-        // The old refresh token is blacklisted after rotation — store the new one.
-        tap(res => this.storeTokens(res.access, res.refresh)),
-        finalize(() => { this.refreshInFlight$ = null; }),
-        shareReplay({ bufferSize: 1, refCount: false }),
-      );
+      this.refreshInFlight$ = this.http
+        .post<RefreshTokenResponse>(`${this.apiUrl}/token/refresh/`, { refresh })
+        .pipe(
+          // The old refresh token is blacklisted after rotation — store the new one.
+          tap((res) => this.storeTokens(res.access, res.refresh)),
+          finalize(() => {
+            this.refreshInFlight$ = null;
+          }),
+          shareReplay({ bufferSize: 1, refCount: false }),
+        );
     }
     return this.refreshInFlight$;
   }
@@ -174,24 +230,38 @@ export class AuthService {
   // ---- Registration Add-ons ---- //
 
   sendRegistrationCode(email: string): Observable<RegistrationCodeResponse> {
-    return this.http.post<RegistrationCodeResponse>(`${this.apiUrl}/register/send-code/`, { email });
+    return this.http.post<RegistrationCodeResponse>(`${this.apiUrl}/register/send-code/`, {
+      email,
+    });
   }
 
   verifyRegistrationCode(email: string, code: string): Observable<ApiMessageResponse> {
-    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/register/verify-code/`, { email, code });
+    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/register/verify-code/`, {
+      email,
+      code,
+    });
   }
 
   // ---- Password Reset Flow ---- //
 
   requestPasswordReset(identifier: string): Observable<ApiMessageResponse> {
-    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/password-reset/request/`, { identifier });
+    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/password-reset/request/`, {
+      identifier,
+    });
   }
 
   verifyResetCode(identifier: string, code: string): Observable<PasswordResetTokenResponse> {
-    return this.http.post<PasswordResetTokenResponse>(`${this.apiUrl}/password-reset/verify/`, { identifier, code });
+    return this.http.post<PasswordResetTokenResponse>(`${this.apiUrl}/password-reset/verify/`, {
+      identifier,
+      code,
+    });
   }
 
-  confirmPasswordReset(resetToken: string, newPassword: string, newPassword2: string): Observable<ApiMessageResponse> {
+  confirmPasswordReset(
+    resetToken: string,
+    newPassword: string,
+    newPassword2: string,
+  ): Observable<ApiMessageResponse> {
     return this.http.post<ApiMessageResponse>(`${this.apiUrl}/password-reset/confirm/`, {
       reset_token: resetToken,
       new_password: newPassword,

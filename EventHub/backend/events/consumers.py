@@ -41,15 +41,20 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
         # A client that authenticated via the JWT subprotocol must get it
         # echoed back, or the browser drops the connection.
         from .ws_auth import JWT_SUBPROTOCOL
+
         offered = self.scope.get('subprotocols') or []
         await self.accept(subprotocol=JWT_SUBPROTOCOL if JWT_SUBPROTOCOL in offered else None)
 
         # Send full seat snapshot so the client doesn't need a separate HTTP call
         snapshot = await self._get_seat_snapshot()
-        await self.send(text_data=json.dumps({
-            'type': 'snapshot',
-            'seats': snapshot,
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    'type': 'snapshot',
+                    'seats': snapshot,
+                }
+            )
+        )
         logger.debug('WS connect: event=%s group=%s', self.event_id, self.group_name)
 
     async def disconnect(self, close_code):
@@ -67,23 +72,28 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
         Handler for group_send type='seat.update'.
         Broadcasts a single seat state change to this client.
         """
-        await self.send(text_data=json.dumps({
-            'type': 'seat_update',
-            'seat_id': event['seat_id'],
-            'is_available': event['is_available'],
-            'price_zone': event.get('price_zone', 'standard'),
-        }))
+        await self.send(
+            text_data=json.dumps(
+                {
+                    'type': 'seat_update',
+                    'seat_id': event['seat_id'],
+                    'is_available': event['is_available'],
+                    'price_zone': event.get('price_zone', 'standard'),
+                }
+            )
+        )
 
     # ── DB helpers (run in threadpool)
     @database_sync_to_async
     def _can_view(self):
         from common.choices import EventStatusChoices
+
         from .models import Event
+
         event = Event.objects.filter(pk=self.event_id).only('status', 'organizer_id').first()
         if event is None:
             return False
-        if event.status in (EventStatusChoices.PUBLISHED, EventStatusChoices.COMPLETED,
-                            EventStatusChoices.CANCELLED):
+        if event.status in (EventStatusChoices.PUBLISHED, EventStatusChoices.COMPLETED, EventStatusChoices.CANCELLED):
             return True
         user = self.scope.get('user')
         return bool(user and user.is_authenticated and (user.is_superuser or event.organizer_id == user.id))
@@ -91,6 +101,7 @@ class SeatMapConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _get_seat_snapshot(self):
         from .models import SeatMap
+
         try:
             seat_map = SeatMap.objects.get(event_id=self.event_id)
             return [

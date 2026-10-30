@@ -1,20 +1,121 @@
 import logging
 import re
 
-from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
+from rest_framework import serializers
+
+from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
+from payments.models import Payment
+
 from .models import (
-    Category, Event, Registration, SeatMap, EventSeat, Favorite, Review,
-    Notification, PromoCode, EventQuestion, QuestionAnswer, WaitlistEntry,
-    TicketType, EventStaff, Webhook, Affiliate, RefundRequest,
-    CheckInList, CheckInLog,
+    Affiliate,
+    Category,
+    CheckInList,
+    CheckInLog,
+    Event,
+    EventQuestion,
+    EventSeat,
+    EventStaff,
+    Favorite,
+    Notification,
+    PromoCode,
+    QuestionAnswer,
+    RefundRequest,
+    Registration,
+    Review,
+    SeatMap,
+    TicketType,
+    WaitlistEntry,
+    Webhook,
 )
-from common.choices import EventStatusChoices, RegistrationStatusChoices
 from .services import create_event, update_event
 
 CURRENCY_RE = re.compile(r'^[A-Z]{3}$')
 logger = logging.getLogger(__name__)
+
+
+def documented_json(schema_field, **kwargs):
+    """A JSONField whose content the OpenAPI schema describes precisely
+    (`schema_field`) instead of as untyped JSON. Validation is unchanged."""
+
+    @extend_schema_field(schema_field)
+    class DocumentedJSONField(serializers.JSONField):
+        pass
+
+    return DocumentedJSONField(**kwargs)
+
+
+class SeatMapLayoutSerializer(serializers.Serializer):
+    price_zones = serializers.DictField(
+        child=serializers.ListField(child=serializers.IntegerField()),
+        required=False,
+        help_text='Price zone → row numbers.',
+    )
+
+
+# ---- Shapes of computed fields (documented in the OpenAPI schema) ---- #
+class SeatRefSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    row = serializers.IntegerField()
+    col = serializers.IntegerField()
+    zone = serializers.ChoiceField(choices=EventSeat.PRICE_ZONE_CHOICES)
+
+
+class RegistrationPaymentSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    status = serializers.ChoiceField(choices=PaymentStatusChoices.choices)
+    method = serializers.ChoiceField(choices=Payment.METHOD_CHOICES)
+    refunded_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    net_amount = serializers.DecimalField(max_digits=12, decimal_places=2)
+    is_refundable = serializers.BooleanField()
+
+
+class PromoRefSerializer(serializers.Serializer):
+    code = serializers.CharField()
+
+
+class TicketTypeRefSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    name = serializers.CharField()
+    kind = serializers.ChoiceField(choices=TicketType.KIND_CHOICES)
+
+
+class AnswerSummarySerializer(serializers.Serializer):
+    label = serializers.CharField()
+    answer = serializers.CharField()
+    type = serializers.ChoiceField(choices=EventQuestion.TYPE_CHOICES)
+
+
+class PriceBreakdownSerializer(serializers.Serializer):
+    subtotal = serializers.DecimalField(max_digits=12, decimal_places=2)
+    tax_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    tax = serializers.DecimalField(max_digits=12, decimal_places=2)
+    fee_percent = serializers.DecimalField(max_digits=5, decimal_places=2)
+    fee = serializers.DecimalField(max_digits=12, decimal_places=2)
+    fees_passed_to_buyer = serializers.BooleanField()
+    total = serializers.DecimalField(max_digits=12, decimal_places=2)
+    currency = serializers.CharField(min_length=3, max_length=3)
+
+
+class RefundRequestSummarySerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=RefundRequest.STATUS_CHOICES)
+    reason = serializers.CharField()
+    organizer_note = serializers.CharField()
+    created_at = serializers.DateTimeField()
+
+
+class ZonePriceSerializer(serializers.Serializer):
+    zone = serializers.ChoiceField(choices=EventSeat.PRICE_ZONE_CHOICES)
+    multiplier = serializers.FloatField()
+    price = serializers.DecimalField(max_digits=12, decimal_places=2)
+
+
+class CheckInAttendeeSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    full_name = serializers.CharField()
 
 
 # ---- ModelSerializer ---- #
@@ -25,7 +126,7 @@ class CategorySerializer(serializers.ModelSerializer):
         model = Category
         fields = ['id', 'name', 'description', 'icon', 'event_count']
 
-    def get_event_count(self, obj):
+    def get_event_count(self, obj) -> int:
         cached = getattr(obj, '_event_count', None)  # annotated by the list view
         if cached is not None:
             return cached
@@ -34,6 +135,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class CategoryMiniSerializer(serializers.ModelSerializer):
     """Nested in every event card — no per-event count query."""
+
     class Meta:
         model = Category
         fields = ['id', 'name', 'description', 'icon']
@@ -46,15 +148,31 @@ class EventCreateSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(),
         write_only=True,
     )
-    
+
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'description', 'category_id', 'date',
-            'end_date', 'location', 'address', 'image', 'price',
-            'max_participants', 'status', 'is_online', 'online_link',
-            'tax_percent', 'service_fee_percent', 'fees_passed_to_buyer', 'currency',
-            'refundable', 'seo_title', 'seo_description',
+            'id',
+            'title',
+            'description',
+            'category_id',
+            'date',
+            'end_date',
+            'location',
+            'address',
+            'image',
+            'price',
+            'max_participants',
+            'status',
+            'is_online',
+            'online_link',
+            'tax_percent',
+            'service_fee_percent',
+            'fees_passed_to_buyer',
+            'currency',
+            'refundable',
+            'seo_title',
+            'seo_description',
         ]
         read_only_fields = ['id', 'status']
         extra_kwargs = {
@@ -143,10 +261,23 @@ class TicketTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TicketType
         fields = [
-            'id', 'name', 'description', 'kind', 'price', 'quantity',
-            'min_per_order', 'max_per_order', 'sale_start', 'sale_end',
-            'is_active', 'order', 'sold', 'available', 'is_sold_out',
-            'on_sale', 'sale_state',
+            'id',
+            'name',
+            'description',
+            'kind',
+            'price',
+            'quantity',
+            'min_per_order',
+            'max_per_order',
+            'sale_start',
+            'sale_end',
+            'is_active',
+            'order',
+            'sold',
+            'available',
+            'is_sold_out',
+            'on_sale',
+            'sale_state',
         ]
         read_only_fields = ['id', 'sold', 'available', 'is_sold_out', 'on_sale', 'sale_state']
 
@@ -178,29 +309,50 @@ class EventListSerializer(serializers.ModelSerializer):
     available_spots = serializers.ReadOnlyField()
     is_free = serializers.ReadOnlyField()
     has_ticket_types = serializers.ReadOnlyField()
-    price_from = serializers.ReadOnlyField()
+    price_from = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
     ticket_types = TicketTypeSerializer(many=True, read_only=True)
     registered_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'description', 'organizer', 'category',
-            'date', 'end_date', 'location', 'address', 'image',
-            'price', 'max_participants', 'status', 'is_online',
-            'online_link', 'available_spots', 'is_free',
-            'has_ticket_types', 'price_from', 'ticket_types',
-            'tax_percent', 'service_fee_percent', 'fees_passed_to_buyer', 'currency',
-            'refundable', 'registered_count', 'created_at',
-            'seo_title', 'seo_description',
+            'id',
+            'title',
+            'description',
+            'organizer',
+            'category',
+            'date',
+            'end_date',
+            'location',
+            'address',
+            'image',
+            'price',
+            'max_participants',
+            'status',
+            'is_online',
+            'online_link',
+            'available_spots',
+            'is_free',
+            'has_ticket_types',
+            'price_from',
+            'ticket_types',
+            'tax_percent',
+            'service_fee_percent',
+            'fees_passed_to_buyer',
+            'currency',
+            'refundable',
+            'registered_count',
+            'created_at',
+            'seo_title',
+            'seo_description',
         ]
 
-    def get_registered_count(self, obj):
+    def get_registered_count(self, obj) -> int:
         # Derived from available_spots (registrations + group-booking seats),
         # so the "X left / Y registered" capacity bar never contradicts itself.
         return max(obj.max_participants - obj.available_spots, 0)
 
-    def get_online_link(self, obj):
+    def get_online_link(self, obj) -> str:
         # The join link is what an online ticket buys — only the event team
         # and people holding a confirmed ticket get it.
         if not obj.online_link:
@@ -212,9 +364,14 @@ class EventListSerializer(serializers.ModelSerializer):
         if user.is_superuser or obj.organizer_id == user.id:
             return obj.online_link
         from common.permissions import can_manage_event
-        if can_manage_event(obj, user) or obj.registrations.filter(
-            user=user, status=RegistrationStatusChoices.CONFIRMED,
-        ).exists():
+
+        if (
+            can_manage_event(obj, user)
+            or obj.registrations.filter(
+                user=user,
+                status=RegistrationStatusChoices.CONFIRMED,
+            ).exists()
+        ):
             return obj.online_link
         return ''
 
@@ -232,27 +389,38 @@ class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Registration
         fields = [
-            'id', 'event', 'username', 'email', 'full_name', 'status', 'registered_at',
-            'notes', 'ticket_uuid', 'is_checked_in', 'checked_in_at', 'seat',
-            'payment', 'promo', 'ticket_type', 'answers', 'breakdown', 'refund_request',
+            'id',
+            'event',
+            'username',
+            'email',
+            'full_name',
+            'status',
+            'registered_at',
+            'notes',
+            'ticket_uuid',
+            'is_checked_in',
+            'checked_in_at',
+            'seat',
+            'payment',
+            'promo',
+            'ticket_type',
+            'answers',
+            'breakdown',
+            'refund_request',
         ]
         read_only_fields = ['id', 'registered_at', 'status', 'ticket_uuid', 'is_checked_in', 'checked_in_at']
 
-    def get_fields(self):
-        fields = super().get_fields()
-        if self.context.get('omit_event'):
-            fields.pop('event', None)
-        return fields
-
-    def get_full_name(self, obj):
+    def get_full_name(self, obj) -> str:
         name = f'{obj.user.first_name} {obj.user.last_name}'.strip()
         return name or obj.user.username
 
+    @extend_schema_field(SeatRefSerializer(allow_null=True))
     def get_seat(self, obj):
         if obj.seat:
             return {'id': obj.seat.id, 'row': obj.seat.row, 'col': obj.seat.col, 'zone': obj.seat.price_zone}
         return None
 
+    @extend_schema_field(RegistrationPaymentSerializer(allow_null=True))
     def get_payment(self, obj):
         pay = getattr(obj, 'payment', None)
         if not pay:
@@ -266,6 +434,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'is_refundable': pay.is_refundable,
         }
 
+    @extend_schema_field(PromoRefSerializer(allow_null=True))
     def get_promo(self, obj):
         if obj.promo_code_id and obj.promo_code:
             return {'code': obj.promo_code.code}
@@ -273,6 +442,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
     ticket_type = serializers.SerializerMethodField()
 
+    @extend_schema_field(TicketTypeRefSerializer(allow_null=True))
     def get_ticket_type(self, obj):
         if obj.ticket_type_id and obj.ticket_type:
             return {'id': obj.ticket_type.id, 'name': obj.ticket_type.name, 'kind': obj.ticket_type.kind}
@@ -280,20 +450,20 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
     answers = serializers.SerializerMethodField()
 
+    @extend_schema_field(AnswerSummarySerializer(many=True))
     def get_answers(self, obj):
         rows = obj.answers.all()  # prefetch_related('answers__question') upstream
-        return [
-            {'label': a.question.label, 'answer': a.answer, 'type': a.question.question_type}
-            for a in rows
-        ]
+        return [{'label': a.question.label, 'answer': a.answer, 'type': a.question.question_type} for a in rows]
 
     breakdown = serializers.SerializerMethodField()
 
+    @extend_schema_field(PriceBreakdownSerializer(allow_null=True))
     def get_breakdown(self, obj):
         if obj.event.is_free and not obj.ticket_type_id:
             return None
         try:
             from .billing import price_breakdown
+
             return price_breakdown(obj)
         except Exception:
             # Don't break the ticket list over one bad row, but a pricing
@@ -303,6 +473,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
 
     refund_request = serializers.SerializerMethodField()
 
+    @extend_schema_field(RefundRequestSummarySerializer(allow_null=True))
     def get_refund_request(self, obj):
         rr = getattr(obj, 'refund_request', None)
         if not rr:
@@ -315,6 +486,14 @@ class RegistrationSerializer(serializers.ModelSerializer):
         }
 
 
+class AttendeeRegistrationSerializer(RegistrationSerializer):
+    """A registration in the organizer's attendee list: the event is the one
+    being viewed, so it isn't repeated in every row."""
+
+    class Meta(RegistrationSerializer.Meta):
+        fields = [name for name in RegistrationSerializer.Meta.fields if name != 'event']
+
+
 # ---- Seat Serializers ---- #
 class EventSeatSerializer(serializers.ModelSerializer):
     price = serializers.SerializerMethodField()
@@ -323,11 +502,13 @@ class EventSeatSerializer(serializers.ModelSerializer):
         model = EventSeat
         fields = ['id', 'row', 'col', 'price_zone', 'is_available', 'price']
 
+    @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2, allow_null=True))
     def get_price(self, obj):
         event = self.context.get('event')
         if event is None:
             return None
         from .seat_pricing import seat_price
+
         try:
             return str(seat_price(event, obj))
         except Exception:
@@ -335,6 +516,7 @@ class EventSeatSerializer(serializers.ModelSerializer):
 
 
 class SeatMapSerializer(serializers.ModelSerializer):
+    layout = documented_json(SeatMapLayoutSerializer(), required=False)
     seats = serializers.SerializerMethodField()
     zone_prices = serializers.SerializerMethodField()
 
@@ -342,12 +524,15 @@ class SeatMapSerializer(serializers.ModelSerializer):
         model = SeatMap
         fields = ['id', 'rows', 'cols', 'layout', 'seats', 'zone_prices']
 
+    @extend_schema_field(EventSeatSerializer(many=True))
     def get_seats(self, obj):
         seats_qs = obj.seats.all()
         return EventSeatSerializer(seats_qs, many=True, context={'event': obj.event}).data
 
+    @extend_schema_field(ZonePriceSerializer(many=True))
     def get_zone_prices(self, obj):
         from .seat_pricing import zone_price_table
+
         return zone_price_table(obj.event)
 
 
@@ -371,7 +556,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         fields = ['id', 'username', 'avatar', 'rating', 'comment', 'created_at']
         read_only_fields = ['id', 'username', 'avatar', 'created_at']
 
-    def get_avatar(self, obj):
+    def get_avatar(self, obj) -> str | None:
         try:
             avatar = obj.user.profile.avatar
             return avatar.url if avatar else None
@@ -400,7 +585,8 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('You can review an event after it has taken place.')
 
         attended = Registration.objects.filter(
-            event_id=event_id, user=request.user,
+            event_id=event_id,
+            user=request.user,
             status=RegistrationStatusChoices.CONFIRMED,
         ).exists()
         if not attended:
@@ -427,19 +613,30 @@ class RefundRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RefundRequest
-        fields = ['id', 'username', 'full_name', 'amount', 'ticket_type',
-                  'status', 'reason', 'organizer_note', 'created_at', 'resolved_at']
+        fields = [
+            'id',
+            'username',
+            'full_name',
+            'amount',
+            'ticket_type',
+            'status',
+            'reason',
+            'organizer_note',
+            'created_at',
+            'resolved_at',
+        ]
         read_only_fields = fields
 
-    def get_full_name(self, obj):
+    def get_full_name(self, obj) -> str:
         u = obj.registration.user
         return f'{u.first_name} {u.last_name}'.strip() or u.username
 
+    @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2))
     def get_amount(self, obj):
         pay = getattr(obj.registration, 'payment', None)
         return str(pay.net_amount) if pay else '0.00'
 
-    def get_ticket_type(self, obj):
+    def get_ticket_type(self, obj) -> str | None:
         tt = obj.registration.ticket_type
         return tt.name if tt else None
 
@@ -474,42 +671,58 @@ class EventStaffSerializer(serializers.ModelSerializer):
         event = self.context['event']
         user = validated_data.pop('_invited_user')
         staff, _ = EventStaff.objects.update_or_create(
-            event=event, user=user, defaults={'role': validated_data.get('role', EventStaff.ROLE_CHECK_IN)},
+            event=event,
+            user=user,
+            defaults={'role': validated_data.get('role', EventStaff.ROLE_CHECK_IN)},
         )
         return staff
 
 
 # ---- Webhooks ---- #
 class WebhookSerializer(serializers.ModelSerializer):
+    triggers = documented_json(
+        serializers.ListField(child=serializers.ChoiceField(choices=Webhook.TRIGGER_CHOICES)),
+        required=False,
+    )
     deliveries_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Webhook
-        fields = ['id', 'url', 'secret', 'triggers', 'is_active', 'created_at',
-                  'last_triggered_at', 'last_status', 'deliveries_count']
+        fields = [
+            'id',
+            'url',
+            'secret',
+            'triggers',
+            'is_active',
+            'created_at',
+            'last_triggered_at',
+            'last_status',
+            'deliveries_count',
+        ]
         read_only_fields = ['id', 'created_at', 'last_triggered_at', 'last_status', 'deliveries_count']
 
-    def get_deliveries_count(self, obj):
+    def get_deliveries_count(self, obj) -> int:
         return obj.deliveries.count()
 
     def validate_url(self, value):
         from .webhooks import is_public_url
+
         if not is_public_url(value):
-            raise serializers.ValidationError(
-                'Webhook URLs must be http(s) and resolve to a public internet address.'
-            )
+            raise serializers.ValidationError('Webhook URLs must be http(s) and resolve to a public internet address.')
         return value
 
     def validate_secret(self, value):
         # Every delivery is signed: generate a secret when none is given.
         if not (value or '').strip():
             import secrets
+
             return secrets.token_hex(32)
         return value.strip()
 
     def create(self, validated_data):
         if not validated_data.get('secret'):
             import secrets
+
             validated_data['secret'] = secrets.token_hex(32)
         return super().create(validated_data)
 
@@ -547,8 +760,10 @@ class AffiliateSerializer(serializers.ModelSerializer):
     def validate_code(self, value):
         return _validate_unique_code(self, Affiliate, value, 'referral link')
 
+    @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2))
     def get_revenue(self, obj):
         from decimal import Decimal
+
         total = Decimal('0')
         for r in obj.registrations.select_related('payment').all():
             pay = getattr(r, 'payment', None)
@@ -566,9 +781,18 @@ class PromoCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PromoCode
         fields = [
-            'id', 'code', 'discount_type', 'discount_value', 'max_uses',
-            'times_used', 'expires_at', 'is_active', 'created_at',
-            'is_valid', 'is_expired', 'is_exhausted',
+            'id',
+            'code',
+            'discount_type',
+            'discount_value',
+            'max_uses',
+            'times_used',
+            'expires_at',
+            'is_active',
+            'created_at',
+            'is_valid',
+            'is_expired',
+            'is_exhausted',
         ]
         read_only_fields = ['id', 'times_used', 'created_at']
 
@@ -590,6 +814,12 @@ class PromoCodeSerializer(serializers.ModelSerializer):
 
 # ---- Custom checkout questions ---- #
 class EventQuestionSerializer(serializers.ModelSerializer):
+    options = documented_json(
+        serializers.ListField(child=serializers.CharField()),
+        required=False,
+        help_text='Choices for dropdown questions.',
+    )
+
     class Meta:
         model = EventQuestion
         fields = ['id', 'label', 'question_type', 'options', 'is_required', 'order']
@@ -613,6 +843,7 @@ class CheckInLogSerializer(serializers.ModelSerializer):
         fields = ['id', 'action', 'attendee', 'scanned_by_username', 'note', 'created_at']
         read_only_fields = fields
 
+    @extend_schema_field(CheckInAttendeeSerializer)
     def get_attendee(self, obj):
         u = obj.registration.user
         return {
@@ -628,18 +859,19 @@ class CheckInListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CheckInList
-        fields = ['id', 'name', 'description', 'color', 'is_default',
-                  'log_count', 'checked_in_count', 'created_at']
+        fields = ['id', 'name', 'description', 'color', 'is_default', 'log_count', 'checked_in_count', 'created_at']
         read_only_fields = ['id', 'log_count', 'checked_in_count', 'created_at']
 
-    def get_log_count(self, obj):
+    def get_log_count(self, obj) -> int:
         return obj.logs.filter(action=CheckInLog.ACTION_CHECK_IN).count()
 
-    def get_checked_in_count(self, obj):
+    def get_checked_in_count(self, obj) -> int:
         # Currently-checked-in = registrations whose most-recent action in this
         # list is a check-in (an 'undo' afterwards cancels it).
         latest = {}
-        for reg_id, action in obj.logs.order_by('registration_id', '-created_at').values_list('registration_id', 'action'):
+        for reg_id, action in obj.logs.order_by('registration_id', '-created_at').values_list(
+            'registration_id', 'action'
+        ):
             if reg_id not in latest:
                 latest[reg_id] = action
         return sum(1 for a in latest.values() if a == CheckInLog.ACTION_CHECK_IN)
@@ -662,13 +894,17 @@ class WaitlistEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WaitlistEntry
-        fields = ['id', 'username', 'event', 'event_title', 'status', 'position',
-                  'offer_expires_at', 'created_at']
+        fields = ['id', 'username', 'event', 'event_title', 'status', 'position', 'offer_expires_at', 'created_at']
         read_only_fields = fields
 
-    def get_position(self, obj):
+    def get_position(self, obj) -> int:
         if obj.status != WaitlistEntry.STATUS_WAITING:
             return 0
-        return WaitlistEntry.objects.filter(
-            event=obj.event, status=WaitlistEntry.STATUS_WAITING, created_at__lt=obj.created_at,
-        ).count() + 1
+        return (
+            WaitlistEntry.objects.filter(
+                event=obj.event,
+                status=WaitlistEntry.STATUS_WAITING,
+                created_at__lt=obj.created_at,
+            ).count()
+            + 1
+        )

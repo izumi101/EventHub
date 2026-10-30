@@ -1,6 +1,6 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, type Signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, isActive as isUrlActive } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { ModalService } from '../services/modal.service';
@@ -9,9 +9,14 @@ import { NAV, NavSection, NavItem, Role, LucideIcon } from './nav.config';
 import { User } from '../models/models';
 import {
   LucideAngularModule,
-  PanelLeftClose, PanelLeftOpen,
-  Sun, Moon, LogOut, User as UserIcon,
-  ChevronDown, ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Sun,
+  Moon,
+  LogOut,
+  User as UserIcon,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-angular';
 
 @Component({
@@ -30,10 +35,16 @@ import {
         @if (!layout.collapsed()) {
           <a routerLink="/" class="sidebar-logo focus-ring rounded" (click)="layout.closeMobile()">
             <span class="ember-mark" aria-hidden="true"></span>
-            <span class="font-display font-semibold text-foreground text-base tracking-tight">EventHub</span>
+            <span class="font-display font-semibold text-foreground text-base tracking-tight"
+              >EventHub</span
+            >
           </a>
         } @else {
-          <a routerLink="/" class="flex justify-center w-full focus-ring rounded" (click)="layout.closeMobile()">
+          <a
+            routerLink="/"
+            class="flex justify-center w-full focus-ring rounded"
+            (click)="layout.closeMobile()"
+          >
             <span class="ember-mark" aria-hidden="true"></span>
           </a>
         }
@@ -48,7 +59,7 @@ import {
             [img]="layout.collapsed() ? icons.PanelLeftOpen : icons.PanelLeftClose"
             class="w-4 h-4"
             aria-hidden="true"
-          ></lucide-icon>
+          />
         </button>
       </div>
 
@@ -63,12 +74,16 @@ import {
                 (click)="layout.toggleGroup(section.id)"
                 [attr.aria-expanded]="layout.isGroupOpen(section.id)"
               >
-                <span>{{ section.id === 'event-context' ? (layout.eventContext()?.title || 'Event') : section.title }}</span>
+                <span>{{
+                  section.id === 'event-context'
+                    ? layout.eventContext()?.title || 'Event'
+                    : section.title
+                }}</span>
                 <lucide-icon
                   [img]="layout.isGroupOpen(section.id) ? icons.ChevronDown : icons.ChevronRight"
                   class="w-3.5 h-3.5 flex-shrink-0"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
               </button>
             } @else {
               <div class="sidebar-section-label">
@@ -93,7 +108,11 @@ import {
                 (click)="layout.closeMobile()"
                 [attr.aria-current]="isActive(item) ? 'page' : null"
               >
-                <lucide-icon [img]="asIcon(item.icon)" class="sidebar-item-icon" aria-hidden="true"></lucide-icon>
+                <lucide-icon
+                  [img]="asIcon(item.icon)"
+                  class="sidebar-item-icon"
+                  aria-hidden="true"
+                />
                 @if (!layout.collapsed()) {
                   <span class="sidebar-item-label">{{ item.label }}</span>
                 }
@@ -117,9 +136,15 @@ import {
           [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
           [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
         >
-          <lucide-icon [img]="theme.isDark() ? icons.Sun : icons.Moon" class="sidebar-item-icon" aria-hidden="true"></lucide-icon>
+          <lucide-icon
+            [img]="theme.isDark() ? icons.Sun : icons.Moon"
+            class="sidebar-item-icon"
+            aria-hidden="true"
+          />
           @if (!layout.collapsed()) {
-            <span class="sidebar-item-label">{{ theme.isDark() ? 'Light mode' : 'Dark mode' }}</span>
+            <span class="sidebar-item-label">{{
+              theme.isDark() ? 'Light mode' : 'Dark mode'
+            }}</span>
           }
         </button>
 
@@ -131,21 +156,35 @@ import {
               class="sidebar-item focus-ring w-full"
               [title]="layout.collapsed() ? user.username : ''"
             >
-              <span class="sidebar-avatar flex-shrink-0">{{ user.username.charAt(0).toUpperCase() }}</span>
+              <span class="sidebar-avatar flex-shrink-0">{{
+                user.username.charAt(0).toUpperCase()
+              }}</span>
               @if (!layout.collapsed()) {
                 <span class="sidebar-item-label truncate min-w-0">{{ user.username }}</span>
-                <lucide-icon [img]="icons.ChevronDown" class="w-3.5 h-3.5 flex-shrink-0 ml-auto text-muted-foreground" aria-hidden="true"></lucide-icon>
+                <lucide-icon
+                  [img]="icons.ChevronDown"
+                  class="w-3.5 h-3.5 flex-shrink-0 ml-auto text-muted-foreground"
+                  aria-hidden="true"
+                />
               }
             </button>
 
             @if (profileOpen) {
-              <div class="profile-dropdown" (click)="$event.stopPropagation()">
-                <a routerLink="/profile" (click)="profileOpen = false; layout.closeMobile()" class="profile-dropdown-item focus-ring">
-                  <lucide-icon [img]="icons.UserIcon" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <!-- Clicks inside the menu must not reach the document listener that closes it. -->
+              <div class="profile-dropdown" role="presentation" (click)="$event.stopPropagation()">
+                <a
+                  routerLink="/profile"
+                  (click)="profileOpen = false; layout.closeMobile()"
+                  class="profile-dropdown-item focus-ring"
+                >
+                  <lucide-icon [img]="icons.UserIcon" class="w-4 h-4" aria-hidden="true" />
                   Profile
                 </a>
-                <button (click)="logout()" class="profile-dropdown-item profile-dropdown-item-danger focus-ring w-full text-left">
-                  <lucide-icon [img]="icons.LogOut" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                <button
+                  (click)="logout()"
+                  class="profile-dropdown-item profile-dropdown-item-danger focus-ring w-full text-left"
+                >
+                  <lucide-icon [img]="icons.LogOut" class="w-4 h-4" aria-hidden="true" />
                   Sign Out
                 </button>
               </div>
@@ -153,8 +192,12 @@ import {
           </div>
         } @else {
           @if (!layout.collapsed()) {
-            <a routerLink="/login" (click)="layout.closeMobile()" class="sidebar-item focus-ring text-primary">
-              <lucide-icon [img]="icons.UserIcon" class="sidebar-item-icon" aria-hidden="true"></lucide-icon>
+            <a
+              routerLink="/login"
+              (click)="layout.closeMobile()"
+              class="sidebar-item focus-ring text-primary"
+            >
+              <lucide-icon [img]="icons.UserIcon" class="sidebar-item-icon" aria-hidden="true" />
               <span class="sidebar-item-label">Sign In</span>
             </a>
           }
@@ -162,40 +205,56 @@ import {
       </div>
     </aside>
   `,
-  styles: [`
-    :host { display: contents; }
-  `],
+  styles: [
+    `
+      :host {
+        display: contents;
+      }
+    `,
+  ],
 })
 export class SidebarComponent {
+  layout = inject(LayoutService);
+  theme = inject(ThemeService);
+  private authService = inject(AuthService);
+  private modalService = inject(ModalService);
+  private router = inject(Router);
+
   user: User | null = null;
   isOrganizer = false;
   isAdmin = false;
   isAttendee = false;
   profileOpen = false;
 
+  /** One router-backed signal per nav target, created on first use. */
+  private readonly activeRoutes = new Map<string, Signal<boolean>>();
+
   readonly icons = {
-    PanelLeftClose, PanelLeftOpen, Sun, Moon, LogOut, UserIcon, ChevronDown, ChevronRight,
+    PanelLeftClose,
+    PanelLeftOpen,
+    Sun,
+    Moon,
+    LogOut,
+    UserIcon,
+    ChevronDown,
+    ChevronRight,
   };
 
-  constructor(
-    public layout: LayoutService,
-    public theme: ThemeService,
-    private authService: AuthService,
-    private modalService: ModalService,
-    private router: Router,
-  ) {
-    this.authService.currentUser$.subscribe(user => {
+  constructor() {
+    this.authService.currentUser$.subscribe((user) => {
       this.user = user;
       // Self-registered organizers carry profile.role === 'organizer';
       // staff/superuser flags come from Django admin.
-      this.isOrganizer = !!(user?.is_staff || user?.is_superuser || user?.profile?.role === 'organizer');
+      this.isOrganizer = user?.is_staff || user?.is_superuser || user?.profile.role === 'organizer';
       this.isAdmin = !!user?.is_superuser;
       this.isAttendee = !!user && !this.isOrganizer;
     });
   }
 
   @HostListener('document:click')
-  onDocumentClick(): void { this.profileOpen = false; }
+  onDocumentClick(): void {
+    this.profileOpen = false;
+  }
 
   @HostListener('document:keydown.escape')
   onEscape(): void {
@@ -217,11 +276,11 @@ export class SidebarComponent {
 
   private hasRole(required: Role[]): boolean {
     const ur = this.userRoles;
-    return required.some(r => ur.has(r));
+    return required.some((r) => ur.has(r));
   }
 
   visibleSections(): NavSection[] {
-    return NAV.filter(section => {
+    return NAV.filter((section) => {
       if (!this.hasRole(section.roles)) return false;
       if (section.context === 'event' && !this.layout.eventContext()) return false;
       return true;
@@ -229,7 +288,7 @@ export class SidebarComponent {
   }
 
   visibleItems(section: NavSection): NavItem[] {
-    return section.items.filter(item => this.hasRole(item.roles));
+    return section.items.filter((item) => this.hasRole(item.roles));
   }
 
   getRoute(item: NavItem): string | null {
@@ -244,16 +303,24 @@ export class SidebarComponent {
     const route = this.getRoute(item);
     if (!route) return false;
     const exact = item.exact ?? !!item.routeFn;
-    return this.router.isActive(route, {
-      paths: exact ? 'exact' : 'subset',
-      queryParams: 'ignored',
-      fragment: 'ignored',
-      matrixParams: 'ignored',
-    });
+    const key = `${exact ? 'exact' : 'subset'}:${route}`;
+    let active = this.activeRoutes.get(key);
+    if (!active) {
+      active = isUrlActive(route, this.router, {
+        paths: exact ? 'exact' : 'subset',
+        queryParams: 'ignored',
+        fragment: 'ignored',
+        matrixParams: 'ignored',
+      });
+      this.activeRoutes.set(key, active);
+    }
+    return active();
   }
 
   // Cast helper so template bindings satisfy Angular strict template checks
-  asIcon(icon: LucideIcon): LucideIcon { return icon; }
+  asIcon(icon: LucideIcon): LucideIcon {
+    return icon;
+  }
 
   async logout(): Promise<void> {
     this.profileOpen = false;
@@ -266,7 +333,7 @@ export class SidebarComponent {
     });
     if (confirmed) {
       this.authService.logout();
-      this.router.navigate(['/login']);
+      void this.router.navigate(['/login']);
     }
   }
 }

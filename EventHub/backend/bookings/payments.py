@@ -63,17 +63,19 @@ def create_booking_checkout(booking: Booking) -> dict:
     currency = event_currency(booking.event)
     line_items = []
     for bs in booking.seats.select_related('seat', 'booking__event'):
-        line_items.append({
-            'price_data': {
-                'currency': currency.lower(),
-                'product_data': {
-                    'name': f'{booking.event.title} — Seat {bs.seat.row}-{bs.seat.col}',
-                    'description': f'{bs.seat.price_zone.title()} zone',
+        line_items.append(
+            {
+                'price_data': {
+                    'currency': currency.lower(),
+                    'product_data': {
+                        'name': f'{booking.event.title} — Seat {bs.seat.row}-{bs.seat.col}',
+                        'description': f'{bs.seat.price_zone.title()} zone',
+                    },
+                    'unit_amount': to_minor_units(seat_total(bs), currency),
                 },
-                'unit_amount': to_minor_units(seat_total(bs), currency),
-            },
-            'quantity': 1,
-        })
+                'quantity': 1,
+            }
+        )
 
     # Keep the seats held for as long as the Stripe page stays payable.
     expires_at = timezone.now() + timedelta(minutes=CHECKOUT_SESSION_MINUTES)
@@ -103,6 +105,7 @@ def confirm_booking_by_session(session):
     intent = session.get('payment_intent', '') or ''
     if booking is None:
         from payments.services import _refund_payment_intent
+
         logger.error('Paid Stripe session %s matches no booking — refunding', session['id'])
         _refund_payment_intent(intent, key=f'orphan-booking-refund-{session["id"]}')
         return None

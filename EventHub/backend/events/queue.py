@@ -15,20 +15,21 @@ placed in queue. A background task (or lazy drain on seat-map request)
 admits N users at a time by issuing them a short-lived access token.
 """
 
+import logging
 import time
 import uuid
-import logging
 
 logger = logging.getLogger(__name__)
 
-QUEUE_THRESHOLD = 0.80      # fill rate above which queue activates
-TOKEN_TTL_SECONDS = 600     # 10 minutes to complete purchase
-DRAIN_BATCH = 5             # users let through per drain tick
+QUEUE_THRESHOLD = 0.80  # fill rate above which queue activates
+TOKEN_TTL_SECONDS = 600  # 10 minutes to complete purchase
+DRAIN_BATCH = 5  # users let through per drain tick
 
 
 def _redis():
     import redis as redis_lib
     from django.conf import settings
+
     return redis_lib.from_url(settings.REDIS_URL, decode_responses=True)
 
 

@@ -18,6 +18,7 @@ EMBEDDING_DIM = 384
 def _get_model():
     """Load model once, cache forever (lazy — only on first search)."""
     from sentence_transformers import SentenceTransformer
+
     logger.info('[Search] Loading embedding model %s', EMBEDDING_MODEL)
     return SentenceTransformer(EMBEDDING_MODEL)
 
@@ -51,6 +52,7 @@ def index_event_async(event) -> None:
     """Queue the embedding — loading the model and encoding can take seconds
     and must not hold up the HTTP request that saved the event."""
     from jobs.queue import enqueue
+
     enqueue('index_event', {'event_id': event.pk}, max_attempts=3)
 
 
@@ -58,11 +60,13 @@ def index_event_job(*, event_id: int) -> None:
     """Job handler. Without sentence-transformers installed (slim image)
     there is nothing to retry: search falls back to keywords."""
     from jobs.queue import PermanentJobError
+
     from .models import Event
+
     try:
         import sentence_transformers  # noqa: F401
     except ImportError:
-        raise PermanentJobError('sentence-transformers is not installed (keyword search only)')
+        raise PermanentJobError('sentence-transformers is not installed (keyword search only)') from None
     event = Event.objects.filter(pk=event_id).select_related('category').first()
     if event is None:
         return
@@ -79,12 +83,11 @@ def semantic_search(query: str, limit: int = 20, extra_qs=None, max_distance: fl
     pagination and OrderingFilter can keep working on it — re-ordering a
     sliced queryset raises TypeError.
     """
-    from .models import Event
     from pgvector.django import CosineDistance
 
-    qs = extra_qs if extra_qs is not None else Event.objects.filter(
-        status='published', embedding__isnull=False
-    )
+    from .models import Event
+
+    qs = extra_qs if extra_qs is not None else Event.objects.filter(status='published', embedding__isnull=False)
 
     if not qs.filter(embedding__isnull=False).exists():
         # Fallback: plain title/description keyword search
@@ -105,9 +108,6 @@ def semantic_search(query: str, limit: int = 20, extra_qs=None, max_distance: fl
         # Nothing semantically close (e.g. non-English query against an
         # English model) — try plain keyword matching before giving up.
         from django.db.models import Q
+
         return qs.filter(Q(title__icontains=query) | Q(description__icontains=query))
-    return (
-        qs.filter(id__in=top_ids)
-        .annotate(distance=CosineDistance('embedding', query_vec))
-        .order_by('distance')
-    )
+    return qs.filter(id__in=top_ids).annotate(distance=CosineDistance('embedding', query_vec)).order_by('distance')

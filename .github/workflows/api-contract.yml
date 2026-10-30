@@ -1,0 +1,41 @@
+name: API contract
+
+# Compares the PR's OpenAPI schema with the base branch: the changelog goes to
+# the job summary, and breaking changes to /api/v1 fail the check unless the
+# PR carries the `breaking-api` label (a deliberate, reviewed break).
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  api-changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Changes against the base branch
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          ALLOW_BREAKING: ${{ contains(github.event.pull_request.labels.*.name, 'breaking-api') }}
+          HEAD_SPEC: /specs/EventHub/backend/openapi.yaml
+          BASE_SPEC: /specs/base-openapi.yaml
+        run: |
+          if ! git show "origin/$BASE_REF:EventHub/backend/openapi.yaml" > base-openapi.yaml 2>/dev/null; then
+            echo "The base branch has no openapi.yaml yet; nothing to compare." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          oasdiff() { docker run --rm -v "$PWD:/specs:ro" tufin/oasdiff:v1.33.0 "$@"; }
+          {
+            echo "## API changes"
+            oasdiff changelog "$BASE_SPEC" "$HEAD_SPEC" --format markdown
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$ALLOW_BREAKING" = "true" ]; then
+            echo "Breaking changes allowed by the breaking-api label." >> "$GITHUB_STEP_SUMMARY"
+            oasdiff breaking "$BASE_SPEC" "$HEAD_SPEC" --format githubactions
+          else
+            oasdiff breaking "$BASE_SPEC" "$HEAD_SPEC" --format githubactions --fail-on ERR
+          fi

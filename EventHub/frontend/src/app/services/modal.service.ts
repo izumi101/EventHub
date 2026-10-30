@@ -13,23 +13,24 @@ export interface ModalConfig {
 export class ModalService {
   isOpen = signal(false);
   config = signal<ModalConfig | null>(null);
-  
+
   private responseSubject: Subject<boolean> | null = null;
 
   open(config: ModalConfig): Promise<boolean> {
     this.config.set(config);
     this.isOpen.set(true);
-    
+
     // Complete previous subject if it exists
     if (this.responseSubject) {
       this.responseSubject.next(false);
       this.responseSubject.complete();
     }
-    
-    this.responseSubject = new Subject<boolean>();
-    
+
+    const response = new Subject<boolean>();
+    this.responseSubject = response;
+
     return new Promise<boolean>((resolve) => {
-      const sub = this.responseSubject!.subscribe((result) => {
+      const sub = response.subscribe((result) => {
         sub.unsubscribe();
         this.isOpen.set(false);
         resolve(result);

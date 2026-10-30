@@ -1,13 +1,15 @@
 import uuid
+from decimal import Decimal
+from typing import Literal
+
+from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
-from django.contrib.auth.models import User
 from django.utils import timezone
 from pgvector.django import VectorField
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
-
 
 INACTIVE_REGISTRATION_STATUSES = [
     RegistrationStatusChoices.CANCELLED,
@@ -21,21 +23,26 @@ class EventQuerySet(models.QuerySet):
         so list endpoints don't issue several queries per event."""
         from django.db.models import Count, IntegerField, OuterRef, Prefetch, Subquery
         from django.db.models.functions import Coalesce
+
         from bookings.models import Booking, BookingSeat
 
         active_regs = (
-            Registration.objects
-            .filter(event=OuterRef('pk'))
+            Registration.objects.filter(event=OuterRef('pk'))
             .exclude(status__in=INACTIVE_REGISTRATION_STATUSES)
-            .order_by().values('event').annotate(c=Count('pk')).values('c')
+            .order_by()
+            .values('event')
+            .annotate(c=Count('pk'))
+            .values('c')
         )
         booked = (
-            BookingSeat.objects
-            .filter(
+            BookingSeat.objects.filter(
                 booking__event=OuterRef('pk'),
                 booking__status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
             )
-            .order_by().values('booking__event').annotate(c=Count('pk')).values('c')
+            .order_by()
+            .values('booking__event')
+            .annotate(c=Count('pk'))
+            .values('c')
         )
         return self.annotate(
             _active_registrations=Coalesce(Subquery(active_regs, output_field=IntegerField()), 0),
@@ -76,10 +83,10 @@ class Event(models.Model):
     online_link = models.URLField(blank=True)
 
     # Tax & service-fee configuration (percentages of the subtotal).
-    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0,
-                                      help_text='e.g. 12 for 12% VAT')
-    service_fee_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0,
-                                              help_text='Platform/booking fee as a %')
+    tax_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text='e.g. 12 for 12% VAT')
+    service_fee_percent = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0, help_text='Platform/booking fee as a %'
+    )
     # True  → fees added on top, buyer pays them.
     # False → fees absorbed, included in the displayed price.
     fees_passed_to_buyer = models.BooleanField(default=True)
@@ -96,7 +103,9 @@ class Event(models.Model):
     embedding = VectorField(dimensions=384, null=True, blank=True)
 
     # SEO overrides — leave blank to auto-derive from title/description/image
-    seo_title = models.CharField(max_length=200, blank=True, help_text='Custom <title> / og:title (falls back to event title)')
+    seo_title = models.CharField(
+        max_length=200, blank=True, help_text='Custom <title> / og:title (falls back to event title)'
+    )
     seo_description = models.CharField(max_length=500, blank=True, help_text='Custom meta description / og:description')
 
     objects = EventQuerySet.as_manager()
@@ -123,14 +132,15 @@ class Event(models.Model):
         cached = getattr(self, '_booked_seats', None)
         if cached is not None:
             return cached
-        from bookings.models import BookingSeat, Booking
+        from bookings.models import Booking, BookingSeat
+
         return BookingSeat.objects.filter(
             booking__event=self,
             booking__status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
         ).count()
 
     @property
-    def available_spots(self):
+    def available_spots(self) -> int:
         return max(self.max_participants - self.active_registration_count - self.booked_seat_count, 0)
 
     def _ticket_types_list(self):
@@ -139,11 +149,11 @@ class Event(models.Model):
         return list(self.ticket_types.all())
 
     @property
-    def has_ticket_types(self):
+    def has_ticket_types(self) -> bool:
         return bool(self._ticket_types_list())
 
     @property
-    def is_free(self):
+    def is_free(self) -> bool:
         # With ticket tiers, the event is free only if every tier is free.
         types = self._ticket_types_list()
         if types:
@@ -151,7 +161,7 @@ class Event(models.Model):
         return self.price == 0
 
     @property
-    def price_from(self):
+    def price_from(self) -> Decimal:
         """Lowest purchasable price across tiers (for 'from $X' display)."""
         prices = [t.price for t in self._ticket_types_list() if t.is_active]
         return min(prices) if prices else self.price
@@ -162,11 +172,14 @@ class Event(models.Model):
 
 
 class SeatMap(models.Model):
-    """Схема посадочных мест для события."""
+    """Seating chart of an event."""
+
     event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name='seat_map')
     rows = models.PositiveIntegerField(default=6)
     cols = models.PositiveIntegerField(default=7)
-    layout = models.JSONField(default=dict, blank=True, help_text='Metadata: {"price_zones": {"vip": [rows], "standard": [rows]}}')
+    layout = models.JSONField(
+        default=dict, blank=True, help_text='Metadata: {"price_zones": {"vip": [rows], "standard": [rows]}}'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -177,7 +190,8 @@ class SeatMap(models.Model):
 
 
 class EventSeat(models.Model):
-    """Индивидуальное место на схеме."""
+    """One seat on the chart."""
+
     PRICE_ZONE_CHOICES = [('standard', 'Standard'), ('vip', 'VIP'), ('premium', 'Premium')]
 
     seat_map = models.ForeignKey(SeatMap, on_delete=models.CASCADE, related_name='seats')
@@ -197,7 +211,9 @@ class EventSeat(models.Model):
 class Registration(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='registrations')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='registrations')
-    status = models.CharField(max_length=20, choices=RegistrationStatusChoices.choices, default=RegistrationStatusChoices.PENDING)
+    status = models.CharField(
+        max_length=20, choices=RegistrationStatusChoices.choices, default=RegistrationStatusChoices.PENDING
+    )
     registered_at = models.DateTimeField(auto_now_add=True)
     notes = models.TextField(blank=True)
 
@@ -258,10 +274,16 @@ class Registration(models.Model):
 class TicketTypeQuerySet(models.QuerySet):
     def with_sold(self):
         from django.db.models import Count
-        return self.annotate(_sold=Count(
-            'registrations',
-            filter=~Q(registrations__status__in=INACTIVE_REGISTRATION_STATUSES),
-        ))
+
+        return self.annotate(
+            _sold=Count(
+                'registrations',
+                filter=~Q(registrations__status__in=INACTIVE_REGISTRATION_STATUSES),
+            )
+        )
+
+
+SaleState = Literal['inactive', 'scheduled', 'ended', 'sold_out', 'on_sale']
 
 
 class TicketType(models.Model):
@@ -271,6 +293,7 @@ class TicketType(models.Model):
     single Event.price flow (and seat maps). When an event HAS ticket types,
     attendees pick one tier at checkout and its price/capacity rules apply.
     """
+
     KIND_PAID = 'paid'
     KIND_FREE = 'free'
     KIND_DONATION = 'donation'
@@ -306,35 +329,33 @@ class TicketType(models.Model):
         return f'{self.name} — {self.event.title}'
 
     @property
-    def sold(self):
+    def sold(self) -> int:
         cached = getattr(self, '_sold', None)
         if cached is not None:
             return cached
         return self.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES).count()
 
     @property
-    def available(self):
+    def available(self) -> int | None:
         if self.quantity is None:
             return None  # unlimited
         return max(self.quantity - self.sold, 0)
 
     @property
-    def is_sold_out(self):
+    def is_sold_out(self) -> bool:
         return self.quantity is not None and self.sold >= self.quantity
 
     @property
-    def on_sale(self):
+    def on_sale(self) -> bool:
         now = timezone.now()
         if not self.is_active:
             return False
         if self.sale_start and now < self.sale_start:
             return False
-        if self.sale_end and now > self.sale_end:
-            return False
-        return True
+        return self.sale_end is None or now <= self.sale_end
 
     @property
-    def sale_state(self):
+    def sale_state(self) -> SaleState:
         """Human label for why a tier can/can't be bought right now."""
         now = timezone.now()
         if not self.is_active:
@@ -354,6 +375,7 @@ class PromoCode(models.Model):
     Supports percentage or fixed-amount discounts, optional usage cap and
     expiry. Validation lives in events.promo so the rules stay in one place.
     """
+
     DISCOUNT_PERCENT = 'percent'
     DISCOUNT_FIXED = 'fixed'
     DISCOUNT_TYPES = [
@@ -382,15 +404,15 @@ class PromoCode(models.Model):
         return f'{self.code} ({self.event.title})'
 
     @property
-    def is_expired(self):
+    def is_expired(self) -> bool:
         return bool(self.expires_at and timezone.now() > self.expires_at)
 
     @property
-    def is_exhausted(self):
+    def is_exhausted(self) -> bool:
         return self.max_uses is not None and self.times_used >= self.max_uses
 
     @property
-    def is_valid(self):
+    def is_valid(self) -> bool:
         return self.is_active and not self.is_expired and not self.is_exhausted
 
 
@@ -400,6 +422,7 @@ class EventQuestion(models.Model):
     Answers are stored per-registration in QuestionAnswer. Types mirror common
     form controls so the frontend can render the right input.
     """
+
     TYPE_TEXT = 'text'
     TYPE_TEXTAREA = 'textarea'
     TYPE_DROPDOWN = 'dropdown'
@@ -432,6 +455,7 @@ class EventQuestion(models.Model):
 
 class QuestionAnswer(models.Model):
     """An attendee's answer to one EventQuestion for their registration."""
+
     registration = models.ForeignKey(Registration, on_delete=models.CASCADE, related_name='answers')
     question = models.ForeignKey(EventQuestion, on_delete=models.CASCADE, related_name='answers')
     answer = models.TextField(blank=True)
@@ -445,6 +469,7 @@ class QuestionAnswer(models.Model):
 
 class WaitlistEntry(models.Model):
     """A user waiting for a sold-out event. FIFO; auto-offered on free spot."""
+
     STATUS_WAITING = 'waiting'
     STATUS_OFFERED = 'offered'
     STATUS_CONVERTED = 'converted'
@@ -483,6 +508,7 @@ class RefundRequest(models.Model):
     - Approved → the payment is refunded and the registration cancelled.
     - Rejected → the registration is marked rejected.
     """
+
     STATUS_PENDING = 'pending'
     STATUS_APPROVED = 'approved'
     STATUS_REJECTED = 'rejected'
@@ -508,6 +534,7 @@ class RefundRequest(models.Model):
 
 class Favorite(models.Model):
     """User saves an event to favourites."""
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='favorited_by')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -522,6 +549,7 @@ class Favorite(models.Model):
 
 class Review(models.Model):
     """Star rating + comment left by an attendee after the event."""
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reviews')
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='reviews')
     rating = models.PositiveSmallIntegerField(choices=[(i, i) for i in range(1, 6)])  # 1-5
@@ -544,6 +572,7 @@ class EventStaff(models.Model):
     that event; check-in staff can only scan tickets. The organizer themselves
     is never an EventStaff row — they're the owner via Event.organizer.
     """
+
     ROLE_CO_ORGANIZER = 'co_organizer'
     ROLE_CHECK_IN = 'check_in'
     ROLE_CHOICES = [
@@ -571,6 +600,7 @@ class Webhook(models.Model):
     (HMAC-SHA256 in the X-EventHub-Signature header) so the receiver can verify
     authenticity. Deliveries are logged for debugging.
     """
+
     TRIGGER_TICKET_SOLD = 'ticket_sold'
     TRIGGER_REGISTRATION = 'registration_created'
     TRIGGER_REFUND = 'refund_issued'
@@ -600,6 +630,7 @@ class Webhook(models.Model):
 
 class WebhookDelivery(models.Model):
     """Log of one webhook POST attempt (for debugging in the UI)."""
+
     webhook = models.ForeignKey(Webhook, on_delete=models.CASCADE, related_name='deliveries')
     trigger = models.CharField(max_length=30)
     status_code = models.IntegerField(null=True, blank=True)
@@ -610,6 +641,9 @@ class WebhookDelivery(models.Model):
     class Meta:
         ordering = ['-created_at']
 
+    def __str__(self):
+        return f'{self.trigger} → {self.webhook.url}: {self.status_code or self.error or "no response"}'
+
 
 class Affiliate(models.Model):
     """A promoter with a tracked referral link for an event.
@@ -618,6 +652,7 @@ class Affiliate(models.Model):
     registration, so the organizer can attribute clicks, sales and revenue to
     each promoter.
     """
+
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='affiliates')
     name = models.CharField(max_length=120, help_text='Promoter name / channel')
     code = models.CharField(max_length=40, help_text='Goes in the ?ref= link')
@@ -635,10 +670,13 @@ class Affiliate(models.Model):
         return f'{self.name} ({self.code}) @ {self.event.title}'
 
     @property
-    def sales(self):
-        return self.registrations.exclude(status__in=[
-            RegistrationStatusChoices.CANCELLED, RegistrationStatusChoices.REJECTED,
-        ]).count()
+    def sales(self) -> int:
+        return self.registrations.exclude(
+            status__in=[
+                RegistrationStatusChoices.CANCELLED,
+                RegistrationStatusChoices.REJECTED,
+            ]
+        ).count()
 
 
 class CheckInList(models.Model):
@@ -647,11 +685,14 @@ class CheckInList(models.Model):
     An event can have multiple lists so staff at different entrances each scan
     into the correct gate. Every check-in action is recorded in CheckInLog.
     """
+
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='checkin_lists')
     name = models.CharField(max_length=120)
     description = models.CharField(max_length=300, blank=True)
     color = models.CharField(max_length=7, default='#4f46e5', help_text='Hex color for UI badge')
-    is_default = models.BooleanField(default=False, help_text='The list used by the QR scanner when no list is selected')
+    is_default = models.BooleanField(
+        default=False, help_text='The list used by the QR scanner when no list is selected'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -665,6 +706,7 @@ class CheckInList(models.Model):
 
 class CheckInLog(models.Model):
     """Audit log of every check-in action (and undo) across all lists."""
+
     ACTION_CHECK_IN = 'check_in'
     ACTION_UNDO = 'undo'
     ACTION_CHOICES = [
@@ -693,14 +735,15 @@ class CheckInLog(models.Model):
 
 class Notification(models.Model):
     """In-app notifications for users."""
+
     TYPE_CHOICES = [
         ('ticket_purchased', '🎫 Ticket purchased'),
-        ('event_reminder',   '⏰ Event reminder'),
-        ('seat_available',   '💺 Seat available'),
-        ('event_updated',    '📝 Event updated'),
-        ('event_cancelled',  '❌ Event cancelled'),
-        ('payment_failed',   '⚠️ Payment failed'),
-        ('review_reminder',  '⭐ Leave a review'),
+        ('event_reminder', '⏰ Event reminder'),
+        ('seat_available', '💺 Seat available'),
+        ('event_updated', '📝 Event updated'),
+        ('event_cancelled', '❌ Event cancelled'),
+        ('payment_failed', '⚠️ Payment failed'),
+        ('review_reminder', '⭐ Leave a review'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

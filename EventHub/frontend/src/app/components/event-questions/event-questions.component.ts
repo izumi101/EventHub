@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -6,6 +6,7 @@ import { EventService, EventQuestion, QuestionType } from '../../services/event.
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-event-questions',
@@ -14,12 +15,17 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
-
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">Dashboard</a>
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
+            >Dashboard</a
+          >
           <span>/</span>
           @if (eventId) {
-            <a [routerLink]="['/organizer/events', eventId, 'attendees']" class="hover:text-foreground transition-colors truncate max-w-[180px]">{{ event?.title || 'Event' }}</a>
+            <a
+              [routerLink]="['/organizer/events', eventId, 'attendees']"
+              class="hover:text-foreground transition-colors truncate max-w-[180px]"
+              >{{ event?.title || 'Event' }}</a
+            >
           }
           <span>/</span>
           <span class="text-foreground font-medium">Questions</span>
@@ -27,27 +33,49 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
 
         <div class="flex items-center justify-between mb-2">
           <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
-            <lucide-icon [img]="icons.MessageSquare" class="w-6 h-6 text-primary"></lucide-icon>
+            <lucide-icon [img]="icons.MessageSquare" class="w-6 h-6 text-primary" />
             Checkout questions
           </h1>
-          <button (click)="showForm = !showForm" class="btn btn-primary btn-sm flex items-center gap-1.5">
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon> Add question
+          <button
+            (click)="showForm = !showForm"
+            class="btn btn-primary btn-sm flex items-center gap-1.5"
+          >
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" /> Add question
           </button>
         </div>
-        <p class="text-sm text-muted-foreground mb-6">Ask attendees for extra info when they register for {{ event?.title }}.</p>
+        <p class="text-sm text-muted-foreground mb-6">
+          Ask attendees for extra info when they register for {{ event?.title }}.
+        </p>
 
         @if (showForm) {
           <div class="card p-5 mb-6 animate-slide-up">
             <h2 class="font-semibold text-foreground mb-4">New question</h2>
             <div class="space-y-4">
               <div>
-                <label for="event-questions-label" class="block text-sm font-medium text-foreground mb-1.5">Question</label>
-                <input id="event-questions-label" [(ngModel)]="form.label" placeholder="e.g. What's your t-shirt size?" class="input w-full" />
+                <label
+                  for="event-questions-label"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >Question</label
+                >
+                <input
+                  id="event-questions-label"
+                  [(ngModel)]="form.label"
+                  placeholder="e.g. What's your t-shirt size?"
+                  class="input w-full"
+                />
               </div>
               <div class="grid grid-cols-2 gap-4">
                 <div>
-                  <label for="event-questions-question-type" class="block text-sm font-medium text-foreground mb-1.5">Type</label>
-                  <select id="event-questions-question-type" [(ngModel)]="form.question_type" class="input w-full">
+                  <label
+                    for="event-questions-question-type"
+                    class="block text-sm font-medium text-foreground mb-1.5"
+                    >Type</label
+                  >
+                  <select
+                    id="event-questions-question-type"
+                    [(ngModel)]="form.question_type"
+                    class="input w-full"
+                  >
                     <option value="text">Short text</option>
                     <option value="textarea">Long text</option>
                     <option value="dropdown">Dropdown</option>
@@ -57,7 +85,9 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
                   </select>
                 </div>
                 <div class="flex items-end">
-                  <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer pb-2">
+                  <label
+                    class="flex items-center gap-2 text-sm text-foreground cursor-pointer pb-2"
+                  >
                     <input type="checkbox" [(ngModel)]="form.is_required" class="w-4 h-4 rounded" />
                     Required
                   </label>
@@ -65,14 +95,28 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
               </div>
               @if (form.question_type === 'dropdown') {
                 <div>
-                  <label for="event-questions-options-text" class="block text-sm font-medium text-foreground mb-1.5">Options (one per line)</label>
-                  <textarea id="event-questions-options-text" [(ngModel)]="optionsText" rows="3" placeholder="Small&#10;Medium&#10;Large" class="input resize-none w-full"></textarea>
+                  <label
+                    for="event-questions-options-text"
+                    class="block text-sm font-medium text-foreground mb-1.5"
+                    >Options (one per line)</label
+                  >
+                  <textarea
+                    id="event-questions-options-text"
+                    [(ngModel)]="optionsText"
+                    rows="3"
+                    placeholder="Small&#10;Medium&#10;Large"
+                    class="input resize-none w-full"
+                  ></textarea>
                 </div>
               }
             </div>
             <div class="flex gap-2 mt-4">
               <button (click)="showForm = false" class="btn btn-secondary flex-1">Cancel</button>
-              <button (click)="create()" [disabled]="!form.label.trim() || saving" class="btn btn-primary flex-1">
+              <button
+                (click)="create()"
+                [disabled]="!form.label.trim() || saving"
+                class="btn btn-primary flex-1"
+              >
                 {{ saving ? 'Adding…' : 'Add question' }}
               </button>
             </div>
@@ -84,7 +128,7 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
         } @else if (questions.length === 0) {
           <div class="flex flex-col items-center justify-center py-16 text-center">
             <div class="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <lucide-icon [img]="icons.MessageSquare" class="w-7 h-7 text-muted-foreground/50"></lucide-icon>
+              <lucide-icon [img]="icons.MessageSquare" class="w-7 h-7 text-muted-foreground/50" />
             </div>
             <h3 class="font-semibold text-foreground mb-1">No questions yet</h3>
             <p class="text-sm text-muted-foreground">Add questions to collect info at checkout.</p>
@@ -93,19 +137,32 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
           <div class="space-y-2">
             @for (q of questions; track q.id) {
               <div class="card p-4 flex items-center gap-3">
-                <lucide-icon [img]="icons.GripVertical" class="w-4 h-4 text-muted-foreground/40 flex-shrink-0"></lucide-icon>
+                <lucide-icon
+                  [img]="icons.GripVertical"
+                  class="w-4 h-4 text-muted-foreground/40 flex-shrink-0"
+                />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-foreground">{{ q.label }}</span>
-                    @if (q.is_required) { <span class="text-[10px] font-bold uppercase text-ember bg-[color:var(--destructive-50)] px-1.5 py-0.5 rounded">Required</span> }
+                    @if (q.is_required) {
+                      <span
+                        class="text-[10px] font-bold uppercase text-ember bg-[color:var(--destructive-50)] px-1.5 py-0.5 rounded"
+                        >Required</span
+                      >
+                    }
                   </div>
                   <p class="text-xs text-muted-foreground mt-0.5 capitalize">
                     {{ q.question_type }}
-                    @if (q.question_type === 'dropdown' && q.options.length) { · {{ q.options.join(', ') }} }
+                    @if (q.question_type === 'dropdown' && q.options.length) {
+                      · {{ q.options.join(', ') }}
+                    }
                   </p>
                 </div>
-                <button (click)="remove(q)" class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]">
-                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                <button
+                  (click)="remove(q)"
+                  class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
+                >
+                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                 </button>
               </div>
             }
@@ -116,6 +173,10 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
   `,
 })
 export class EventQuestionsComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toast = inject(ToastService);
+
   eventId = 0;
   event: EventModel | null = null;
   questions: EventQuestion[] = [];
@@ -124,29 +185,31 @@ export class EventQuestionsComponent implements OnInit {
   saving = false;
 
   form: { label: string; question_type: QuestionType; is_required: boolean } = {
-    label: '', question_type: 'text', is_required: false,
+    label: '',
+    question_type: 'text',
+    is_required: false,
   };
   optionsText = '';
 
   readonly icons = { MessageSquare, Plus, Trash2, GripVertical };
 
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toast: ToastService,
-  ) {}
-
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
-    this.eventService.getEvent(this.eventId).subscribe(e => this.event = e);
+    this.eventService.getEvent(this.eventId).subscribe((e) => (this.event = e));
     this.load();
   }
 
   load(): void {
     this.loading = true;
     this.eventService.getEventQuestions(this.eventId).subscribe({
-      next: q => { this.questions = q; this.loading = false; },
-      error: () => { this.loading = false; this.toast.error('Failed to load questions.'); },
+      next: (q) => {
+        this.questions = q;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+        this.toast.error('Failed to load questions.');
+      },
     });
   }
 
@@ -160,7 +223,10 @@ export class EventQuestionsComponent implements OnInit {
       order: this.questions.length,
     };
     if (this.form.question_type === 'dropdown') {
-      payload.options = this.optionsText.split('\n').map(s => s.trim()).filter(Boolean);
+      payload.options = this.optionsText
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
     this.eventService.createQuestion(this.eventId, payload).subscribe({
       next: () => {
@@ -171,16 +237,19 @@ export class EventQuestionsComponent implements OnInit {
         this.optionsText = '';
         this.load();
       },
-      error: err => {
+      error: (err) => {
         this.saving = false;
-        this.toast.error(err.error?.options?.[0] || 'Could not add question.');
+        this.toast.error(apiErrorMessage(err, 'Could not add question.', 'options'));
       },
     });
   }
 
   remove(q: EventQuestion): void {
     this.eventService.deleteQuestion(q.id).subscribe({
-      next: () => { this.questions = this.questions.filter(x => x.id !== q.id); this.toast.success('Deleted.'); },
+      next: () => {
+        this.questions = this.questions.filter((x) => x.id !== q.id);
+        this.toast.success('Deleted.');
+      },
       error: () => this.toast.error('Delete failed.'),
     });
   }

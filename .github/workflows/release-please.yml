@@ -1,0 +1,37 @@
+name: Release
+
+# release-please keeps a "release PR" open against main. It derives the next
+# version from Conventional Commits, updates CHANGELOG.md and the version in
+# EventHub/frontend/package.json (+ lock file), and, when that PR is merged,
+# tags vX.Y.Z and creates the GitHub release. Configuration lives in
+# release-please-config.json; the current version in .release-please-manifest.json.
+#
+# One-time repository setup: Settings -> Actions -> General -> Workflow
+# permissions -> enable "Allow GitHub Actions to create and approve pull
+# requests". Note that pull requests opened with the default GITHUB_TOKEN do
+# not trigger other workflows; to run required checks on release PRs, pass a
+# PAT or GitHub App token via the `token` input instead.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # tag and create GitHub releases, push the release branch
+  pull-requests: write # open and update the release PR
+  issues: write # release-please labels the release PR ("autorelease: ...")
+
+# Never cancel a running release; queue the next one instead.
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: release-please
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

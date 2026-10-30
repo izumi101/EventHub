@@ -1,13 +1,18 @@
+import contextlib
 import logging
 
 from django.conf import settings
-from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 from rest_framework import status
+from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer, OrganizerCreateSerializer
+from common.schema import ERROR, FORBIDDEN, UNAUTHENTICATED, VALIDATION_ERROR, MessageSerializer
+
+from . import schema
+from .serializers import LoginSerializer, OrganizerCreateSerializer, RegisterSerializer, UserSerializer
 from .services import (
     build_auth_payload,
     change_password,
@@ -27,9 +32,11 @@ class RegisterView(APIView):
     Handles new user registration.
     Validates user credentials, verification code, and creates the user profile.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'register'
 
+    @extend_schema(request=RegisterSerializer, responses={201: schema.AuthPayloadSerializer, 400: VALIDATION_ERROR})
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -42,8 +49,13 @@ class AdminCreateOrganizerView(APIView):
     Admin-only: creates an organizer account.
     Attendees cannot promote themselves — this is the only way to get the role.
     """
+
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        request=OrganizerCreateSerializer,
+        responses={201: UserSerializer, 400: VALIDATION_ERROR, 401: UNAUTHENTICATED, 403: FORBIDDEN},
+    )
     def post(self, request):
         serializer = OrganizerCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -55,9 +67,14 @@ class RegisterSendCodeView(APIView):
     """
     Sends a registration verification code to the target email.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'register'
 
+    @extend_schema(
+        request=schema.EmailRequestSerializer,
+        responses={200: schema.SendCodeResponseSerializer, 400: ERROR, 503: ERROR},
+    )
     def post(self, request):
         email = request.data.get('email', '').strip()
 
@@ -68,7 +85,10 @@ class RegisterSendCodeView(APIView):
             verification = send_registration_code(email)
         except Exception:
             logger.exception('Sending the verification email failed')
-            return Response({'error': 'Failed to send verification email. Please try again.'}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            return Response(
+                {'error': 'Failed to send verification email. Please try again.'},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
 
         # Same answer whether or not the address already has an account.
         payload = {'message': 'If this address can be used, a verification code has been sent to it.'}
@@ -85,9 +105,11 @@ class VerifyRegistrationCodeView(APIView):
     """
     Verifies the email registration code.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'register'
 
+    @extend_schema(request=schema.EmailCodeRequestSerializer, responses={200: MessageSerializer, 400: ERROR})
     def post(self, request):
         email = request.data.get('email', '').strip()
         code = request.data.get('code', '').strip()
@@ -108,9 +130,13 @@ class LoginView(APIView):
     Handles user login, supporting both username and email as identifiers.
     Returns access and refresh JWT tokens on successful authentication.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'login'
 
+    @extend_schema(
+        request=LoginSerializer, responses={200: schema.AuthPayloadSerializer, 400: VALIDATION_ERROR, 401: ERROR}
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if serializer.is_valid():
@@ -129,18 +155,19 @@ class LogoutView(APIView):
     """
     Blacklists the user's refresh token to sign out.
     """
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=schema.LogoutRequestSerializer, responses={200: MessageSerializer, 401: UNAUTHENTICATED})
     def post(self, request):
         from rest_framework_simplejwt.exceptions import TokenError
         from rest_framework_simplejwt.tokens import RefreshToken
 
         refresh_token = request.data.get('refresh')
         if refresh_token:
-            try:
+            # Already invalid or blacklisted: the user is logged out either way.
+            with contextlib.suppress(TokenError):
                 RefreshToken(refresh_token).blacklist()
-            except TokenError:
-                pass  # already invalid or blacklisted — the user is logged out either way
         return Response({'message': 'Successfully logged out'}, status=status.HTTP_200_OK)
 
 
@@ -148,12 +175,18 @@ class ProfileView(APIView):
     """
     Retrieves or updates the authenticated user's profile.
     """
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: UserSerializer, 401: UNAUTHENTICATED})
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
 
+    @extend_schema(
+        request=UserSerializer(partial=True),
+        responses={200: UserSerializer, 400: VALIDATION_ERROR, 401: UNAUTHENTICATED},
+    )
     def put(self, request):
         serializer = UserSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
@@ -164,8 +197,13 @@ class ProfileView(APIView):
 
 class AvatarUploadView(APIView):
     """Upload (or clear) the authenticated user's profile avatar."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request={'multipart/form-data': schema.AvatarUploadSerializer},
+        responses={200: UserSerializer, 400: ERROR, 401: UNAUTHENTICATED},
+    )
     def post(self, request):
         avatar = request.FILES.get('avatar')
         if not avatar:
@@ -179,9 +217,12 @@ class AvatarUploadView(APIView):
         # under MEDIA and served back to other users.
         allowed_types = {'image/jpeg', 'image/png', 'image/webp', 'image/gif'}
         if getattr(avatar, 'content_type', None) not in allowed_types:
-            return Response({'error': 'Avatar must be a JPEG, PNG, WebP or GIF image.'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {'error': 'Avatar must be a JPEG, PNG, WebP or GIF image.'}, status=status.HTTP_400_BAD_REQUEST
+            )
         try:
             from PIL import Image
+
             Image.open(avatar).verify()
             avatar.seek(0)
         except Exception:
@@ -192,6 +233,7 @@ class AvatarUploadView(APIView):
         profile.save(update_fields=['avatar'])
         return Response(UserSerializer(request.user).data)
 
+    @extend_schema(responses={200: UserSerializer, 401: UNAUTHENTICATED})
     def delete(self, request):
         profile = request.user.profile
         if profile.avatar:
@@ -205,9 +247,11 @@ class PasswordResetRequestView(APIView):
     """
     Sends a 6-digit password reset code to the user's associated email if the account exists.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'password_reset'
 
+    @extend_schema(request=schema.IdentifierRequestSerializer, responses={200: MessageSerializer, 400: ERROR})
     def post(self, request):
         identifier = request.data.get('identifier', '').strip()
         if not identifier:
@@ -216,8 +260,9 @@ class PasswordResetRequestView(APIView):
         try:
             request_password_reset(identifier)
         except Exception:
-            # We intentionally do not reveal whether the account exists.
-            pass
+            # Same answer either way — the response must not reveal whether
+            # the account exists — but the failure is logged.
+            logger.exception('Password reset request failed')
 
         return Response({'message': 'If an account exists, a reset code has been sent to the associated email.'})
 
@@ -226,9 +271,13 @@ class PasswordResetVerifyView(APIView):
     """
     Verifies the password reset code and returns a one-time reset token.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'password_reset'
 
+    @extend_schema(
+        request=schema.IdentifierCodeRequestSerializer, responses={200: schema.ResetTokenResponseSerializer, 400: ERROR}
+    )
     def post(self, request):
         identifier = request.data.get('identifier', '').strip()
         code = request.data.get('code', '').strip()
@@ -248,9 +297,11 @@ class PasswordResetConfirmView(APIView):
     """
     Resets the user's password using the one-time reset token.
     """
+
     permission_classes = [AllowAny]
     throttle_scope = 'password_reset'
 
+    @extend_schema(request=schema.PasswordResetConfirmSerializer, responses={200: MessageSerializer, 400: ERROR})
     def post(self, request):
         reset_token = str(request.data.get('reset_token', '')).strip()
         # Passwords are taken verbatim: stripping would silently change them.
@@ -277,9 +328,14 @@ class ChangePasswordView(APIView):
     Every other session is signed out; the response carries a fresh token
     pair for the current device.
     """
+
     permission_classes = [IsAuthenticated]
     throttle_scope = 'change_password'
 
+    @extend_schema(
+        request=schema.ChangePasswordRequestSerializer,
+        responses={200: schema.ChangePasswordResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED},
+    )
     def post(self, request):
         old_password = str(request.data.get('old_password', ''))
         new_password = str(request.data.get('new_password', ''))

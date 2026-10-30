@@ -2,21 +2,25 @@ import logging
 
 import stripe
 from django.shortcuts import get_object_or_404
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 from events.models import Event
 
+from . import schema
 from .models import Booking
 from .payments import create_booking_checkout
 from .serializers import (
-    BookingSerializer,
     BookingCreateSerializer,
+    BookingSerializer,
     ClaimSeatSerializer,
 )
-from .services import create_booking, claim_seat, cancel_booking, refund_booking
+from .services import cancel_booking, claim_seat, create_booking, refund_booking
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +31,13 @@ def _ctx(request, **extra):
 
 class BookingCreateView(APIView):
     """POST /api/bookings/  — hold a group of seats."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=BookingCreateSerializer,
+        responses={201: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+    )
     def post(self, request):
         ser = BookingCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -46,8 +55,10 @@ class BookingCreateView(APIView):
 
 class BookingDetailView(APIView):
     """GET /api/bookings/{id}/  — owner views their booking."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: BookingSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     def get(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         return Response(BookingSerializer(booking, context=_ctx(request)).data)
@@ -55,8 +66,13 @@ class BookingDetailView(APIView):
 
 class BookingCheckoutView(APIView):
     """POST /api/bookings/{id}/checkout/  — pay for the whole group."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={200: schema.BookingCheckoutResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+    )
     def post(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         try:
@@ -68,8 +84,12 @@ class BookingCheckoutView(APIView):
 
 class BookingCancelView(APIView):
     """POST /api/bookings/{id}/cancel/  — release the held seats."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None, responses={200: schema.BookingStatusSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND}
+    )
     def post(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         try:
@@ -81,8 +101,10 @@ class BookingCancelView(APIView):
 
 class SharedBookingView(APIView):
     """GET /api/bookings/shared/{token}/  — friends open the invite link."""
+
     permission_classes = [AllowAny]
 
+    @extend_schema(auth=[], responses={200: BookingSerializer, 404: NOT_FOUND})
     def get(self, request, token):
         booking = get_object_or_404(Booking, share_token=token)
         return Response(BookingSerializer(booking, context=_ctx(request, via_share_link=True)).data)
@@ -90,9 +112,11 @@ class SharedBookingView(APIView):
 
 class ClaimSeatView(APIView):
     """POST /api/bookings/shared/{token}/claim/  — claim one seat."""
+
     permission_classes = [AllowAny]
     throttle_scope = 'claim'
 
+    @extend_schema(request=ClaimSeatSerializer, responses={200: BookingSerializer, 400: ERROR, 404: NOT_FOUND})
     def post(self, request, token):
         booking = get_object_or_404(Booking, share_token=token)
         ser = ClaimSeatSerializer(data=request.data)
@@ -113,8 +137,20 @@ class ClaimSeatView(APIView):
 class VerifyBookingView(APIView):
     """GET /api/bookings/verify/?session_id=…  — success page confirms a paid
     booking even when the Stripe webhook is not forwarded (local dev)."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                'session_id',
+                OpenApiTypes.STR,
+                required=True,
+                description='Payment provider session id from the success redirect.',
+            )
+        ],
+        responses={200: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+    )
     def get(self, request):
         from django.conf import settings
 
@@ -127,6 +163,7 @@ class VerifyBookingView(APIView):
         if booking.status == Booking.Status.HOLDING and not settings.STRIPE_MOCK_MODE:
             stripe.api_key = settings.STRIPE_SECRET_KEY
             from payments.services import stripe_to_dict
+
             try:
                 session = stripe_to_dict(stripe.checkout.Session.retrieve(session_id))
             except stripe.error.StripeError as exc:
@@ -134,6 +171,7 @@ class VerifyBookingView(APIView):
             else:
                 if session.get('payment_status') == 'paid':
                     from .payments import confirm_booking_by_session
+
                     confirm_booking_by_session(session)
                     booking.refresh_from_db()
 
@@ -142,12 +180,13 @@ class VerifyBookingView(APIView):
 
 class MyBookingsView(APIView):
     """GET /api/bookings/  — list the user's confirmed/holding bookings."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: BookingSerializer(many=True), 401: UNAUTHENTICATED})
     def get(self, request):
         bookings = (
-            Booking.objects
-            .filter(owner=request.user)
+            Booking.objects.filter(owner=request.user)
             .exclude(status__in=[Booking.Status.EXPIRED, Booking.Status.CANCELLED])
             .select_related('event', 'owner')
         )
@@ -156,10 +195,13 @@ class MyBookingsView(APIView):
 
 class EventBookingsView(APIView):
     """GET /api/bookings/event/{event_id}/  — the event team lists group bookings."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: BookingSerializer(many=True), 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
     def get(self, request, event_id):
         from common.permissions import can_manage_event
+
         event = get_object_or_404(Event, pk=event_id)
         if not can_manage_event(event, request.user):
             return Response({'error': 'You do not manage this event.'}, status=status.HTTP_403_FORBIDDEN)
@@ -174,19 +216,25 @@ class EventBookingsView(APIView):
 
 class BookingRefundView(APIView):
     """POST /api/bookings/{id}/refund/  — the event team refunds one paid group booking."""
+
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=schema.BookingRefundRequestSerializer,
+        responses={200: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND, 502: ERROR},
+    )
     def post(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk)
         try:
-            booking = refund_booking(booking, actor=request.user,
-                                     reason=str(request.data.get('reason', '') or ''))
+            booking = refund_booking(booking, actor=request.user, reason=str(request.data.get('reason', '') or ''))
         except PermissionError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         except stripe.error.StripeError as exc:
             logger.error('Stripe refund failed for booking %s: %s', pk, exc)
-            return Response({'error': 'The payment provider refused the refund. Try again later.'},
-                            status=status.HTTP_502_BAD_GATEWAY)
+            return Response(
+                {'error': 'The payment provider refused the refund. Try again later.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         return Response(BookingSerializer(booking, context=_ctx(request)).data)

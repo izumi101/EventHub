@@ -33,9 +33,11 @@ class Command(BaseCommand):
         events = self.seed_events(users, categories)
         self.seed_registrations(users, events)
 
-        self.stdout.write(self.style.SUCCESS(
-            f'Seed data ready: {len(users)} users, {len(categories)} categories, {len(events)} events.'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f'Seed data ready: {len(users)} users, {len(categories)} categories, {len(events)} events.'
+            )
+        )
         self.stdout.write('Demo logins: organizer/password123, attendee/password123')
         if self.admin_created:
             self.stdout.write(f'Admin login: admin / {self.admin_password}')
@@ -59,7 +61,11 @@ class Command(BaseCommand):
                 'password': 'password123',
                 'first_name': 'Aruzhan',
                 'last_name': 'Organizer',
-                'profile': {'bio': 'Creates community and tech events.', 'phone': '+7 777 100 2000', 'location': 'Almaty'},
+                'profile': {
+                    'bio': 'Creates community and tech events.',
+                    'phone': '+7 777 100 2000',
+                    'location': 'Almaty',
+                },
             },
             {
                 'username': 'attendee',

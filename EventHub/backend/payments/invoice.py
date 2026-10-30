@@ -8,6 +8,7 @@ Visual language: Ember (warm paper / ink / coral, ticket-stub perforation,
 mono kicker labels). The page is opened from a blob: URL, so brand fonts
 can't be fetched — the font stacks degrade gracefully to system fonts.
 """
+
 from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.html import escape
@@ -21,10 +22,10 @@ EMBER = '#E8552D'
 EMBER_CTA = '#C2410C'
 
 _PILL_STYLES = {
-    'completed': 'background:#E8F2EF;color:#235850;',   # pine — paid
-    'refunded':  'background:#F2ECE3;color:#3A332C;',   # warm neutral
+    'completed': 'background:#E8F2EF;color:#235850;',  # pine — paid
+    'refunded': 'background:#F2ECE3;color:#3A332C;',  # warm neutral
 }
-_PILL_DUE = 'background:#FEF3C7;color:#B45309;'         # warm amber — pending
+_PILL_DUE = 'background:#FEF3C7;color:#B45309;'  # warm amber — pending
 
 
 def _row(label, value, bold=False, muted=False):
@@ -32,7 +33,8 @@ def _row(label, value, bold=False, muted=False):
     color = f'color:{MUTED};' if muted else f'color:{INK};'
     return (
         f'<tr><td style="padding:9px 0;{color}">{label}</td>'
-        f'<td style="padding:9px 0;text-align:right;font-variant-numeric:tabular-nums;{weight}{color}">{value}</td></tr>'
+        f'<td style="padding:9px 0;text-align:right;font-variant-numeric:tabular-nums;{weight}{color}">'
+        f'{value}</td></tr>'
     )
 
 
@@ -42,7 +44,7 @@ def invoice_html(registration) -> str:
     event = registration.event
     user = registration.user
     payment = getattr(registration, 'payment', None)
-    bd = price_breakdown(registration) if (event and not event.is_free or registration.ticket_type_id) else None
+    bd = price_breakdown(registration) if ((event and not event.is_free) or registration.ticket_type_id) else None
 
     cur = (bd or {}).get('currency', 'USD')
     sym = {'USD': '$', 'EUR': '€', 'GBP': '£', 'KZT': '₸'}.get(cur, '')
@@ -56,9 +58,15 @@ def invoice_html(registration) -> str:
     status = (payment.status if payment else 'pending').upper()
     pill = _PILL_STYLES.get(status.lower(), _PILL_DUE)
 
-    tier = escape(registration.ticket_type.name if registration.ticket_type_id else (
-        f'Seat Row {registration.seat.row} / {registration.seat.col}' if registration.seat_id else 'General admission'
-    ))
+    tier = escape(
+        registration.ticket_type.name
+        if registration.ticket_type_id
+        else (
+            f'Seat Row {registration.seat.row} / {registration.seat.col}'
+            if registration.seat_id
+            else 'General admission'
+        )
+    )
 
     rows = ''
     if bd:

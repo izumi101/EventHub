@@ -6,7 +6,10 @@ djangorestframework>=3.15
 djangorestframework-simplejwt>=5.3
 django-cors-headers>=4.3
 psycopg[binary]>=3.1
-daphne>=4.1
+# ASGI server: gunicorn manages uvicorn worker processes (HTTP + WebSocket).
+gunicorn>=23.0
+uvicorn[standard]>=0.32
+uvicorn-worker>=0.3
 whitenoise>=6.6
 stripe>=7.0
 Pillow>=10.0
@@ -18,3 +21,9 @@ redis>=5.0
 # pgvector column type (always needed: it's part of the schema)
 pgvector>=0.3
 openpyxl>=3.1
+# OpenAPI schema generated from the code (served at /api/v1/schema/)
+drf-spectacular>=0.28
+# Swagger UI assets served from our own origin (the CSP allows no CDNs)
+drf-spectacular-sidecar>=2025.1
+# Feature flags from the self-hosted Unleash server (featureflags app)
+UnleashClient>=6.9,<7

@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 
-from events.models import Event, Registration, EventStaff
+from events.models import Event, EventStaff, Registration
 
 
 def is_event_organizer(event: Event, user: User) -> bool:

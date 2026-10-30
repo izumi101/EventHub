@@ -5,13 +5,14 @@ dashboard needs: headline KPIs, a daily sales timeline, and breakdowns by
 ticket tier and promoter. All money comes from the Payment rows so refunds are
 reflected (net of refunds) automatically.
 """
+
 from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
 from django.utils import timezone
 
-from common.choices import RegistrationStatusChoices, PaymentStatusChoices
+from common.choices import PaymentStatusChoices, RegistrationStatusChoices
 
 
 def _active_regs(event):
@@ -28,6 +29,7 @@ def _revenue(event):
     # Includes cancelled registrations: a full refund cancels the ticket, and
     # skipping those rows would make the "refunded" figure leave them out.
     from payments.models import Payment
+
     gross = Decimal('0')
     refunded = Decimal('0')
     paid_count = 0
@@ -43,9 +45,11 @@ def _revenue(event):
     # ── Group bookings (no Registration/Payment rows of their own) ──
     from bookings.models import Booking
     from bookings.payments import booking_amount
+
     group_confirmed = []
     for booking in Booking.objects.filter(
-        event=event, status__in=[Booking.Status.CONFIRMED, Booking.Status.REFUNDED],
+        event=event,
+        status__in=[Booking.Status.CONFIRMED, Booking.Status.REFUNDED],
     ).prefetch_related('seats'):
         amount = booking.amount_paid if booking.amount_paid is not None else booking_amount(booking)
         gross += amount
@@ -70,9 +74,7 @@ def event_analytics(event) -> dict:
 
     gross, refunded, paid_count, group_confirmed = _revenue(event)
     group_seats = sum(seats for _, _, seats in group_confirmed)
-    group_checked_in = sum(
-        1 for booking, _, _ in group_confirmed for bs in booking.seats.all() if bs.is_checked_in
-    )
+    group_checked_in = sum(1 for booking, _, _ in group_confirmed for bs in booking.seats.all() if bs.is_checked_in)
 
     net = gross - refunded
 
@@ -101,11 +103,13 @@ def event_analytics(event) -> dict:
     timeline = []
     for i in range(30):
         d = start + timedelta(days=i)
-        timeline.append({
-            'date': d.isoformat(),
-            'tickets': by_day_count.get(d, 0),
-            'revenue': float(by_day_revenue.get(d, Decimal('0'))),
-        })
+        timeline.append(
+            {
+                'date': d.isoformat(),
+                'tickets': by_day_count.get(d, 0),
+                'revenue': float(by_day_revenue.get(d, Decimal('0'))),
+            }
+        )
 
     # ── Breakdown by ticket type ──
     tier_count = defaultdict(int)

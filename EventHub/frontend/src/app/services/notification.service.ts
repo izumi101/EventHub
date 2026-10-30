@@ -1,18 +1,21 @@
-import { Injectable, signal } from '@angular/core';
-import { EventService } from './event.service';
+import { Injectable, signal, inject } from '@angular/core';
+import { EventService, type UserNotification } from './event.service';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
 export class NotificationService {
-  notifications = signal<any[]>([]);
+  private eventService = inject(EventService);
+  private auth = inject(AuthService);
+
+  notifications = signal<UserNotification[]>([]);
   unreadCount = signal<number>(0);
 
   private interval?: ReturnType<typeof setInterval>;
 
-  constructor(private eventService: EventService, private auth: AuthService) {
+  constructor() {
     // React to login/logout so the badge appears right after signing in
     // (not only when the app happens to boot with a stored session).
-    this.auth.currentUser$.subscribe(user => {
+    this.auth.currentUser$.subscribe((user) => {
       if (user) this.startPolling();
       else this.stopPolling();
     });
@@ -35,18 +38,22 @@ export class NotificationService {
 
   load(): void {
     this.eventService.getNotifications().subscribe({
-      next: list => {
+      next: (list) => {
         this.notifications.set(list);
-        this.unreadCount.set(list.filter((n: any) => !n.is_read).length);
+        this.unreadCount.set(list.filter((n) => !n.is_read).length);
       },
-      error: () => {},
+      error: () => {
+        // Background poll: keep the last known list; the next tick retries.
+      },
     });
   }
 
   markRead(id?: number): void {
     this.eventService.markNotificationRead(id).subscribe({
       next: () => this.load(),
-      error: () => {},
+      error: () => {
+        // The badge stays as it was; the next poll reconciles it.
+      },
     });
   }
 }

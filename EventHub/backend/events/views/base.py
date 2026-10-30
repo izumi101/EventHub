@@ -4,7 +4,7 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
-from rest_framework.permissions import BasePermission, SAFE_METHODS, IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, BasePermission, IsAuthenticated
 
 from common.choices import EventStatusChoices
 from common.permissions import can_manage_event
@@ -57,6 +57,7 @@ def restrict_status_list(queryset, user, status_value):
 
 class ManagedEventListCreate(generics.ListCreateAPIView):
     """Base for event-scoped collections only managers may list+create."""
+
     permission_classes = [IsAuthenticated]
     model = None  # set in subclass
 
@@ -83,6 +84,7 @@ class ManagedEventListCreate(generics.ListCreateAPIView):
 
 class ManagedDetail(generics.RetrieveUpdateDestroyAPIView):
     """Base for detail views restricted to the event's managers."""
+
     permission_classes = [IsAuthenticated]
     model = None
 

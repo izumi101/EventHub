@@ -1,9 +1,10 @@
-from django.db import models
+from datetime import timedelta
+
 from django.contrib.auth.models import User
+from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-from datetime import timedelta
 
 from common.choices import RoleChoices
 from common.codes import generate_numeric_code
@@ -40,9 +41,10 @@ def ensure_user_profile(sender, instance, **kwargs):
 
 class PasswordResetCode(models.Model):
     """Stores a 6-digit verification code for password reset."""
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reset_codes')
     code = models.CharField(max_length=6)
-    reset_token = models.CharField(max_length=64, blank=True, null=True)
+    reset_token = models.CharField(max_length=64, blank=True, default='')
     is_used = models.BooleanField(default=False)
     # Wrong guesses against this code; it is burned after MAX_CODE_ATTEMPTS.
     attempts = models.PositiveSmallIntegerField(default=0)
@@ -64,14 +66,13 @@ class PasswordResetCode(models.Model):
         # Invalidate previous codes
         cls.objects.filter(user=user, is_used=False).update(is_used=True)
         return cls.objects.create(
-            user=user,
-            code=generate_numeric_code(),
-            expires_at=timezone.now() + timedelta(minutes=15)
+            user=user, code=generate_numeric_code(), expires_at=timezone.now() + timedelta(minutes=15)
         )
 
 
 class EmailVerificationCode(models.Model):
     """Stores a 6-digit verification code for email during registration."""
+
     email = models.EmailField()
     code = models.CharField(max_length=6)
     is_used = models.BooleanField(default=False)
@@ -94,7 +95,5 @@ class EmailVerificationCode(models.Model):
         # Invalidate previous codes
         cls.objects.filter(email=email, is_used=False).update(is_used=True)
         return cls.objects.create(
-            email=email,
-            code=generate_numeric_code(),
-            expires_at=timezone.now() + timedelta(minutes=15)
+            email=email, code=generate_numeric_code(), expires_at=timezone.now() + timedelta(minutes=15)
         )

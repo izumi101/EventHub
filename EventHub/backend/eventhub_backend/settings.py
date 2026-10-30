@@ -2,12 +2,13 @@
 Django settings for the EventHub REST API.
 """
 
-from datetime import timedelta
-from pathlib import Path
-from dotenv import load_dotenv
-from django.core.exceptions import ImproperlyConfigured
 import os
 import sys
+from datetime import timedelta
+from pathlib import Path
+
+from django.core.exceptions import ImproperlyConfigured
+from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
@@ -34,10 +35,11 @@ _default_key = 'django-insecure-dev-only-change-me'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _default_key)
 DEBUG = env_bool('DJANGO_DEBUG', False)
 
-if not DEBUG and not TESTING and SECRET_KEY == _default_key:
+if not DEBUG and not TESTING and _default_key == SECRET_KEY:
     raise RuntimeError(
         'You must set DJANGO_SECRET_KEY environment variable in production! '
-        'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
+        'Generate one with: python -c '
+        '"from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
     )
 ALLOWED_HOSTS = env_list(
     'DJANGO_ALLOWED_HOSTS',
@@ -54,6 +56,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'corsheaders',
     'channels',
     'django.contrib.postgres',
@@ -62,6 +66,7 @@ INSTALLED_APPS = [
     'payments',
     'bookings',
     'jobs',
+    'featureflags',
 ]
 
 MIDDLEWARE = [
@@ -70,6 +75,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'common.api_versioning.DeprecatedApiMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -151,15 +157,12 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
-    'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
-    ),
+    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticatedOrReadOnly',),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
     'EXCEPTION_HANDLER': 'common.exceptions.exception_handler',
+    'DEFAULT_SCHEMA_CLASS': 'common.openapi.AutoSchema',
     # Only nginx talks to Django; it appends the real client address as the
     # last X-Forwarded-For entry. Without this DRF would trust the whole,
     # client-supplied header and every request could fake a new identity.
@@ -180,6 +183,54 @@ REST_FRAMEWORK = {
         'promo': '10/min',
         'claim': '10/min',
         'affiliate_click': '30/min',
+    },
+}
+
+# ---- API contract ---- #
+# /api/v1/ is canonical; the unversioned /api/ alias answers with Deprecation
+# and Sunset headers until it is removed (common/api_versioning.py).
+API_LEGACY_DEPRECATED_ON = '2026-10-30'
+API_LEGACY_SUNSET_ON = '2027-04-30'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EventHub API',
+    'DESCRIPTION': (
+        'Events, tickets, seat maps, payments and check-in. Authenticate with '
+        '`Authorization: Bearer <access token>` from `POST /api/v1/auth/login/`. '
+        'Errors are `{"error": "<message>"}`, with a stable `code` where clients '
+        'branch on it.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Swagger UI from our own static files: the CSP allows no CDNs.
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    # Separate request/response components, so generated clients don't make
+    # read-only fields required on input.
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/v1',
+    'PREPROCESSING_HOOKS': ['common.openapi.only_current_version'],
+    # Stable, readable names for value sets that share a field name
+    # (`status`, `type`, ...) — generated clients use them as type names.
+    'ENUM_NAME_OVERRIDES': {
+        'EventStatusEnum': 'common.choices.EventStatusChoices',
+        'RegistrationStatusEnum': 'common.choices.RegistrationStatusChoices',
+        'PaymentStatusEnum': 'common.choices.PaymentStatusChoices',
+        'PaymentMethodEnum': 'payments.models.Payment.METHOD_CHOICES',
+        'BookingStatusEnum': 'bookings.models.Booking.Status',
+        'RefundRequestStatusEnum': 'events.models.RefundRequest.STATUS_CHOICES',
+        'WaitlistEntryStatusEnum': 'events.models.WaitlistEntry.STATUS_CHOICES',
+        'WaitlistStatusEnum': 'events.schema.WAITLIST_STATUSES',
+        'QueueStatusEnum': 'events.schema.QUEUE_STATUSES',
+        'DemandLevelEnum': 'events.schema.DEMAND_LEVELS',
+        'TicketScanResultEnum': 'events.schema.SCAN_RESULTS',
+        'TicketScanRefusalEnum': 'events.schema.SCAN_REFUSALS',
+        'QuestionTypeEnum': 'events.models.EventQuestion.TYPE_CHOICES',
+        'PriceZoneEnum': 'events.models.EventSeat.PRICE_ZONE_CHOICES',
+        'NotificationTypeEnum': 'events.models.Notification.TYPE_CHOICES',
+        'TicketKindEnum': 'events.models.TicketType.KIND_CHOICES',
+        'CheckInActionEnum': 'events.models.CheckInLog.ACTION_CHOICES',
+        'WebhookTriggerEnum': 'events.models.Webhook.TRIGGER_CHOICES',
     },
 }
 
@@ -247,6 +298,28 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@ev
 # transaction commits instead — handy for local development without a worker.
 JOBS_RUN_INLINE = env_bool('JOBS_RUN_INLINE', False)
 
+# ---- Feature flags (self-hosted Unleash; featureflags app) ---- #
+# Off by default and always off in tests: every flag then answers with its
+# default from featureflags/registry.py. The client is created lazily in each
+# worker process and polls in the background, so Unleash being slow or down
+# never blocks or fails a request (docs/FEATURE_FLAGS.md).
+UNLEASH_ENABLED = env_bool('UNLEASH_ENABLED', False) and not TESTING
+# The client API base, e.g. http://unleash:4242/api
+UNLEASH_URL = os.environ.get('UNLEASH_URL', '').strip()
+# A backend token ("<project>:<environment>.<secret>"); its environment decides
+# which flag configuration this deployment gets. Never sent to the browser.
+UNLEASH_API_TOKEN = os.environ.get('UNLEASH_API_TOKEN', '').strip()
+UNLEASH_APP_NAME = os.environ.get('UNLEASH_APP_NAME', 'eventhub-backend')
+UNLEASH_ENVIRONMENT = os.environ.get('UNLEASH_ENVIRONMENT', 'development' if DEBUG else 'production')
+UNLEASH_REFRESH_INTERVAL = int(os.environ.get('UNLEASH_REFRESH_INTERVAL', '15'))
+UNLEASH_METRICS_INTERVAL = int(os.environ.get('UNLEASH_METRICS_INTERVAL', '60'))
+UNLEASH_REQUEST_TIMEOUT = int(os.environ.get('UNLEASH_REQUEST_TIMEOUT', '5'))
+if UNLEASH_ENABLED and not (UNLEASH_URL and UNLEASH_API_TOKEN):
+    raise ImproperlyConfigured(
+        'UNLEASH_ENABLED=1 needs UNLEASH_URL and UNLEASH_API_TOKEN (see .env.example); '
+        'set UNLEASH_ENABLED=0 to run with the flag defaults.'
+    )
+
 # ---- Logging ---- #
 LOGGING = {
     'version': 1,
@@ -255,6 +328,14 @@ LOGGING = {
         'verbose': {
             'format': '[{asctime}] {levelname} {name}: {message}',
             'style': '{',
+        },
+    },
+    'filters': {
+        # One copy of each Unleash SDK message per 5 minutes per process: an
+        # outage would otherwise log a traceback on every poll.
+        'unleash_rate_limit': {
+            '()': 'featureflags.log_filters.RateLimitFilter',
+            'interval': 300,
         },
     },
     'handlers': {
@@ -293,6 +374,23 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        'featureflags': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        # The Unleash SDK and its scheduler log every poll at INFO.
+        'UnleashClient': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'filters': ['unleash_rate_limit'],
+            'propagate': False,
+        },
+        'apscheduler': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
     },
 }
 
@@ -304,11 +402,14 @@ if not DEBUG and not TESTING:
     if _is_placeholder(STRIPE_SECRET_KEY) or _is_placeholder(STRIPE_WEBHOOK_SECRET):
         _problems.append('STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set')
     if 'console' in EMAIL_BACKEND or 'locmem' in EMAIL_BACKEND:
-        _problems.append('EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
-                         'sign-up and password-reset codes are delivered by email')
+        _problems.append(
+            'EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
+            'sign-up and password-reset codes are delivered by email'
+        )
     if _problems:
         raise ImproperlyConfigured(
-            'Refusing to start with DJANGO_DEBUG=0: ' + '; '.join(_problems)
+            'Refusing to start with DJANGO_DEBUG=0: '
+            + '; '.join(_problems)
             + '. For local development set DJANGO_DEBUG=1 (see .env.example).'
         )
 

@@ -20,3 +20,6 @@ pyrightconfig.json
 
 # Local Redis snapshots
 dump.rdb
+
+# Django collectstatic output
+EventHub/backend/staticfiles/

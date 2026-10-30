@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -23,7 +23,7 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
 
     <!-- Sidebar (hidden for bare routes: login/register/payment/…) -->
     @if (!isBare) {
-      <app-sidebar></app-sidebar>
+      <app-sidebar />
     }
 
     <!-- Right column — always present so the single router-outlet never moves -->
@@ -34,7 +34,7 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
       [class.shell-right-bare]="isBare"
     >
       @if (!isBare) {
-        <app-topbar></app-topbar>
+        <app-topbar />
       }
 
       <main class="shell-main">
@@ -42,24 +42,31 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
       </main>
 
       @if (!isBare) {
-        <app-footer></app-footer>
+        <app-footer />
       }
     </div>
   `,
-  styles: [`:host { display: contents; }`],
+  styles: [
+    `
+      :host {
+        display: contents;
+      }
+    `,
+  ],
 })
 export class AppShellComponent implements OnInit, OnDestroy {
+  layout = inject(LayoutService);
+  private router = inject(Router);
+
   isBare = false;
   isMobileWidth = false;
   private sub?: Subscription;
 
-  constructor(public layout: LayoutService, private router: Router) {}
-
   ngOnInit(): void {
     this.checkWidth();
     this.sub = this.router.events
-      .pipe(filter(e => e instanceof NavigationEnd))
-      .subscribe(e => this.checkBare((e as NavigationEnd).urlAfterRedirects));
+      .pipe(filter((e) => e instanceof NavigationEnd))
+      .subscribe((e) => this.checkBare(e.urlAfterRedirects));
     this.checkBare(this.router.url);
   }
 
@@ -74,6 +81,6 @@ export class AppShellComponent implements OnInit, OnDestroy {
 
   private checkBare(url: string): void {
     const path = url.split('?')[0];
-    this.isBare = BARE_ROUTES.some(r => path === r || path.startsWith(r));
+    this.isBare = BARE_ROUTES.some((r) => path === r || path.startsWith(r));
   }
 }

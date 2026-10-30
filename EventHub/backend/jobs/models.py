@@ -9,6 +9,7 @@ class Job(models.Model):
     change that needs it, so a job exists if and only if that change was
     committed. `run_worker` executes due jobs with retries and backoff.
     """
+
     STATUS_PENDING = 'pending'
     STATUS_RUNNING = 'running'
     STATUS_DONE = 'done'

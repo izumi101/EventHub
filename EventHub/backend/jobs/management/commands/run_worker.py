@@ -4,6 +4,7 @@ every few seconds and the periodic maintenance every minute.
     python manage.py run_worker                  # forever
     python manage.py run_worker --once           # one pass of both, then exit
 """
+
 import logging
 import time
 
@@ -22,8 +23,7 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--once', action='store_true', help='One pass, then exit.')
         parser.add_argument('--poll', type=float, default=2.0, help='Seconds between job polls.')
-        parser.add_argument('--maintenance-every', type=float, default=60.0,
-                            help='Seconds between maintenance passes.')
+        parser.add_argument('--maintenance-every', type=float, default=60.0, help='Seconds between maintenance passes.')
 
     def handle(self, *args, **options):
         last_maintenance = 0.0

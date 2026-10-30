@@ -38,18 +38,18 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         // request started the refresh first.
         return authService.refreshToken().pipe(
           switchMap(() => next(withToken(req, authService.getToken()))),
-          catchError((refreshErr) => {
+          catchError((refreshErr: unknown) => {
             // Refresh failed — full logout
             authService.forceLogout();
-            router.navigate(['/login'], {
-              queryParams: { returnUrl: router.url }
+            void router.navigate(['/login'], {
+              queryParams: { returnUrl: router.url },
             });
             return throwError(() => refreshErr);
-          })
+          }),
         );
       }
 
       return throwError(() => err);
-    })
+    }),
   );
 };

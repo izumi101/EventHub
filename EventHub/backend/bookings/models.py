@@ -12,11 +12,11 @@ class Booking(models.Model):
     """A group reservation of one or more seats for an event."""
 
     class Status(models.TextChoices):
-        HOLDING = 'holding', 'Holding'        # seats held, awaiting payment
+        HOLDING = 'holding', 'Holding'  # seats held, awaiting payment
         CONFIRMED = 'confirmed', 'Confirmed'  # paid
         CANCELLED = 'cancelled', 'Cancelled'  # released by owner
-        EXPIRED = 'expired', 'Expired'        # hold timed out
-        REFUNDED = 'refunded', 'Refunded'     # paid, then refunded by the organizer
+        EXPIRED = 'expired', 'Expired'  # hold timed out
+        REFUNDED = 'refunded', 'Refunded'  # paid, then refunded by the organizer
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
@@ -70,9 +70,7 @@ class BookingSeat(models.Model):
 
     # Who sits here — filled by the owner or a friend via the share link
     attendee_name = models.CharField(max_length=120, blank=True)
-    claimed_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='claimed_seats'
-    )
+    claimed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='claimed_seats')
 
     # Ticket / QR
     ticket_uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)

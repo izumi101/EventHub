@@ -34,16 +34,18 @@ jobs:
       POSTGRES_USER: eventhub_user
       POSTGRES_PASSWORD: eventhub_password
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: EventHub/backend/requirements.lock
       - name: Install dependencies
-        run: pip install -r requirements.lock ruff pip-audit
-      - name: Lint (pyflakes rules)
-        run: ruff check --select F,E9 --exclude "*/migrations/*" .
+        run: pip install -r requirements.lock ruff==0.17.1 pip-audit
+      - name: Format and lint (ruff, rules in pyproject.toml)
+        run: |
+          ruff format --check .
+          ruff check .
       - name: Migrations are up to date
         # Not a test run: without DEBUG the settings refuse the dev secret key.
         env:
@@ -51,14 +53,17 @@ jobs:
         run: python manage.py makemigrations --check --dry-run
       - name: Tests (PostgreSQL, real transactions)
         run: python manage.py test --noinput
+      - name: OpenAPI schema is valid and committed
+        env:
+          DJANGO_DEBUG: "1"
+        run: |
+          python manage.py spectacular --file /tmp/openapi.yaml --validate --fail-on-warn
+          diff -u openapi.yaml /tmp/openapi.yaml || {
+            echo "::error file=EventHub/backend/openapi.yaml::Out of date. In EventHub/backend run: python manage.py spectacular --file openapi.yaml --validate --fail-on-warn"
+            exit 1
+          }
       - name: Dependency audit
-        # twisted (via daphne) has no stable release with these fixes yet
-        # (only 26.10.0rc1); drop the ignores once it ships.
-        run: >-
-          pip-audit -r requirements.lock --progress-spinner off
-          --ignore-vuln CVE-2026-106454 --ignore-vuln CVE-2026-115778
-          --ignore-vuln CVE-2026-115774 --ignore-vuln CVE-2026-115775
-          --ignore-vuln CVE-2026-115776 --ignore-vuln CVE-2026-115877
+        run: pip-audit -r requirements.lock --progress-spinner off
 
   frontend:
     runs-on: ubuntu-latest
@@ -66,13 +71,24 @@ jobs:
       run:
         working-directory: EventHub/frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: EventHub/frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Lint (ESLint, angular-eslint)
+        run: npm run lint
+      - name: Formatting (Prettier)
+        run: npm run format:check
+      - name: API types match the backend schema
+        run: |
+          npm run api:types
+          git diff --exit-code -- src/app/api/openapi.ts || {
+            echo "::error file=EventHub/frontend/src/app/api/openapi.ts::Out of date. In EventHub/frontend run: npm run api:types"
+            exit 1
+          }
       - name: Unit tests (Vitest)
         run: npm test
       - name: Production build (type-checks templates, enforces bundle budgets)
@@ -86,15 +102,30 @@ jobs:
       run:
         working-directory: EventHub
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: docker-compose files are valid
         run: |
           docker compose --env-file .env.example config -q
+          docker compose --env-file .env.example --profile flags config -q
           GRAFANA_ADMIN_PASSWORD=ci docker compose -f docker-compose.monitoring.yml config -q
       - name: Build backend image (without the PyTorch layer)
         run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=0 -t eventhub-backend ./backend
       - name: Build frontend image
         run: docker build -t eventhub-frontend ./frontend
+      - name: Unleash starts and serves flags to the backend token
+        # Feature flags are opt-in (compose profile `flags`), so the e2e job
+        # does not start Unleash; this proves the image, its database and the
+        # dev tokens from .env.example still work together.
+        run: |
+          docker compose --env-file .env.example --profile flags up -d --wait --wait-timeout 180 unleash
+          curl -fsS http://localhost:4242/health
+          curl -fsS -H 'Authorization: *:development.dev-only-backend-token' http://localhost:4242/api/client/features > /dev/null
+      - name: Unleash logs
+        if: failure()
+        run: docker compose --env-file .env.example --profile flags logs --tail 100 unleash unleash-db
+      - name: Stop Unleash
+        if: always()
+        run: docker compose --env-file .env.example --profile flags down -v
       - name: nginx config is valid in the image
         run: >-
           docker run --rm --add-host backend:127.0.0.1 eventhub-frontend
@@ -105,7 +136,7 @@ jobs:
     # in, so semantic search works without network access at runtime.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Build backend image with semantic search
         run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=1 -t eventhub-backend-search EventHub/backend
       - name: CPU-only torch, model works offline
@@ -126,13 +157,13 @@ jobs:
       run:
         working-directory: EventHub
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start the stack
         run: |
           cp .env.example .env
           sed -i 's/^INSTALL_SEMANTIC_SEARCH=.*/INSTALL_SEMANTIC_SEARCH=0/' .env
           docker compose up -d --build --wait --wait-timeout 600
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: "22"
           cache: npm
@@ -150,7 +181,7 @@ jobs:
       - name: The worker sent the queued sign-up email
         # The worker polls every 2 s; give it a moment after the last test.
         run: |
-          for i in $(seq 1 30); do
+          for _ in $(seq 1 30); do
             docker compose logs worker | grep -q "Your verification code is" && exit 0
             sleep 1
           done
@@ -159,7 +190,7 @@ jobs:
       - name: Stack logs
         if: failure()
         run: docker compose logs --tail 200
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report
