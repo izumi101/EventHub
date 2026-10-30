@@ -1,0 +1,47 @@
+name: pre-commit
+
+# Runs the repository's pre-commit hooks against the whole tree, so the checks
+# developers run locally cannot be bypassed with `git commit --no-verify`.
+#
+# Hooks that are covered elsewhere are skipped here:
+#   - gitleaks: scans only staged changes as a hook; the "Secret scan" workflow
+#     scans the full history.
+#   - frontend-eslint / frontend-prettier: need `npm ci`; the `frontend` job in
+#     ci.yml runs the same npm scripts.
+#   - conventional-pre-commit: a commit-msg hook; the "PR title" workflow
+#     enforces Conventional Commits on the squash-merge title.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pre-commit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PRE_COMMIT_VERSION: 4.7.0
+  SKIP: gitleaks,frontend-eslint,frontend-prettier,conventional-pre-commit
+
+jobs:
+  pre-commit:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install pre-commit
+        run: python -m pip install --disable-pip-version-check "pre-commit==${PRE_COMMIT_VERSION}"
+
+      - name: Run hooks
+        run: pre-commit run --all-files --show-diff-on-failure --color always

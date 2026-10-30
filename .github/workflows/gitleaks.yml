@@ -1,0 +1,51 @@
+name: Secret scan
+
+# Scans the full git history for committed secrets on every push to main and on
+# every pull request, so a secret removed in a later commit is still caught.
+#
+# The pinned gitleaks release binary is run directly instead of
+# gitleaks/gitleaks-action: the action needs a paid licence for organisation
+# repositories, the binary does not, and the download is verified against a
+# SHA-256 pinned in this file (taken from the release's checksums file).
+# To upgrade, change GITLEAKS_VERSION and GITLEAKS_SHA256 together.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  GITLEAKS_VERSION: 8.30.1
+  # gitleaks_8.30.1_linux_x64.tar.gz
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks
+        run: |
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl --fail --silent --show-error --location --retry 3 \
+            --output "${RUNNER_TEMP}/${archive}" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${RUNNER_TEMP}/${archive}" | sha256sum --check --strict
+          mkdir -p "${RUNNER_TEMP}/gitleaks"
+          tar --extract --gzip --file "${RUNNER_TEMP}/${archive}" --directory "${RUNNER_TEMP}/gitleaks" gitleaks
+          echo "${RUNNER_TEMP}/gitleaks" >> "$GITHUB_PATH"
+
+      - name: Scan git history
+        run: gitleaks git --no-banner --redact --verbose --exit-code 1 .
