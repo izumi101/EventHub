@@ -23,11 +23,17 @@ import { DialogDirective } from '../../directives/dialog.directive';
 @Component({
   selector: 'app-my-registrations',
   standalone: true,
-  imports: [DialogDirective, MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [
+    DialogDirective,
+    MoneyPipe,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideAngularModule,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
-
         <!-- Header -->
         <div class="flex items-center justify-between mb-7">
           <div>
@@ -41,9 +47,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
           <button
             (click)="activeTab = 'upcoming'"
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px"
-            [class]="activeTab === 'upcoming'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'"
+            [class]="
+              activeTab === 'upcoming'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            "
           >
             <span class="flex items-center gap-1.5">
               <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true"></lucide-icon>
@@ -53,9 +61,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
           <button
             (click)="activeTab = 'past'"
             class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px"
-            [class]="activeTab === 'past'
-              ? 'border-primary text-primary'
-              : 'border-transparent text-muted-foreground hover:text-foreground'"
+            [class]="
+              activeTab === 'past'
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
+            "
           >
             <span class="flex items-center gap-1.5">
               <lucide-icon [img]="icons.Clock" class="w-4 h-4" aria-hidden="true"></lucide-icon>
@@ -71,12 +81,17 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <span class="text-sm">Loading tickets...</span>
           </div>
         } @else {
-
           @if (visibleRegs.length === 0) {
             @if (activeTab === 'upcoming') {
               <div class="flex flex-col items-center justify-center py-20 text-center">
-                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-                  <lucide-icon [img]="icons.Ticket" class="w-8 h-8 text-primary/50" aria-hidden="true"></lucide-icon>
+                <div
+                  class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4"
+                >
+                  <lucide-icon
+                    [img]="icons.Ticket"
+                    class="w-8 h-8 text-primary/50"
+                    aria-hidden="true"
+                  ></lucide-icon>
                 </div>
                 <h3 class="text-base font-semibold text-foreground mb-1">No tickets yet</h3>
                 <p class="text-sm text-muted-foreground mb-5 max-w-xs">
@@ -86,175 +101,258 @@ import { DialogDirective } from '../../directives/dialog.directive';
               </div>
             } @else {
               <div class="flex flex-col items-center justify-center py-20 text-center">
-                <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center mb-4">
-                  <lucide-icon [img]="icons.Clock" class="w-8 h-8 text-muted-foreground/50" aria-hidden="true"></lucide-icon>
+                <div
+                  class="w-16 h-16 rounded-2xl bg-gradient-to-br from-muted to-muted/50 flex items-center justify-center mb-4"
+                >
+                  <lucide-icon
+                    [img]="icons.Clock"
+                    class="w-8 h-8 text-muted-foreground/50"
+                    aria-hidden="true"
+                  ></lucide-icon>
                 </div>
                 <h3 class="text-base font-semibold text-foreground mb-1">No past tickets</h3>
-                <p class="text-sm text-muted-foreground">Your attended events will be archived here.</p>
+                <p class="text-sm text-muted-foreground">
+                  Your attended events will be archived here.
+                </p>
               </div>
             }
           } @else {
-              <div class="space-y-5">
-                @for (reg of visibleRegs; track reg.id) {
-                  <!-- ═══ BOARDING PASS TICKET ═══ -->
-                  <div class="ticket group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ring-1 ring-border bg-card">
-
-                    <!-- ── Hero header (image + gradient overlay) ── -->
+            <div class="space-y-5">
+              @for (reg of visibleRegs; track reg.id) {
+                <!-- ═══ BOARDING PASS TICKET ═══ -->
+                <div
+                  class="ticket group rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 ring-1 ring-border bg-card"
+                >
+                  <!-- ── Hero header (image + gradient overlay) ── -->
+                  <div
+                    class="relative h-32 cursor-pointer overflow-hidden"
+                    [routerLink]="['/events', reg.event.id]"
+                  >
+                    @if (reg.event.image) {
+                      <img
+                        [src]="reg.event.image"
+                        [alt]="reg.event.title"
+                        class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    } @else {
+                      <div class="w-full h-full" [class]="heroBg(reg.event.id)"></div>
+                    }
+                    <!-- Dark gradient overlay -->
                     <div
-                      class="relative h-32 cursor-pointer overflow-hidden"
-                      [routerLink]="['/events', reg.event.id]"
-                    >
-                      @if (reg.event.image) {
-                        <img
-                          [src]="reg.event.image"
-                          [alt]="reg.event.title"
-                          class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                        />
-                      } @else {
-                        <div class="w-full h-full" [class]="heroBg(reg.event.id)"></div>
-                      }
-                      <!-- Dark gradient overlay -->
-                      <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"></div>
-                      <!-- Status top-right -->
-                      <div class="absolute top-3 right-3 flex items-center gap-1.5">
-                        @if (reg.ticket_type) {
-                          <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/90 text-primary backdrop-blur-sm">
-                            {{ reg.ticket_type.name }}
-                          </span>
-                        }
+                      class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10"
+                    ></div>
+                    <!-- Status top-right -->
+                    <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                      @if (reg.ticket_type) {
                         <span
-                          class="text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur-sm"
-                          [class]="statusPillClass(reg.status)"
-                        >{{ statusLabel(reg.status) }}</span>
-                      </div>
-                      @if (reg.is_checked_in) {
-                        <div class="absolute top-3 left-3">
-                          <span class="flex items-center gap-1 text-[11px] font-bold text-white bg-pine backdrop-blur-sm px-2.5 py-1 rounded-full">
-                            <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                            Checked in
-                          </span>
-                        </div>
+                          class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/90 text-primary backdrop-blur-sm"
+                        >
+                          {{ reg.ticket_type.name }}
+                        </span>
                       }
-                      <!-- Event title over image -->
-                      <div class="absolute bottom-3 left-4 right-4">
-                        <h3 class="text-white font-bold text-lg leading-tight drop-shadow-lg line-clamp-1">
-                          {{ reg.event.title }}
-                        </h3>
-                      </div>
+                      <span
+                        class="text-[11px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full backdrop-blur-sm"
+                        [class]="statusPillClass(reg.status)"
+                        >{{ statusLabel(reg.status) }}</span
+                      >
                     </div>
-
-                    <!-- ── Perforation line ── -->
-                    <div class="relative flex items-center px-4">
-                      <span class="absolute -left-3 w-6 h-6 rounded-full bg-background ring-1 ring-border z-10"></span>
-                      <div class="flex-1 border-t-2 border-dashed border-border my-0"></div>
-                      <span class="absolute -right-3 w-6 h-6 rounded-full bg-background ring-1 ring-border z-10"></span>
-                    </div>
-
-                    <!-- ── Body ── -->
-                    <div class="flex gap-0">
-
-                      <!-- Left: event details + actions -->
-                      <div class="flex-1 px-5 py-4 min-w-0">
-                        <div class="grid grid-cols-2 gap-x-4 gap-y-3 mb-4">
-                          <div>
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Date</p>
-                            <p class="text-sm font-semibold text-foreground">{{ reg.event.date | date:'MMM d, y' }}</p>
-                            <p class="text-xs text-muted-foreground">{{ reg.event.date | date:'h:mm a' }}</p>
-                          </div>
-                          <div>
-                            <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Venue</p>
-                            <p class="text-sm font-semibold text-foreground truncate">{{ reg.event.location }}</p>
-                          </div>
-                          @if (reg.seat) {
-                            <div>
-                              <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Seat</p>
-                              <p class="text-sm font-semibold text-foreground">Row {{ reg.seat.row }} · {{ reg.seat.col }}</p>
-                            </div>
-                            <div>
-                              <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5">Zone</p>
-                              <span class="inline-block text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md {{ zoneBadgeClass(reg.seat.zone) }}">{{ reg.seat.zone }}</span>
-                            </div>
-                          }
-                        </div>
-
-                        <!-- Actions: tickets can't be cancelled by the client —
-                             paid ones can only go through a refund request,
-                             free ones have no exit action at all. -->
-                        <div class="js-ticket-actions flex items-center gap-2 pt-3 border-t border-border/60">
-                          @if (reg.refund_request?.status === 'pending') {
-                            <span class="text-xs font-medium text-warning">Refund pending review</span>
-                          } @else if (reg.refund_request?.status === 'rejected') {
-                            <span class="text-xs font-medium text-ember">Refund declined</span>
-                          } @else if (isPaidConfirmed(reg)) {
-                            @if (reg.is_checked_in) {
-                              <span class="text-xs text-muted-foreground">Ticket used for entry — refunds unavailable</span>
-                            } @else if (reg.event.refundable === false) {
-                              <span class="text-xs text-muted-foreground">🔒 Non-refundable</span>
-                            } @else {
-                              <button (click)="openRefund(reg)" class="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors">Request refund</button>
-                            }
-                          }
-
-                          @if (reg.status === 'pending') {
-                            <button
-                              (click)="completePayment(reg, $event)"
-                              [disabled]="payingId === reg.id"
-                              class="ml-auto btn btn-sm btn-primary text-xs flex items-center gap-1.5"
-                            >
-                              @if (payingId === reg.id) { <span class="spinner spinner-sm"></span> }
-                              Complete payment
-                            </button>
-                          }
-                          @if (reg.status === 'confirmed') {
-                            @if (reg.payment && +reg.payment.amount > 0) {
-                              <button (click)="openInvoice(reg)" class="btn btn-sm btn-ghost text-xs flex items-center gap-1 text-muted-foreground">
-                                <lucide-icon [img]="icons.FileText" class="w-3.5 h-3.5"></lucide-icon>
-                                Invoice
-                              </button>
-                            }
-                            <button
-                              (click)="exportTicket(reg, $event)"
-                              [disabled]="exportingId === reg.id"
-                              class="ml-auto btn btn-sm btn-secondary text-xs flex items-center gap-1.5"
-                            >
-                              @if (exportingId === reg.id) {
-                                <span class="spinner spinner-sm"></span>
-                              } @else {
-                                <lucide-icon [img]="isMobile ? icons.Share2 : icons.Download" class="w-3.5 h-3.5"></lucide-icon>
-                              }
-                              {{ isMobile ? 'Share' : 'Download PDF' }}
-                            </button>
-                          }
-                        </div>
+                    @if (reg.is_checked_in) {
+                      <div class="absolute top-3 left-3">
+                        <span
+                          class="flex items-center gap-1 text-[11px] font-bold text-white bg-pine backdrop-blur-sm px-2.5 py-1 rounded-full"
+                        >
+                          <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                          Checked in
+                        </span>
                       </div>
-
-                      <!-- Right: QR stub (confirmed only) -->
-                      @if (reg.status === 'confirmed') {
-                        <div class="relative flex-shrink-0 w-36 flex flex-col items-center justify-center gap-2.5 px-4 py-4 border-l-2 border-dashed border-border bg-muted/30">
-                          <!-- Notches -->
-                          <span class="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-background ring-1 ring-border z-10"></span>
-
-                          <button
-                            (click)="showQr(reg)"
-                            class="bg-white rounded-xl p-2 shadow-md ring-1 ring-border hover:ring-primary/50 hover:shadow-lg transition-all cursor-zoom-in"
-                            title="Tap to enlarge"
-                          >
-                            @if (qrCodes[reg.ticket_uuid]) {
-                              <img [src]="qrCodes[reg.ticket_uuid]" alt="QR" class="w-20 h-20 block" />
-                            } @else {
-                              <div class="w-20 h-20 flex items-center justify-center"><span class="spinner spinner-sm"></span></div>
-                            }
-                          </button>
-                          <div class="text-center">
-                            <p class="text-[10px] font-mono font-bold text-foreground tracking-wider leading-none">#{{ reg.ticket_uuid.substring(0, 8).toUpperCase() }}</p>
-                            <p class="text-[9px] text-muted-foreground mt-0.5">tap to enlarge</p>
-                          </div>
-                        </div>
-                      }
+                    }
+                    <!-- Event title over image -->
+                    <div class="absolute bottom-3 left-4 right-4">
+                      <h3
+                        class="text-white font-bold text-lg leading-tight drop-shadow-lg line-clamp-1"
+                      >
+                        {{ reg.event.title }}
+                      </h3>
                     </div>
                   </div>
-                }
-              </div>
+
+                  <!-- ── Perforation line ── -->
+                  <div class="relative flex items-center px-4">
+                    <span
+                      class="absolute -left-3 w-6 h-6 rounded-full bg-background ring-1 ring-border z-10"
+                    ></span>
+                    <div class="flex-1 border-t-2 border-dashed border-border my-0"></div>
+                    <span
+                      class="absolute -right-3 w-6 h-6 rounded-full bg-background ring-1 ring-border z-10"
+                    ></span>
+                  </div>
+
+                  <!-- ── Body ── -->
+                  <div class="flex gap-0">
+                    <!-- Left: event details + actions -->
+                    <div class="flex-1 px-5 py-4 min-w-0">
+                      <div class="grid grid-cols-2 gap-x-4 gap-y-3 mb-4">
+                        <div>
+                          <p
+                            class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
+                          >
+                            Date
+                          </p>
+                          <p class="text-sm font-semibold text-foreground">
+                            {{ reg.event.date | date: 'MMM d, y' }}
+                          </p>
+                          <p class="text-xs text-muted-foreground">
+                            {{ reg.event.date | date: 'h:mm a' }}
+                          </p>
+                        </div>
+                        <div>
+                          <p
+                            class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
+                          >
+                            Venue
+                          </p>
+                          <p class="text-sm font-semibold text-foreground truncate">
+                            {{ reg.event.location }}
+                          </p>
+                        </div>
+                        @if (reg.seat) {
+                          <div>
+                            <p
+                              class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
+                            >
+                              Seat
+                            </p>
+                            <p class="text-sm font-semibold text-foreground">
+                              Row {{ reg.seat.row }} · {{ reg.seat.col }}
+                            </p>
+                          </div>
+                          <div>
+                            <p
+                              class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
+                            >
+                              Zone
+                            </p>
+                            <span
+                              class="inline-block text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md {{
+                                zoneBadgeClass(reg.seat.zone)
+                              }}"
+                              >{{ reg.seat.zone }}</span
+                            >
+                          </div>
+                        }
+                      </div>
+
+                      <!-- Actions: tickets can't be cancelled by the client —
+                             paid ones can only go through a refund request,
+                             free ones have no exit action at all. -->
+                      <div
+                        class="js-ticket-actions flex items-center gap-2 pt-3 border-t border-border/60"
+                      >
+                        @if (reg.refund_request?.status === 'pending') {
+                          <span class="text-xs font-medium text-warning"
+                            >Refund pending review</span
+                          >
+                        } @else if (reg.refund_request?.status === 'rejected') {
+                          <span class="text-xs font-medium text-ember">Refund declined</span>
+                        } @else if (isPaidConfirmed(reg)) {
+                          @if (reg.is_checked_in) {
+                            <span class="text-xs text-muted-foreground"
+                              >Ticket used for entry — refunds unavailable</span
+                            >
+                          } @else if (reg.event.refundable === false) {
+                            <span class="text-xs text-muted-foreground">🔒 Non-refundable</span>
+                          } @else {
+                            <button
+                              (click)="openRefund(reg)"
+                              class="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                              Request refund
+                            </button>
+                          }
+                        }
+
+                        @if (reg.status === 'pending') {
+                          <button
+                            (click)="completePayment(reg, $event)"
+                            [disabled]="payingId === reg.id"
+                            class="ml-auto btn btn-sm btn-primary text-xs flex items-center gap-1.5"
+                          >
+                            @if (payingId === reg.id) {
+                              <span class="spinner spinner-sm"></span>
+                            }
+                            Complete payment
+                          </button>
+                        }
+                        @if (reg.status === 'confirmed') {
+                          @if (reg.payment && +reg.payment.amount > 0) {
+                            <button
+                              (click)="openInvoice(reg)"
+                              class="btn btn-sm btn-ghost text-xs flex items-center gap-1 text-muted-foreground"
+                            >
+                              <lucide-icon [img]="icons.FileText" class="w-3.5 h-3.5"></lucide-icon>
+                              Invoice
+                            </button>
+                          }
+                          <button
+                            (click)="exportTicket(reg, $event)"
+                            [disabled]="exportingId === reg.id"
+                            class="ml-auto btn btn-sm btn-secondary text-xs flex items-center gap-1.5"
+                          >
+                            @if (exportingId === reg.id) {
+                              <span class="spinner spinner-sm"></span>
+                            } @else {
+                              <lucide-icon
+                                [img]="isMobile ? icons.Share2 : icons.Download"
+                                class="w-3.5 h-3.5"
+                              ></lucide-icon>
+                            }
+                            {{ isMobile ? 'Share' : 'Download PDF' }}
+                          </button>
+                        }
+                      </div>
+                    </div>
+
+                    <!-- Right: QR stub (confirmed only) -->
+                    @if (reg.status === 'confirmed') {
+                      <div
+                        class="relative flex-shrink-0 w-36 flex flex-col items-center justify-center gap-2.5 px-4 py-4 border-l-2 border-dashed border-border bg-muted/30"
+                      >
+                        <!-- Notches -->
+                        <span
+                          class="absolute -left-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-background ring-1 ring-border z-10"
+                        ></span>
+
+                        <button
+                          (click)="showQr(reg)"
+                          class="bg-white rounded-xl p-2 shadow-md ring-1 ring-border hover:ring-primary/50 hover:shadow-lg transition-all cursor-zoom-in"
+                          title="Tap to enlarge"
+                        >
+                          @if (qrCodes[reg.ticket_uuid]) {
+                            <img
+                              [src]="qrCodes[reg.ticket_uuid]"
+                              alt="QR"
+                              class="w-20 h-20 block"
+                            />
+                          } @else {
+                            <div class="w-20 h-20 flex items-center justify-center">
+                              <span class="spinner spinner-sm"></span>
+                            </div>
+                          }
+                        </button>
+                        <div class="text-center">
+                          <p
+                            class="text-[10px] font-mono font-bold text-foreground tracking-wider leading-none"
+                          >
+                            #{{ reg.ticket_uuid.substring(0, 8).toUpperCase() }}
+                          </p>
+                          <p class="text-[9px] text-muted-foreground mt-0.5">tap to enlarge</p>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
           }
         }
       </div>
@@ -269,17 +367,24 @@ import { DialogDirective } from '../../directives/dialog.directive';
         <div
           class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
           (click)="$event.stopPropagation()"
-          appDialog (dismiss)="qrModalReg = null"
+          appDialog
+          (dismiss)="qrModalReg = null"
         >
           <span class="badge badge-confirmed mb-3">Confirmed</span>
-          <h3 class="text-base font-bold text-foreground leading-tight">{{ qrModalReg.event.title }}</h3>
-          <p class="text-xs text-muted-foreground mt-1 mb-5">Show this code to the organizer at the entrance</p>
+          <h3 class="text-base font-bold text-foreground leading-tight">
+            {{ qrModalReg.event.title }}
+          </h3>
+          <p class="text-xs text-muted-foreground mt-1 mb-5">
+            Show this code to the organizer at the entrance
+          </p>
 
           <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
             @if (qrCodes[qrModalReg.ticket_uuid]) {
               <img [src]="qrCodes[qrModalReg.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
             } @else {
-              <div class="w-56 h-56 flex items-center justify-center"><span class="spinner"></span></div>
+              <div class="w-56 h-56 flex items-center justify-center">
+                <span class="spinner"></span>
+              </div>
             }
           </div>
 
@@ -302,18 +407,41 @@ import { DialogDirective } from '../../directives/dialog.directive';
 
     <!-- Refund request modal -->
     @if (refundReg) {
-      <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" (click)="refundReg = null">
-        <div class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="refundReg = null">
+      <div
+        class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in"
+        (click)="refundReg = null"
+      >
+        <div
+          class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up"
+          (click)="$event.stopPropagation()"
+          appDialog
+          (dismiss)="refundReg = null"
+        >
           <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
           <p class="text-sm text-muted-foreground mb-4">
-            For "{{ refundReg.event.title }}" — {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}.
-            The organizer reviews and approves or declines it.
+            For "{{ refundReg.event.title }}" —
+            {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}. The organizer
+            reviews and approves or declines it.
           </p>
-          <label for="my-registrations-refund-reason" class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
-          <textarea id="my-registrations-refund-reason" [(ngModel)]="refundReason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
+          <label
+            for="my-registrations-refund-reason"
+            class="block text-sm font-medium text-foreground mb-1.5"
+            >Reason <span class="text-muted-foreground font-normal">(optional)</span></label
+          >
+          <textarea
+            id="my-registrations-refund-reason"
+            [(ngModel)]="refundReason"
+            rows="3"
+            placeholder="Why are you requesting a refund?"
+            class="input resize-none w-full mb-4"
+          ></textarea>
           <div class="flex gap-2">
             <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
-            <button (click)="submitRefundRequest()" [disabled]="submittingRefund" class="btn btn-primary flex-1">
+            <button
+              (click)="submitRefundRequest()"
+              [disabled]="submittingRefund"
+              class="btn btn-primary flex-1"
+            >
               {{ submittingRefund ? 'Submitting…' : 'Submit request' }}
             </button>
           </div>
@@ -339,12 +467,12 @@ export class MyRegistrationsComponent implements OnInit {
 
   get upcomingRegs(): Registration[] {
     const now = Date.now();
-    return this.registrations.filter(r => new Date(r.event.date).getTime() >= now);
+    return this.registrations.filter((r) => new Date(r.event.date).getTime() >= now);
   }
 
   get pastRegs(): Registration[] {
     const now = Date.now();
-    return this.registrations.filter(r => new Date(r.event.date).getTime() < now);
+    return this.registrations.filter((r) => new Date(r.event.date).getTime() < now);
   }
 
   get visibleRegs(): Registration[] {
@@ -362,19 +490,24 @@ export class MyRegistrationsComponent implements OnInit {
   ngOnInit(): void {
     this.loadRegistrations();
     if (typeof window !== 'undefined') {
-      this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      this.isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent,
+      );
     }
   }
 
   loadRegistrations(): void {
     this.loading = true;
     this.eventService.getMyRegistrations().subscribe({
-      next: res => {
+      next: (res) => {
         this.registrations = res.results;
         this.loading = false;
         this.generateQrCodes();
       },
-      error: () => { this.toastService.error('Failed to load registrations.'); this.loading = false; },
+      error: () => {
+        this.toastService.error('Failed to load registrations.');
+        this.loading = false;
+      },
     });
   }
 
@@ -384,7 +517,9 @@ export class MyRegistrationsComponent implements OnInit {
       if (reg.status !== 'confirmed' || this.qrCodes[reg.ticket_uuid]) continue;
       const url = `${window.location.origin}/validate/${reg.ticket_uuid}`;
       QRCode.toDataURL(url, { width: 300, margin: 0 })
-        .then(dataUrl => { this.qrCodes[reg.ticket_uuid] = dataUrl; })
+        .then((dataUrl) => {
+          this.qrCodes[reg.ticket_uuid] = dataUrl;
+        })
         .catch(() => {});
     }
   }
@@ -392,8 +527,8 @@ export class MyRegistrationsComponent implements OnInit {
   statusStripeClass(status: string): string {
     const map: Record<string, string> = {
       confirmed: 'bg-[color:var(--pine-50)]0',
-      pending:   'bg-amber-400',
-      rejected:  'bg-red-400',
+      pending: 'bg-amber-400',
+      rejected: 'bg-red-400',
       cancelled: 'bg-gray-300',
     };
     return map[status] ?? 'bg-gray-300';
@@ -402,8 +537,8 @@ export class MyRegistrationsComponent implements OnInit {
   statusPillClass(status: string): string {
     const map: Record<string, string> = {
       confirmed: 'bg-[color:var(--pine-50)]0/90 text-white',
-      pending:   'bg-amber-400/90 text-white',
-      rejected:  'bg-[color:var(--destructive-50)]0/90 text-white',
+      pending: 'bg-amber-400/90 text-white',
+      rejected: 'bg-[color:var(--destructive-50)]0/90 text-white',
       cancelled: 'bg-gray-500/80 text-white',
     };
     return map[status] ?? 'bg-gray-500/80 text-white';
@@ -422,8 +557,8 @@ export class MyRegistrationsComponent implements OnInit {
 
   zoneBadgeClass(zone: string): string {
     const map: Record<string, string> = {
-      vip:      'bg-blue-100 text-blue-700',
-      premium:  'bg-purple-100 text-purple-700',
+      vip: 'bg-blue-100 text-blue-700',
+      premium: 'bg-purple-100 text-purple-700',
       standard: 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]',
     };
     return map[zone] ?? 'bg-muted text-muted-foreground';
@@ -432,8 +567,8 @@ export class MyRegistrationsComponent implements OnInit {
   statusBadgeClass(status: string): string {
     const map: Record<string, string> = {
       confirmed: 'badge-confirmed',
-      pending:   'badge-pending',
-      rejected:  'badge-rejected',
+      pending: 'badge-pending',
+      rejected: 'badge-rejected',
       cancelled: 'badge-rejected',
     };
     return map[status] ?? 'badge-pending';
@@ -442,8 +577,8 @@ export class MyRegistrationsComponent implements OnInit {
   statusLabel(status: string): string {
     const map: Record<string, string> = {
       confirmed: 'Confirmed',
-      pending:   'Payment pending',
-      rejected:  'Cancelled',
+      pending: 'Payment pending',
+      rejected: 'Cancelled',
       cancelled: 'Cancelled',
     };
     return map[status] ?? status;
@@ -457,7 +592,7 @@ export class MyRegistrationsComponent implements OnInit {
     // Fetched with the auth header and opened as a blob — the JWT never
     // appears in a URL (no leaks into history/server logs).
     this.eventService.getInvoiceBlob(reg.id).subscribe({
-      next: blob => {
+      next: (blob) => {
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
@@ -485,7 +620,7 @@ export class MyRegistrationsComponent implements OnInit {
         this.toastService.success('Refund request submitted — the organizer will review it.');
         this.loadRegistrations();
       },
-      error: err => {
+      error: (err) => {
         this.submittingRefund = false;
         this.toastService.error(err.error?.error || 'Could not submit request.');
       },
@@ -503,12 +638,19 @@ export class MyRegistrationsComponent implements OnInit {
       if (actions) actions.style.display = 'none';
 
       // Heavy PDF libraries are loaded on demand, not in the initial bundle.
-      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([import('jspdf'), import('html2canvas')]);
+      const [{ jsPDF }, { default: html2canvas }] = await Promise.all([
+        import('jspdf'),
+        import('html2canvas'),
+      ]);
       const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
       if (actions) actions.style.display = 'flex';
 
       const img = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: [canvas.width * 0.264583 / 2, canvas.height * 0.264583 / 2] });
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: [(canvas.width * 0.264583) / 2, (canvas.height * 0.264583) / 2],
+      });
       const w = pdf.internal.pageSize.getWidth();
       const h = (pdf.getImageProperties(img).height * w) / pdf.getImageProperties(img).width;
       pdf.addImage(img, 'PNG', 0, 0, w, h);
@@ -535,7 +677,9 @@ export class MyRegistrationsComponent implements OnInit {
     evt.stopPropagation();
     this.payingId = reg.id;
     this.paymentService.createCheckoutSession(reg.id).subscribe({
-      next: res => { window.location.href = res.checkout_url; },
+      next: (res) => {
+        window.location.href = res.checkout_url;
+      },
       error: () => {
         this.payingId = null;
         this.toastService.error('Could not start payment. Your seat hold may have expired.');

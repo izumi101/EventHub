@@ -52,30 +52,42 @@ export class AuthService {
     verification_code: string,
     first_name: string = '',
     last_name: string = '',
-    phone: string = ''
+    phone: string = '',
   ): Observable<AuthResponse> {
     // Always registers an attendee — organizer accounts are created by admins.
-    return this.http.post<AuthResponse>(`${this.apiUrl}/register/`, {
-      username, email, password, password2, verification_code, first_name, last_name, phone
-    }).pipe(
-      tap(res => this.handleAuth(res))
-    );
+    return this.http
+      .post<AuthResponse>(`${this.apiUrl}/register/`, {
+        username,
+        email,
+        password,
+        password2,
+        verification_code,
+        first_name,
+        last_name,
+        phone,
+      })
+      .pipe(tap((res) => this.handleAuth(res)));
   }
 
   /** Admin-only: provision a new organizer account. */
   adminCreateOrganizer(payload: {
-    username: string; email: string; password: string;
-    first_name?: string; last_name?: string; phone?: string;
+    username: string;
+    email: string;
+    password: string;
+    first_name?: string;
+    last_name?: string;
+    phone?: string;
   }): Observable<User> {
     return this.http.post<User>(`${this.apiUrl}/admin/organizers/`, payload);
   }
 
   login(username: string, password: string): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.apiUrl}/login/`, {
-      username, password
-    }).pipe(
-      tap(res => this.handleAuth(res))
-    );
+    return this.http
+      .post<AuthResponse>(`${this.apiUrl}/login/`, {
+        username,
+        password,
+      })
+      .pipe(tap((res) => this.handleAuth(res)));
   }
 
   logout(): void {
@@ -94,49 +106,58 @@ export class AuthService {
 
   getProfile(): Observable<User> {
     return this.http.get<User>(`${this.apiUrl}/profile/`).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
   updateProfile(data: Partial<User>): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/profile/`, data).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
-  changePassword(oldPassword: string, newPassword: string, newPassword2: string): Observable<ChangePasswordResponse> {
-    return this.http.post<ChangePasswordResponse>(
-      `${this.apiUrl}/change-password/`,
-      { old_password: oldPassword, new_password: newPassword, new_password2: newPassword2 },
-    ).pipe(
-      // The backend signs out every other session; keep this one with the new pair.
-      tap(res => { if (res.tokens) this.storeTokens(res.tokens.access, res.tokens.refresh); })
-    );
+  changePassword(
+    oldPassword: string,
+    newPassword: string,
+    newPassword2: string,
+  ): Observable<ChangePasswordResponse> {
+    return this.http
+      .post<ChangePasswordResponse>(`${this.apiUrl}/change-password/`, {
+        old_password: oldPassword,
+        new_password: newPassword,
+        new_password2: newPassword2,
+      })
+      .pipe(
+        // The backend signs out every other session; keep this one with the new pair.
+        tap((res) => {
+          if (res.tokens) this.storeTokens(res.tokens.access, res.tokens.refresh);
+        }),
+      );
   }
 
   uploadAvatar(file: File): Observable<User> {
     const fd = new FormData();
     fd.append('avatar', file);
     return this.http.post<User>(`${this.apiUrl}/profile/avatar/`, fd).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
   deleteAvatar(): Observable<User> {
     return this.http.delete<User>(`${this.apiUrl}/profile/avatar/`).pipe(
-      tap(user => {
+      tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
         this.currentUserSubject.next(user);
-      })
+      }),
     );
   }
 
@@ -150,12 +171,16 @@ export class AuthService {
   refreshToken(): Observable<RefreshTokenResponse> {
     if (!this.refreshInFlight$) {
       const refresh = localStorage.getItem(this.refreshTokenKey);
-      this.refreshInFlight$ = this.http.post<RefreshTokenResponse>(`${this.apiUrl}/token/refresh/`, { refresh }).pipe(
-        // The old refresh token is blacklisted after rotation — store the new one.
-        tap(res => this.storeTokens(res.access, res.refresh)),
-        finalize(() => { this.refreshInFlight$ = null; }),
-        shareReplay({ bufferSize: 1, refCount: false }),
-      );
+      this.refreshInFlight$ = this.http
+        .post<RefreshTokenResponse>(`${this.apiUrl}/token/refresh/`, { refresh })
+        .pipe(
+          // The old refresh token is blacklisted after rotation — store the new one.
+          tap((res) => this.storeTokens(res.access, res.refresh)),
+          finalize(() => {
+            this.refreshInFlight$ = null;
+          }),
+          shareReplay({ bufferSize: 1, refCount: false }),
+        );
     }
     return this.refreshInFlight$;
   }
@@ -174,24 +199,38 @@ export class AuthService {
   // ---- Registration Add-ons ---- //
 
   sendRegistrationCode(email: string): Observable<RegistrationCodeResponse> {
-    return this.http.post<RegistrationCodeResponse>(`${this.apiUrl}/register/send-code/`, { email });
+    return this.http.post<RegistrationCodeResponse>(`${this.apiUrl}/register/send-code/`, {
+      email,
+    });
   }
 
   verifyRegistrationCode(email: string, code: string): Observable<ApiMessageResponse> {
-    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/register/verify-code/`, { email, code });
+    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/register/verify-code/`, {
+      email,
+      code,
+    });
   }
 
   // ---- Password Reset Flow ---- //
 
   requestPasswordReset(identifier: string): Observable<ApiMessageResponse> {
-    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/password-reset/request/`, { identifier });
+    return this.http.post<ApiMessageResponse>(`${this.apiUrl}/password-reset/request/`, {
+      identifier,
+    });
   }
 
   verifyResetCode(identifier: string, code: string): Observable<PasswordResetTokenResponse> {
-    return this.http.post<PasswordResetTokenResponse>(`${this.apiUrl}/password-reset/verify/`, { identifier, code });
+    return this.http.post<PasswordResetTokenResponse>(`${this.apiUrl}/password-reset/verify/`, {
+      identifier,
+      code,
+    });
   }
 
-  confirmPasswordReset(resetToken: string, newPassword: string, newPassword2: string): Observable<ApiMessageResponse> {
+  confirmPasswordReset(
+    resetToken: string,
+    newPassword: string,
+    newPassword2: string,
+  ): Observable<ApiMessageResponse> {
     return this.http.post<ApiMessageResponse>(`${this.apiUrl}/password-reset/confirm/`, {
       reset_token: resetToken,
       new_password: newPassword,

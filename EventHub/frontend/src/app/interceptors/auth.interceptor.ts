@@ -42,14 +42,14 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             // Refresh failed — full logout
             authService.forceLogout();
             router.navigate(['/login'], {
-              queryParams: { returnUrl: router.url }
+              queryParams: { returnUrl: router.url },
             });
             return throwError(() => refreshErr);
-          })
+          }),
         );
       }
 
       return throwError(() => err);
-    })
+    }),
   );
 };

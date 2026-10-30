@@ -51,21 +51,25 @@ export class SeatWsService implements OnDestroy {
       protocol: token ? ['eventhub.jwt', token] : undefined,
     });
 
-    this.socket$.pipe(
-      retry({
-        count: MAX_RECONNECTS,
-        delay: (_err, attempt) => timer(Math.min(1000 * 2 ** (attempt - 1), 30_000)),
-        resetOnSuccess: true,
-      }),
-      takeUntil(this.destroy$),
-    ).subscribe({
-      next: msg => {
-        if (msg.type === 'snapshot') this.snapshot$.next(msg as WsSnapshot);
-        if (msg.type === 'seat_update') this.updates$.next(msg as WsSeatUpdate);
-      },
-      // Live updates are a progressive enhancement; the page keeps working.
-      error: () => { this.socket$ = null; },
-    });
+    this.socket$
+      .pipe(
+        retry({
+          count: MAX_RECONNECTS,
+          delay: (_err, attempt) => timer(Math.min(1000 * 2 ** (attempt - 1), 30_000)),
+          resetOnSuccess: true,
+        }),
+        takeUntil(this.destroy$),
+      )
+      .subscribe({
+        next: (msg) => {
+          if (msg.type === 'snapshot') this.snapshot$.next(msg as WsSnapshot);
+          if (msg.type === 'seat_update') this.updates$.next(msg as WsSeatUpdate);
+        },
+        // Live updates are a progressive enhancement; the page keeps working.
+        error: () => {
+          this.socket$ = null;
+        },
+      });
   }
 
   disconnect(): void {

@@ -7,12 +7,12 @@ import { LayoutService } from './layout.service';
 import { AuthService } from '../services/auth.service';
 import { NotificationService } from '../services/notification.service';
 import { User } from '../models/models';
-import {
-  LucideAngularModule,
-  Menu, Bell, ChevronRight,
-} from 'lucide-angular';
+import { LucideAngularModule, Menu, Bell, ChevronRight } from 'lucide-angular';
 
-interface Crumb { label: string; route?: string; }
+interface Crumb {
+  label: string;
+  route?: string;
+}
 
 @Component({
   selector: 'app-topbar',
@@ -21,7 +21,6 @@ interface Crumb { label: string; route?: string; }
   template: `
     <header class="topbar">
       <div class="topbar-inner">
-
         <!-- Mobile: burger + logo -->
         <div class="flex items-center gap-3 md:hidden">
           <button
@@ -42,16 +41,24 @@ interface Crumb { label: string; route?: string; }
           @for (crumb of breadcrumbs; track $index; let last = $last) {
             @if (!last) {
               @if (crumb.route) {
-                <a [routerLink]="crumb.route"
-                  class="text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px] focus-ring rounded">
+                <a
+                  [routerLink]="crumb.route"
+                  class="text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px] focus-ring rounded"
+                >
                   {{ crumb.label }}
                 </a>
               } @else {
                 <span class="text-muted-foreground truncate max-w-[180px]">{{ crumb.label }}</span>
               }
-              <lucide-icon [img]="icons.ChevronRight" class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.ChevronRight"
+                class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0"
+                aria-hidden="true"
+              ></lucide-icon>
             } @else {
-              <span class="font-medium text-foreground truncate max-w-[220px]">{{ crumb.label }}</span>
+              <span class="font-medium text-foreground truncate max-w-[220px]">{{
+                crumb.label
+              }}</span>
             }
           }
         </nav>
@@ -60,7 +67,6 @@ interface Crumb { label: string; route?: string; }
 
         <!-- Right side: ⌘K stub + bell -->
         <div class="topbar-actions">
-
           <!-- ⌘K search stub (desktop only) -->
           <button
             class="hidden md:flex items-center gap-2 text-xs text-muted-foreground border border-border rounded-md px-2.5 py-1.5 hover:bg-muted transition-colors focus-ring"
@@ -77,47 +83,61 @@ interface Crumb { label: string; route?: string; }
               <button
                 (click)="toggleNotif($event)"
                 class="topbar-icon-btn focus-ring relative"
-                [attr.aria-label]="'Notifications' + (notifService.unreadCount() > 0 ? ' (' + notifService.unreadCount() + ' unread)' : '')"
+                [attr.aria-label]="
+                  'Notifications' +
+                  (notifService.unreadCount() > 0
+                    ? ' (' + notifService.unreadCount() + ' unread)'
+                    : '')
+                "
               >
                 <lucide-icon [img]="icons.Bell" class="w-5 h-5" aria-hidden="true"></lucide-icon>
                 @if (notifService.unreadCount() > 0) {
-                  <span class="absolute -top-0.5 -right-0.5 w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">
+                  <span
+                    class="absolute -top-0.5 -right-0.5 w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none"
+                  >
                     {{ notifService.unreadCount() > 9 ? '9+' : notifService.unreadCount() }}
                   </span>
                 }
               </button>
 
               @if (notifOpen) {
-                <div
-                  class="topbar-notif-dropdown"
-                  (click)="$event.stopPropagation()"
-                >
+                <div class="topbar-notif-dropdown" (click)="$event.stopPropagation()">
                   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                     <span class="font-semibold text-foreground text-sm">Notifications</span>
                     @if (notifService.unreadCount() > 0) {
-                      <button (click)="notifService.markRead(); notifOpen = false"
-                        class="text-xs text-primary hover:underline">
+                      <button
+                        (click)="notifService.markRead(); notifOpen = false"
+                        class="text-xs text-primary hover:underline"
+                      >
                         Mark all read
                       </button>
                     }
                   </div>
                   <div class="max-h-80 overflow-y-auto divide-y divide-border">
                     @if (notifService.notifications().length === 0) {
-                      <div class="px-4 py-8 text-center text-sm text-muted-foreground">No notifications</div>
+                      <div class="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No notifications
+                      </div>
                     }
                     @for (n of notifService.notifications(); track n.id) {
                       <div
                         class="px-4 py-3 text-sm cursor-pointer transition-colors"
-                        [class]="n.is_read ? 'hover:bg-muted/50' : 'bg-primary/5 hover:bg-primary/10'"
+                        [class]="
+                          n.is_read ? 'hover:bg-muted/50' : 'bg-primary/5 hover:bg-primary/10'
+                        "
                         (click)="notifService.markRead(n.id); notifOpen = false"
                       >
                         @if (n.title?.trim()) {
                           <p class="font-medium text-foreground leading-tight">{{ n.title }}</p>
                         }
                         @if (n.body?.trim()) {
-                          <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">{{ n.body }}</p>
+                          <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                            {{ n.body }}
+                          </p>
                         }
-                        <p class="text-muted-foreground text-[10px] mt-1">{{ n.created_at | date:'MMM d, HH:mm' }}</p>
+                        <p class="text-muted-foreground text-[10px] mt-1">
+                          {{ n.created_at | date: 'MMM d, HH:mm' }}
+                        </p>
                       </div>
                     }
                   </div>
@@ -129,7 +149,13 @@ interface Crumb { label: string; route?: string; }
       </div>
     </header>
   `,
-  styles: [`:host { display: contents; }`],
+  styles: [
+    `
+      :host {
+        display: contents;
+      }
+    `,
+  ],
 })
 export class TopbarComponent implements OnInit, OnDestroy {
   user: User | null = null;
@@ -147,10 +173,10 @@ export class TopbarComponent implements OnInit, OnDestroy {
   ) {}
 
   ngOnInit(): void {
-    this.authService.currentUser$.subscribe(u => this.user = u);
+    this.authService.currentUser$.subscribe((u) => (this.user = u));
     this.sub = this.router.events
-      .pipe(filter(e => e instanceof NavigationEnd))
-      .subscribe(e => this.buildBreadcrumbs((e as NavigationEnd).urlAfterRedirects));
+      .pipe(filter((e) => e instanceof NavigationEnd))
+      .subscribe((e) => this.buildBreadcrumbs((e as NavigationEnd).urlAfterRedirects));
     this.buildBreadcrumbs(this.router.url);
   }
 
@@ -159,10 +185,14 @@ export class TopbarComponent implements OnInit, OnDestroy {
   }
 
   @HostListener('document:click')
-  onDocumentClick(): void { this.notifOpen = false; }
+  onDocumentClick(): void {
+    this.notifOpen = false;
+  }
 
   @HostListener('document:keydown.escape')
-  onEscape(): void { this.notifOpen = false; }
+  onEscape(): void {
+    this.notifOpen = false;
+  }
 
   toggleNotif(event: MouseEvent): void {
     event.stopPropagation();

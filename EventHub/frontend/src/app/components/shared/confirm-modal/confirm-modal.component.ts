@@ -31,18 +31,17 @@ import { ModalService } from '../../../services/modal.service';
           </p>
 
           <div class="flex gap-2 justify-end">
-            <button
-              (click)="modalService.cancel()"
-              class="btn btn-secondary btn-sm"
-            >
+            <button (click)="modalService.cancel()" class="btn btn-secondary btn-sm">
               {{ modalService.config()?.cancelText || 'Cancel' }}
             </button>
             <button
               (click)="modalService.confirm()"
               class="btn btn-sm"
-              [class]="modalService.config()?.isDestructive
-                ? 'bg-destructive text-destructive-foreground border-destructive hover:opacity-90'
-                : 'btn-primary'"
+              [class]="
+                modalService.config()?.isDestructive
+                  ? 'bg-destructive text-destructive-foreground border-destructive hover:opacity-90'
+                  : 'btn-primary'
+              "
             >
               {{ modalService.config()?.confirmText || 'Confirm' }}
             </button>

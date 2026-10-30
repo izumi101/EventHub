@@ -43,8 +43,8 @@ describe('AuthService', () => {
   it('shares one refresh request between concurrent callers', () => {
     localStorage.setItem('refresh_token', 'r');
     const results: string[] = [];
-    auth.refreshToken().subscribe(r => results.push(r.access));
-    auth.refreshToken().subscribe(r => results.push(r.access));
+    auth.refreshToken().subscribe((r) => results.push(r.access));
+    auth.refreshToken().subscribe((r) => results.push(r.access));
 
     http.expectOne(`${API}/auth/token/refresh/`).flush({ access: 'shared', refresh: 'r2' });
     expect(results).toEqual(['shared', 'shared']);
@@ -57,7 +57,8 @@ describe('AuthService', () => {
   it('keeps this device signed in after a password change', () => {
     auth.changePassword('old', 'New-pass-123', 'New-pass-123').subscribe();
     http.expectOne(`${API}/auth/change-password/`).flush({
-      message: 'ok', tokens: { access: 'fresh-access', refresh: 'fresh-refresh' },
+      message: 'ok',
+      tokens: { access: 'fresh-access', refresh: 'fresh-refresh' },
     });
     expect(localStorage.getItem('access_token')).toBe('fresh-access');
     expect(localStorage.getItem('refresh_token')).toBe('fresh-refresh');

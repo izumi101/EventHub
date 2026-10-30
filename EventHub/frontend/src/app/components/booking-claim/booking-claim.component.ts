@@ -21,17 +21,26 @@ import { DialogDirective } from '../../directives/dialog.directive';
         } @else if (!booking) {
           <div class="text-center py-20">
             <h1 class="text-xl font-bold text-foreground mb-2">Invite not found</h1>
-            <p class="text-sm text-muted-foreground">This booking link is invalid or has expired.</p>
+            <p class="text-sm text-muted-foreground">
+              This booking link is invalid or has expired.
+            </p>
             <a routerLink="/" class="btn btn-primary btn-sm mt-5">Browse events</a>
           </div>
         } @else {
           <div class="text-center mb-6">
-            <div class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3">
+            <div
+              class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3"
+            >
               <lucide-icon [img]="icons.Users" class="w-6 h-6 text-primary"></lucide-icon>
             </div>
-            <h1 class="text-xl font-bold text-foreground">{{ booking.owner_username }} invited you</h1>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ booking.owner_username }} invited you
+            </h1>
             <p class="text-sm text-muted-foreground mt-1">{{ booking.event_title }}</p>
-            <p class="text-xs text-muted-foreground">{{ booking.event_date | date:'EEE, MMM d, y · h:mm a' }} · {{ booking.event_location }}</p>
+            <p class="text-xs text-muted-foreground">
+              {{ booking.event_date | date: 'EEE, MMM d, y · h:mm a' }} ·
+              {{ booking.event_location }}
+            </p>
           </div>
 
           @if (booking.status === 'confirmed') {
@@ -41,7 +50,12 @@ import { DialogDirective } from '../../directives/dialog.directive';
             </div>
             @if (!isLoggedIn) {
               <p class="text-xs text-center text-muted-foreground mb-4">
-                <a routerLink="/login" [queryParams]="{ returnUrl: '/booking/' + token }" class="underline">Sign in</a>
+                <a
+                  routerLink="/login"
+                  [queryParams]="{ returnUrl: '/booking/' + token }"
+                  class="underline"
+                  >Sign in</a
+                >
                 before claiming to get your own QR ticket.
               </p>
             }
@@ -50,12 +64,26 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 <div class="card p-4">
                   <div class="flex items-center justify-between gap-3">
                     <div class="flex items-center gap-3 min-w-0">
-                      <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground"></lucide-icon>
+                      <div
+                        class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"
+                      >
+                        <lucide-icon
+                          [img]="icons.Armchair"
+                          class="w-4 h-4 text-muted-foreground"
+                        ></lucide-icon>
                       </div>
                       <div class="min-w-0">
-                        <p class="text-sm font-semibold text-foreground">Row {{ s.row }}, Seat {{ s.col }}</p>
-                        <p class="text-xs" [class]="s.attendee_name ? 'text-[color:var(--pine-600)]' : 'text-muted-foreground'">
+                        <p class="text-sm font-semibold text-foreground">
+                          Row {{ s.row }}, Seat {{ s.col }}
+                        </p>
+                        <p
+                          class="text-xs"
+                          [class]="
+                            s.attendee_name
+                              ? 'text-[color:var(--pine-600)]'
+                              : 'text-muted-foreground'
+                          "
+                        >
                           {{ s.attendee_name || 'Unclaimed' }}
                         </p>
                       </div>
@@ -64,7 +92,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
                     @if (s.attendee_name || s.claimed) {
                       <!-- Only your own seat carries a QR; other guests' tickets stay private. -->
                       @if (s.ticket_uuid && qrCodes[s.ticket_uuid]) {
-                        <button class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in flex-shrink-0" (click)="zoomSeat = s" title="Show ticket QR">
+                        <button
+                          class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in flex-shrink-0"
+                          (click)="zoomSeat = s"
+                          title="Show ticket QR"
+                        >
                           <img [src]="qrCodes[s.ticket_uuid]" alt="QR" class="w-14 h-14 block" />
                         </button>
                       } @else {
@@ -72,11 +104,27 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       }
                     } @else if (claimingId === s.seat_id) {
                       <div class="flex gap-2">
-                        <input [(ngModel)]="claimName" placeholder="Your name" class="input h-9 text-sm w-28" (keyup.enter)="confirmClaim(s)" />
-                        <button (click)="confirmClaim(s)" [disabled]="!claimName.trim()" class="btn btn-primary btn-sm">Claim</button>
+                        <input
+                          [(ngModel)]="claimName"
+                          placeholder="Your name"
+                          class="input h-9 text-sm w-28"
+                          (keyup.enter)="confirmClaim(s)"
+                        />
+                        <button
+                          (click)="confirmClaim(s)"
+                          [disabled]="!claimName.trim()"
+                          class="btn btn-primary btn-sm"
+                        >
+                          Claim
+                        </button>
                       </div>
                     } @else {
-                      <button (click)="startClaim(s)" class="btn btn-secondary btn-sm flex-shrink-0">Claim seat</button>
+                      <button
+                        (click)="startClaim(s)"
+                        class="btn btn-secondary btn-sm flex-shrink-0"
+                      >
+                        Claim seat
+                      </button>
                     }
                   </div>
                 </div>
@@ -90,7 +138,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
               <p class="text-sm text-muted-foreground">This booking is no longer active.</p>
             </div>
           } @else {
-            <p class="text-sm text-center text-muted-foreground mb-4">Tap a seat to claim it with your name</p>
+            <p class="text-sm text-center text-muted-foreground mb-4">
+              Tap a seat to claim it with your name
+            </p>
             <div class="space-y-2">
               @for (s of booking.seats; track s.id) {
                 <div
@@ -100,16 +150,25 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 >
                   <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                      <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground"></lucide-icon>
+                      <lucide-icon
+                        [img]="icons.Armchair"
+                        class="w-4 h-4 text-muted-foreground"
+                      ></lucide-icon>
                     </div>
                     <div>
-                      <p class="text-sm font-semibold text-foreground">Row {{ s.row }}, Seat {{ s.col }}</p>
-                      <p class="text-xs text-muted-foreground capitalize">{{ s.zone }} · {{ s.price }} {{ booking.currency }}</p>
+                      <p class="text-sm font-semibold text-foreground">
+                        Row {{ s.row }}, Seat {{ s.col }}
+                      </p>
+                      <p class="text-xs text-muted-foreground capitalize">
+                        {{ s.zone }} · {{ s.price }} {{ booking.currency }}
+                      </p>
                     </div>
                   </div>
 
                   @if (s.attendee_name) {
-                    <span class="flex items-center gap-1 text-sm text-[color:var(--pine-600)] font-medium">
+                    <span
+                      class="flex items-center gap-1 text-sm text-[color:var(--pine-600)] font-medium"
+                    >
                       <lucide-icon [img]="icons.Check" class="w-4 h-4"></lucide-icon>
                       {{ s.attendee_name }}
                     </span>
@@ -121,10 +180,18 @@ import { DialogDirective } from '../../directives/dialog.directive';
                         class="input h-9 text-sm w-28"
                         (keyup.enter)="confirmClaim(s)"
                       />
-                      <button (click)="confirmClaim(s)" [disabled]="!claimName.trim()" class="btn btn-primary btn-sm">Claim</button>
+                      <button
+                        (click)="confirmClaim(s)"
+                        [disabled]="!claimName.trim()"
+                        class="btn btn-primary btn-sm"
+                      >
+                        Claim
+                      </button>
                     </div>
                   } @else {
-                    <button (click)="startClaim(s)" class="btn btn-secondary btn-sm">Claim seat</button>
+                    <button (click)="startClaim(s)" class="btn btn-secondary btn-sm">
+                      Claim seat
+                    </button>
                   }
                 </div>
               }
@@ -140,10 +207,22 @@ import { DialogDirective } from '../../directives/dialog.directive';
 
     <!-- QR zoom -->
     @if (zoomSeat) {
-      <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" (click)="zoomSeat = null">
-        <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="zoomSeat = null">
-          <h3 class="text-base font-bold text-foreground leading-tight">Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}</h3>
-          <p class="text-xs text-muted-foreground mt-1 mb-5">{{ zoomSeat.attendee_name }} — show at the entrance</p>
+      <div
+        class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+        (click)="zoomSeat = null"
+      >
+        <div
+          class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
+          (click)="$event.stopPropagation()"
+          appDialog
+          (dismiss)="zoomSeat = null"
+        >
+          <h3 class="text-base font-bold text-foreground leading-tight">
+            Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}
+          </h3>
+          <p class="text-xs text-muted-foreground mt-1 mb-5">
+            {{ zoomSeat.attendee_name }} — show at the entrance
+          </p>
           @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
             <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
               <img [src]="qrCodes[zoomSeat.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
@@ -182,8 +261,15 @@ export class BookingClaimComponent implements OnInit {
     this.token = this.route.snapshot.paramMap.get('token') || '';
     this.loading = true;
     this.bookingService.getShared(this.token).subscribe({
-      next: b => { this.booking = b; this.loading = false; this.generateQrs(); },
-      error: () => { this.booking = null; this.loading = false; },
+      next: (b) => {
+        this.booking = b;
+        this.loading = false;
+        this.generateQrs();
+      },
+      error: () => {
+        this.booking = null;
+        this.loading = false;
+      },
     });
   }
 
@@ -191,11 +277,13 @@ export class BookingClaimComponent implements OnInit {
   private generateQrs(): void {
     if (!this.booking || this.booking.status !== 'confirmed') return;
     for (const s of this.booking.seats) {
-      const uuid = s.ticket_uuid;  // null unless this seat is yours
+      const uuid = s.ticket_uuid; // null unless this seat is yours
       if (!uuid || this.qrCodes[uuid]) continue;
       const url = `${window.location.origin}/validate/${uuid}`;
       QRCode.toDataURL(url, { width: 300, margin: 0 })
-        .then(dataUrl => { this.qrCodes[uuid] = dataUrl; })
+        .then((dataUrl) => {
+          this.qrCodes[uuid] = dataUrl;
+        })
         .catch(() => {});
     }
   }
@@ -208,14 +296,14 @@ export class BookingClaimComponent implements OnInit {
   confirmClaim(s: BookingSeatDto): void {
     if (!this.claimName.trim()) return;
     this.bookingService.claimSeat(this.token, s.seat_id, this.claimName.trim()).subscribe({
-      next: b => {
+      next: (b) => {
         this.booking = b;
         this.claimingId = null;
         this.claimName = '';
         this.toast.success('Seat claimed!');
         this.generateQrs();
       },
-      error: err => this.toast.error(err.error?.error || 'Could not claim seat'),
+      error: (err) => this.toast.error(err.error?.error || 'Could not claim seat'),
     });
   }
 }

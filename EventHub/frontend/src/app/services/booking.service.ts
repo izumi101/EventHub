@@ -27,11 +27,17 @@ export class BookingService {
   }
 
   claimSeat(token: string, seatId: number, name: string): Observable<BookingDto> {
-    return this.http.post<BookingDto>(`${this.api}/shared/${token}/claim/`, { seat_id: seatId, name });
+    return this.http.post<BookingDto>(`${this.api}/shared/${token}/claim/`, {
+      seat_id: seatId,
+      name,
+    });
   }
 
   checkout(id: string): Observable<{ checkout_url: string; mock?: boolean }> {
-    return this.http.post<{ checkout_url: string; mock?: boolean }>(`${this.api}/${id}/checkout/`, {});
+    return this.http.post<{ checkout_url: string; mock?: boolean }>(
+      `${this.api}/${id}/checkout/`,
+      {},
+    );
   }
 
   cancel(id: string): Observable<any> {

@@ -5,7 +5,17 @@ import { EventService } from '../../services/event.service';
 import { ModalService } from '../../services/modal.service';
 import { ToastService } from '../../services/toast.service';
 import { Event } from '../../models/models';
-import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, Copy } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  Plus,
+  Calendar,
+  MapPin,
+  Edit,
+  Trash2,
+  Users,
+  Eye,
+  Copy,
+} from 'lucide-angular';
 
 @Component({
   selector: 'app-my-events',
@@ -14,7 +24,6 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
-
         <!-- Header -->
         <div class="flex items-center justify-between mb-7">
           <div>
@@ -33,12 +42,15 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
             <span class="spinner"></span>
             <span class="text-sm">Loading your events...</span>
           </div>
-
         } @else if (events.length === 0) {
           <!-- Empty -->
           <div class="flex flex-col items-center justify-center py-20 text-center">
             <div class="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
-              <lucide-icon [img]="icons.Calendar" class="w-6 h-6 text-muted-foreground" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.Calendar"
+                class="w-6 h-6 text-muted-foreground"
+                aria-hidden="true"
+              ></lucide-icon>
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">No events yet</h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
@@ -49,19 +61,23 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
               Create event
             </a>
           </div>
-
         } @else {
           <div class="card divide-y divide-border">
             @for (event of events; track event.id) {
               <div class="flex items-center gap-4 p-4 hover:bg-muted/40 transition-colors">
-
                 <!-- Thumbnail -->
                 <div class="w-16 h-12 rounded-md bg-muted overflow-hidden flex-shrink-0">
                   @if (event.image) {
-                    <img [src]="event.image" [alt]="event.title" class="w-full h-full object-cover" />
+                    <img
+                      [src]="event.image"
+                      [alt]="event.title"
+                      class="w-full h-full object-cover"
+                    />
                   } @else {
                     <div class="w-full h-full flex items-center justify-center bg-secondary">
-                      <span class="text-lg font-bold text-muted-foreground/20">{{ event.title.charAt(0) }}</span>
+                      <span class="text-lg font-bold text-muted-foreground/20">{{
+                        event.title.charAt(0)
+                      }}</span>
                     </div>
                   }
                 </div>
@@ -69,16 +85,26 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
                 <!-- Info -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-0.5">
-                    <span class="badge {{ statusBadgeClass(event.status) }} text-2xs">{{ event.status }}</span>
+                    <span class="badge {{ statusBadgeClass(event.status) }} text-2xs">{{
+                      event.status
+                    }}</span>
                   </div>
                   <p class="text-sm font-semibold text-foreground truncate">{{ event.title }}</p>
                   <div class="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                     <span class="flex items-center gap-1">
-                      <lucide-icon [img]="icons.Calendar" class="w-3 h-3" aria-hidden="true"></lucide-icon>
-                      {{ event.date | date:'MMM d, y' }}
+                      <lucide-icon
+                        [img]="icons.Calendar"
+                        class="w-3 h-3"
+                        aria-hidden="true"
+                      ></lucide-icon>
+                      {{ event.date | date: 'MMM d, y' }}
                     </span>
                     <span class="flex items-center gap-1 truncate">
-                      <lucide-icon [img]="icons.MapPin" class="w-3 h-3" aria-hidden="true"></lucide-icon>
+                      <lucide-icon
+                        [img]="icons.MapPin"
+                        class="w-3 h-3"
+                        aria-hidden="true"
+                      ></lucide-icon>
                       {{ event.location }}
                     </span>
                   </div>
@@ -100,7 +126,11 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
                     title="Manage attendees"
                     aria-label="Manage attendees"
                   >
-                    <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                    <lucide-icon
+                      [img]="icons.Users"
+                      class="w-4 h-4"
+                      aria-hidden="true"
+                    ></lucide-icon>
                   </a>
                   <a
                     [routerLink]="['/edit-event', event.id]"
@@ -108,7 +138,11 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
                     title="Edit event"
                     aria-label="Edit event"
                   >
-                    <lucide-icon [img]="icons.Edit" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                    <lucide-icon
+                      [img]="icons.Edit"
+                      class="w-4 h-4"
+                      aria-hidden="true"
+                    ></lucide-icon>
                   </a>
                   <button
                     (click)="cloneEvent(event.id)"
@@ -120,7 +154,11 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
                     @if (cloningId === event.id) {
                       <span class="spinner spinner-sm"></span>
                     } @else {
-                      <lucide-icon [img]="icons.Copy" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                      <lucide-icon
+                        [img]="icons.Copy"
+                        class="w-4 h-4"
+                        aria-hidden="true"
+                      ></lucide-icon>
                     }
                   </button>
                   <button
@@ -129,7 +167,11 @@ import { LucideAngularModule, Plus, Calendar, MapPin, Edit, Trash2, Users, Eye, 
                     title="Delete event"
                     aria-label="Delete event"
                   >
-                    <lucide-icon [img]="icons.Trash2" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                    <lucide-icon
+                      [img]="icons.Trash2"
+                      class="w-4 h-4"
+                      aria-hidden="true"
+                    ></lucide-icon>
                   </button>
                 </div>
               </div>
@@ -160,8 +202,14 @@ export class MyEventsComponent implements OnInit {
   loadEvents(): void {
     this.loading = true;
     this.eventService.getMyEvents().subscribe({
-      next: res => { this.events = res.results; this.loading = false; },
-      error: () => { this.toastService.error('Failed to load events.'); this.loading = false; },
+      next: (res) => {
+        this.events = res.results;
+        this.loading = false;
+      },
+      error: () => {
+        this.toastService.error('Failed to load events.');
+        this.loading = false;
+      },
     });
   }
 
@@ -173,17 +221,20 @@ export class MyEventsComponent implements OnInit {
         this.toastService.success('Event duplicated as a draft.');
         this.loadEvents();
       },
-      error: () => { this.cloningId = null; this.toastService.error('Could not duplicate event.'); },
+      error: () => {
+        this.cloningId = null;
+        this.toastService.error('Could not duplicate event.');
+      },
     });
   }
 
   statusBadgeClass(status: string): string {
     const map: Record<string, string> = {
-      published:  'badge-published',
-      pending:    'badge-pending',
-      rejected:   'badge-rejected',
-      cancelled:  'badge-rejected',
-      completed:  'badge-completed',
+      published: 'badge-published',
+      pending: 'badge-pending',
+      rejected: 'badge-rejected',
+      cancelled: 'badge-rejected',
+      completed: 'badge-completed',
     };
     return map[status] ?? 'badge-pending';
   }
@@ -199,7 +250,7 @@ export class MyEventsComponent implements OnInit {
     if (!ok) return;
     this.eventService.deleteEvent(id).subscribe({
       next: () => {
-        this.events = this.events.filter(e => e.id !== id);
+        this.events = this.events.filter((e) => e.id !== id);
         this.toastService.success('Event deleted.');
       },
       error: () => this.toastService.error('Failed to delete event.'),

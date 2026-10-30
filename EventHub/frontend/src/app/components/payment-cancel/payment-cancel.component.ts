@@ -10,14 +10,20 @@ import { LucideAngularModule, XCircle } from 'lucide-angular';
   template: `
     <div class="min-h-screen bg-muted flex items-center justify-center px-4 py-12 pt-20">
       <div class="card w-full max-w-sm p-8 shadow-md text-center animate-scale-in">
-
         <div class="flex flex-col items-center gap-3 mb-6">
-          <div class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center">
-            <lucide-icon [img]="icons.XCircle" class="w-8 h-8 text-[color:var(--destructive)]" aria-hidden="true"></lucide-icon>
+          <div
+            class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
+          >
+            <lucide-icon
+              [img]="icons.XCircle"
+              class="w-8 h-8 text-[color:var(--destructive)]"
+              aria-hidden="true"
+            ></lucide-icon>
           </div>
           <h1 class="text-xl font-bold text-foreground">Payment cancelled</h1>
           <p class="text-sm text-muted-foreground max-w-xs">
-            No charges were made. Your registration is on hold — you can retry or browse other events.
+            No charges were made. Your registration is on hold — you can retry or browse other
+            events.
           </p>
         </div>
 

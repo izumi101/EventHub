@@ -8,7 +8,7 @@ async function login(page: Page, username: string, password: string) {
   await page.fill('input[name="username"]', username);
   await page.fill('input[name="password"]', password);
   const [response] = await Promise.all([
-    page.waitForResponse(r => r.url().includes('/api/v1/auth/login/')),
+    page.waitForResponse((r) => r.url().includes('/api/v1/auth/login/')),
     page.click('button[type="submit"]'),
   ]);
   expect(response.status()).toBe(200);
@@ -16,12 +16,13 @@ async function login(page: Page, username: string, password: string) {
 
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
-  page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
-  page.on('console', m => {
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
     // CSP violations and runtime errors show up as console errors.
     if (m.type() !== 'error') return;
     // "No seat map for this event" is an expected 404 the checkout handles.
-    if (m.text().startsWith('Failed to load resource') && m.location().url.endsWith('/seat_map/')) return;
+    if (m.text().startsWith('Failed to load resource') && m.location().url.endsWith('/seat_map/'))
+      return;
     errors.push(`console: ${m.text()} (${m.location().url})`);
   });
   return errors;
@@ -58,9 +59,11 @@ test('attendee buys a paid ticket and gets the online link', async ({ page }) =>
   const id = (await events.json()).results[0].id;
   const token = await page.evaluate(() => localStorage.getItem('access_token'));
   const anonymous = await (await page.request.get(`/api/v1/events/${id}/`, { headers: {} })).json();
-  const holder = await (await page.request.get(`/api/v1/events/${id}/`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })).json();
+  const holder = await (
+    await page.request.get(`/api/v1/events/${id}/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  ).json();
   expect(anonymous.online_link).toBe('');
   expect(holder.online_link).toContain('meet.example.com');
 
@@ -72,9 +75,11 @@ test('seat map updates arrive over the WebSocket through nginx', async ({ page }
   const id = events.results[0].id;
 
   // The demo data has no seat maps: the organizer creates one (400 if it exists).
-  const org = await (await page.request.post('/api/v1/auth/login/', {
-    data: { username: 'organizer', password: 'password123' },
-  })).json();
+  const org = await (
+    await page.request.post('/api/v1/auth/login/', {
+      data: { username: 'organizer', password: 'password123' },
+    })
+  ).json();
   await page.request.post(`/api/v1/events/${id}/seat-map/create/`, {
     data: { rows: 2, cols: 4, sync_capacity: false },
     headers: { Authorization: `Bearer ${org.tokens.access}` },
@@ -82,8 +87,9 @@ test('seat map updates arrive over the WebSocket through nginx', async ({ page }
 
   await login(page, 'attendee', 'password123');
 
-  const snapshot = page.waitForEvent('websocket', ws => ws.url().includes(`/ws/seats/${id}/`))
-    .then(ws => ws.waitForEvent('framereceived'));
+  const snapshot = page
+    .waitForEvent('websocket', (ws) => ws.url().includes(`/ws/seats/${id}/`))
+    .then((ws) => ws.waitForEvent('framereceived'));
   await page.goto(`/events/${id}/group`);
   const frame = await snapshot;
   expect(String(frame.payload)).toContain('"type": "snapshot"');
