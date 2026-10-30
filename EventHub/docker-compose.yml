@@ -123,6 +123,71 @@ services:
       backend:
         condition: service_healthy
 
+  # ---- Feature flags: self-hosted Unleash (docs/FEATURE_FLAGS.md) ---- #
+  # Opt-in profile (`COMPOSE_PROFILES=flags` in .env, or `--profile flags`):
+  # the default stack and CI don't depend on it. Its own database: Unleash migrates its schema on every
+  # start, and keeping it apart from the app's data keeps backups, restores,
+  # credentials and upgrades independent.
+  unleash-db:
+    image: pgvector/pgvector:pg16
+    container_name: eventhub_unleash_db
+    profiles: [flags]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: unleash
+      POSTGRES_USER: unleash
+      POSTGRES_PASSWORD: ${UNLEASH_DB_PASSWORD:?Set UNLEASH_DB_PASSWORD in .env (see .env.example)}
+    volumes:
+      - unleash_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unleash -d unleash"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  unleash:
+    # 8.2.0, pinned by the digest of its multi-arch index (amd64 + arm64).
+    image: unleashorg/unleash-server:8.2.0@sha256:5020013b7a9a93c8ed3686d36b5025399714020b3fb5ef41afd84ba37a88c050
+    container_name: eventhub_unleash
+    profiles: [flags]
+    restart: unless-stopped
+    environment:
+      DATABASE_HOST: unleash-db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: unleash
+      DATABASE_USERNAME: unleash
+      DATABASE_PASSWORD: ${UNLEASH_DB_PASSWORD}
+      DATABASE_SSL: "false"
+      # Public address of the admin UI (links in emails / invitations).
+      UNLEASH_URL: ${UNLEASH_PUBLIC_URL:-http://localhost:4242}
+      # The first admin account, created on the first start only; change the
+      # password in the UI afterwards (changing it here has no effect).
+      UNLEASH_DEFAULT_ADMIN_USERNAME: admin
+      UNLEASH_DEFAULT_ADMIN_PASSWORD: ${UNLEASH_ADMIN_PASSWORD:?Set UNLEASH_ADMIN_PASSWORD in .env (see .env.example)}
+      # Tokens created on the first start (only while no token exists yet);
+      # rotate them in the UI or API afterwards. The backend token is the one
+      # the backend polls with; an admin token is for local automation only.
+      INIT_BACKEND_API_TOKENS: ${UNLEASH_BACKEND_API_TOKEN:?Set UNLEASH_BACKEND_API_TOKEN in .env (see .env.example)}
+      INIT_ADMIN_API_TOKENS: ${UNLEASH_ADMIN_API_TOKEN:-}
+      # No calls home.
+      CHECK_VERSION: "false"
+      SEND_TELEMETRY: "false"
+      LOG_LEVEL: ${UNLEASH_LOG_LEVEL:-warn}
+    # Admin UI for operators on this machine only (an SSH tunnel on a server).
+    ports:
+      - "127.0.0.1:${UNLEASH_HOST_PORT:-4242}:4242"
+    depends_on:
+      unleash-db:
+        condition: service_healthy
+    healthcheck:
+      # The image has busybox wget, no curl. /health answers once migrations ran.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4242/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 volumes:
   postgres_data:
   backend_media:
+  unleash_db_data:
