@@ -1,10 +1,11 @@
-import { Component, Input, OnInit } from '@angular/core';
+import { Component, Input, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { EventService } from '../../services/event.service';
+import { EventService, type Review } from '../../services/event.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { Event, Registration } from '../../models/models';
+import { apiErrorMessage } from '../../api/api-error';
 
 /** Reviews block on the event page: list, average rating and the
  *  "write a review" form (confirmed attendees, after the event starts). */
@@ -99,33 +100,39 @@ import { Event, Registration } from '../../models/models';
   `,
 })
 export class EventReviewsComponent implements OnInit {
+  private eventService = inject(EventService);
+  private authService = inject(AuthService);
+  private toastService = inject(ToastService);
+
   @Input({ required: true }) event!: Event;
   /** The viewer's registration — review rights need a confirmed ticket. */
   @Input() myRegistration: Registration | null = null;
 
-  reviews: any[] = [];
-  myReview: any = null;
+  reviews: Review[] = [];
+  myReview: Review | null = null;
   showReviewForm = false;
   reviewRating = 0;
   reviewComment = '';
   submittingReview = false;
-
-  constructor(
-    private eventService: EventService,
-    private authService: AuthService,
-    private toastService: ToastService,
-  ) {}
+  /** Set once this visitor's review is accepted, before the reload brings it in. */
+  private reviewPosted = false;
 
   ngOnInit(): void {
+    this.loadReviews();
+  }
+
+  private loadReviews(): void {
     this.eventService.getEventReviews(this.event.id).subscribe({
       next: (list) => {
         this.reviews = list;
         if (this.authService.currentUser) {
           this.myReview =
-            list.find((r: any) => r.username === this.authService.currentUser?.username) ?? null;
+            list.find((r) => r.username === this.authService.currentUser?.username) ?? null;
         }
       },
-      error: () => {},
+      error: () => {
+        // The block shows "No reviews yet"; reviews are not essential to the page.
+      },
     });
   }
 
@@ -136,7 +143,7 @@ export class EventReviewsComponent implements OnInit {
 
   /** Reviews: confirmed attendees only, and only once the event started. */
   get canReview(): boolean {
-    if (!this.authService.isLoggedIn || this.myReview) return false;
+    if (!this.authService.isLoggedIn || this.myReview || this.reviewPosted) return false;
     if (this.myRegistration?.status !== 'confirmed') return false;
     return new Date(this.event.date).getTime() <= Date.now();
   }
@@ -145,9 +152,11 @@ export class EventReviewsComponent implements OnInit {
     if (!this.reviewRating) return;
     this.submittingReview = true;
     this.eventService.createReview(this.event.id, this.reviewRating, this.reviewComment).subscribe({
-      next: (review) => {
-        this.reviews = [review, ...this.reviews];
-        this.myReview = review;
+      next: () => {
+        this.reviewPosted = true;
+        // The create endpoint echoes only rating + comment (ReviewCreate), not a
+        // full Review with id/author/date, so reload the list to show it.
+        this.loadReviews();
         this.showReviewForm = false;
         this.reviewRating = 0;
         this.reviewComment = '';
@@ -155,7 +164,7 @@ export class EventReviewsComponent implements OnInit {
         this.toastService.success('Review posted!');
       },
       error: (err) => {
-        this.toastService.error(err.error?.non_field_errors?.[0] || 'Failed to post review');
+        this.toastService.error(apiErrorMessage(err, 'Failed to post review', 'non_field_errors'));
         this.submittingReview = false;
       },
     });

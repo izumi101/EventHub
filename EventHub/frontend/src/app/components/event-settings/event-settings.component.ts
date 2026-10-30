@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -12,7 +12,7 @@ import {
 } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
-import { Event as EventModel } from '../../models/models';
+import { Event as EventModel, SeatMap } from '../../models/models';
 import {
   LucideAngularModule,
   Users,
@@ -25,9 +25,10 @@ import {
   Link2,
   RotateCcw,
   Armchair,
-  AlertTriangle,
+  TriangleAlert,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-event-settings',
@@ -66,7 +67,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.Users" class="w-4 h-4"></lucide-icon> Team
+            <lucide-icon [img]="icons.Users" class="w-4 h-4" /> Team
           </button>
           <button
             (click)="tab = 'affiliates'"
@@ -77,7 +78,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.Share2" class="w-4 h-4"></lucide-icon> Affiliates
+            <lucide-icon [img]="icons.Share2" class="w-4 h-4" /> Affiliates
           </button>
           <button
             (click)="tab = 'webhooks'"
@@ -88,7 +89,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.WebhookIcon" class="w-4 h-4"></lucide-icon> Webhooks
+            <lucide-icon [img]="icons.WebhookIcon" class="w-4 h-4" /> Webhooks
           </button>
           <button
             (click)="tab = 'refunds'"
@@ -99,7 +100,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.RotateCcw" class="w-4 h-4"></lucide-icon> Refunds
+            <lucide-icon [img]="icons.RotateCcw" class="w-4 h-4" /> Refunds
             @if (pendingRefunds > 0) {
               <span
                 class="bg-[color:var(--destructive)] text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center"
@@ -116,7 +117,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.Armchair" class="w-4 h-4"></lucide-icon> Seat map
+            <lucide-icon [img]="icons.Armchair" class="w-4 h-4" /> Seat map
           </button>
           <button
             (click)="tab = 'danger'"
@@ -127,7 +128,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.AlertTriangle" class="w-4 h-4"></lucide-icon> Danger
+            <lucide-icon [img]="icons.TriangleAlert" class="w-4 h-4" /> Danger
           </button>
         </div>
 
@@ -182,7 +183,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                     (click)="removeStaff(s)"
                     class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
                   >
-                    <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                    <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                   </button>
                 </div>
               }
@@ -242,14 +243,14 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       (click)="removeAffiliate(a)"
                       class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
                     >
-                      <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                      <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                     </button>
                   </div>
                   <div class="flex items-center gap-2 bg-muted rounded-lg px-3 py-2">
                     <lucide-icon
                       [img]="icons.Link2"
                       class="w-4 h-4 text-muted-foreground flex-shrink-0"
-                    ></lucide-icon>
+                    />
                     <span class="text-xs text-muted-foreground truncate flex-1 font-mono">{{
                       affLink(a)
                     }}</span>
@@ -257,7 +258,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       <lucide-icon
                         [img]="copiedId === a.id ? icons.Check : icons.Copy"
                         class="w-4 h-4"
-                      ></lucide-icon>
+                      />
                     </button>
                   </div>
                 </div>
@@ -368,7 +369,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       (click)="removeWebhook(w)"
                       class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
                     >
-                      <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                      <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -564,12 +565,17 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   `,
 })
 export class EventSettingsComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toast = inject(ToastService);
+  private modal = inject(ModalService);
+
   eventId = 0;
   event: EventModel | null = null;
   tab: 'team' | 'affiliates' | 'webhooks' | 'refunds' | 'seatmap' | 'danger' = 'team';
 
   // Seat map
-  seatMapInfo: any = null;
+  seatMapInfo: SeatMap | null = null;
   loadingSeatMap = false;
   smRows = 6;
   smCols = 8;
@@ -625,15 +631,8 @@ export class EventSettingsComponent implements OnInit {
     Link2,
     RotateCcw,
     Armchair,
-    AlertTriangle,
+    TriangleAlert,
   };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toast: ToastService,
-    private modal: ModalService,
-  ) {}
 
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
@@ -678,7 +677,7 @@ export class EventSettingsComponent implements OnInit {
         },
         error: (err) => {
           this.creatingSeatMap = false;
-          this.toast.error(err.error?.error || 'Could not create the seat map.');
+          this.toast.error(apiErrorMessage(err, 'Could not create the seat map.', 'error'));
         },
       });
   }
@@ -705,7 +704,7 @@ export class EventSettingsComponent implements OnInit {
       },
       error: (err) => {
         this.cancellingEvent = false;
-        this.toast.error(err.error?.error || 'Could not cancel the event.');
+        this.toast.error(apiErrorMessage(err, 'Could not cancel the event.', 'error'));
       },
     });
   }
@@ -723,7 +722,7 @@ export class EventSettingsComponent implements OnInit {
       },
       error: (err) => {
         this.resolvingId = null;
-        this.toast.error(err.error?.error || 'Could not resolve.');
+        this.toast.error(apiErrorMessage(err, 'Could not resolve.', 'error'));
       },
     });
   }
@@ -753,7 +752,7 @@ export class EventSettingsComponent implements OnInit {
       error: (err) => {
         this.savingStaff = false;
         this.toast.error(
-          err.error?.invite_username?.[0] || err.error?.detail || 'Could not add member.',
+          apiErrorMessage(err, 'Could not add member.', 'invite_username', 'detail'),
         );
       },
     });
@@ -789,7 +788,7 @@ export class EventSettingsComponent implements OnInit {
         },
         error: (err) => {
           this.savingAff = false;
-          this.toast.error(err.error?.code?.[0] || 'Could not create (duplicate code?).');
+          this.toast.error(apiErrorMessage(err, 'Could not create (duplicate code?).', 'code'));
         },
       });
   }
@@ -806,7 +805,7 @@ export class EventSettingsComponent implements OnInit {
     return `${window.location.origin}/events/${this.eventId}?ref=${a.code}`;
   }
   copy(text: string, id: number) {
-    navigator.clipboard.writeText(text).then(() => {
+    void navigator.clipboard.writeText(text).then(() => {
       this.copiedId = id;
       setTimeout(() => (this.copiedId = null), 2000);
     });
@@ -841,7 +840,7 @@ export class EventSettingsComponent implements OnInit {
         },
         error: (err) => {
           this.savingHook = false;
-          this.toast.error(err.error?.url?.[0] || 'Could not create webhook.');
+          this.toast.error(apiErrorMessage(err, 'Could not create webhook.', 'url'));
         },
       });
   }

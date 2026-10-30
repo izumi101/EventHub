@@ -1,15 +1,19 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
+import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-register',
   standalone: true,
   imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
   template: `
+    <!-- Each step of this multi-step form shows the one field to fill next, which
+         takes focus on purpose: a deliberate exception to no-autofocus. -->
+    <!-- eslint-disable @angular-eslint/template/no-autofocus -->
     <div class="min-h-dvh flex bg-background">
       <!-- Left: editorial brand panel -->
       <aside
@@ -218,7 +222,7 @@ import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
                       [img]="showPassword ? icons.EyeOff : icons.Eye"
                       class="w-4 h-4"
                       aria-hidden="true"
-                    ></lucide-icon>
+                    />
                   </button>
                 </div>
                 @if (password) {
@@ -318,6 +322,9 @@ import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
   `,
 })
 export class RegisterComponent {
+  private authService = inject(AuthService);
+  private router = inject(Router);
+
   readonly steps = [1, 2, 3, 4];
 
   currentStep = 1;
@@ -347,11 +354,6 @@ export class RegisterComponent {
     return titles[this.currentStep] ?? '';
   }
 
-  constructor(
-    private authService: AuthService,
-    private router: Router,
-  ) {}
-
   nextStep(): void {
     this.errors = [];
 
@@ -373,14 +375,14 @@ export class RegisterComponent {
         },
         error: (err) => {
           this.submitting = false;
-          this.errors.push(err.error?.error || 'Failed to send verification code.');
+          this.errors.push(apiErrorMessage(err, 'Failed to send verification code.', 'error'));
         },
       });
       return;
     }
 
     if (this.currentStep === 2) {
-      if (!this.verification_code || this.verification_code.length !== 6) {
+      if (this.verification_code.length !== 6) {
         this.errors.push('Enter the 6-digit code from your email.');
         return;
       }
@@ -392,7 +394,7 @@ export class RegisterComponent {
         },
         error: (err) => {
           this.submitting = false;
-          this.errors.push(err.error?.error || 'Invalid or expired code.');
+          this.errors.push(apiErrorMessage(err, 'Invalid or expired code.', 'error'));
         },
       });
       return;
@@ -437,13 +439,15 @@ export class RegisterComponent {
       .subscribe({
         next: () => {
           this.submitting = false;
-          this.router.navigate(['/']);
+          void this.router.navigate(['/']);
         },
         error: (err) => {
           this.submitting = false;
-          if (err.error && typeof err.error === 'object') {
-            for (const key of Object.keys(err.error)) {
-              this.errors.push(`${err.error[key]}`);
+          const body = apiErrorBody(err);
+          if (body) {
+            // DRF validation errors: one entry per field, each a list of messages.
+            for (const messages of Object.values(body)) {
+              this.errors.push(String(messages));
             }
           } else {
             this.errors.push('Registration failed. Please try again.');

@@ -12,16 +12,18 @@ import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import jsQR from 'jsqr';
 import { EventService } from '../../services/event.service';
+import { supportsCamera } from '../../utils/browser-support';
 import { CheckInResponse } from '../../models/models';
 import {
   LucideAngularModule,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
+  CircleCheckBig,
+  TriangleAlert,
+  CircleX,
   Camera,
   RefreshCw,
   ChevronLeft,
 } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 type ScanState =
   | 'requesting' // asking for camera access
@@ -44,11 +46,7 @@ type ScanState =
           routerLink="/organizer/dashboard"
           class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5"
         >
-          <lucide-icon
-            [img]="icons.ChevronLeft"
-            class="w-3.5 h-3.5"
-            aria-hidden="true"
-          ></lucide-icon>
+          <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true" />
           Dashboard
         </a>
 
@@ -96,7 +94,7 @@ type ScanState =
               <div
                 class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/90"
               >
-                <lucide-icon [img]="icons.Camera" class="w-8 h-8" aria-hidden="true"></lucide-icon>
+                <lucide-icon [img]="icons.Camera" class="w-8 h-8" aria-hidden="true" />
                 <p class="text-sm font-medium">Requesting camera access...</p>
               </div>
             }
@@ -109,10 +107,10 @@ type ScanState =
                 class="w-14 h-14 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4"
               >
                 <lucide-icon
-                  [img]="icons.XCircle"
+                  [img]="icons.CircleX"
                   class="w-7 h-7 text-[color:var(--destructive)]"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
               </div>
               <h2 class="text-base font-semibold text-foreground mb-1">
                 @switch (state) {
@@ -141,11 +139,7 @@ type ScanState =
                 }
               </p>
               <button (click)="startCamera()" class="btn btn-secondary btn-sm">
-                <lucide-icon
-                  [img]="icons.RefreshCw"
-                  class="w-4 h-4"
-                  aria-hidden="true"
-                ></lucide-icon>
+                <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
                 Try again
               </button>
             </div>
@@ -159,10 +153,10 @@ type ScanState =
                   class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center mx-auto mb-4"
                 >
                   <lucide-icon
-                    [img]="icons.CheckCircle"
+                    [img]="icons.CircleCheckBig"
                     class="w-8 h-8 text-[color:var(--pine-600)]"
                     aria-hidden="true"
-                  ></lucide-icon>
+                  />
                 </div>
                 <h2 class="text-xl font-bold text-foreground mb-1">Access granted</h2>
                 <p class="text-sm text-muted-foreground mb-5">Ticket valid · checked in</p>
@@ -171,10 +165,10 @@ type ScanState =
                   class="w-16 h-16 rounded-full bg-[color:var(--warning-50)] flex items-center justify-center mx-auto mb-4"
                 >
                   <lucide-icon
-                    [img]="icons.AlertTriangle"
+                    [img]="icons.TriangleAlert"
                     class="w-8 h-8 text-warning"
                     aria-hidden="true"
-                  ></lucide-icon>
+                  />
                 </div>
                 <h2 class="text-xl font-bold text-foreground mb-1">Already scanned</h2>
                 <p class="text-sm text-muted-foreground mb-5">This ticket has been used</p>
@@ -183,10 +177,10 @@ type ScanState =
                   class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4"
                 >
                   <lucide-icon
-                    [img]="icons.XCircle"
+                    [img]="icons.CircleX"
                     class="w-8 h-8 text-[color:var(--destructive)]"
                     aria-hidden="true"
-                  ></lucide-icon>
+                  />
                 </div>
                 <h2 class="text-xl font-bold text-foreground mb-1">Invalid ticket</h2>
                 <p class="text-sm text-muted-foreground mb-5">{{ errorMessage }}</p>
@@ -221,7 +215,7 @@ type ScanState =
               }
 
               <button (click)="scanNext()" class="btn btn-primary btn-full btn-lg">
-                <lucide-icon [img]="icons.Camera" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                <lucide-icon [img]="icons.Camera" class="w-4 h-4" aria-hidden="true" />
                 Scan next ticket
               </button>
             </div>
@@ -236,6 +230,9 @@ type ScanState =
   `,
 })
 export class ScanComponent implements AfterViewInit, OnDestroy {
+  private eventService = inject(EventService);
+  private zone = inject(NgZone);
+
   @ViewChild('video') videoRef!: ElementRef<HTMLVideoElement>;
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
 
@@ -244,20 +241,15 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
   resultStatus: 'success' | 'used' | 'error' = 'error';
   errorMessage = '';
 
-  readonly icons = { CheckCircle, AlertTriangle, XCircle, Camera, RefreshCw, ChevronLeft };
+  readonly icons = { CircleCheckBig, TriangleAlert, CircleX, Camera, RefreshCw, ChevronLeft };
 
   private stream: MediaStream | null = null;
   private rafId: number | null = null;
   private readonly platformId = inject(PLATFORM_ID);
 
-  constructor(
-    private eventService: EventService,
-    private zone: NgZone,
-  ) {}
-
   ngAfterViewInit(): void {
     if (isPlatformBrowser(this.platformId)) {
-      this.startCamera();
+      void this.startCamera();
     }
   }
 
@@ -269,7 +261,7 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
     this.state = 'requesting';
     this.result = null;
 
-    if (!navigator.mediaDevices?.getUserMedia) {
+    if (!supportsCamera()) {
       this.state = 'insecure';
       return;
     }
@@ -287,7 +279,8 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
       this.state = 'scanning';
       this.zone.runOutsideAngular(() => this.tick());
     } catch (err: unknown) {
-      const name = (err as DOMException)?.name;
+      // getUserMedia rejects with a DOMException (an Error subclass).
+      const name = err instanceof Error ? err.name : undefined;
       if (name === 'NotAllowedError' || name === 'SecurityError') {
         this.state = 'denied';
       } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
@@ -311,9 +304,10 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
   private tick(): void {
     if (this.state !== 'scanning') return;
 
-    const video = this.videoRef?.nativeElement;
-    const canvas = this.canvasRef?.nativeElement;
-    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+    // Both elements are always in the template, so the view queries are set.
+    const video = this.videoRef.nativeElement;
+    const canvas = this.canvasRef.nativeElement;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
       this.rafId = requestAnimationFrame(() => this.tick());
       return;
     }
@@ -343,7 +337,7 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
 
   /** Extracts the ticket uuid from a QR payload (a full URL or a bare uuid). */
   private extractUuid(data: string): string | null {
-    const urlMatch = data.match(/\/validate\/([0-9a-fA-F-]{6,})/);
+    const urlMatch = /\/validate\/([0-9a-fA-F-]{6,})/.exec(data);
     if (urlMatch) return urlMatch[1];
     const trimmed = data.trim();
     if (/^[0-9a-fA-F-]{6,}$/.test(trimmed)) return trimmed;
@@ -367,7 +361,11 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
       error: (err) => {
         this.result = null;
         this.resultStatus = 'error';
-        this.errorMessage = err.error?.error || 'Invalid ticket or insufficient permissions.';
+        this.errorMessage = apiErrorMessage(
+          err,
+          'Invalid ticket or insufficient permissions.',
+          'error',
+        );
         this.vibrate([200]);
         this.state = 'result';
       },

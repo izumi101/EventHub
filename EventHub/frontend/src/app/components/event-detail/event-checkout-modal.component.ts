@@ -1,12 +1,19 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { EventService, PromoQuote, EventQuestion, TicketType } from '../../services/event.service';
+import {
+  EventService,
+  PromoQuote,
+  EventQuestion,
+  TicketType,
+  type RegisterPayload,
+} from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event, Seat, SeatMap } from '../../models/models';
 import { SeatSelectorComponent } from '../seat-selector/seat-selector.component';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
 
 /** The "Confirm registration" checkout dialog.
  *
@@ -21,12 +28,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
   template: `
     <div
       class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
-      (click)="closed.emit()"
     >
       <div
         class="card w-full max-w-md shadow-lg animate-slide-up"
-        (click)="$event.stopPropagation()"
         appDialog
+        dismissOnBackdrop
         (dismiss)="closed.emit()"
       >
         <div class="flex items-center justify-between p-5 border-b border-border">
@@ -108,11 +114,10 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <div class="space-y-2">
               <p class="text-sm font-semibold text-foreground">Choose your ticket</p>
               @for (tt of event.ticket_types; track tt.id) {
-                <button
-                  type="button"
-                  (click)="selectTicketType(tt)"
-                  [disabled]="tt.sale_state !== 'on_sale'"
-                  class="w-full text-left p-3 rounded-xl border-2 transition-all"
+                <!-- The donation input sits beside the tier button, not inside it:
+                     interactive content inside a <button> is invalid HTML. -->
+                <div
+                  class="rounded-xl border-2 transition-all"
                   [class]="
                     selectedTicketType?.id === tt.id
                       ? 'border-primary bg-primary/5'
@@ -121,40 +126,47 @@ import { DialogDirective } from '../../directives/dialog.directive';
                         : 'border-border hover:border-primary/40'
                   "
                 >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="font-semibold text-foreground">{{ tt.name }}</span>
-                        @if (tt.kind === 'donation') {
-                          <span
-                            class="text-[10px] font-bold uppercase text-ember bg-ember/10 px-1.5 py-0.5 rounded"
-                            >Donation</span
-                          >
+                  <button
+                    type="button"
+                    (click)="selectTicketType(tt)"
+                    [disabled]="tt.sale_state !== 'on_sale'"
+                    class="w-full text-left p-3"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="font-semibold text-foreground">{{ tt.name }}</span>
+                          @if (tt.kind === 'donation') {
+                            <span
+                              class="text-[10px] font-bold uppercase text-ember bg-ember/10 px-1.5 py-0.5 rounded"
+                              >Donation</span
+                            >
+                          }
+                        </div>
+                        @if (tt.description) {
+                          <p class="text-xs text-muted-foreground mt-0.5">{{ tt.description }}</p>
                         }
+                        <p class="text-xs mt-1" [class]="tierAvailabilityClass(tt)">
+                          {{ tierAvailabilityLabel(tt) }}
+                        </p>
                       </div>
-                      @if (tt.description) {
-                        <p class="text-xs text-muted-foreground mt-0.5">{{ tt.description }}</p>
-                      }
-                      <p class="text-xs mt-1" [class]="tierAvailabilityClass(tt)">
-                        {{ tierAvailabilityLabel(tt) }}
-                      </p>
+                      <div class="text-right flex-shrink-0">
+                        <span class="font-bold text-foreground">
+                          @if (tt.kind === 'free') {
+                            Free
+                          } @else if (tt.kind === 'donation') {
+                            {{ tt.price | money: event.currency }}+
+                          } @else {
+                            {{ tt.price | money: event.currency }}
+                          }
+                        </span>
+                      </div>
                     </div>
-                    <div class="text-right flex-shrink-0">
-                      <span class="font-bold text-foreground">
-                        @if (tt.kind === 'free') {
-                          Free
-                        } @else if (tt.kind === 'donation') {
-                          {{ tt.price | money: event.currency }}+
-                        } @else {
-                          {{ tt.price | money: event.currency }}
-                        }
-                      </span>
-                    </div>
-                  </div>
+                  </button>
 
                   <!-- Donation amount input -->
                   @if (selectedTicketType?.id === tt.id && tt.kind === 'donation') {
-                    <div class="mt-3 flex items-center gap-2" (click)="$event.stopPropagation()">
+                    <div class="px-3 pb-3 flex items-center gap-2">
                       <span class="text-muted-foreground">$</span>
                       <input
                         type="number"
@@ -166,7 +178,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       />
                     </div>
                   }
-                </button>
+                </div>
               }
             </div>
           }
@@ -230,7 +242,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                   [seats]="seatMap.seats"
                   [eventId]="event.id"
                   (seatSelected)="selectedSeat = $event"
-                ></app-seat-selector>
+                />
               }
             </div>
           }
@@ -371,16 +383,19 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class EventCheckoutModalComponent implements OnInit {
+  private eventService = inject(EventService);
+  private toastService = inject(ToastService);
+
   @Input({ required: true }) event!: Event;
   /** The dynamic GA price quoted on the page (falls back to event.price). */
   @Input() currentGaPrice = '0.00';
   /** True while the parent runs the registration / payment flow. */
   @Input() registering = false;
 
-  @Output() closed = new EventEmitter<void>();
+  @Output() readonly closed = new EventEmitter<void>();
   /** Emits the ready-to-send registration payload (without affiliate code —
    *  the parent owns referral attribution). */
-  @Output() confirmed = new EventEmitter<Record<string, any>>();
+  @Output() readonly confirmed = new EventEmitter<RegisterPayload>();
 
   registrationNotes = '';
 
@@ -403,19 +418,17 @@ export class EventCheckoutModalComponent implements OnInit {
 
   // Custom questions
   questions: EventQuestion[] = [];
-  answers: Record<number, any> = {};
-
-  constructor(
-    private eventService: EventService,
-    private toastService: ToastService,
-  ) {}
+  answers: Record<number, unknown> = {};
 
   ngOnInit(): void {
     this.eventService.getEventQuestions(this.event.id).subscribe({
       next: (qs) => {
         this.questions = qs;
       },
-      error: () => {},
+      error: () => {
+        // Without the custom questions the checkout still works; the backend
+        // rejects a registration that misses a required answer.
+      },
     });
 
     // Seat map only matters for paid events without ticket tiers.
@@ -429,7 +442,7 @@ export class EventCheckoutModalComponent implements OnInit {
         error: (err) => {
           this.loadingSeatMap = false;
           // 404 = no seat map → general admission, purchase proceeds without a seat.
-          if (err.status === 404) {
+          if (apiErrorStatus(err) === 404) {
             this.seatMapMissing = true;
           } else {
             this.toastService.error('Failed to load seat map');
@@ -497,7 +510,7 @@ export class EventCheckoutModalComponent implements OnInit {
         this.checkingPromo = false;
       },
       error: (err) => {
-        this.promoError = err.error?.error || 'Invalid promo code';
+        this.promoError = apiErrorMessage(err, 'Invalid promo code', 'error');
         this.promoQuote = null;
         this.checkingPromo = false;
       },
@@ -514,14 +527,14 @@ export class EventCheckoutModalComponent implements OnInit {
 
   /** Base price after tier/seat + promo, before tax & fees. */
   get checkoutSubtotalNum(): number {
-    let base = 0;
+    let base: number;
     if (this.selectedTicketType) {
       if (this.selectedTicketType.kind === 'free') base = 0;
       else if (this.selectedTicketType.kind === 'donation')
         base = Number(this.donationAmount || this.selectedTicketType.price);
       else base = Number(this.selectedTicketType.price);
     } else if (this.selectedSeat) {
-      base = Number((this.selectedSeat as any).price ?? this.event.price);
+      base = Number(this.selectedSeat.price ?? this.event.price);
     } else {
       // GA: the dynamic price that will actually be charged.
       base = Number(this.currentGaPrice);
@@ -553,12 +566,12 @@ export class EventCheckoutModalComponent implements OnInit {
   showFeeLines(): boolean {
     const hasFees =
       Number(this.event.tax_percent || 0) > 0 || Number(this.event.service_fee_percent || 0) > 0;
-    return hasFees && this.event.fees_passed_to_buyer !== false && this.checkoutSubtotalNum > 0;
+    return hasFees && this.event.fees_passed_to_buyer && this.checkoutSubtotalNum > 0;
   }
 
   get checkoutTotal(): string {
     let total = this.checkoutSubtotalNum;
-    if (this.event.fees_passed_to_buyer !== false) {
+    if (this.event.fees_passed_to_buyer) {
       total += this.taxAmount + this.feeAmount;
     }
     return total.toFixed(2);
@@ -612,13 +625,12 @@ export class EventCheckoutModalComponent implements OnInit {
       return;
     }
 
-    const payload: Record<string, any> = { notes: this.registrationNotes };
-    if (this.selectedSeat) payload['seat_id'] = this.selectedSeat.id;
-    if (this.selectedTicketType) payload['ticket_type_id'] = this.selectedTicketType.id;
-    if (this.selectedTicketType?.kind === 'donation')
-      payload['donation_amount'] = this.donationAmount;
-    if (this.promoQuote) payload['promo_code'] = this.promoQuote.code;
-    if (this.questions.length) payload['answers'] = this.answers;
+    const payload: RegisterPayload = { notes: this.registrationNotes };
+    if (this.selectedSeat) payload.seat_id = this.selectedSeat.id;
+    if (this.selectedTicketType) payload.ticket_type_id = this.selectedTicketType.id;
+    if (this.selectedTicketType?.kind === 'donation') payload.donation_amount = this.donationAmount;
+    if (this.promoQuote) payload.promo_code = this.promoQuote.code;
+    if (this.questions.length) payload.answers = this.answers;
 
     this.confirmed.emit(payload);
   }

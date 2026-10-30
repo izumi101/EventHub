@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { BehaviorSubject, Observable, finalize, shareReplay, tap } from 'rxjs';
 import {
@@ -11,9 +11,15 @@ import {
   User,
 } from '../models/models';
 import { environment } from '../../environments/environment';
+import type { components } from '../api/openapi';
+
+/** PUT /auth/profile/: the editable name fields and profile details. */
+export type ProfileUpdate = components['schemas']['PatchedUserRequest'];
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private http = inject(HttpClient);
+
   private apiUrl = `${environment.apiUrl}/auth`;
   private readonly accessTokenKey = 'access_token';
   private readonly refreshTokenKey = 'refresh_token';
@@ -21,14 +27,14 @@ export class AuthService {
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
-  constructor(private http: HttpClient) {
+  constructor() {
     this.loadUser();
   }
 
   private loadUser(): void {
     const userData = localStorage.getItem(this.userKey);
     if (userData) {
-      this.currentUserSubject.next(JSON.parse(userData));
+      this.currentUserSubject.next(JSON.parse(userData) as User);
     }
   }
 
@@ -50,9 +56,9 @@ export class AuthService {
     password: string,
     password2: string,
     verification_code: string,
-    first_name: string = '',
-    last_name: string = '',
-    phone: string = '',
+    first_name = '',
+    last_name = '',
+    phone = '',
   ): Observable<AuthResponse> {
     // Always registers an attendee — organizer accounts are created by admins.
     return this.http
@@ -113,7 +119,7 @@ export class AuthService {
     );
   }
 
-  updateProfile(data: Partial<User>): Observable<User> {
+  updateProfile(data: ProfileUpdate): Observable<User> {
     return this.http.put<User>(`${this.apiUrl}/profile/`, data).pipe(
       tap((user) => {
         localStorage.setItem(this.userKey, JSON.stringify(user));
@@ -136,7 +142,7 @@ export class AuthService {
       .pipe(
         // The backend signs out every other session; keep this one with the new pair.
         tap((res) => {
-          if (res.tokens) this.storeTokens(res.tokens.access, res.tokens.refresh);
+          this.storeTokens(res.tokens.access, res.tokens.refresh);
         }),
       );
   }

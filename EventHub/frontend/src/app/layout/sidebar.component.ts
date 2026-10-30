@@ -1,6 +1,6 @@
-import { Component, HostListener } from '@angular/core';
+import { Component, HostListener, type Signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, Router } from '@angular/router';
+import { RouterModule, Router, isActive as isUrlActive } from '@angular/router';
 import { AuthService } from '../services/auth.service';
 import { ThemeService } from '../services/theme.service';
 import { ModalService } from '../services/modal.service';
@@ -59,7 +59,7 @@ import {
             [img]="layout.collapsed() ? icons.PanelLeftOpen : icons.PanelLeftClose"
             class="w-4 h-4"
             aria-hidden="true"
-          ></lucide-icon>
+          />
         </button>
       </div>
 
@@ -83,7 +83,7 @@ import {
                   [img]="layout.isGroupOpen(section.id) ? icons.ChevronDown : icons.ChevronRight"
                   class="w-3.5 h-3.5 flex-shrink-0"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
               </button>
             } @else {
               <div class="sidebar-section-label">
@@ -112,7 +112,7 @@ import {
                   [img]="asIcon(item.icon)"
                   class="sidebar-item-icon"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
                 @if (!layout.collapsed()) {
                   <span class="sidebar-item-label">{{ item.label }}</span>
                 }
@@ -140,7 +140,7 @@ import {
             [img]="theme.isDark() ? icons.Sun : icons.Moon"
             class="sidebar-item-icon"
             aria-hidden="true"
-          ></lucide-icon>
+          />
           @if (!layout.collapsed()) {
             <span class="sidebar-item-label">{{
               theme.isDark() ? 'Light mode' : 'Dark mode'
@@ -165,33 +165,26 @@ import {
                   [img]="icons.ChevronDown"
                   class="w-3.5 h-3.5 flex-shrink-0 ml-auto text-muted-foreground"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
               }
             </button>
 
             @if (profileOpen) {
-              <div class="profile-dropdown" (click)="$event.stopPropagation()">
+              <!-- Clicks inside the menu must not reach the document listener that closes it. -->
+              <div class="profile-dropdown" role="presentation" (click)="$event.stopPropagation()">
                 <a
                   routerLink="/profile"
                   (click)="profileOpen = false; layout.closeMobile()"
                   class="profile-dropdown-item focus-ring"
                 >
-                  <lucide-icon
-                    [img]="icons.UserIcon"
-                    class="w-4 h-4"
-                    aria-hidden="true"
-                  ></lucide-icon>
+                  <lucide-icon [img]="icons.UserIcon" class="w-4 h-4" aria-hidden="true" />
                   Profile
                 </a>
                 <button
                   (click)="logout()"
                   class="profile-dropdown-item profile-dropdown-item-danger focus-ring w-full text-left"
                 >
-                  <lucide-icon
-                    [img]="icons.LogOut"
-                    class="w-4 h-4"
-                    aria-hidden="true"
-                  ></lucide-icon>
+                  <lucide-icon [img]="icons.LogOut" class="w-4 h-4" aria-hidden="true" />
                   Sign Out
                 </button>
               </div>
@@ -204,11 +197,7 @@ import {
               (click)="layout.closeMobile()"
               class="sidebar-item focus-ring text-primary"
             >
-              <lucide-icon
-                [img]="icons.UserIcon"
-                class="sidebar-item-icon"
-                aria-hidden="true"
-              ></lucide-icon>
+              <lucide-icon [img]="icons.UserIcon" class="sidebar-item-icon" aria-hidden="true" />
               <span class="sidebar-item-label">Sign In</span>
             </a>
           }
@@ -225,11 +214,20 @@ import {
   ],
 })
 export class SidebarComponent {
+  layout = inject(LayoutService);
+  theme = inject(ThemeService);
+  private authService = inject(AuthService);
+  private modalService = inject(ModalService);
+  private router = inject(Router);
+
   user: User | null = null;
   isOrganizer = false;
   isAdmin = false;
   isAttendee = false;
   profileOpen = false;
+
+  /** One router-backed signal per nav target, created on first use. */
+  private readonly activeRoutes = new Map<string, Signal<boolean>>();
 
   readonly icons = {
     PanelLeftClose,
@@ -242,22 +240,12 @@ export class SidebarComponent {
     ChevronRight,
   };
 
-  constructor(
-    public layout: LayoutService,
-    public theme: ThemeService,
-    private authService: AuthService,
-    private modalService: ModalService,
-    private router: Router,
-  ) {
+  constructor() {
     this.authService.currentUser$.subscribe((user) => {
       this.user = user;
       // Self-registered organizers carry profile.role === 'organizer';
       // staff/superuser flags come from Django admin.
-      this.isOrganizer = !!(
-        user?.is_staff ||
-        user?.is_superuser ||
-        user?.profile?.role === 'organizer'
-      );
+      this.isOrganizer = user?.is_staff || user?.is_superuser || user?.profile.role === 'organizer';
       this.isAdmin = !!user?.is_superuser;
       this.isAttendee = !!user && !this.isOrganizer;
     });
@@ -315,12 +303,18 @@ export class SidebarComponent {
     const route = this.getRoute(item);
     if (!route) return false;
     const exact = item.exact ?? !!item.routeFn;
-    return this.router.isActive(route, {
-      paths: exact ? 'exact' : 'subset',
-      queryParams: 'ignored',
-      fragment: 'ignored',
-      matrixParams: 'ignored',
-    });
+    const key = `${exact ? 'exact' : 'subset'}:${route}`;
+    let active = this.activeRoutes.get(key);
+    if (!active) {
+      active = isUrlActive(route, this.router, {
+        paths: exact ? 'exact' : 'subset',
+        queryParams: 'ignored',
+        fragment: 'ignored',
+        matrixParams: 'ignored',
+      });
+      this.activeRoutes.set(key, active);
+    }
+    return active();
   }
 
   // Cast helper so template bindings satisfy Angular strict template checks
@@ -339,7 +333,7 @@ export class SidebarComponent {
     });
     if (confirmed) {
       this.authService.logout();
-      this.router.navigate(['/login']);
+      void this.router.navigate(['/login']);
     }
   }
 }

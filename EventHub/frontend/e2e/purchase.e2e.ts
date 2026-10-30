@@ -1,4 +1,12 @@
-import { expect, Page, test } from '@playwright/test';
+import { APIResponse, expect, Page, test } from '@playwright/test';
+import type { components } from '../src/app/api/openapi';
+
+type Schemas = components['schemas'];
+
+/** The JSON body of an API response, typed by the OpenAPI contract. */
+async function body<T>(response: APIResponse): Promise<T> {
+  return (await response.json()) as T;
+}
 
 // Demo data from `seed_data` (DJANGO_SEED_DATA=1 in .env.example).
 const PAID_ONLINE_EVENT = 'Online Django REST Workshop';
@@ -56,14 +64,16 @@ test('attendee buys a paid ticket and gets the online link', async ({ page }) =>
 
   // The join link is only revealed to confirmed ticket holders.
   const events = await page.request.get('/api/v1/events/?search=Django');
-  const id = (await events.json()).results[0].id;
+  const id = (await body<Schemas['PaginatedEventListList']>(events)).results[0].id;
   const token = await page.evaluate(() => localStorage.getItem('access_token'));
-  const anonymous = await (await page.request.get(`/api/v1/events/${id}/`, { headers: {} })).json();
-  const holder = await (
+  const anonymous = await body<Schemas['EventList']>(
+    await page.request.get(`/api/v1/events/${id}/`, { headers: {} }),
+  );
+  const holder = await body<Schemas['EventList']>(
     await page.request.get(`/api/v1/events/${id}/`, {
       headers: { Authorization: `Bearer ${token}` },
-    })
-  ).json();
+    }),
+  );
   expect(anonymous.online_link).toBe('');
   expect(holder.online_link).toContain('meet.example.com');
 
@@ -71,15 +81,17 @@ test('attendee buys a paid ticket and gets the online link', async ({ page }) =>
 });
 
 test('seat map updates arrive over the WebSocket through nginx', async ({ page }) => {
-  const events = await (await page.request.get('/api/v1/events/?search=Startup')).json();
+  const events = await body<Schemas['PaginatedEventListList']>(
+    await page.request.get('/api/v1/events/?search=Startup'),
+  );
   const id = events.results[0].id;
 
   // The demo data has no seat maps: the organizer creates one (400 if it exists).
-  const org = await (
+  const org = await body<Schemas['AuthPayload']>(
     await page.request.post('/api/v1/auth/login/', {
       data: { username: 'organizer', password: 'password123' },
-    })
-  ).json();
+    }),
+  );
   await page.request.post(`/api/v1/events/${id}/seat-map/create/`, {
     data: { rows: 2, cols: 4, sync_capacity: false },
     headers: { Authorization: `Bearer ${org.tokens.access}` },
@@ -101,5 +113,5 @@ test('sign-up code is queued for the worker, not sent in the request', async ({ 
   });
   expect(response.status()).toBe(200);
   // DEBUG + console email backend: the code is shown to the developer.
-  expect((await response.json()).dev_code).toMatch(/^\d{6}$/);
+  expect((await body<Schemas['SendCodeResponse']>(response)).dev_code).toMatch(/^\d{6}$/);
 });

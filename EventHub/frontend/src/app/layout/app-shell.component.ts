@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -23,7 +23,7 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
 
     <!-- Sidebar (hidden for bare routes: login/register/payment/…) -->
     @if (!isBare) {
-      <app-sidebar></app-sidebar>
+      <app-sidebar />
     }
 
     <!-- Right column — always present so the single router-outlet never moves -->
@@ -34,7 +34,7 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
       [class.shell-right-bare]="isBare"
     >
       @if (!isBare) {
-        <app-topbar></app-topbar>
+        <app-topbar />
       }
 
       <main class="shell-main">
@@ -42,7 +42,7 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
       </main>
 
       @if (!isBare) {
-        <app-footer></app-footer>
+        <app-footer />
       }
     </div>
   `,
@@ -55,20 +55,18 @@ const BARE_ROUTES = ['/login', '/register', '/forgot-password', '/payment/', '/b
   ],
 })
 export class AppShellComponent implements OnInit, OnDestroy {
+  layout = inject(LayoutService);
+  private router = inject(Router);
+
   isBare = false;
   isMobileWidth = false;
   private sub?: Subscription;
-
-  constructor(
-    public layout: LayoutService,
-    private router: Router,
-  ) {}
 
   ngOnInit(): void {
     this.checkWidth();
     this.sub = this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd))
-      .subscribe((e) => this.checkBare((e as NavigationEnd).urlAfterRedirects));
+      .subscribe((e) => this.checkBare(e.urlAfterRedirects));
     this.checkBare(this.router.url);
   }
 

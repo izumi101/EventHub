@@ -1,4 +1,4 @@
-import { Component, HostListener, OnInit, OnDestroy } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -28,7 +28,7 @@ interface Crumb {
             class="topbar-icon-btn focus-ring"
             aria-label="Open navigation"
           >
-            <lucide-icon [img]="icons.Menu" class="w-5 h-5" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.Menu" class="w-5 h-5" aria-hidden="true" />
           </button>
           <a routerLink="/" class="flex items-center gap-2 focus-ring rounded">
             <img src="assets/logo.png" alt="EventHub" class="w-6 h-6 rounded object-cover" />
@@ -38,8 +38,8 @@ interface Crumb {
 
         <!-- Desktop: breadcrumbs -->
         <nav class="hidden md:flex items-center gap-1 text-sm min-w-0" aria-label="Breadcrumb">
-          @for (crumb of breadcrumbs; track $index; let last = $last) {
-            @if (!last) {
+          @for (crumb of breadcrumbs; track $index) {
+            @if (!$last) {
               @if (crumb.route) {
                 <a
                   [routerLink]="crumb.route"
@@ -54,7 +54,7 @@ interface Crumb {
                 [img]="icons.ChevronRight"
                 class="w-3.5 h-3.5 text-muted-foreground flex-shrink-0"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             } @else {
               <span class="font-medium text-foreground truncate max-w-[220px]">{{
                 crumb.label
@@ -90,7 +90,7 @@ interface Crumb {
                     : '')
                 "
               >
-                <lucide-icon [img]="icons.Bell" class="w-5 h-5" aria-hidden="true"></lucide-icon>
+                <lucide-icon [img]="icons.Bell" class="w-5 h-5" aria-hidden="true" />
                 @if (notifService.unreadCount() > 0) {
                   <span
                     class="absolute -top-0.5 -right-0.5 w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none"
@@ -101,7 +101,12 @@ interface Crumb {
               </button>
 
               @if (notifOpen) {
-                <div class="topbar-notif-dropdown" (click)="$event.stopPropagation()">
+                <!-- Clicks inside the panel must not reach the document listener that closes it. -->
+                <div
+                  class="topbar-notif-dropdown"
+                  role="presentation"
+                  (click)="$event.stopPropagation()"
+                >
                   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
                     <span class="font-semibold text-foreground text-sm">Notifications</span>
                     @if (notifService.unreadCount() > 0) {
@@ -120,25 +125,28 @@ interface Crumb {
                       </div>
                     }
                     @for (n of notifService.notifications(); track n.id) {
-                      <div
-                        class="px-4 py-3 text-sm cursor-pointer transition-colors"
+                      <button
+                        type="button"
+                        class="block w-full text-left px-4 py-3 text-sm cursor-pointer transition-colors"
                         [class]="
                           n.is_read ? 'hover:bg-muted/50' : 'bg-primary/5 hover:bg-primary/10'
                         "
                         (click)="notifService.markRead(n.id); notifOpen = false"
                       >
-                        @if (n.title?.trim()) {
-                          <p class="font-medium text-foreground leading-tight">{{ n.title }}</p>
+                        @if (n.title.trim()) {
+                          <span class="block font-medium text-foreground leading-tight">{{
+                            n.title
+                          }}</span>
                         }
-                        @if (n.body?.trim()) {
-                          <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                        @if (n.body.trim()) {
+                          <span class="block text-muted-foreground mt-0.5 text-xs leading-relaxed">
                             {{ n.body }}
-                          </p>
+                          </span>
                         }
-                        <p class="text-muted-foreground text-[10px] mt-1">
+                        <span class="block text-muted-foreground text-[10px] mt-1">
                           {{ n.created_at | date: 'MMM d, HH:mm' }}
-                        </p>
-                      </div>
+                        </span>
+                      </button>
                     }
                   </div>
                 </div>
@@ -158,6 +166,11 @@ interface Crumb {
   ],
 })
 export class TopbarComponent implements OnInit, OnDestroy {
+  layout = inject(LayoutService);
+  private authService = inject(AuthService);
+  notifService = inject(NotificationService);
+  private router = inject(Router);
+
   user: User | null = null;
   breadcrumbs: Crumb[] = [];
   notifOpen = false;
@@ -165,18 +178,11 @@ export class TopbarComponent implements OnInit, OnDestroy {
 
   readonly icons = { Menu, Bell, ChevronRight };
 
-  constructor(
-    public layout: LayoutService,
-    private authService: AuthService,
-    public notifService: NotificationService,
-    private router: Router,
-  ) {}
-
   ngOnInit(): void {
     this.authService.currentUser$.subscribe((u) => (this.user = u));
     this.sub = this.router.events
       .pipe(filter((e) => e instanceof NavigationEnd))
-      .subscribe((e) => this.buildBreadcrumbs((e as NavigationEnd).urlAfterRedirects));
+      .subscribe((e) => this.buildBreadcrumbs(e.urlAfterRedirects));
     this.buildBreadcrumbs(this.router.url);
   }
 

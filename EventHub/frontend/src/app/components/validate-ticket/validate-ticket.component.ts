@@ -1,15 +1,16 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterModule } from '@angular/router';
 import { EventService } from '../../services/event.service';
 import { CheckInResponse } from '../../models/models';
 import {
   LucideAngularModule,
-  CheckCircle,
-  AlertTriangle,
-  XCircle,
+  CircleCheckBig,
+  TriangleAlert,
+  CircleX,
   RefreshCw,
 } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-validate-ticket',
@@ -29,10 +30,10 @@ import {
               class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center"
             >
               <lucide-icon
-                [img]="icons.CheckCircle"
+                [img]="icons.CircleCheckBig"
                 class="w-8 h-8 text-[color:var(--pine-600)]"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h1 class="text-xl font-bold text-foreground">Access granted</h1>
             <p class="text-sm text-muted-foreground">Ticket is valid</p>
@@ -56,7 +57,7 @@ import {
           }
 
           <button (click)="recheck()" class="btn btn-primary btn-full">
-            <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
             Next ticket
           </button>
         } @else if (status === 'used') {
@@ -65,10 +66,10 @@ import {
               class="w-16 h-16 rounded-full bg-[color:var(--warning-50)] flex items-center justify-center"
             >
               <lucide-icon
-                [img]="icons.AlertTriangle"
+                [img]="icons.TriangleAlert"
                 class="w-8 h-8 text-warning"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h1 class="text-xl font-bold text-foreground">Already scanned</h1>
             <p class="text-sm text-muted-foreground">This ticket has been used</p>
@@ -94,7 +95,7 @@ import {
           }
 
           <button (click)="recheck()" class="btn btn-secondary btn-full">
-            <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+            <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
             Next ticket
           </button>
         } @else {
@@ -104,10 +105,10 @@ import {
               class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
             >
               <lucide-icon
-                [img]="icons.XCircle"
+                [img]="icons.CircleX"
                 class="w-8 h-8 text-[color:var(--destructive)]"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h1 class="text-xl font-bold text-foreground">Validation failed</h1>
             <p class="text-sm text-muted-foreground max-w-xs">
@@ -117,7 +118,7 @@ import {
 
           <div class="flex flex-col gap-2">
             <button (click)="recheck()" class="btn btn-primary btn-full">
-              <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+              <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
               Retry
             </button>
             <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">
@@ -130,18 +131,16 @@ import {
   `,
 })
 export class ValidateTicketComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+
   loading = true;
   status: 'success' | 'used' | 'error' = 'error';
   result: CheckInResponse | null = null;
   errorMessage = '';
   uuid: string | null = null;
 
-  readonly icons = { CheckCircle, AlertTriangle, XCircle, RefreshCw };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-  ) {}
+  readonly icons = { CircleCheckBig, TriangleAlert, CircleX, RefreshCw };
 
   ngOnInit(): void {
     this.uuid = this.route.snapshot.paramMap.get('uuid');
@@ -163,7 +162,7 @@ export class ValidateTicketComponent implements OnInit {
       },
       error: (err) => {
         this.status = 'error';
-        this.errorMessage = err.error?.error || 'Validation failed.';
+        this.errorMessage = apiErrorMessage(err, 'Validation failed.', 'error');
         this.loading = false;
       },
     });

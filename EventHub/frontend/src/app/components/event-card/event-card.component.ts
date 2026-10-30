@@ -38,7 +38,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             style="background:linear-gradient(135deg,#F4D9CC,#E8B8A2 55%,#CBB6A6)"
           >
             <span class="font-display text-5xl font-semibold text-white/70 select-none">
-              {{ event.title?.charAt(0)?.toUpperCase() || 'E' }}
+              {{ event.title.charAt(0).toUpperCase() || 'E' }}
             </span>
           </div>
         }
@@ -77,7 +77,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             @if (featured) {
               Featured ·
             }
-            {{ event.category?.name || 'Event' }}
+            {{ event.category.name || 'Event' }}
           </p>
           <h3
             class="font-display font-medium text-foreground leading-snug line-clamp-2"
@@ -100,7 +100,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 [img]="icons.MapPin"
                 class="w-3.5 h-3.5 flex-shrink-0"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
               <span class="truncate">{{ event.location }}</span>
             </div>
             @if (event.max_participants > 0) {
@@ -109,7 +109,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   [img]="icons.Users"
                   class="w-3.5 h-3.5 flex-shrink-0"
                   aria-hidden="true"
-                ></lucide-icon>
+                />
                 <span>{{ event.available_spots }} spots left</span>
               </div>
             }
@@ -133,7 +133,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 [img]="icons.ArrowRight"
                 class="w-3.5 h-3.5 cta-arrow transition-transform"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </span>
           </div>
         </div>

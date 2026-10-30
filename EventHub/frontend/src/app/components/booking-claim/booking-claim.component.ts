@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule, ActivatedRoute } from '@angular/router';
@@ -8,6 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Users, Check, Armchair } from 'lucide-angular';
 import * as QRCode from 'qrcode';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-booking-claim',
@@ -31,7 +32,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <div
               class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-3"
             >
-              <lucide-icon [img]="icons.Users" class="w-6 h-6 text-primary"></lucide-icon>
+              <lucide-icon [img]="icons.Users" class="w-6 h-6 text-primary" />
             </div>
             <h1 class="text-xl font-bold text-foreground">
               {{ booking.owner_username }} invited you
@@ -67,10 +68,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       <div
                         class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"
                       >
-                        <lucide-icon
-                          [img]="icons.Armchair"
-                          class="w-4 h-4 text-muted-foreground"
-                        ></lucide-icon>
+                        <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div class="min-w-0">
                         <p class="text-sm font-semibold text-foreground">
@@ -150,10 +148,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 >
                   <div class="flex items-center gap-3">
                     <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
-                      <lucide-icon
-                        [img]="icons.Armchair"
-                        class="w-4 h-4 text-muted-foreground"
-                      ></lucide-icon>
+                      <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div>
                       <p class="text-sm font-semibold text-foreground">
@@ -169,7 +164,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                     <span
                       class="flex items-center gap-1 text-sm text-[color:var(--pine-600)] font-medium"
                     >
-                      <lucide-icon [img]="icons.Check" class="w-4 h-4"></lucide-icon>
+                      <lucide-icon [img]="icons.Check" class="w-4 h-4" />
                       {{ s.attendee_name }}
                     </span>
                   } @else if (claimingId === s.seat_id) {
@@ -209,12 +204,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
     @if (zoomSeat) {
       <div
         class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
-        (click)="zoomSeat = null"
       >
         <div
           class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
-          (click)="$event.stopPropagation()"
           appDialog
+          dismissOnBackdrop
           (dismiss)="zoomSeat = null"
         >
           <h3 class="text-base font-bold text-foreground leading-tight">
@@ -235,6 +229,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class BookingClaimComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private bookingService = inject(BookingService);
+  private toast = inject(ToastService);
+  private auth = inject(AuthService);
+
   token = '';
   booking: BookingDto | null = null;
   loading = false;
@@ -245,13 +244,6 @@ export class BookingClaimComponent implements OnInit {
   qrCodes: Record<string, string> = {};
 
   readonly icons = { Users, Check, Armchair };
-
-  constructor(
-    private route: ActivatedRoute,
-    private bookingService: BookingService,
-    private toast: ToastService,
-    private auth: AuthService,
-  ) {}
 
   get isLoggedIn(): boolean {
     return this.auth.isLoggedIn;
@@ -275,7 +267,7 @@ export class BookingClaimComponent implements OnInit {
 
   /** Claimed seats on a paid booking get their QR tickets rendered locally. */
   private generateQrs(): void {
-    if (!this.booking || this.booking.status !== 'confirmed') return;
+    if (this.booking?.status !== 'confirmed') return;
     for (const s of this.booking.seats) {
       const uuid = s.ticket_uuid; // null unless this seat is yours
       if (!uuid || this.qrCodes[uuid]) continue;
@@ -284,7 +276,9 @@ export class BookingClaimComponent implements OnInit {
         .then((dataUrl) => {
           this.qrCodes[uuid] = dataUrl;
         })
-        .catch(() => {});
+        .catch(() => {
+          // The seat still shows its ticket number; the QR is only a convenience.
+        });
     }
   }
 
@@ -303,7 +297,7 @@ export class BookingClaimComponent implements OnInit {
         this.toast.success('Seat claimed!');
         this.generateQrs();
       },
-      error: (err) => this.toast.error(err.error?.error || 'Could not claim seat'),
+      error: (err) => this.toast.error(apiErrorMessage(err, 'Could not claim seat', 'error')),
     });
   }
 }

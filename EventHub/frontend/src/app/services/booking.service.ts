@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -7,12 +7,13 @@ import type { components } from '../api/openapi';
 // API shapes come from the backend's OpenAPI schema (see models/models.ts).
 export type BookingSeatDto = components['schemas']['BookingSeat'];
 export type BookingDto = components['schemas']['Booking'];
+export type BookingStatusDto = components['schemas']['BookingStatus'];
 
 @Injectable({ providedIn: 'root' })
 export class BookingService {
-  private api = `${environment.apiUrl}/bookings`;
+  private http = inject(HttpClient);
 
-  constructor(private http: HttpClient) {}
+  private api = `${environment.apiUrl}/bookings`;
 
   create(eventId: number, seatIds: number[]): Observable<BookingDto> {
     return this.http.post<BookingDto>(`${this.api}/`, { event: eventId, seat_ids: seatIds });
@@ -40,8 +41,8 @@ export class BookingService {
     );
   }
 
-  cancel(id: string): Observable<any> {
-    return this.http.post<any>(`${this.api}/${id}/cancel/`, {});
+  cancel(id: string): Observable<BookingStatusDto> {
+    return this.http.post<BookingStatusDto>(`${this.api}/${id}/cancel/`, {});
   }
 
   mine(): Observable<BookingDto[]> {

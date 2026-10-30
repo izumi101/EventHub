@@ -62,8 +62,8 @@ export class SeatWsService implements OnDestroy {
       )
       .subscribe({
         next: (msg) => {
-          if (msg.type === 'snapshot') this.snapshot$.next(msg as WsSnapshot);
-          if (msg.type === 'seat_update') this.updates$.next(msg as WsSeatUpdate);
+          if (msg.type === 'snapshot') this.snapshot$.next(msg);
+          if (msg.type === 'seat_update') this.updates$.next(msg);
         },
         // Live updates are a progressive enhancement; the page keeps working.
         error: () => {

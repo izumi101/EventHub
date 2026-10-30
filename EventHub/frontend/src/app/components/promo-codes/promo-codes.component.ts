@@ -1,8 +1,13 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
-import { EventService, PromoCode } from '../../services/event.service';
+import {
+  EventService,
+  PromoCode,
+  type DiscountType,
+  type PromoCodeInput,
+} from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import {
@@ -16,6 +21,24 @@ import {
   DollarSign,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { apiErrorMessage } from '../../api/api-error';
+
+/** The "new code" form; numeric inputs are null while empty. */
+interface PromoForm {
+  code: string;
+  discount_type: DiscountType;
+  discount_value: number | null;
+  max_uses: number | null;
+  expires_at: string;
+}
+
+const emptyPromoForm = (): PromoForm => ({
+  code: '',
+  discount_type: 'percent',
+  discount_value: null,
+  max_uses: null,
+  expires_at: '',
+});
 
 @Component({
   selector: 'app-promo-codes',
@@ -45,7 +68,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         <div class="flex items-center justify-between mb-6">
           <div>
             <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
-              <lucide-icon [img]="icons.Tag" class="w-6 h-6 text-primary"></lucide-icon>
+              <lucide-icon [img]="icons.Tag" class="w-6 h-6 text-primary" />
               Promo codes
             </h1>
             <p class="text-sm text-muted-foreground mt-1">{{ event?.title }}</p>
@@ -54,7 +77,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             (click)="showForm = !showForm"
             class="btn btn-primary btn-sm flex items-center gap-1.5"
           >
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon>
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
             New code
           </button>
         </div>
@@ -93,7 +116,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         : 'border-border text-muted-foreground'
                     "
                   >
-                    <lucide-icon [img]="icons.Percent" class="w-4 h-4"></lucide-icon> Percent
+                    <lucide-icon [img]="icons.Percent" class="w-4 h-4" /> Percent
                   </button>
                   <button
                     type="button"
@@ -106,7 +129,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         : 'border-border text-muted-foreground'
                     "
                   >
-                    <lucide-icon [img]="icons.DollarSign" class="w-4 h-4"></lucide-icon> Fixed
+                    <lucide-icon [img]="icons.DollarSign" class="w-4 h-4" /> Fixed
                   </button>
                 </div>
               </div>
@@ -175,7 +198,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         } @else if (codes.length === 0) {
           <div class="flex flex-col items-center justify-center py-16 text-center">
             <div class="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <lucide-icon [img]="icons.Tag" class="w-7 h-7 text-muted-foreground/50"></lucide-icon>
+              <lucide-icon [img]="icons.Tag" class="w-7 h-7 text-muted-foreground/50" />
             </div>
             <h3 class="font-semibold text-foreground mb-1">No promo codes yet</h3>
             <p class="text-sm text-muted-foreground">
@@ -239,16 +262,13 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   class="btn btn-ghost btn-sm text-xs"
                   [title]="c.is_active ? 'Disable' : 'Enable'"
                 >
-                  <lucide-icon
-                    [img]="c.is_active ? icons.X : icons.Check"
-                    class="w-4 h-4"
-                  ></lucide-icon>
+                  <lucide-icon [img]="c.is_active ? icons.X : icons.Check" class="w-4 h-4" />
                 </button>
                 <button
                   (click)="remove(c)"
                   class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
                 >
-                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                 </button>
               </div>
             }
@@ -259,6 +279,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   `,
 })
 export class PromoCodesComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toast = inject(ToastService);
+
   eventId = 0;
   event: EventModel | null = null;
   codes: PromoCode[] = [];
@@ -266,21 +290,9 @@ export class PromoCodesComponent implements OnInit {
   showForm = false;
   saving = false;
 
-  form: any = {
-    code: '',
-    discount_type: 'percent',
-    discount_value: null,
-    max_uses: null,
-    expires_at: '',
-  };
+  form: PromoForm = emptyPromoForm();
 
   readonly icons = { Tag, Plus, Trash2, Check, X, Percent, DollarSign };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toast: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
@@ -303,16 +315,16 @@ export class PromoCodesComponent implements OnInit {
   }
 
   canSubmit(): boolean {
-    return !!this.form.code?.trim() && this.form.discount_value > 0;
+    return !!this.form.code.trim() && (this.form.discount_value ?? 0) > 0;
   }
 
   create(): void {
     if (!this.canSubmit()) return;
     this.saving = true;
-    const payload: any = {
+    const payload: PromoCodeInput = {
       code: this.form.code.trim().toUpperCase(),
       discount_type: this.form.discount_type,
-      discount_value: this.form.discount_value,
+      discount_value: this.form.discount_value ?? 0,
     };
     if (this.form.max_uses) payload.max_uses = this.form.max_uses;
     if (this.form.expires_at) payload.expires_at = new Date(this.form.expires_at).toISOString();
@@ -322,20 +334,13 @@ export class PromoCodesComponent implements OnInit {
         this.toast.success('Promo code created.');
         this.saving = false;
         this.showForm = false;
-        this.form = {
-          code: '',
-          discount_type: 'percent',
-          discount_value: null,
-          max_uses: null,
-          expires_at: '',
-        };
+        this.form = emptyPromoForm();
         this.load();
       },
       error: (err) => {
         this.saving = false;
-        const e = err.error;
         this.toast.error(
-          e?.code?.[0] || e?.detail || 'Could not create code (is it a duplicate?).',
+          apiErrorMessage(err, 'Could not create code (is it a duplicate?).', 'code', 'detail'),
         );
       },
     });

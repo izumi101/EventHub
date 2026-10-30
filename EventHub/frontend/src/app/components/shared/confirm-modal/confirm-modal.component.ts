@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ModalService } from '../../../services/modal.service';
 
@@ -15,9 +15,11 @@ import { ModalService } from '../../../services/modal.service';
         [attr.aria-labelledby]="'modal-title'"
         (keydown.escape)="modalService.cancel()"
       >
-        <!-- Backdrop -->
+        <!-- Backdrop: decorative for assistive tech; keyboard users close with
+             Escape or the Cancel button. -->
         <div
           class="absolute inset-0 bg-black/40 animate-fade-in"
+          aria-hidden="true"
           (click)="modalService.cancel()"
         ></div>
 
@@ -52,5 +54,5 @@ import { ModalService } from '../../../services/modal.service';
   `,
 })
 export class ConfirmModalComponent {
-  constructor(public modalService: ModalService) {}
+  modalService = inject(ModalService);
 }

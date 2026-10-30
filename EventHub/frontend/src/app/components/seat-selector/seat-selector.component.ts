@@ -6,9 +6,10 @@ import {
   OnInit,
   OnDestroy,
   OnChanges,
+  inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { LucideAngularModule, AlertTriangle, Wifi, WifiOff } from 'lucide-angular';
+import { LucideAngularModule, TriangleAlert, Wifi, WifiOff } from 'lucide-angular';
 import { Seat } from '../../models/models';
 import { SeatWsService, WsSeatUpdate } from '../../services/seat-ws.service';
 import { Subscription } from 'rxjs';
@@ -150,10 +151,10 @@ import { Subscription } from 'rxjs';
           class="p-3 rounded-lg bg-[color:var(--warning-50)] border border-transparent flex items-start gap-2 text-sm text-warning"
         >
           <lucide-icon
-            [img]="icons.AlertTriangle"
+            [img]="icons.TriangleAlert"
             class="w-4 h-4 flex-shrink-0 mt-0.5"
             aria-hidden="true"
-          ></lucide-icon>
+          />
           <span>Select a seat to continue</span>
         </div>
       }
@@ -161,9 +162,11 @@ import { Subscription } from 'rxjs';
   `,
 })
 export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
+  private seatWs = inject(SeatWsService);
+
   @Input() seats: Seat[] = [];
   @Input() eventId: number | null = null;
-  @Output() seatSelected = new EventEmitter<Seat | null>();
+  @Output() readonly seatSelected = new EventEmitter<Seat | null>();
 
   selectedSeat: Seat | null = null;
   rows: number[] = [];
@@ -171,10 +174,8 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
   seatsByRow: Record<number, Seat[]> = {};
   wsConnected = false;
 
-  readonly icons = { AlertTriangle, Wifi, WifiOff };
+  readonly icons = { TriangleAlert, Wifi, WifiOff };
   private subs = new Subscription();
-
-  constructor(private seatWs: SeatWsService) {}
 
   ngOnInit(): void {
     this.buildGrid();
@@ -215,7 +216,8 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
         this.wsConnected = true;
         // Deselect if our seat was grabbed by someone else
         if (this.selectedSeat) {
-          const fresh = this.seats.find((s) => s.id === this.selectedSeat!.id);
+          const selectedId = this.selectedSeat.id;
+          const fresh = this.seats.find((s) => s.id === selectedId);
           if (fresh && !fresh.is_available) {
             this.selectedSeat = null;
             this.seatSelected.emit(null);

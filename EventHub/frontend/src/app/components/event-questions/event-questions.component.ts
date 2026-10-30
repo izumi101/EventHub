@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterModule } from '@angular/router';
@@ -6,6 +6,7 @@ import { EventService, EventQuestion, QuestionType } from '../../services/event.
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-event-questions',
@@ -32,14 +33,14 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
 
         <div class="flex items-center justify-between mb-2">
           <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
-            <lucide-icon [img]="icons.MessageSquare" class="w-6 h-6 text-primary"></lucide-icon>
+            <lucide-icon [img]="icons.MessageSquare" class="w-6 h-6 text-primary" />
             Checkout questions
           </h1>
           <button
             (click)="showForm = !showForm"
             class="btn btn-primary btn-sm flex items-center gap-1.5"
           >
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4"></lucide-icon> Add question
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" /> Add question
           </button>
         </div>
         <p class="text-sm text-muted-foreground mb-6">
@@ -127,10 +128,7 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
         } @else if (questions.length === 0) {
           <div class="flex flex-col items-center justify-center py-16 text-center">
             <div class="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
-              <lucide-icon
-                [img]="icons.MessageSquare"
-                class="w-7 h-7 text-muted-foreground/50"
-              ></lucide-icon>
+              <lucide-icon [img]="icons.MessageSquare" class="w-7 h-7 text-muted-foreground/50" />
             </div>
             <h3 class="font-semibold text-foreground mb-1">No questions yet</h3>
             <p class="text-sm text-muted-foreground">Add questions to collect info at checkout.</p>
@@ -142,7 +140,7 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
                 <lucide-icon
                   [img]="icons.GripVertical"
                   class="w-4 h-4 text-muted-foreground/40 flex-shrink-0"
-                ></lucide-icon>
+                />
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="font-medium text-foreground">{{ q.label }}</span>
@@ -164,7 +162,7 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
                   (click)="remove(q)"
                   class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]"
                 >
-                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4"></lucide-icon>
+                  <lucide-icon [img]="icons.Trash2" class="w-4 h-4" />
                 </button>
               </div>
             }
@@ -175,6 +173,10 @@ import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from '
   `,
 })
 export class EventQuestionsComponent implements OnInit {
+  private route = inject(ActivatedRoute);
+  private eventService = inject(EventService);
+  private toast = inject(ToastService);
+
   eventId = 0;
   event: EventModel | null = null;
   questions: EventQuestion[] = [];
@@ -190,12 +192,6 @@ export class EventQuestionsComponent implements OnInit {
   optionsText = '';
 
   readonly icons = { MessageSquare, Plus, Trash2, GripVertical };
-
-  constructor(
-    private route: ActivatedRoute,
-    private eventService: EventService,
-    private toast: ToastService,
-  ) {}
 
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
@@ -243,7 +239,7 @@ export class EventQuestionsComponent implements OnInit {
       },
       error: (err) => {
         this.saving = false;
-        this.toast.error(err.error?.options?.[0] || 'Could not add question.');
+        this.toast.error(apiErrorMessage(err, 'Could not add question.', 'options'));
       },
     });
   }

@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule, ActivatedRoute } from '@angular/router';
+import { RouterModule, ActivatedRoute, convertToParamMap } from '@angular/router';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
 import { BookingStatus, PaymentStatus } from '../../models/models';
-import { LucideAngularModule, CheckCircle, AlertCircle } from 'lucide-angular';
+import { LucideAngularModule, CircleCheckBig, CircleAlert } from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 /** What the page tells the buyer, from a ticket payment or a group booking. */
 type Outcome = 'paid' | 'processing' | 'refunded';
@@ -53,10 +54,10 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center"
             >
               <lucide-icon
-                [img]="icons.CheckCircle"
+                [img]="icons.CircleCheckBig"
                 class="w-8 h-8 text-[color:var(--pine-600)]"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h1 class="text-xl font-bold text-foreground">Payment confirmed</h1>
             <p class="text-sm text-muted-foreground">Your registration is complete</p>
@@ -104,10 +105,10 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
             >
               <lucide-icon
-                [img]="icons.AlertCircle"
+                [img]="icons.CircleAlert"
                 class="w-8 h-8 text-[color:var(--destructive)]"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             @if (data.outcome === 'refunded') {
               <h1 class="text-xl font-bold text-foreground">Payment refunded</h1>
@@ -141,10 +142,10 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
             >
               <lucide-icon
-                [img]="icons.AlertCircle"
+                [img]="icons.CircleAlert"
                 class="w-8 h-8 text-[color:var(--destructive)]"
                 aria-hidden="true"
-              ></lucide-icon>
+              />
             </div>
             <h1 class="text-xl font-bold text-foreground">Verification failed</h1>
             <p class="text-sm text-muted-foreground">
@@ -166,23 +167,22 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
   `,
 })
 export class PaymentSuccessComponent implements OnInit {
+  private paymentService = inject(PaymentService);
+  private bookingService = inject(BookingService);
+  private route = inject(ActivatedRoute);
+
   loading = true;
   data: PaymentResult | null = null;
   error = '';
   isBooking = false;
 
-  readonly icons = { CheckCircle, AlertCircle };
-
-  constructor(
-    private paymentService: PaymentService,
-    private bookingService: BookingService,
-    private route: ActivatedRoute,
-  ) {}
+  readonly icons = { CircleCheckBig, CircleAlert };
 
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
-      const sessionId = params['session_id'];
-      const bookingId = params['booking_id'];
+      const query = convertToParamMap(params);
+      const sessionId = query.get('session_id');
+      const bookingId = query.get('booking_id');
 
       // Group booking — verify with the backend (confirms it even when the
       // Stripe webhook is not forwarded, e.g. local dev with a real key).
@@ -198,15 +198,19 @@ export class PaymentSuccessComponent implements OnInit {
             this.data = {
               outcome: BOOKING_OUTCOME[b.status],
               event_title: b.event_title,
-              amount: b.total_due ?? b.total_price,
+              amount: b.total_due,
               currency: b.currency,
             };
             this.loading = false;
           },
           error: (err) => {
             // Never claim success we couldn't verify.
-            this.error =
-              err.error?.error || err.error?.detail || 'We could not verify this payment yet.';
+            this.error = apiErrorMessage(
+              err,
+              'We could not verify this payment yet.',
+              'error',
+              'detail',
+            );
             this.loading = false;
           },
         });
@@ -229,7 +233,7 @@ export class PaymentSuccessComponent implements OnInit {
           this.loading = false;
         },
         error: (err) => {
-          this.error = err.error?.error || err.error?.detail || 'Verification failed.';
+          this.error = apiErrorMessage(err, 'Verification failed.', 'error', 'detail');
           this.loading = false;
         },
       });
