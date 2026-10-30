@@ -1,0 +1,96 @@
+# Local quality gates. Install once per clone:
+#
+#   pipx install pre-commit   # or: uv tool install pre-commit
+#   pre-commit install        # installs the pre-commit and commit-msg hooks
+#
+# Hook revisions are full commit SHAs with the tag in a `# frozen:` comment
+# (the format `pre-commit autoupdate --freeze` writes and Renovate keeps).
+#
+# Run everything against the whole tree with `pre-commit run --all-files`.
+# CI re-checks the same things (ruff, gitleaks, PR title, frontend lint), so a
+# skipped hook cannot reach `main`.
+minimum_pre_commit_version: "4.0.0"
+default_install_hook_types: [pre-commit, commit-msg]
+fail_fast: false
+
+# Generated, locked or binary files are never reformatted by hooks: they are
+# produced by their own tooling and verified in CI instead (the OpenAPI schema
+# by the drift test, the TS types by `npm run api:types`, the locks by
+# `uv pip compile` / `npm install`).
+exclude: |
+  (?x)^(
+    EventHub/backend/openapi\.yaml|
+    EventHub/backend/staticfiles/.*|
+    EventHub/frontend/package-lock\.json|
+    EventHub/frontend/src/app/api/openapi\.ts|
+    EventHub/frontend/src/assets/.*|
+    EventHub/frontend/src/favicon\.ico|
+    .*\.lock|
+    .*\.(woff2?|ttf|otf|eot|png|jpe?g|gif|webp|ico|pdf)
+  )$
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c # frozen: v6.0.0
+    hooks:
+      # Prettier owns whitespace in the frontend sources (ts/html), so the
+      # generic whitespace fixers skip them instead of racing the formatter.
+      - id: trailing-whitespace
+        # Two trailing spaces are a Markdown hard line break.
+        args: [--markdown-linebreak-ext=md]
+        exclude: ^EventHub/frontend/src/.*\.(ts|html)$
+      - id: end-of-file-fixer
+        exclude: ^EventHub/frontend/src/.*\.(ts|html)$
+      - id: check-yaml
+      - id: check-json
+        # tsconfig*.json are JSONC (comments and trailing commas are valid).
+        exclude: ^EventHub/frontend/tsconfig.*\.json$
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+
+  # Backend lint and format. Same configuration and ruff version as CI
+  # (EventHub/backend/pyproject.toml); the hook runs from the repository root,
+  # hence the explicit --config.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: 38bfb07c0c64c304f47eb52090f8288150c77730 # frozen: v0.17.1
+    hooks:
+      - id: ruff-check
+        args: [--config, EventHub/backend/pyproject.toml, --fix]
+        files: ^EventHub/backend/
+      - id: ruff-format
+        args: [--config, EventHub/backend/pyproject.toml]
+        files: ^EventHub/backend/
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # frozen: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # Frontend checks reuse the project's own npm scripts (and therefore the
+  # locally installed ESLint/Prettier versions): run `npm ci` in
+  # EventHub/frontend first. The scripts are `lint` (angular-eslint) and
+  # `format:check` (prettier --check) in EventHub/frontend/package.json.
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: eslint (frontend)
+        entry: npm --prefix EventHub/frontend run lint
+        language: system
+        files: ^EventHub/frontend/src/.*\.(ts|html)$
+        pass_filenames: false
+      - id: frontend-prettier
+        name: prettier --check (frontend)
+        entry: npm --prefix EventHub/frontend run format:check
+        language: system
+        files: ^EventHub/frontend/src/.*\.(ts|html)$
+        pass_filenames: false
+
+  # Conventional Commits, enforced on the commit message.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: 91ab4bf57e58b32adf1a122681f6ebe164d081c8 # frozen: v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: [feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert]

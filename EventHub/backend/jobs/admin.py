@@ -14,6 +14,8 @@ class JobAdmin(admin.ModelAdmin):
     @admin.action(description='Retry selected jobs now')
     def retry(self, request, queryset):
         updated = queryset.exclude(status=Job.STATUS_DONE).update(
-            status=Job.STATUS_PENDING, run_after=timezone.now(), attempts=0,
+            status=Job.STATUS_PENDING,
+            run_after=timezone.now(),
+            attempts=0,
         )
         self.message_user(request, f'{updated} job(s) queued again.')

@@ -10,11 +10,10 @@ internal detail and may change:
 - ``refunds``      — refund requests and resolution
 """
 
-from .realtime import broadcast_seat_update
 from .holds import (
     SEAT_HOLD_MINUTES,
-    release_expired_seat_holds,
     reconcile_paid_registrations,
+    release_expired_seat_holds,
 )
 from .lifecycle import (
     approve_event,
@@ -25,6 +24,11 @@ from .lifecycle import (
     submit_event,
     update_event,
 )
+from .realtime import broadcast_seat_update
+from .refunds import (
+    request_refund,
+    resolve_refund_request,
+)
 from .registration import (
     attendee_cancel,
     cancel_registration,
@@ -34,30 +38,26 @@ from .registration import (
     get_active_registration,
     register_for_event,
 )
-from .refunds import (
-    request_refund,
-    resolve_refund_request,
-)
 
 __all__ = [
-    'broadcast_seat_update',
     'SEAT_HOLD_MINUTES',
-    'release_expired_seat_holds',
-    'reconcile_paid_registrations',
     'approve_event',
-    'cancel_event',
-    'clone_event',
-    'create_event',
-    'reject_event',
-    'submit_event',
-    'update_event',
     'attendee_cancel',
+    'broadcast_seat_update',
+    'cancel_event',
     'cancel_registration',
     'check_in_registration',
+    'clone_event',
+    'create_event',
     'ensure_attendee_can_buy',
     'ensure_event_on_sale',
     'get_active_registration',
+    'reconcile_paid_registrations',
     'register_for_event',
+    'reject_event',
+    'release_expired_seat_holds',
     'request_refund',
     'resolve_refund_request',
+    'submit_event',
+    'update_event',
 ]

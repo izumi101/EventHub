@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { EventService } from '../../services/event.service';
@@ -7,7 +7,16 @@ import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
 import { Event, Seat, ZonePrice } from '../../models/models';
 import { SeatMapSvgComponent } from '../seat-map-svg/seat-map-svg.component';
-import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  ChevronLeft,
+  Users,
+  Copy,
+  Check,
+  Clock,
+  Ticket,
+} from 'lucide-angular';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-group-booking',
@@ -16,9 +25,11 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
   template: `
     <div class="page-root">
       <div class="container max-w-6xl py-6">
-
-        <a [routerLink]="['/events', eventId]" class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4">
-          <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4"></lucide-icon> Back to event
+        <a
+          [routerLink]="['/events', eventId]"
+          class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
+        >
+          <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4" /> Back to event
         </a>
 
         @if (loading) {
@@ -26,7 +37,7 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
         } @else if (event) {
           <div class="flex items-center gap-3 mb-6">
             <div class="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <lucide-icon [img]="icons.Users" class="w-5 h-5 text-primary"></lucide-icon>
+              <lucide-icon [img]="icons.Users" class="w-5 h-5 text-primary" />
             </div>
             <div>
               <h1 class="text-xl font-bold text-foreground">Group booking</h1>
@@ -35,7 +46,6 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
           </div>
 
           <div class="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6">
-
             <!-- Seat map -->
             <div class="card p-4">
               @if (seats.length) {
@@ -46,35 +56,47 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                   [zonePrices]="zonePrices"
                   [currency]="currency"
                   (selectionChange)="onSelection($event)"
-                ></app-seat-map-svg>
+                />
               } @else {
-                <p class="text-sm text-muted-foreground py-10 text-center">No seat map for this event.</p>
+                <p class="text-sm text-muted-foreground py-10 text-center">
+                  No seat map for this event.
+                </p>
               }
             </div>
 
             <!-- Side panel -->
             <aside class="lg:sticky lg:top-20 self-start">
               <div class="card p-5">
-
                 @if (!booking) {
                   <!-- SELECT PHASE -->
                   <h2 class="font-semibold text-foreground mb-3">Your selection</h2>
                   @if (selected.length === 0) {
-                    <p class="text-sm text-muted-foreground py-6 text-center">Tap seats on the map to add them.</p>
+                    <p class="text-sm text-muted-foreground py-6 text-center">
+                      Tap seats on the map to add them.
+                    </p>
                   } @else {
                     <ul class="space-y-2 mb-4">
                       @for (s of selected; track s.id) {
                         <li class="flex items-center justify-between text-sm">
-                          <span class="text-foreground">Row {{ s.row }}, Seat {{ s.col }}
-                            <span class="text-xs text-muted-foreground capitalize ml-1">({{ s.price_zone }})</span>
+                          <span class="text-foreground"
+                            >Row {{ s.row }}, Seat {{ s.col }}
+                            <span class="text-xs text-muted-foreground capitalize ml-1"
+                              >({{ s.price_zone }})</span
+                            >
                           </span>
-                          <span class="font-semibold text-foreground">{{ s.price }} {{ currency }}</span>
+                          <span class="font-semibold text-foreground"
+                            >{{ s.price }} {{ currency }}</span
+                          >
                         </li>
                       }
                     </ul>
                     <div class="flex items-center justify-between border-t border-border pt-3 mb-4">
-                      <span class="text-sm text-muted-foreground">{{ selected.length }} seat(s)</span>
-                      <span class="text-lg font-bold text-foreground">{{ selectionTotal }} {{ currency }}</span>
+                      <span class="text-sm text-muted-foreground"
+                        >{{ selected.length }} seat(s)</span
+                      >
+                      <span class="text-lg font-bold text-foreground"
+                        >{{ selectionTotal }} {{ currency }}</span
+                      >
                     </div>
                   }
                   <button
@@ -88,9 +110,11 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                   <!-- HOLD PHASE -->
                   <div class="flex items-center justify-between mb-3">
                     <h2 class="font-semibold text-foreground">Seats held</h2>
-                    <span class="flex items-center gap-1 text-sm font-mono font-semibold"
-                          [class]="secondsLeft < 60 ? 'text-ember' : 'text-warning'">
-                      <lucide-icon [img]="icons.Clock" class="w-4 h-4"></lucide-icon>
+                    <span
+                      class="flex items-center gap-1 text-sm font-mono font-semibold"
+                      [class]="secondsLeft < 60 ? 'text-ember' : 'text-warning'"
+                    >
+                      <lucide-icon [img]="icons.Clock" class="w-4 h-4" />
                       {{ countdown }}
                     </span>
                   </div>
@@ -101,20 +125,28 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                         <span class="text-foreground">
                           Row {{ s.row }}, Seat {{ s.col }}
                           @if (s.attendee_name) {
-                            <span class="text-xs text-[color:var(--pine-600)] ml-1">· {{ s.attendee_name }}</span>
+                            <span class="text-xs text-[color:var(--pine-600)] ml-1"
+                              >· {{ s.attendee_name }}</span
+                            >
                           } @else {
                             <span class="text-xs text-muted-foreground ml-1">· unclaimed</span>
                           }
                         </span>
-                        <span class="font-semibold text-foreground">{{ s.price }} {{ currency }}</span>
+                        <span class="font-semibold text-foreground"
+                          >{{ s.price }} {{ currency }}</span
+                        >
                       </li>
                     }
                   </ul>
 
                   <div class="flex items-center justify-between border-t border-border pt-3 mb-4">
-                    <span class="text-sm text-muted-foreground">{{ booking.seat_count }} seats</span>
+                    <span class="text-sm text-muted-foreground"
+                      >{{ booking.seat_count }} seats</span
+                    >
                     <span class="text-right">
-                      <span class="text-lg font-bold text-foreground">{{ booking.total_due }} {{ booking.currency }}</span>
+                      <span class="text-lg font-bold text-foreground"
+                        >{{ booking.total_due }} {{ booking.currency }}</span
+                      >
                       @if (booking.total_due !== booking.total_price) {
                         <span class="block text-xs text-muted-foreground">incl. tax & fees</span>
                       }
@@ -123,19 +155,35 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
 
                   <!-- Share link -->
                   <div class="mb-4">
-                    <label for="group-booking-share-url" class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim a seat</label>
+                    <label
+                      for="group-booking-share-url"
+                      class="block text-xs font-medium text-muted-foreground mb-1.5"
+                      >Invite friends to claim a seat</label
+                    >
                     <div class="flex gap-2">
-                      <input id="group-booking-share-url" readonly [value]="shareUrl" class="input flex-1 text-xs" />
+                      <input
+                        id="group-booking-share-url"
+                        readonly
+                        [value]="shareUrl"
+                        class="input flex-1 text-xs"
+                      />
                       <button (click)="copyLink()" class="btn btn-secondary btn-sm flex-shrink-0">
-                        <lucide-icon [img]="copied ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
+                        <lucide-icon [img]="copied ? icons.Check : icons.Copy" class="w-4 h-4" />
                       </button>
                     </div>
                   </div>
 
                   <button (click)="pay()" [disabled]="paying" class="btn btn-primary btn-full mb-2">
-                    {{ paying ? 'Processing…' : 'Pay for group — ' + booking.total_due + ' ' + booking.currency }}
+                    {{
+                      paying
+                        ? 'Processing…'
+                        : 'Pay for group — ' + booking.total_due + ' ' + booking.currency
+                    }}
                   </button>
-                  <button (click)="cancelHold()" class="btn btn-ghost btn-full btn-sm text-muted-foreground">
+                  <button
+                    (click)="cancelHold()"
+                    class="btn btn-ghost btn-full btn-sm text-muted-foreground"
+                  >
                     Release seats
                   </button>
                 }
@@ -148,6 +196,13 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
   `,
 })
 export class GroupBookingComponent implements OnInit, OnDestroy {
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private eventService = inject(EventService);
+  private bookingService = inject(BookingService);
+  private toast = inject(ToastService);
+  authService = inject(AuthService);
+
   eventId = 0;
   event: Event | null = null;
   seats: Seat[] = [];
@@ -167,25 +222,26 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
 
   readonly icons = { ChevronLeft, Users, Copy, Check, Clock, Ticket };
 
-  constructor(
-    private route: ActivatedRoute,
-    private router: Router,
-    private eventService: EventService,
-    private bookingService: BookingService,
-    private toast: ToastService,
-    public authService: AuthService,
-  ) {}
-
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
     this.loading = true;
     this.eventService.getEvent(this.eventId).subscribe({
-      next: ev => { this.event = ev; this.loading = false; },
-      error: () => { this.loading = false; },
+      next: (ev) => {
+        this.event = ev;
+        this.loading = false;
+      },
+      error: () => {
+        this.loading = false;
+      },
     });
     this.eventService.getSeatMap(this.eventId).subscribe({
-      next: sm => { this.seats = sm.seats || []; this.zonePrices = sm.zone_prices || []; },
-      error: () => {},
+      next: (sm) => {
+        this.seats = sm.seats;
+        this.zonePrices = sm.zone_prices;
+      },
+      error: () => {
+        // No seat map: the picker stays empty and nothing can be held.
+      },
     });
   }
 
@@ -212,18 +268,20 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
   holdSeats(): void {
     if (!this.selected.length) return;
     this.holding = true;
-    const ids = this.selected.map(s => s.id);
+    const ids = this.selected.map((s) => s.id);
     this.bookingService.create(this.eventId, ids).subscribe({
-      next: b => {
+      next: (b) => {
         this.booking = b;
         this.holding = false;
         this.startCountdown();
       },
-      error: err => {
+      error: (err) => {
         this.holding = false;
-        this.toast.error(err.error?.error || 'Could not hold seats. Some may be taken.');
+        this.toast.error(apiErrorMessage(err, 'Could not hold seats. Some may be taken.', 'error'));
         // refresh map
-        this.eventService.getSeatMap(this.eventId).subscribe(sm => { this.seats = sm.seats || []; });
+        this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
+          this.seats = sm.seats;
+        });
       },
     });
   }
@@ -232,8 +290,13 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
     if (!this.booking) return;
     this.paying = true;
     this.bookingService.checkout(this.booking.id).subscribe({
-      next: res => { window.location.href = res.checkout_url; },
-      error: () => { this.paying = false; this.toast.error('Payment could not be started.'); },
+      next: (res) => {
+        window.location.href = res.checkout_url;
+      },
+      error: () => {
+        this.paying = false;
+        this.toast.error('Payment could not be started.');
+      },
     });
   }
 
@@ -245,14 +308,16 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
         this.selected = [];
         if (this.timer) clearInterval(this.timer);
         this.toast.success('Seats released');
-        this.eventService.getSeatMap(this.eventId).subscribe(sm => { this.seats = sm.seats || []; });
+        this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
+          this.seats = sm.seats;
+        });
       },
       error: () => this.toast.error('Could not release seats'),
     });
   }
 
   copyLink(): void {
-    navigator.clipboard.writeText(this.shareUrl).then(() => {
+    void navigator.clipboard.writeText(this.shareUrl).then(() => {
       this.copied = true;
       setTimeout(() => (this.copied = false), 2000);
     });
@@ -271,7 +336,9 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
         this.toast.error('Your seat hold has expired.');
         this.booking = null;
         this.selected = [];
-        this.eventService.getSeatMap(this.eventId).subscribe(sm => { this.seats = sm.seats || []; });
+        this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
+          this.seats = sm.seats;
+        });
       }
     };
     tick();

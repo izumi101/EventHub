@@ -65,6 +65,7 @@ def release_expired_seat_holds(event: Event = None):
     # Offer the freed spots to anyone waiting.
     if freed_events:
         from ..waitlist import promote_waitlist
+
         for ev in Event.objects.filter(id__in=freed_events):
             promote_waitlist(ev)
     return len(freed_events)

@@ -39,8 +39,6 @@ services:
         INSTALL_SEMANTIC_SEARCH: ${INSTALL_SEMANTIC_SEARCH:-1}
     container_name: eventhub_backend
     restart: unless-stopped
-    # daphne = ASGI server needed for Django Channels / WebSocket
-    command: daphne -b 0.0.0.0 -p 8000 eventhub_backend.asgi:application
     environment: &backend-env
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in .env (see .env.example)}
       DJANGO_DEBUG: ${DJANGO_DEBUG:-0}
@@ -66,6 +64,17 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-EventHub <no-reply@eventhub.local>}
       JOBS_RUN_INLINE: ${JOBS_RUN_INLINE:-0}
+      # gunicorn worker processes per backend container (default: CPU count,
+      # which inside a container is the host's — so set it explicitly).
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+      # Feature flags. Off: every flag uses its default from
+      # featureflags/registry.py. On: polls the `unleash` service below
+      # (start it with the `flags` profile). The backend never waits for it.
+      UNLEASH_ENABLED: ${UNLEASH_ENABLED:-0}
+      UNLEASH_URL: ${UNLEASH_URL:-http://unleash:4242/api}
+      UNLEASH_API_TOKEN: ${UNLEASH_BACKEND_API_TOKEN}
+      UNLEASH_APP_NAME: ${UNLEASH_APP_NAME:-eventhub-backend}
+      UNLEASH_ENVIRONMENT: ${UNLEASH_ENVIRONMENT:-production}
     # Only nginx (frontend container) should talk to Django. The port is
     # published on localhost for `npm start` development only.
     ports:
@@ -122,6 +131,72 @@ services:
       backend:
         condition: service_healthy
 
+  # ---- Feature flags: self-hosted Unleash (docs/FEATURE_FLAGS.md) ---- #
+  # Opt-in profile (`COMPOSE_PROFILES=flags` in .env, or `--profile flags`):
+  # the backend runs on flag defaults without it, so the default stack and CI
+  # don't depend on it. Its own database: Unleash migrates its schema on every
+  # start, and keeping it apart from the app's data keeps backups, restores,
+  # credentials and upgrades independent.
+  unleash-db:
+    image: pgvector/pgvector:pg16
+    container_name: eventhub_unleash_db
+    profiles: [flags]
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: unleash
+      POSTGRES_USER: unleash
+      POSTGRES_PASSWORD: ${UNLEASH_DB_PASSWORD:?Set UNLEASH_DB_PASSWORD in .env (see .env.example)}
+    volumes:
+      - unleash_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U unleash -d unleash"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  unleash:
+    # 8.2.0, pinned by the digest of its multi-arch index (amd64 + arm64).
+    image: unleashorg/unleash-server:8.2.0@sha256:5020013b7a9a93c8ed3686d36b5025399714020b3fb5ef41afd84ba37a88c050
+    container_name: eventhub_unleash
+    profiles: [flags]
+    restart: unless-stopped
+    environment:
+      DATABASE_HOST: unleash-db
+      DATABASE_PORT: 5432
+      DATABASE_NAME: unleash
+      DATABASE_USERNAME: unleash
+      DATABASE_PASSWORD: ${UNLEASH_DB_PASSWORD}
+      DATABASE_SSL: "false"
+      # Public address of the admin UI (links in emails / invitations).
+      UNLEASH_URL: ${UNLEASH_PUBLIC_URL:-http://localhost:4242}
+      # The first admin account, created on the first start only; change the
+      # password in the UI afterwards (changing it here has no effect).
+      UNLEASH_DEFAULT_ADMIN_USERNAME: admin
+      UNLEASH_DEFAULT_ADMIN_PASSWORD: ${UNLEASH_ADMIN_PASSWORD:?Set UNLEASH_ADMIN_PASSWORD in .env (see .env.example)}
+      # Tokens created on the first start (only while no token exists yet);
+      # rotate them in the UI or API afterwards. The backend token is the one
+      # the backend polls with; an admin token is for local automation only.
+      INIT_BACKEND_API_TOKENS: ${UNLEASH_BACKEND_API_TOKEN:?Set UNLEASH_BACKEND_API_TOKEN in .env (see .env.example)}
+      INIT_ADMIN_API_TOKENS: ${UNLEASH_ADMIN_API_TOKEN:-}
+      # No calls home.
+      CHECK_VERSION: "false"
+      SEND_TELEMETRY: "false"
+      LOG_LEVEL: ${UNLEASH_LOG_LEVEL:-warn}
+    # Admin UI for operators on this machine only (an SSH tunnel on a server).
+    ports:
+      - "127.0.0.1:${UNLEASH_HOST_PORT:-4242}:4242"
+    depends_on:
+      unleash-db:
+        condition: service_healthy
+    healthcheck:
+      # The image has busybox wget, no curl. /health answers once migrations ran.
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:4242/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 volumes:
   postgres_data:
   backend_media:
+  unleash_db_data:

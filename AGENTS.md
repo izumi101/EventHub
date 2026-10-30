@@ -18,6 +18,7 @@ Event management platform — Django REST backend + Angular frontend. Users crea
 | Docker setup | `EventHub/docker-compose.yml` |
 | API collection | `EventHub/postman_collection.json` |
 | Docs | `EventHub/docs/` |
+| Roadmap status / handoff | `EventHub/docs/HANDOFF.md` |
 
 ## Agent Entry
 
@@ -59,6 +60,9 @@ Event management platform — Django REST backend + Angular frontend. Users crea
 | Start frontend only | `cd EventHub/frontend && npm start` |
 | Install frontend deps | `cd EventHub/frontend && npm install` |
 | Run frontend tests | `cd EventHub/frontend && npm test` |
+| Lint / format frontend | `cd EventHub/frontend && npm run lint && npm run format:check` |
+| Run all pre-commit hooks | `pre-commit run --all-files` (install once: `pre-commit install`) |
+| Feature flags | `EventHub/docs/FEATURE_FLAGS.md` (opt-in: `COMPOSE_PROFILES=flags`) |
 | Build frontend | `cd EventHub/frontend && npm run build` |
 | Backend migrations | `docker compose exec backend python manage.py migrate` |
 | Backend shell | `docker compose exec backend python manage.py shell` |

@@ -22,7 +22,7 @@ export class SeoService {
     // Reset to site defaults on every navigation (individual pages override after)
     this.router.events
       .pipe(
-        filter(e => e instanceof NavigationEnd),
+        filter((e) => e instanceof NavigationEnd),
         takeUntilDestroyed(),
       )
       .subscribe(() => this.setDefault());
@@ -43,8 +43,14 @@ export class SeoService {
     const seoTitle = event.seo_title || event.title;
     const seoDesc =
       event.seo_description ||
-      (event.description ? event.description.slice(0, 200).replace(/\s+/g, ' ').trim() : DEFAULT_DESCRIPTION);
-    const image = event.image ? (event.image.startsWith('http') ? event.image : `${BASE_URL}${event.image}`) : DEFAULT_IMAGE;
+      (event.description
+        ? event.description.slice(0, 200).replace(/\s+/g, ' ').trim()
+        : DEFAULT_DESCRIPTION);
+    const image = event.image
+      ? event.image.startsWith('http')
+        ? event.image
+        : `${BASE_URL}${event.image}`
+      : DEFAULT_IMAGE;
     const url = `${BASE_URL}/events/${event.id}`;
     const pageTitle = `${seoTitle} — ${SITE_NAME}`;
 
@@ -71,21 +77,26 @@ export class SeoService {
       },
       offers: {
         '@type': 'Offer',
-        price: event.price_from ?? event.price,
-        priceCurrency: event.currency ?? 'USD',
-        availability: (event.available_spots ?? 1) > 0
-          ? 'https://schema.org/InStock'
-          : 'https://schema.org/SoldOut',
+        price: event.price_from,
+        priceCurrency: event.currency,
+        availability:
+          event.available_spots > 0 ? 'https://schema.org/InStock' : 'https://schema.org/SoldOut',
         url,
       },
     });
   }
 
-  private _apply(opts: { title: string; description: string; image: string; url: string; type: string }): void {
+  private _apply(opts: {
+    title: string;
+    description: string;
+    image: string;
+    url: string;
+    type: string;
+  }): void {
     this.title.setTitle(opts.title);
 
-    const tags: { [key: string]: string } = {
-      'description': opts.description,
+    const tags: Record<string, string> = {
+      description: opts.description,
       'og:title': opts.title,
       'og:description': opts.description,
       'og:image': opts.image,

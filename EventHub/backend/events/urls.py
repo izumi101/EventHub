@@ -1,5 +1,6 @@
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+
 from . import views
 
 router = DefaultRouter()
@@ -19,7 +20,7 @@ urlpatterns = [
     path('events/<int:event_id>/reviews/', views.EventReviewsView.as_view(), name='event-reviews'),
     # Notifications
     path('notifications/', views.NotificationsListView.as_view(), name='notifications-list'),
-    path('notifications/read/', views.NotificationMarkReadView.as_view(), name='notifications-read-all'),
+    path('notifications/read/', views.NotificationMarkAllReadView.as_view(), name='notifications-read-all'),
     path('notifications/<int:pk>/read/', views.NotificationMarkReadView.as_view(), name='notification-read'),
     # Promo codes (organizer)
     path('events/<int:event_id>/promo-codes/', views.EventPromoCodesView.as_view(), name='event-promo-codes'),
@@ -33,7 +34,9 @@ urlpatterns = [
     # Waitlist (organizer view)
     path('events/<int:event_id>/waitlist-entries/', views.EventWaitlistView.as_view(), name='event-waitlist'),
     # Refund requests
-    path('events/<int:event_id>/refund-requests/', views.EventRefundRequestsView.as_view(), name='event-refund-requests'),
+    path(
+        'events/<int:event_id>/refund-requests/', views.EventRefundRequestsView.as_view(), name='event-refund-requests'
+    ),
     path('refund-requests/<int:pk>/resolve/', views.ResolveRefundRequestView.as_view(), name='resolve-refund-request'),
     # Team / roles
     path('events/<int:event_id>/staff/', views.EventStaffView.as_view(), name='event-staff'),

@@ -25,6 +25,7 @@ HOLD_MINUTES = 10
 
 # ───────────────────────── expiry ─────────────────────────
 
+
 @transaction.atomic
 def release_expired_bookings(event=None):
     """Release seats from holding bookings whose 10-min hold has elapsed."""
@@ -32,8 +33,7 @@ def release_expired_bookings(event=None):
     qs = (
         Booking.objects
         # skip_locked: a booking being confirmed right now keeps its seats.
-        .select_for_update(skip_locked=True)
-        .filter(status=Booking.Status.HOLDING, hold_expires_at__lt=now)
+        .select_for_update(skip_locked=True).filter(status=Booking.Status.HOLDING, hold_expires_at__lt=now)
     )
     if event is not None:
         qs = qs.filter(event=event)
@@ -60,11 +60,12 @@ def _release_booking_seats(booking):
 
 # ───────────────────────── create ─────────────────────────
 
+
 @transaction.atomic
 def create_booking(*, user, event, seat_ids):
     """Hold a group of seats for a user. Returns the Booking."""
-    from events.services import ensure_attendee_can_buy, ensure_event_on_sale
     from events.models import WaitlistEntry
+    from events.services import ensure_attendee_can_buy, ensure_event_on_sale
 
     # Same lock order as single registrations (event → seats) so the two
     # flows serialise on capacity instead of overselling each other.
@@ -85,17 +86,20 @@ def create_booking(*, user, event, seat_ids):
     if Booking.objects.filter(owner=user, event=event, status=Booking.Status.HOLDING).exists():
         raise ValueError('You already have a group booking awaiting payment for this event.')
 
-    outstanding_offers = WaitlistEntry.objects.filter(
-        event=event, status=WaitlistEntry.STATUS_OFFERED,
-    ).exclude(user=user).count()
+    outstanding_offers = (
+        WaitlistEntry.objects.filter(
+            event=event,
+            status=WaitlistEntry.STATUS_OFFERED,
+        )
+        .exclude(user=user)
+        .count()
+    )
     if event.available_spots - outstanding_offers < len(seat_ids):
         raise ValueError('Not enough spots left for this many seats.')
 
     # Lock the seat rows so concurrent bookings serialise.
     seats = list(
-        EventSeat.objects.select_for_update()
-        .filter(id__in=seat_ids, seat_map__event=event)
-        .select_related('seat_map')
+        EventSeat.objects.select_for_update().filter(id__in=seat_ids, seat_map__event=event).select_related('seat_map')
     )
     if len(seats) != len(seat_ids):
         raise ValueError('One or more seats were not found for this event.')
@@ -127,6 +131,7 @@ def create_booking(*, user, event, seat_ids):
 
 # ───────────────────────── claim ─────────────────────────
 
+
 @transaction.atomic
 def claim_seat(*, booking, seat_id, attendee_name, user=None):
     """A friend (or the owner) claims a specific seat in the booking.
@@ -145,7 +150,7 @@ def claim_seat(*, booking, seat_id, attendee_name, user=None):
     try:
         bs = booking.seats.select_related('seat').get(seat_id=seat_id)
     except BookingSeat.DoesNotExist:
-        raise ValueError('That seat is not part of this booking.')
+        raise ValueError('That seat is not part of this booking.') from None
 
     is_auth = user is not None and user.is_authenticated
     is_owner = is_auth and user.id == booking.owner_id
@@ -166,6 +171,7 @@ def claim_seat(*, booking, seat_id, attendee_name, user=None):
 
 # ───────────────────────── confirm / cancel ─────────────────────────
 
+
 @transaction.atomic
 def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
     """Mark a booking paid. Seats become permanent, tickets are live.
@@ -176,23 +182,34 @@ def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
     booking = Booking.objects.select_for_update().select_related('event', 'owner').get(pk=booking.pk)
 
     if booking.status == Booking.Status.CONFIRMED:
-        if payment_intent_id and booking.stripe_payment_intent_id \
-                and payment_intent_id != booking.stripe_payment_intent_id:
+        if (
+            payment_intent_id
+            and booking.stripe_payment_intent_id
+            and payment_intent_id != booking.stripe_payment_intent_id
+        ):
             from payments.services import _refund_payment_intent
+
             _refund_payment_intent(payment_intent_id, key=f'booking-duplicate-refund-{payment_intent_id}')
         return booking
 
     if booking.status != Booking.Status.HOLDING:
         logger.warning('Payment for booking %s arrived in status %s — refunding', booking.id, booking.status)
         from payments.services import _refund_payment_intent
+
         _refund_payment_intent(payment_intent_id, key=f'booking-late-refund-{payment_intent_id}')
         owner, event = booking.owner, booking.event
 
         def notify_late():
             from events.notify import notify
-            notify(owner, 'payment_failed', f'💸 Payment refunded: {event.title}',
-                   'Your group payment arrived after the seat hold expired, so it was refunded '
-                   'automatically. Please book again.', event)
+
+            notify(
+                owner,
+                'payment_failed',
+                f'💸 Payment refunded: {event.title}',
+                'Your group payment arrived after the seat hold expired, so it was refunded '
+                'automatically. Please book again.',
+                event,
+            )
 
         transaction.on_commit(notify_late)
         return booking
@@ -209,8 +226,10 @@ def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
 
     def notify_confirmed():
         from events.notify import notify
+
         notify(
-            owner, 'ticket_purchased',
+            owner,
+            'ticket_purchased',
             f'🎫 {count} tickets confirmed: {event.title}',
             'Your group booking is confirmed. Tickets are in My Tickets.',
             event,
@@ -240,6 +259,7 @@ def refund_booking(booking, *, actor, reason='', event_cancelled=False):
         _refund_payment_intent(booking.stripe_payment_intent_id, key=f'booking-refund-{booking.pk}')
     if booking.amount_paid is None:
         from .payments import booking_amount
+
         booking.amount_paid = booking_amount(booking)
 
     _release_booking_seats(booking)
@@ -249,16 +269,26 @@ def refund_booking(booking, *, actor, reason='', event_cancelled=False):
     booking.save(update_fields=['status', 'refunded_at', 'refund_reason', 'amount_paid'])
 
     from events.notify import notify
-    notify(booking.owner, 'payment_failed', f'💸 Group booking refunded: {booking.event.title}',
-           'Your group booking was refunded by the organizer.' + (f' Reason: {reason}' if reason else ''),
-           booking.event)
+
+    notify(
+        booking.owner,
+        'payment_failed',
+        f'💸 Group booking refunded: {booking.event.title}',
+        'Your group booking was refunded by the organizer.' + (f' Reason: {reason}' if reason else ''),
+        booking.event,
+    )
     from events.webhooks import fire
-    fire(booking.event, 'refund_issued', {
-        'booking_id': str(booking.pk),
-        'user': booking.owner.username,
-        'refunded_amount': str(booking.amount_paid),
-        'full_refund': True,
-    })
+
+    fire(
+        booking.event,
+        'refund_issued',
+        {
+            'booking_id': str(booking.pk),
+            'user': booking.owner.username,
+            'refunded_amount': str(booking.amount_paid),
+            'full_refund': True,
+        },
+    )
     logger.info('Booking %s refunded by %s', booking.pk, actor.pk)
     return booking
 

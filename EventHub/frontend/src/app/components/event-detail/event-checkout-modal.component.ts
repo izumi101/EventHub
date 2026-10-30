@@ -1,12 +1,19 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
+import { Component, EventEmitter, Input, OnInit, Output, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { EventService, PromoQuote, EventQuestion, TicketType } from '../../services/event.service';
+import {
+  EventService,
+  PromoQuote,
+  EventQuestion,
+  TicketType,
+  type RegisterPayload,
+} from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event, Seat, SeatMap } from '../../models/models';
 import { SeatSelectorComponent } from '../seat-selector/seat-selector.component';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
 
 /** The "Confirm registration" checkout dialog.
  *
@@ -21,12 +28,12 @@ import { DialogDirective } from '../../directives/dialog.directive';
   template: `
     <div
       class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
-      (click)="closed.emit()"
     >
       <div
         class="card w-full max-w-md shadow-lg animate-slide-up"
-        (click)="$event.stopPropagation()"
-        appDialog (dismiss)="closed.emit()"
+        appDialog
+        dismissOnBackdrop
+        (dismiss)="closed.emit()"
       >
         <div class="flex items-center justify-between p-5 border-b border-border">
           <h2 class="text-base font-semibold text-foreground">Confirm registration</h2>
@@ -34,7 +41,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
             (click)="closed.emit()"
             class="btn btn-ghost btn-sm w-8 h-8 p-0 text-muted-foreground"
             aria-label="Close"
-          >✕</button>
+          >
+            ✕
+          </button>
         </div>
 
         <div class="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
@@ -42,16 +51,22 @@ import { DialogDirective } from '../../directives/dialog.directive';
           <div class="p-3 rounded-lg bg-muted border border-border text-sm">
             <div class="flex justify-between mb-1.5">
               <span class="text-muted-foreground">Event</span>
-              <span class="font-medium text-foreground text-right max-w-[200px] truncate">{{ event.title }}</span>
+              <span class="font-medium text-foreground text-right max-w-[200px] truncate">{{
+                event.title
+              }}</span>
             </div>
             <div class="flex justify-between">
               <span class="text-muted-foreground">Price</span>
-              <span class="font-semibold text-foreground">{{ event.is_free ? 'Free' : (currentGaPrice | money: event.currency) }}</span>
+              <span class="font-semibold text-foreground">{{
+                event.is_free ? 'Free' : (currentGaPrice | money: event.currency)
+              }}</span>
             </div>
             @if (selectedSeat) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
                 <span class="text-muted-foreground">Seat</span>
-                <span class="font-medium text-foreground">Row {{ selectedSeat.row }}, Seat {{ selectedSeat.col }}</span>
+                <span class="font-medium text-foreground"
+                  >Row {{ selectedSeat.row }}, Seat {{ selectedSeat.col }}</span
+                >
               </div>
             }
             @if (selectedTicketType) {
@@ -87,7 +102,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
             @if (selectedTicketType || promoQuote || showFeeLines()) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
                 <span class="text-foreground font-semibold">Total</span>
-                <span class="text-foreground font-bold">{{ checkoutTotal | money: event.currency }}</span>
+                <span class="text-foreground font-bold">{{
+                  checkoutTotal | money: event.currency
+                }}</span>
               </div>
             }
           </div>
@@ -97,44 +114,71 @@ import { DialogDirective } from '../../directives/dialog.directive';
             <div class="space-y-2">
               <p class="text-sm font-semibold text-foreground">Choose your ticket</p>
               @for (tt of event.ticket_types; track tt.id) {
-                <button
-                  type="button"
-                  (click)="selectTicketType(tt)"
-                  [disabled]="tt.sale_state !== 'on_sale'"
-                  class="w-full text-left p-3 rounded-xl border-2 transition-all"
-                  [class]="selectedTicketType?.id === tt.id
-                    ? 'border-primary bg-primary/5'
-                    : tt.sale_state !== 'on_sale'
-                      ? 'border-border opacity-50 cursor-not-allowed'
-                      : 'border-border hover:border-primary/40'"
+                <!-- The donation input sits beside the tier button, not inside it:
+                     interactive content inside a <button> is invalid HTML. -->
+                <div
+                  class="rounded-xl border-2 transition-all"
+                  [class]="
+                    selectedTicketType?.id === tt.id
+                      ? 'border-primary bg-primary/5'
+                      : tt.sale_state !== 'on_sale'
+                        ? 'border-border opacity-50 cursor-not-allowed'
+                        : 'border-border hover:border-primary/40'
+                  "
                 >
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <div class="flex items-center gap-2">
-                        <span class="font-semibold text-foreground">{{ tt.name }}</span>
-                        @if (tt.kind === 'donation') { <span class="text-[10px] font-bold uppercase text-ember bg-ember/10 px-1.5 py-0.5 rounded">Donation</span> }
+                  <button
+                    type="button"
+                    (click)="selectTicketType(tt)"
+                    [disabled]="tt.sale_state !== 'on_sale'"
+                    class="w-full text-left p-3"
+                  >
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <div class="flex items-center gap-2">
+                          <span class="font-semibold text-foreground">{{ tt.name }}</span>
+                          @if (tt.kind === 'donation') {
+                            <span
+                              class="text-[10px] font-bold uppercase text-ember bg-ember/10 px-1.5 py-0.5 rounded"
+                              >Donation</span
+                            >
+                          }
+                        </div>
+                        @if (tt.description) {
+                          <p class="text-xs text-muted-foreground mt-0.5">{{ tt.description }}</p>
+                        }
+                        <p class="text-xs mt-1" [class]="tierAvailabilityClass(tt)">
+                          {{ tierAvailabilityLabel(tt) }}
+                        </p>
                       </div>
-                      @if (tt.description) { <p class="text-xs text-muted-foreground mt-0.5">{{ tt.description }}</p> }
-                      <p class="text-xs mt-1" [class]="tierAvailabilityClass(tt)">{{ tierAvailabilityLabel(tt) }}</p>
+                      <div class="text-right flex-shrink-0">
+                        <span class="font-bold text-foreground">
+                          @if (tt.kind === 'free') {
+                            Free
+                          } @else if (tt.kind === 'donation') {
+                            {{ tt.price | money: event.currency }}+
+                          } @else {
+                            {{ tt.price | money: event.currency }}
+                          }
+                        </span>
+                      </div>
                     </div>
-                    <div class="text-right flex-shrink-0">
-                      <span class="font-bold text-foreground">
-                        @if (tt.kind === 'free') { Free }
-                        @else if (tt.kind === 'donation') { {{ tt.price | money: event.currency }}+ }
-                        @else { {{ tt.price | money: event.currency }} }
-                      </span>
-                    </div>
-                  </div>
+                  </button>
 
                   <!-- Donation amount input -->
                   @if (selectedTicketType?.id === tt.id && tt.kind === 'donation') {
-                    <div class="mt-3 flex items-center gap-2" (click)="$event.stopPropagation()">
+                    <div class="px-3 pb-3 flex items-center gap-2">
                       <span class="text-muted-foreground">$</span>
-                      <input type="number" [(ngModel)]="donationAmount" [min]="tt.price" step="1"
-                        class="input flex-1" placeholder="Amount" />
+                      <input
+                        type="number"
+                        [(ngModel)]="donationAmount"
+                        [min]="tt.price"
+                        step="1"
+                        class="input flex-1"
+                        placeholder="Amount"
+                      />
                     </div>
                   }
-                </button>
+                </div>
               }
             </div>
           }
@@ -142,7 +186,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
           <!-- Promo code (paid events) -->
           @if (showPromoField()) {
             <div>
-              <label for="checkout-promo" class="block text-sm font-medium text-foreground mb-1.5">Promo code</label>
+              <label for="checkout-promo" class="block text-sm font-medium text-foreground mb-1.5"
+                >Promo code</label
+              >
               @if (!promoQuote) {
                 <div class="flex gap-2">
                   <input
@@ -165,11 +211,19 @@ import { DialogDirective } from '../../directives/dialog.directive';
                   <p class="text-xs text-destructive mt-1">{{ promoError }}</p>
                 }
               } @else {
-                <div class="flex items-center justify-between p-2.5 rounded-lg bg-[color:var(--pine-50)] border border-transparent">
+                <div
+                  class="flex items-center justify-between p-2.5 rounded-lg bg-[color:var(--pine-50)] border border-transparent"
+                >
                   <span class="text-sm font-medium text-[color:var(--pine-600)]">
-                    ✓ {{ promoQuote.code }} applied — you save {{ promoQuote.savings | money: event.currency }}
+                    ✓ {{ promoQuote.code }} applied — you save
+                    {{ promoQuote.savings | money: event.currency }}
                   </span>
-                  <button (click)="removePromo()" class="text-xs text-[color:var(--pine-600)] hover:underline">Remove</button>
+                  <button
+                    (click)="removePromo()"
+                    class="text-xs text-[color:var(--pine-600)] hover:underline"
+                  >
+                    Remove
+                  </button>
                 </div>
               }
             </div>
@@ -188,7 +242,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                   [seats]="seatMap.seats"
                   [eventId]="event.id"
                   (seatSelected)="selectedSeat = $event"
-                ></app-seat-selector>
+                />
               }
             </div>
           }
@@ -201,38 +255,77 @@ import { DialogDirective } from '../../directives/dialog.directive';
           <!-- Custom organizer questions -->
           @if (questions.length) {
             <div class="border-t border-border pt-4 space-y-3">
-              <p class="text-sm font-semibold text-foreground">A few questions from the organizer</p>
+              <p class="text-sm font-semibold text-foreground">
+                A few questions from the organizer
+              </p>
               @for (q of questions; track q.id) {
                 <div>
-                  <label [attr.for]="'question-' + q.id" class="block text-sm font-medium text-foreground mb-1.5">
+                  <label
+                    [attr.for]="'question-' + q.id"
+                    class="block text-sm font-medium text-foreground mb-1.5"
+                  >
                     {{ q.label }}
-                    @if (q.is_required) { <span class="text-destructive">*</span> }
+                    @if (q.is_required) {
+                      <span class="text-destructive">*</span>
+                    }
                   </label>
 
                   @switch (q.question_type) {
                     @case ('textarea') {
-                      <textarea [id]="'question-' + q.id" [(ngModel)]="answers[q.id]" rows="2" class="input resize-none w-full"></textarea>
+                      <textarea
+                        [id]="'question-' + q.id"
+                        [(ngModel)]="answers[q.id]"
+                        rows="2"
+                        class="input resize-none w-full"
+                      ></textarea>
                     }
                     @case ('dropdown') {
-                      <select [id]="'question-' + q.id" [(ngModel)]="answers[q.id]" class="input w-full">
+                      <select
+                        [id]="'question-' + q.id"
+                        [(ngModel)]="answers[q.id]"
+                        class="input w-full"
+                      >
                         <option value="">Select…</option>
-                        @for (opt of q.options; track opt) { <option [value]="opt">{{ opt }}</option> }
+                        @for (opt of q.options; track opt) {
+                          <option [value]="opt">{{ opt }}</option>
+                        }
                       </select>
                     }
                     @case ('checkbox') {
                       <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                        <input [id]="'question-' + q.id" type="checkbox" [(ngModel)]="answers[q.id]" class="w-4 h-4 rounded" />
+                        <input
+                          [id]="'question-' + q.id"
+                          type="checkbox"
+                          [(ngModel)]="answers[q.id]"
+                          class="w-4 h-4 rounded"
+                        />
                         Yes
                       </label>
                     }
                     @case ('date') {
-                      <input [id]="'question-' + q.id" type="date" [(ngModel)]="answers[q.id]" class="input w-full" />
+                      <input
+                        [id]="'question-' + q.id"
+                        type="date"
+                        [(ngModel)]="answers[q.id]"
+                        class="input w-full"
+                      />
                     }
                     @case ('phone') {
-                      <input [id]="'question-' + q.id" type="tel" [(ngModel)]="answers[q.id]" placeholder="+1 555 000 0000" class="input w-full" />
+                      <input
+                        [id]="'question-' + q.id"
+                        type="tel"
+                        [(ngModel)]="answers[q.id]"
+                        placeholder="+1 555 000 0000"
+                        class="input w-full"
+                      />
                     }
                     @default {
-                      <input [id]="'question-' + q.id" type="text" [(ngModel)]="answers[q.id]" class="input w-full" />
+                      <input
+                        [id]="'question-' + q.id"
+                        type="text"
+                        [(ngModel)]="answers[q.id]"
+                        class="input w-full"
+                      />
                     }
                   }
                 </div>
@@ -256,9 +349,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
         </div>
 
         <div class="flex items-center gap-3 p-5 border-t border-border">
-          <button (click)="closed.emit()" class="btn btn-secondary flex-1">
-            Cancel
-          </button>
+          <button (click)="closed.emit()" class="btn btn-secondary flex-1">Cancel</button>
           <button
             (click)="submit()"
             [disabled]="registering || !canConfirm()"
@@ -269,9 +360,16 @@ import { DialogDirective } from '../../directives/dialog.directive';
               Processing...
             } @else if (event.has_ticket_types && !selectedTicketType) {
               Choose a ticket
-            } @else if (!event.is_free && !event.has_ticket_types && !seatMapMissing && (loadingSeatMap || !seatMap)) {
+            } @else if (
+              !event.is_free &&
+              !event.has_ticket_types &&
+              !seatMapMissing &&
+              (loadingSeatMap || !seatMap)
+            ) {
               Loading seats…
-            } @else if (!event.is_free && !event.has_ticket_types && !seatMapMissing && !selectedSeat) {
+            } @else if (
+              !event.is_free && !event.has_ticket_types && !seatMapMissing && !selectedSeat
+            ) {
               Select a seat to continue
             } @else if (confirmIsPaid()) {
               Proceed to payment — {{ checkoutTotal | money: event.currency }}
@@ -285,16 +383,19 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class EventCheckoutModalComponent implements OnInit {
+  private eventService = inject(EventService);
+  private toastService = inject(ToastService);
+
   @Input({ required: true }) event!: Event;
   /** The dynamic GA price quoted on the page (falls back to event.price). */
   @Input() currentGaPrice = '0.00';
   /** True while the parent runs the registration / payment flow. */
   @Input() registering = false;
 
-  @Output() closed = new EventEmitter<void>();
+  @Output() readonly closed = new EventEmitter<void>();
   /** Emits the ready-to-send registration payload (without affiliate code —
    *  the parent owns referral attribution). */
-  @Output() confirmed = new EventEmitter<Record<string, any>>();
+  @Output() readonly confirmed = new EventEmitter<RegisterPayload>();
 
   registrationNotes = '';
 
@@ -317,17 +418,17 @@ export class EventCheckoutModalComponent implements OnInit {
 
   // Custom questions
   questions: EventQuestion[] = [];
-  answers: Record<number, any> = {};
-
-  constructor(
-    private eventService: EventService,
-    private toastService: ToastService,
-  ) {}
+  answers: Record<number, unknown> = {};
 
   ngOnInit(): void {
     this.eventService.getEventQuestions(this.event.id).subscribe({
-      next: qs => { this.questions = qs; },
-      error: () => {},
+      next: (qs) => {
+        this.questions = qs;
+      },
+      error: () => {
+        // Without the custom questions the checkout still works; the backend
+        // rejects a registration that misses a required answer.
+      },
     });
 
     // Seat map only matters for paid events without ticket tiers.
@@ -338,10 +439,10 @@ export class EventCheckoutModalComponent implements OnInit {
           this.seatMap = sm;
           this.loadingSeatMap = false;
         },
-        error: err => {
+        error: (err) => {
           this.loadingSeatMap = false;
           // 404 = no seat map → general admission, purchase proceeds without a seat.
-          if (err.status === 404) {
+          if (apiErrorStatus(err) === 404) {
             this.seatMapMissing = true;
           } else {
             this.toastService.error('Failed to load seat map');
@@ -366,10 +467,14 @@ export class EventCheckoutModalComponent implements OnInit {
 
   tierAvailabilityLabel(tt: TicketType): string {
     switch (tt.sale_state) {
-      case 'sold_out': return 'Sold out';
-      case 'scheduled': return 'Sales not started yet';
-      case 'ended': return 'Sales ended';
-      case 'inactive': return 'Unavailable';
+      case 'sold_out':
+        return 'Sold out';
+      case 'scheduled':
+        return 'Sales not started yet';
+      case 'ended':
+        return 'Sales ended';
+      case 'inactive':
+        return 'Unavailable';
       default:
         if (tt.available !== null && tt.available <= 10) return `Only ${tt.available} left`;
         return 'Available';
@@ -400,9 +505,12 @@ export class EventCheckoutModalComponent implements OnInit {
     if (this.selectedTicketType) ctx.ticket_type_id = this.selectedTicketType.id;
     else if (this.selectedSeat) ctx.seat_id = this.selectedSeat.id;
     this.eventService.validatePromo(this.event.id, this.promoInput.trim(), ctx).subscribe({
-      next: q => { this.promoQuote = q; this.checkingPromo = false; },
-      error: err => {
-        this.promoError = err.error?.error || 'Invalid promo code';
+      next: (q) => {
+        this.promoQuote = q;
+        this.checkingPromo = false;
+      },
+      error: (err) => {
+        this.promoError = apiErrorMessage(err, 'Invalid promo code', 'error');
         this.promoQuote = null;
         this.checkingPromo = false;
       },
@@ -419,13 +527,14 @@ export class EventCheckoutModalComponent implements OnInit {
 
   /** Base price after tier/seat + promo, before tax & fees. */
   get checkoutSubtotalNum(): number {
-    let base = 0;
+    let base: number;
     if (this.selectedTicketType) {
       if (this.selectedTicketType.kind === 'free') base = 0;
-      else if (this.selectedTicketType.kind === 'donation') base = Number(this.donationAmount || this.selectedTicketType.price);
+      else if (this.selectedTicketType.kind === 'donation')
+        base = Number(this.donationAmount || this.selectedTicketType.price);
       else base = Number(this.selectedTicketType.price);
     } else if (this.selectedSeat) {
-      base = Number((this.selectedSeat as any).price ?? this.event.price);
+      base = Number(this.selectedSeat.price ?? this.event.price);
     } else {
       // GA: the dynamic price that will actually be charged.
       base = Number(this.currentGaPrice);
@@ -440,26 +549,29 @@ export class EventCheckoutModalComponent implements OnInit {
     return base;
   }
 
-  get checkoutSubtotal(): string { return this.checkoutSubtotalNum.toFixed(2); }
+  get checkoutSubtotal(): string {
+    return this.checkoutSubtotalNum.toFixed(2);
+  }
 
   get taxAmount(): number {
     const pct = Number(this.event.tax_percent || 0);
-    return this.checkoutSubtotalNum > 0 ? this.checkoutSubtotalNum * pct / 100 : 0;
+    return this.checkoutSubtotalNum > 0 ? (this.checkoutSubtotalNum * pct) / 100 : 0;
   }
 
   get feeAmount(): number {
     const pct = Number(this.event.service_fee_percent || 0);
-    return this.checkoutSubtotalNum > 0 ? this.checkoutSubtotalNum * pct / 100 : 0;
+    return this.checkoutSubtotalNum > 0 ? (this.checkoutSubtotalNum * pct) / 100 : 0;
   }
 
   showFeeLines(): boolean {
-    const hasFees = Number(this.event.tax_percent || 0) > 0 || Number(this.event.service_fee_percent || 0) > 0;
-    return hasFees && this.event.fees_passed_to_buyer !== false && this.checkoutSubtotalNum > 0;
+    const hasFees =
+      Number(this.event.tax_percent || 0) > 0 || Number(this.event.service_fee_percent || 0) > 0;
+    return hasFees && this.event.fees_passed_to_buyer && this.checkoutSubtotalNum > 0;
   }
 
   get checkoutTotal(): string {
     let total = this.checkoutSubtotalNum;
-    if (this.event.fees_passed_to_buyer !== false) {
+    if (this.event.fees_passed_to_buyer) {
       total += this.taxAmount + this.feeAmount;
     }
     return total.toFixed(2);
@@ -469,8 +581,11 @@ export class EventCheckoutModalComponent implements OnInit {
 
   confirmIsPaid(): boolean {
     if (this.event.has_ticket_types) {
-      return !!this.selectedTicketType && this.selectedTicketType.kind !== 'free'
-        && Number(this.checkoutTotal) > 0;
+      return (
+        !!this.selectedTicketType &&
+        this.selectedTicketType.kind !== 'free' &&
+        Number(this.checkoutTotal) > 0
+      );
     }
     return !this.event.is_free;
   }
@@ -485,7 +600,10 @@ export class EventCheckoutModalComponent implements OnInit {
   submit(): void {
     // Ticket-typed events require a tier; seat-map events require a seat.
     if (this.event.has_ticket_types) {
-      if (!this.selectedTicketType) { this.toastService.error('Please choose a ticket'); return; }
+      if (!this.selectedTicketType) {
+        this.toastService.error('Please choose a ticket');
+        return;
+      }
       if (this.selectedTicketType.kind === 'donation') {
         const min = Number(this.selectedTicketType.price);
         if (Number(this.donationAmount) < min) {
@@ -499,18 +617,20 @@ export class EventCheckoutModalComponent implements OnInit {
     }
 
     // Enforce required custom questions.
-    const missing = this.questions.find(q => q.is_required && !this.answers[q.id] && this.answers[q.id] !== false);
+    const missing = this.questions.find(
+      (q) => q.is_required && !this.answers[q.id] && this.answers[q.id] !== false,
+    );
     if (missing) {
       this.toastService.error(`Please answer: ${missing.label}`);
       return;
     }
 
-    const payload: Record<string, any> = { notes: this.registrationNotes };
-    if (this.selectedSeat) payload['seat_id'] = this.selectedSeat.id;
-    if (this.selectedTicketType) payload['ticket_type_id'] = this.selectedTicketType.id;
-    if (this.selectedTicketType?.kind === 'donation') payload['donation_amount'] = this.donationAmount;
-    if (this.promoQuote) payload['promo_code'] = this.promoQuote.code;
-    if (this.questions.length) payload['answers'] = this.answers;
+    const payload: RegisterPayload = { notes: this.registrationNotes };
+    if (this.selectedSeat) payload.seat_id = this.selectedSeat.id;
+    if (this.selectedTicketType) payload.ticket_type_id = this.selectedTicketType.id;
+    if (this.selectedTicketType?.kind === 'donation') payload.donation_amount = this.donationAmount;
+    if (this.promoQuote) payload.promo_code = this.promoQuote.code;
+    if (this.questions.length) payload.answers = this.answers;
 
     this.confirmed.emit(payload);
   }

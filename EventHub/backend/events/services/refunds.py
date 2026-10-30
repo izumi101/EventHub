@@ -45,18 +45,17 @@ def request_refund(*, user, event: Event, reason: str = ''):
     else:
         req = RefundRequest.objects.create(registration=registration, reason=reason)
 
-    # Notify the organizer in-app.
-    try:
-        from ..notify import notify
-        notify(
-            event.organizer, 'event_updated',
-            f'💸 Refund requested: {event.title}',
-            f'{user.username} requested a refund of {payment.net_amount} {event.currency}.'
-            + (f' Reason: {reason}' if reason else ''),
-            event=event,
-        )
-    except Exception:
-        pass
+    # Notify the organizer in-app (notify() never raises; it logs its own failures).
+    from ..notify import notify
+
+    notify(
+        event.organizer,
+        'event_updated',
+        f'💸 Refund requested: {event.title}',
+        f'{user.username} requested a refund of {payment.net_amount} {event.currency}.'
+        + (f' Reason: {reason}' if reason else ''),
+        event=event,
+    )
 
     return req
 
@@ -65,9 +64,11 @@ def request_refund(*, user, event: Event, reason: str = ''):
 def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = ''):
     """Organizer approves or rejects a refund request."""
     from django.utils import timezone as _tz
-    from ..models import RefundRequest
 
     from common.permissions import can_manage_event
+
+    from ..models import RefundRequest
+
     if not can_manage_event(refund_request.registration.event, actor):
         raise PermissionError('Only the organizer can resolve refund requests.')
 
@@ -83,6 +84,7 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
         payment = getattr(registration, 'payment', None)
         if payment and payment.is_refundable:
             from payments.services import refund_payment
+
             # Suppress the low-level "Refund issued" notice — we send the
             # user-facing "Refund approved" message below, avoiding duplicates.
             refund_payment(
@@ -104,11 +106,9 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
     refund_request.resolved_at = _tz.now()
     refund_request.save(update_fields=['status', 'organizer_note', 'resolved_at'])
 
-    try:
-        from ..notify import notify
-        notify(registration.user, notify_type, title,
-               body + (f' Note: {note}' if note else ''), event=event)
-    except Exception:
-        pass
+    # notify() never raises: it logs its own failures.
+    from ..notify import notify
+
+    notify(registration.user, notify_type, title, body + (f' Note: {note}' if note else ''), event=event)
 
     return refund_request

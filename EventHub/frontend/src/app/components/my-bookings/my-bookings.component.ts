@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { BookingService, BookingDto, BookingSeatDto } from '../../services/booking.service';
@@ -14,10 +14,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
-
         <div class="mb-7">
           <h1 class="text-2xl font-bold text-foreground">My Bookings</h1>
-          <p class="text-sm text-muted-foreground mt-1">Group seat reservations you own — each seat is its own ticket</p>
+          <p class="text-sm text-muted-foreground mt-1">
+            Group seat reservations you own — each seat is its own ticket
+          </p>
         </div>
 
         @if (loading) {
@@ -27,8 +28,10 @@ import { DialogDirective } from '../../directives/dialog.directive';
           </div>
         } @else if (bookings.length === 0) {
           <div class="flex flex-col items-center justify-center py-20 text-center">
-            <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
-              <lucide-icon [img]="icons.Users" class="w-8 h-8 text-primary/50" aria-hidden="true"></lucide-icon>
+            <div
+              class="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4"
+            >
+              <lucide-icon [img]="icons.Users" class="w-8 h-8 text-primary/50" aria-hidden="true" />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">No group bookings</h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
@@ -42,20 +45,27 @@ import { DialogDirective } from '../../directives/dialog.directive';
               <div class="card overflow-hidden">
                 <div class="p-5 flex items-start justify-between gap-3 flex-wrap">
                   <div class="min-w-0">
-                    <a [routerLink]="['/events', b.event_id]" class="font-semibold text-foreground hover:text-primary transition-colors">
+                    <a
+                      [routerLink]="['/events', b.event_id]"
+                      class="font-semibold text-foreground hover:text-primary transition-colors"
+                    >
                       {{ b.event_title }}
                     </a>
                     <p class="text-xs text-muted-foreground mt-0.5">
-                      {{ b.event_date | date:'EEE, MMM d, y · h:mm a' }} · {{ b.event_location }}
+                      {{ b.event_date | date: 'EEE, MMM d, y · h:mm a' }} · {{ b.event_location }}
                     </p>
                     <p class="text-xs text-muted-foreground mt-1">
                       {{ b.seat_count }} seats · {{ b.total_due }} {{ b.currency }}
                     </p>
                   </div>
-                  <span class="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
-                    [class]="b.status === 'confirmed'
-                      ? 'text-[color:var(--pine-600)] bg-[color:var(--pine-50)]'
-                      : 'text-warning bg-[color:var(--warning-50)]'">
+                  <span
+                    class="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"
+                    [class]="
+                      b.status === 'confirmed'
+                        ? 'text-[color:var(--pine-600)] bg-[color:var(--pine-50)]'
+                        : 'text-warning bg-[color:var(--warning-50)]'
+                    "
+                  >
                     {{ b.status }}
                   </span>
                 </div>
@@ -63,15 +73,30 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 <!-- Holding: share link + countdown hint -->
                 @if (b.status === 'holding') {
                   <div class="px-5 pb-4">
-                    <div class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] text-warning text-xs mb-3">
-                      <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0"></lucide-icon>
-                      Seats are held until {{ b.hold_expires_at | date:'h:mm a' }} — complete the payment from the event page.
+                    <div
+                      class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] text-warning text-xs mb-3"
+                    >
+                      <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
+                      Seats are held until {{ b.hold_expires_at | date: 'h:mm a' }} — complete the
+                      payment from the event page.
                     </div>
-                    <label [attr.for]="'share-' + b.id" class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim their seats</label>
+                    <label
+                      [attr.for]="'share-' + b.id"
+                      class="block text-xs font-medium text-muted-foreground mb-1.5"
+                      >Invite friends to claim their seats</label
+                    >
                     <div class="flex gap-2">
-                      <input [id]="'share-' + b.id" readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
+                      <input
+                        [id]="'share-' + b.id"
+                        readonly
+                        [value]="shareUrl(b)"
+                        class="input flex-1 text-xs"
+                      />
                       <button (click)="copyLink(b)" class="btn btn-secondary btn-sm flex-shrink-0">
-                        <lucide-icon [img]="copiedId === b.id ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
+                        <lucide-icon
+                          [img]="copiedId === b.id ? icons.Check : icons.Copy"
+                          class="w-4 h-4"
+                        />
                       </button>
                     </div>
                   </div>
@@ -81,22 +106,41 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 <div class="border-t border-border divide-y divide-border">
                   @for (s of b.seats; track s.id) {
                     <div class="px-5 py-3 flex items-center gap-4">
-                      <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                        <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground"></lucide-icon>
+                      <div
+                        class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center flex-shrink-0"
+                      >
+                        <lucide-icon [img]="icons.Armchair" class="w-4 h-4 text-muted-foreground" />
                       </div>
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-foreground">
                           Row {{ s.row }}, Seat {{ s.col }}
-                          <span class="text-xs font-normal text-muted-foreground capitalize">· {{ s.zone }} · {{ s.price }} {{ b.currency }}</span>
+                          <span class="text-xs font-normal text-muted-foreground capitalize"
+                            >· {{ s.zone }} · {{ s.price }} {{ b.currency }}</span
+                          >
                         </p>
-                        <p class="text-xs" [class]="s.attendee_name ? 'text-[color:var(--pine-600)]' : 'text-muted-foreground'">
+                        <p
+                          class="text-xs"
+                          [class]="
+                            s.attendee_name
+                              ? 'text-[color:var(--pine-600)]'
+                              : 'text-muted-foreground'
+                          "
+                        >
                           {{ s.attendee_name || 'Unclaimed' }}
-                          @if (s.is_checked_in) { <span class="text-[color:var(--pine-600)] font-medium">· checked in</span> }
+                          @if (s.is_checked_in) {
+                            <span class="text-[color:var(--pine-600)] font-medium"
+                              >· checked in</span
+                            >
+                          }
                         </p>
                       </div>
                       @if (b.status === 'confirmed') {
                         @if (s.ticket_uuid && qrCodes[s.ticket_uuid]) {
-                          <button class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in" (click)="zoomSeat = s" title="Tap to enlarge">
+                          <button
+                            class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in"
+                            (click)="zoomSeat = s"
+                            title="Tap to enlarge"
+                          >
                             <img [src]="qrCodes[s.ticket_uuid]" alt="QR" class="w-14 h-14 block" />
                           </button>
                         } @else {
@@ -110,13 +154,22 @@ import { DialogDirective } from '../../directives/dialog.directive';
                 @if (b.status === 'confirmed') {
                   <div class="px-5 py-3 border-t border-border bg-muted/30">
                     <p class="text-xs text-muted-foreground flex items-center gap-1.5">
-                      <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5"></lucide-icon>
-                      Each seat has its own QR ticket — share the invite link and friends see theirs too.
+                      <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5" />
+                      Each seat has its own QR ticket — share the invite link and friends see theirs
+                      too.
                     </p>
                     <div class="flex gap-2 mt-2">
-                      <input aria-label="Invite link" readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
+                      <input
+                        aria-label="Invite link"
+                        readonly
+                        [value]="shareUrl(b)"
+                        class="input flex-1 text-xs"
+                      />
                       <button (click)="copyLink(b)" class="btn btn-secondary btn-sm flex-shrink-0">
-                        <lucide-icon [img]="copiedId === b.id ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
+                        <lucide-icon
+                          [img]="copiedId === b.id ? icons.Check : icons.Copy"
+                          class="w-4 h-4"
+                        />
                       </button>
                     </div>
                   </div>
@@ -130,10 +183,21 @@ import { DialogDirective } from '../../directives/dialog.directive';
 
     <!-- QR zoom modal -->
     @if (zoomSeat) {
-      <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" (click)="zoomSeat = null">
-        <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="zoomSeat = null">
-          <h3 class="text-base font-bold text-foreground leading-tight">Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}</h3>
-          <p class="text-xs text-muted-foreground mt-1 mb-5">{{ zoomSeat.attendee_name || 'Unclaimed seat' }} — show at the entrance</p>
+      <div
+        class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+      >
+        <div
+          class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
+          appDialog
+          dismissOnBackdrop
+          (dismiss)="zoomSeat = null"
+        >
+          <h3 class="text-base font-bold text-foreground leading-tight">
+            Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}
+          </h3>
+          <p class="text-xs text-muted-foreground mt-1 mb-5">
+            {{ zoomSeat.attendee_name || 'Unclaimed seat' }} — show at the entrance
+          </p>
           @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
             <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
               <img [src]="qrCodes[zoomSeat.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
@@ -149,6 +213,9 @@ import { DialogDirective } from '../../directives/dialog.directive';
   `,
 })
 export class MyBookingsComponent implements OnInit {
+  private bookingService = inject(BookingService);
+  private toast = inject(ToastService);
+
   bookings: BookingDto[] = [];
   loading = false;
   copiedId: string | null = null;
@@ -157,17 +224,18 @@ export class MyBookingsComponent implements OnInit {
 
   readonly icons = { Users, Copy, Check, Clock, Armchair, Ticket };
 
-  constructor(private bookingService: BookingService, private toast: ToastService) {}
-
   ngOnInit(): void {
     this.loading = true;
     this.bookingService.mine().subscribe({
-      next: list => {
+      next: (list) => {
         this.bookings = list;
         this.loading = false;
         this.generateQrs();
       },
-      error: () => { this.loading = false; this.toast.error('Failed to load bookings.'); },
+      error: () => {
+        this.loading = false;
+        this.toast.error('Failed to load bookings.');
+      },
     });
   }
 
@@ -179,8 +247,12 @@ export class MyBookingsComponent implements OnInit {
         if (!uuid || this.qrCodes[uuid]) continue;
         const url = `${window.location.origin}/validate/${uuid}`;
         QRCode.toDataURL(url, { width: 300, margin: 0 })
-          .then(dataUrl => { this.qrCodes[uuid] = dataUrl; })
-          .catch(() => {});
+          .then((dataUrl) => {
+            this.qrCodes[uuid] = dataUrl;
+          })
+          .catch(() => {
+            // The seat still shows its ticket number; the QR is only a convenience.
+          });
       }
     }
   }
@@ -190,7 +262,7 @@ export class MyBookingsComponent implements OnInit {
   }
 
   copyLink(b: BookingDto): void {
-    navigator.clipboard.writeText(this.shareUrl(b)).then(() => {
+    void navigator.clipboard.writeText(this.shareUrl(b)).then(() => {
       this.copiedId = b.id;
       setTimeout(() => (this.copiedId = null), 2000);
     });

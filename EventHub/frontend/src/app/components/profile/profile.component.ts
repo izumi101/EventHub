@@ -1,10 +1,11 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { User } from '../../models/models';
+import { apiErrorMessage } from '../../api/api-error';
 
 @Component({
   selector: 'app-profile',
@@ -13,7 +14,6 @@ import { User } from '../../models/models';
   template: `
     <div class="page-root">
       <div class="container max-w-2xl py-8">
-
         <!-- Header -->
         <div class="mb-7">
           <p class="kicker mb-2">Account</p>
@@ -32,10 +32,15 @@ import { User } from '../../models/models';
           <!-- Avatar + username row -->
           <div class="card p-5 mb-4 flex items-center gap-4 flex-wrap">
             @if (user.profile.avatar) {
-              <img [src]="user.profile.avatar" alt="Avatar"
-                class="w-14 h-14 rounded-full object-cover ring-1 ring-border flex-shrink-0" />
+              <img
+                [src]="user.profile.avatar"
+                alt="Avatar"
+                class="w-14 h-14 rounded-full object-cover ring-1 ring-border flex-shrink-0"
+              />
             } @else {
-              <div class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary flex-shrink-0">
+              <div
+                class="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-xl font-bold text-primary flex-shrink-0"
+              >
                 {{ user.username.charAt(0).toUpperCase() }}
               </div>
             }
@@ -54,11 +59,29 @@ import { User } from '../../models/models';
             </div>
             <div class="flex items-center gap-2">
               <label class="btn btn-sm btn-secondary cursor-pointer">
-                {{ uploadingAvatar ? 'Uploading…' : (user.profile.avatar ? 'Change photo' : 'Upload photo') }}
-                <input type="file" accept="image/*" class="hidden" (change)="onAvatarSelected($event)" [disabled]="uploadingAvatar" />
+                {{
+                  uploadingAvatar
+                    ? 'Uploading…'
+                    : user.profile.avatar
+                      ? 'Change photo'
+                      : 'Upload photo'
+                }}
+                <input
+                  type="file"
+                  accept="image/*"
+                  class="hidden"
+                  (change)="onAvatarSelected($event)"
+                  [disabled]="uploadingAvatar"
+                />
               </label>
               @if (user.profile.avatar) {
-                <button type="button" (click)="removeAvatar()" class="btn btn-sm btn-ghost text-muted-foreground">Remove</button>
+                <button
+                  type="button"
+                  (click)="removeAvatar()"
+                  class="btn btn-sm btn-ghost text-muted-foreground"
+                >
+                  Remove
+                </button>
               }
             </div>
           </div>
@@ -71,9 +94,11 @@ import { User } from '../../models/models';
                   {{ user.profile.role === 'organizer' ? 'Organizer account' : 'Attendee account' }}
                 </p>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  {{ user.profile.role === 'organizer'
-                    ? 'You can create and manage events.'
-                    : 'Organizer accounts are created by administrators. Contact support if you need one.' }}
+                  {{
+                    user.profile.role === 'organizer'
+                      ? 'You can create and manage events.'
+                      : 'Organizer accounts are created by administrators. Contact support if you need one.'
+                  }}
                 </p>
               </div>
             </div>
@@ -82,13 +107,14 @@ import { User } from '../../models/models';
           <!-- Form -->
           <form (ngSubmit)="onSubmit()" novalidate>
             <div class="card divide-y divide-border">
-
               <!-- Personal details -->
               <div class="p-5">
                 <h2 class="text-sm font-semibold text-foreground mb-4">Personal details</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label for="first_name" class="block text-sm font-medium text-foreground mb-1.5">First name</label>
+                    <label for="first_name" class="block text-sm font-medium text-foreground mb-1.5"
+                      >First name</label
+                    >
                     <input
                       id="first_name"
                       type="text"
@@ -100,7 +126,9 @@ import { User } from '../../models/models';
                     />
                   </div>
                   <div>
-                    <label for="last_name" class="block text-sm font-medium text-foreground mb-1.5">Last name</label>
+                    <label for="last_name" class="block text-sm font-medium text-foreground mb-1.5"
+                      >Last name</label
+                    >
                     <input
                       id="last_name"
                       type="text"
@@ -112,7 +140,9 @@ import { User } from '../../models/models';
                     />
                   </div>
                   <div class="sm:col-span-2">
-                    <label for="bio" class="block text-sm font-medium text-foreground mb-1.5">Bio</label>
+                    <label for="bio" class="block text-sm font-medium text-foreground mb-1.5"
+                      >Bio</label
+                    >
                     <textarea
                       id="bio"
                       [(ngModel)]="formData.profile.bio"
@@ -130,7 +160,9 @@ import { User } from '../../models/models';
                 <h2 class="text-sm font-semibold text-foreground mb-4">Contact & location</h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label for="phone" class="block text-sm font-medium text-foreground mb-1.5">Phone</label>
+                    <label for="phone" class="block text-sm font-medium text-foreground mb-1.5"
+                      >Phone</label
+                    >
                     <input
                       id="phone"
                       type="tel"
@@ -142,7 +174,9 @@ import { User } from '../../models/models';
                     />
                   </div>
                   <div>
-                    <label for="location" class="block text-sm font-medium text-foreground mb-1.5">Location</label>
+                    <label for="location" class="block text-sm font-medium text-foreground mb-1.5"
+                      >Location</label
+                    >
                     <input
                       id="location"
                       type="text"
@@ -153,7 +187,9 @@ import { User } from '../../models/models';
                     />
                   </div>
                   <div class="sm:col-span-2">
-                    <label for="website" class="block text-sm font-medium text-foreground mb-1.5">Website</label>
+                    <label for="website" class="block text-sm font-medium text-foreground mb-1.5"
+                      >Website</label
+                    >
                     <input
                       id="website"
                       type="url"
@@ -177,11 +213,7 @@ import { User } from '../../models/models';
                     <p class="text-sm text-[color:var(--pine-600)]">{{ success }}</p>
                   }
                 </div>
-                <button
-                  type="submit"
-                  [disabled]="submitting"
-                  class="btn btn-primary"
-                >
+                <button type="submit" [disabled]="submitting" class="btn btn-primary">
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
                     Saving...
@@ -199,27 +231,61 @@ import { User } from '../../models/models';
               <h2 class="text-sm font-semibold text-foreground mb-4">Change password</h2>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label for="old_pw" class="block text-sm font-medium text-foreground mb-1.5">Current password</label>
-                  <input id="old_pw" type="password" [(ngModel)]="pw.old" name="old_pw" class="input" autocomplete="current-password" />
+                  <label for="old_pw" class="block text-sm font-medium text-foreground mb-1.5"
+                    >Current password</label
+                  >
+                  <input
+                    id="old_pw"
+                    type="password"
+                    [(ngModel)]="pw.old"
+                    name="old_pw"
+                    class="input"
+                    autocomplete="current-password"
+                  />
                 </div>
                 <div>
-                  <label for="new_pw" class="block text-sm font-medium text-foreground mb-1.5">New password</label>
-                  <input id="new_pw" type="password" [(ngModel)]="pw.new1" name="new_pw" class="input" autocomplete="new-password" />
+                  <label for="new_pw" class="block text-sm font-medium text-foreground mb-1.5"
+                    >New password</label
+                  >
+                  <input
+                    id="new_pw"
+                    type="password"
+                    [(ngModel)]="pw.new1"
+                    name="new_pw"
+                    class="input"
+                    autocomplete="new-password"
+                  />
                 </div>
                 <div>
-                  <label for="new_pw2" class="block text-sm font-medium text-foreground mb-1.5">Repeat new password</label>
-                  <input id="new_pw2" type="password" [(ngModel)]="pw.new2" name="new_pw2" class="input" autocomplete="new-password" />
+                  <label for="new_pw2" class="block text-sm font-medium text-foreground mb-1.5"
+                    >Repeat new password</label
+                  >
+                  <input
+                    id="new_pw2"
+                    type="password"
+                    [(ngModel)]="pw.new2"
+                    name="new_pw2"
+                    class="input"
+                    autocomplete="new-password"
+                  />
                 </div>
               </div>
             </div>
             <div class="p-5 flex items-center justify-between gap-3">
               <div>
-                @if (pwError) { <p class="text-sm text-destructive">{{ pwError }}</p> }
-                @if (pwSuccess) { <p class="text-sm text-[color:var(--pine-600)]">{{ pwSuccess }}</p> }
+                @if (pwError) {
+                  <p class="text-sm text-destructive">{{ pwError }}</p>
+                }
+                @if (pwSuccess) {
+                  <p class="text-sm text-[color:var(--pine-600)]">{{ pwSuccess }}</p>
+                }
               </div>
-              <button type="button" (click)="changePassword()"
+              <button
+                type="button"
+                (click)="changePassword()"
                 [disabled]="changingPw || !pw.old || !pw.new1 || !pw.new2"
-                class="btn btn-secondary">
+                class="btn btn-secondary"
+              >
                 {{ changingPw ? 'Updating…' : 'Update password' }}
               </button>
             </div>
@@ -230,6 +296,9 @@ import { User } from '../../models/models';
   `,
 })
 export class ProfileComponent implements OnInit {
+  private authService = inject(AuthService);
+  private toastService = inject(ToastService);
+
   user: User | null = null;
   loading = false;
   submitting = false;
@@ -251,12 +320,10 @@ export class ProfileComponent implements OnInit {
   pwError = '';
   pwSuccess = '';
 
-  constructor(private authService: AuthService, private toastService: ToastService) {}
-
   ngOnInit(): void {
     this.loading = true;
     this.authService.getProfile().subscribe({
-      next: user => {
+      next: (user) => {
         this.user = user;
         this.formData = {
           first_name: user.first_name,
@@ -278,16 +345,20 @@ export class ProfileComponent implements OnInit {
   }
 
   onSubmit(): void {
-    this.error = ''; this.success = ''; this.submitting = true;
-    this.authService.updateProfile(this.formData as any).subscribe({
-      next: user => {
+    this.error = '';
+    this.success = '';
+    this.submitting = true;
+    this.authService.updateProfile(this.formData).subscribe({
+      next: (user) => {
         this.user = user;
         this.success = 'Profile updated.';
         this.submitting = false;
-        setTimeout(() => { this.success = ''; }, 3000);
+        setTimeout(() => {
+          this.success = '';
+        }, 3000);
       },
-      error: err => {
-        this.error = err.error?.detail || 'Failed to update profile.';
+      error: (err) => {
+        this.error = apiErrorMessage(err, 'Failed to update profile.', 'detail');
         this.submitting = false;
       },
     });
@@ -304,14 +375,14 @@ export class ProfileComponent implements OnInit {
     }
     this.uploadingAvatar = true;
     this.authService.uploadAvatar(file).subscribe({
-      next: user => {
+      next: (user) => {
         this.user = user;
         this.uploadingAvatar = false;
         this.toastService.success('Avatar updated.');
       },
-      error: err => {
+      error: (err) => {
         this.uploadingAvatar = false;
-        this.toastService.error(err.error?.error || 'Could not upload the avatar.');
+        this.toastService.error(apiErrorMessage(err, 'Could not upload the avatar.', 'error'));
       },
     });
     input.value = '';
@@ -319,26 +390,38 @@ export class ProfileComponent implements OnInit {
 
   removeAvatar(): void {
     this.authService.deleteAvatar().subscribe({
-      next: user => { this.user = user; this.toastService.success('Avatar removed.'); },
+      next: (user) => {
+        this.user = user;
+        this.toastService.success('Avatar removed.');
+      },
       error: () => this.toastService.error('Could not remove the avatar.'),
     });
   }
 
   changePassword(): void {
-    this.pwError = ''; this.pwSuccess = '';
-    if (this.pw.new1 !== this.pw.new2) { this.pwError = 'Passwords do not match.'; return; }
-    if (this.pw.new1.length < 8) { this.pwError = 'Password must be at least 8 characters.'; return; }
+    this.pwError = '';
+    this.pwSuccess = '';
+    if (this.pw.new1 !== this.pw.new2) {
+      this.pwError = 'Passwords do not match.';
+      return;
+    }
+    if (this.pw.new1.length < 8) {
+      this.pwError = 'Password must be at least 8 characters.';
+      return;
+    }
     this.changingPw = true;
     this.authService.changePassword(this.pw.old, this.pw.new1, this.pw.new2).subscribe({
       next: () => {
         this.changingPw = false;
         this.pw = { old: '', new1: '', new2: '' };
         this.pwSuccess = 'Password changed.';
-        setTimeout(() => { this.pwSuccess = ''; }, 3000);
+        setTimeout(() => {
+          this.pwSuccess = '';
+        }, 3000);
       },
-      error: err => {
+      error: (err) => {
         this.changingPw = false;
-        this.pwError = err.error?.error || 'Could not change the password.';
+        this.pwError = apiErrorMessage(err, 'Could not change the password.', 'error');
       },
     });
   }

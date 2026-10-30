@@ -1,6 +1,7 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
+import { apiErrorStatus } from '../../api/api-error';
 import { FormsModule } from '@angular/forms';
 import { EventService } from '../../services/event.service';
 import { SearchService } from '../../services/search.service';
@@ -9,7 +10,14 @@ import { AuthService } from '../../services/auth.service';
 import { EventCardComponent } from '../event-card/event-card.component';
 import { Event, Category } from '../../models/models';
 import { Subscription, distinctUntilChanged } from 'rxjs';
-import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X } from 'lucide-angular';
+import {
+  LucideAngularModule,
+  Search,
+  MapPin,
+  SlidersHorizontal,
+  ChevronRight,
+  X,
+} from 'lucide-angular';
 
 @Component({
   selector: 'app-home',
@@ -17,39 +25,48 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
   imports: [CommonModule, RouterModule, FormsModule, EventCardComponent, LucideAngularModule],
   template: `
     <div class="page-root-white">
-
       <!-- ─── Discovery header ─── -->
       <section class="border-b border-border bg-background">
         <div class="container py-7">
-
           <!-- Editorial hero -->
           <div class="mb-6 max-w-2xl">
             <p class="kicker mb-3">What's on · This week</p>
-            <h1 class="font-display font-semibold tracking-tight leading-[1.02] text-foreground"
-                style="font-size:clamp(2.25rem,4.6vw,3.4rem)">
-              Find your next<br><span class="text-ember">night out.</span>
+            <h1
+              class="font-display font-semibold tracking-tight leading-[1.02] text-foreground"
+              style="font-size:clamp(2.25rem,4.6vw,3.4rem)"
+            >
+              Find your next<br /><span class="text-ember">night out.</span>
             </h1>
             <p class="text-muted-foreground mt-4 text-[0.975rem] leading-relaxed max-w-xl">
-              From sold-out gigs to quiet gallery openings — every event worth your evening, in one place.
+              From sold-out gigs to quiet gallery openings — every event worth your evening, in one
+              place.
             </p>
           </div>
 
           <!-- Search bar -->
           <div class="flex flex-col sm:flex-row gap-2 max-w-2xl">
-
             <!-- Search field — flex wrapper, icon + input side by side -->
             <label
               class="flex items-center gap-2 flex-1 border rounded-md px-3 h-10 bg-background transition-shadow cursor-text"
-              [class]="semanticMode
-                ? 'border-ember ring-2 ring-ember/20 focus-within:border-ember'
-                : 'border-border focus-within:border-ember focus-within:ring-2 focus-within:ring-ember/15'"
+              [class]="
+                semanticMode
+                  ? 'border-ember ring-2 ring-ember/20 focus-within:border-ember'
+                  : 'border-border focus-within:border-ember focus-within:ring-2 focus-within:ring-ember/15'
+              "
             >
-              <lucide-icon [img]="icons.Search" class="w-4 h-4 flex-shrink-0" [class]="semanticMode ? 'text-ember' : 'text-muted-foreground'" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.Search"
+                class="w-4 h-4 flex-shrink-0"
+                [class]="semanticMode ? 'text-ember' : 'text-muted-foreground'"
+                aria-hidden="true"
+              />
               <input
                 type="search"
                 [(ngModel)]="searchQuery"
                 (keyup.enter)="applyFilters()"
-                [placeholder]="semanticMode ? 'Describe what you are looking for...' : 'Search events...'"
+                [placeholder]="
+                  semanticMode ? 'Describe what you are looking for...' : 'Search events...'
+                "
                 class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
                 aria-label="Search events"
               />
@@ -57,16 +74,26 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
               <button
                 type="button"
                 (click)="semanticMode = !semanticMode; applyFilters()"
-                [class]="semanticMode
-                  ? 'flex-shrink-0 font-mono-ui text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded bg-ember text-white'
-                  : 'flex-shrink-0 font-mono-ui text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-ember/10 hover:text-ember transition-colors'"
+                [class]="
+                  semanticMode
+                    ? 'flex-shrink-0 font-mono-ui text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded bg-ember text-white'
+                    : 'flex-shrink-0 font-mono-ui text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-ember/10 hover:text-ember transition-colors'
+                "
                 title="Toggle AI semantic search"
-              >AI</button>
+              >
+                AI
+              </button>
             </label>
 
             <!-- Location field -->
-            <label class="flex items-center gap-2 sm:w-44 border border-border rounded-md px-3 h-10 bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-shadow cursor-text">
-              <lucide-icon [img]="icons.MapPin" class="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true"></lucide-icon>
+            <label
+              class="flex items-center gap-2 sm:w-44 border border-border rounded-md px-3 h-10 bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-shadow cursor-text"
+            >
+              <lucide-icon
+                [img]="icons.MapPin"
+                class="w-4 h-4 text-muted-foreground flex-shrink-0"
+                aria-hidden="true"
+              />
               <input
                 type="text"
                 [(ngModel)]="searchLocation"
@@ -77,9 +104,7 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
               />
             </label>
 
-            <button (click)="applyFilters()" class="btn btn-primary h-10 px-5">
-              Search
-            </button>
+            <button (click)="applyFilters()" class="btn btn-primary h-10 px-5">Search</button>
 
             @if (hasActiveFilters) {
               <button
@@ -87,7 +112,7 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
                 class="btn btn-ghost btn-sm h-10 flex items-center gap-1.5 text-muted-foreground"
                 aria-label="Clear all filters"
               >
-                <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+                <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true" />
                 Clear
               </button>
             }
@@ -95,10 +120,15 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
 
           <!-- Filter row -->
           <div class="flex flex-wrap items-center gap-2 mt-4">
-
             <!-- Sort -->
-            <div class="flex items-center gap-1.5 border border-border rounded-md px-2.5 h-8 bg-background">
-              <lucide-icon [img]="icons.SlidersHorizontal" class="w-3.5 h-3.5 text-muted-foreground" aria-hidden="true"></lucide-icon>
+            <div
+              class="flex items-center gap-1.5 border border-border rounded-md px-2.5 h-8 bg-background"
+            >
+              <lucide-icon
+                [img]="icons.SlidersHorizontal"
+                class="w-3.5 h-3.5 text-muted-foreground"
+                aria-hidden="true"
+              />
               <select
                 [(ngModel)]="ordering"
                 (change)="applyFilters()"
@@ -134,7 +164,6 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
             >
               Online
             </button>
-
           </div>
         </div>
       </section>
@@ -167,7 +196,6 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
 
       <!-- ─── Events grid ─── -->
       <main class="container py-8">
-
         <!-- Recommended for you (personalised, signed-in only) -->
         @if (recommended.length > 0 && !hasActiveFilters) {
           <section class="mb-10">
@@ -175,7 +203,7 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
             <div class="flex gap-5 overflow-x-auto pb-2 no-scrollbar">
               @for (event of recommended; track event.id) {
                 <div class="w-72 flex-shrink-0">
-                  <app-event-card [event]="event"></app-event-card>
+                  <app-event-card [event]="event" />
                 </div>
               }
             </div>
@@ -209,48 +237,46 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
             }
           </div>
 
-        <!-- Empty state -->
+          <!-- Empty state -->
         } @else if (events.length === 0) {
           <div class="flex flex-col items-center justify-center py-24 text-center">
             <div class="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
-              <lucide-icon [img]="icons.Search" class="w-6 h-6 text-muted-foreground" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.Search"
+                class="w-6 h-6 text-muted-foreground"
+                aria-hidden="true"
+              />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">No events found</h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
               Try adjusting your search or filters to find what you're looking for.
             </p>
-            <button (click)="resetFilters()" class="btn btn-secondary btn-sm">
-              Clear filters
-            </button>
+            <button (click)="resetFilters()" class="btn btn-secondary btn-sm">Clear filters</button>
           </div>
 
-        <!-- Grid -->
+          <!-- Grid -->
         } @else {
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            @for (event of events; track event.id; let i = $index) {
+            @for (event of events; track event.id) {
               <app-event-card
                 [event]="event"
-                [featured]="i === 0"
-                [class.sm:col-span-2]="i === 0"
-                [class.lg:col-span-2]="i === 0"
-              ></app-event-card>
+                [featured]="$first"
+                [class.sm:col-span-2]="$first"
+                [class.lg:col-span-2]="$first"
+              />
             }
           </div>
 
           <!-- Load more -->
           @if (hasMore) {
             <div class="mt-10 flex justify-center">
-              <button
-                (click)="loadMore()"
-                [disabled]="loadingMore"
-                class="btn btn-secondary"
-              >
+              <button (click)="loadMore()" [disabled]="loadingMore" class="btn btn-secondary">
                 @if (loadingMore) {
                   <span class="spinner spinner-sm"></span>
                   Loading...
                 } @else {
                   Load more events
-                  <lucide-icon [img]="icons.ChevronRight" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                  <lucide-icon [img]="icons.ChevronRight" class="w-4 h-4" aria-hidden="true" />
                 }
               </button>
             </div>
@@ -261,6 +287,11 @@ import { LucideAngularModule, Search, MapPin, SlidersHorizontal, ChevronRight, X
   `,
 })
 export class HomeComponent implements OnInit, OnDestroy {
+  private eventService = inject(EventService);
+  private searchService = inject(SearchService);
+  private toastService = inject(ToastService);
+  private authService = inject(AuthService);
+
   events: Event[] = [];
   categories: Category[] = [];
   recommended: Event[] = [];
@@ -272,7 +303,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   ordering = 'date';
   isFree = false;
   isOnline = false;
-  semanticMode = false;   // toggle: semantic AI search vs keyword
+  semanticMode = false; // toggle: semantic AI search vs keyword
 
   loading = false;
   loadingMore = false;
@@ -285,34 +316,27 @@ export class HomeComponent implements OnInit, OnDestroy {
   private searchSub?: Subscription;
   private locationSub?: Subscription;
 
-  constructor(
-    private eventService: EventService,
-    private searchService: SearchService,
-    private toastService: ToastService,
-    private authService: AuthService,
-  ) {}
-
   ngOnInit(): void {
     this.loadCategories();
     this.applyFilters();
     this.loadRecommendations();
 
-    this.searchSub = this.searchService.searchQuery$.pipe(
-      distinctUntilChanged()
-    ).subscribe(query => {
-      if (query !== this.searchQuery) {
-        this.searchQuery = query;
-        this.applyFilters();
-      }
-    });
+    this.searchSub = this.searchService.searchQuery$
+      .pipe(distinctUntilChanged())
+      .subscribe((query) => {
+        if (query !== this.searchQuery) {
+          this.searchQuery = query;
+          this.applyFilters();
+        }
+      });
 
     // Kept in its own subscription so it is released with the component —
     // the root SearchService outlives every visit to the home page.
-    this.locationSub = this.searchService.searchLocation$.pipe(
-      distinctUntilChanged()
-    ).subscribe(loc => {
-      this.searchLocation = loc;
-    });
+    this.locationSub = this.searchService.searchLocation$
+      .pipe(distinctUntilChanged())
+      .subscribe((loc) => {
+        this.searchLocation = loc;
+      });
   }
 
   ngOnDestroy(): void {
@@ -321,21 +345,36 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   get hasActiveFilters(): boolean {
-    return !!(this.searchQuery || this.searchLocation || this.selectedCategory || this.isFree || this.isOnline || this.ordering !== 'date');
+    return !!(
+      this.searchQuery ||
+      this.searchLocation ||
+      this.selectedCategory ||
+      this.isFree ||
+      this.isOnline ||
+      this.ordering !== 'date'
+    );
   }
 
   loadCategories(): void {
     this.eventService.getCategories().subscribe({
-      next: cats => { this.categories = cats; },
-      error: () => {},
+      next: (cats) => {
+        this.categories = cats;
+      },
+      error: () => {
+        // Without categories the filter chips are just not shown.
+      },
     });
   }
 
   loadRecommendations(): void {
     if (!this.authService.isLoggedIn) return;
     this.eventService.getRecommendations().subscribe({
-      next: res => { this.recommended = (res.results ?? []).slice(0, 8); },
-      error: () => {},
+      next: (res) => {
+        this.recommended = res.results.slice(0, 8);
+      },
+      error: () => {
+        // The "For you" row is optional; the main listing is unaffected.
+      },
     });
   }
 
@@ -347,14 +386,15 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.currentPage = 1;
 
     this.eventService.getEvents(this.buildParams(1)).subscribe({
-      next: res => {
+      next: (res) => {
         this.events = res.results;
         this.totalCount = res.count;
         this.hasMore = !!res.next;
         this.loading = false;
       },
-      error: err => {
-        if (err.status !== 0) {
+      error: (err) => {
+        // Status 0 = offline / aborted request: no toast for that.
+        if (apiErrorStatus(err) !== 0) {
           this.toastService.error('Failed to load events. Please try again.');
         }
         this.loading = false;
@@ -368,7 +408,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.currentPage++;
 
     this.eventService.getEvents(this.buildParams(this.currentPage)).subscribe({
-      next: res => {
+      next: (res) => {
         this.events = [...this.events, ...res.results];
         this.hasMore = !!res.next;
         this.loadingMore = false;
@@ -412,12 +452,14 @@ export class HomeComponent implements OnInit, OnDestroy {
       page,
       upcoming: true, // discovery never shows events that already happened
       // In semantic mode send ?q= instead of ?search= to hit the vector path
-      ...(useSemanticSearch ? { q: this.searchQuery } : (this.searchQuery && { search: this.searchQuery })),
+      ...(useSemanticSearch
+        ? { q: this.searchQuery }
+        : this.searchQuery && { search: this.searchQuery }),
       ...(this.searchLocation && { location: this.searchLocation }),
       ...(this.selectedCategory !== null && { category: this.selectedCategory }),
-      ...(this.ordering       && { ordering: this.ordering }),
-      ...(this.isFree         && { is_free: true }),
-      ...(this.isOnline       && { is_online: true }),
+      ...(this.ordering && { ordering: this.ordering }),
+      ...(this.isFree && { is_free: true }),
+      ...(this.isOnline && { is_online: true }),
     };
   }
 }

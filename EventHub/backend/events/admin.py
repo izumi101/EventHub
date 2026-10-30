@@ -1,7 +1,17 @@
 from django.contrib import admin
+
 from .models import (
-    Category, Event, Registration, PromoCode, EventQuestion, WaitlistEntry,
-    TicketType, EventStaff, Webhook, Affiliate, RefundRequest,
+    Affiliate,
+    Category,
+    Event,
+    EventQuestion,
+    EventStaff,
+    PromoCode,
+    RefundRequest,
+    Registration,
+    TicketType,
+    WaitlistEntry,
+    Webhook,
 )
 
 
@@ -44,7 +54,16 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(PromoCode)
 class PromoCodeAdmin(admin.ModelAdmin):
-    list_display = ['code', 'event', 'discount_type', 'discount_value', 'times_used', 'max_uses', 'is_active', 'expires_at']
+    list_display = [
+        'code',
+        'event',
+        'discount_type',
+        'discount_value',
+        'times_used',
+        'max_uses',
+        'is_active',
+        'expires_at',
+    ]
     list_filter = ['discount_type', 'is_active']
     search_fields = ['code', 'event__title']
 

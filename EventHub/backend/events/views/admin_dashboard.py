@@ -1,11 +1,14 @@
 """Platform-wide stats for the admin dashboard."""
 
+from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
+from common.schema import ERROR, UNAUTHENTICATED
 
+from .. import schema as api
 from ..models import INACTIVE_REGISTRATION_STATUSES, Event, Registration
 from ..serializers import EventListSerializer
 
@@ -13,6 +16,7 @@ from ..serializers import EventListSerializer
 class AdminDashboardView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: api.AdminDashboardSerializer, 401: UNAUTHENTICATED, 403: ERROR})
     def get(self, request):
         from collections import defaultdict
         from decimal import Decimal
@@ -37,41 +41,42 @@ class AdminDashboardView(generics.GenericAPIView):
         # includes paid group bookings (they have no Payment row).
         totals = defaultdict(Decimal)
         for row in (
-            Payment.objects
-            .filter(status__in=[PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED])
+            Payment.objects.filter(status__in=[PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED])
             .values('currency')
             .annotate(gross=Sum('amount'), refunded=Sum('refunded_amount'))
         ):
             totals[(row['currency'] or 'usd').upper()] += row['gross'] - row['refunded']
         for row in (
-            Booking.objects
-            .filter(status=Booking.Status.CONFIRMED, amount_paid__isnull=False)
+            Booking.objects.filter(status=Booking.Status.CONFIRMED, amount_paid__isnull=False)
             .values('event__currency')
             .annotate(total=Sum('amount_paid'))
         ):
             totals[(row['event__currency'] or 'USD').upper()] += row['total']
         revenue_by_currency = [
-            {'currency': cur, 'amount': str(amount.quantize(Decimal('0.01')))}
-            for cur, amount in sorted(totals.items())
+            {'currency': cur, 'amount': str(amount.quantize(Decimal('0.01')))} for cur, amount in sorted(totals.items())
         ]
 
         top_events = (
-            Event.objects
-            .filter(status=EventStatusChoices.PUBLISHED)
-            .annotate(reg_count=Count(
-                'registrations', filter=~Q(registrations__status__in=INACTIVE_REGISTRATION_STATUSES),
-            ))
+            Event.objects.filter(status=EventStatusChoices.PUBLISHED)
+            .annotate(
+                reg_count=Count(
+                    'registrations',
+                    filter=~Q(registrations__status__in=INACTIVE_REGISTRATION_STATUSES),
+                )
+            )
             .order_by('-reg_count')
             .select_related('organizer', 'category')
             .with_capacity()[:5]
         )
 
-        return Response({
-            'total_users': total_users,
-            'total_events': total_events,
-            'published_events': published_events,
-            'total_registrations': total_registrations,
-            'confirmed_registrations': confirmed_registrations,
-            'revenue_by_currency': revenue_by_currency,
-            'top_events': EventListSerializer(top_events, many=True, context={'request': request}).data,
-        })
+        return Response(
+            {
+                'total_users': total_users,
+                'total_events': total_events,
+                'published_events': published_events,
+                'total_registrations': total_registrations,
+                'confirmed_registrations': confirmed_registrations,
+                'revenue_by_currency': revenue_by_currency,
+                'top_events': EventListSerializer(top_events, many=True, context={'request': request}).data,
+            }
+        )

@@ -4,7 +4,7 @@ describe('MoneyPipe', () => {
   const money = new MoneyPipe();
   // Intl puts a non-breaking space between a currency code and the amount.
   const fmt = (value: string | number | null, currency?: string) =>
-    money.transform(value, currency).replace(/ /g, ' ');
+    money.transform(value, currency).replace(/\u00a0/g, ' ');
 
   it('formats in the event currency, not always dollars', () => {
     expect(fmt('15', 'USD')).toBe('$15.00');

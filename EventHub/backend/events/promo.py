@@ -4,7 +4,8 @@ Single source of truth for: looking up a code, checking it's usable, and
 computing the final price. Used by both the public "validate" endpoint and the
 checkout flow so the number the attendee sees equals the number they pay.
 """
-from decimal import Decimal, ROUND_HALF_UP
+
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db.models import F, Q
 
@@ -24,11 +25,7 @@ def get_valid_promo(event, code: str) -> PromoCode:
     if not code or not code.strip():
         raise PromoError('Enter a promo code.')
 
-    promo = (
-        PromoCode.objects
-        .filter(event=event, code__iexact=code.strip())
-        .first()
-    )
+    promo = PromoCode.objects.filter(event=event, code__iexact=code.strip()).first()
     # One message for "unknown", "inactive", "expired" and "used up" so the
     # public validate endpoint can't be used to enumerate existing codes.
     if promo is None or not promo.is_valid:
@@ -45,8 +42,7 @@ def reserve_promo(promo: PromoCode) -> None:
     can't both succeed: the conditional UPDATE matches for only one of them.
     """
     taken = (
-        PromoCode.objects
-        .filter(pk=promo.pk, is_active=True)
+        PromoCode.objects.filter(pk=promo.pk, is_active=True)
         .filter(Q(max_uses__isnull=True) | Q(times_used__lt=F('max_uses')))
         .update(times_used=F('times_used') + 1)
     )

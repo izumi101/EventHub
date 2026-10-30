@@ -1,7 +1,13 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
-import { EventService, WaitlistStatus, QueueStatus } from '../../services/event.service';
+import {
+  EventService,
+  WaitlistStatus,
+  QueueStatus,
+  type DynamicPrice,
+  type RegisterPayload,
+} from '../../services/event.service';
 import { PaymentService } from '../../services/payment.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
@@ -19,15 +25,17 @@ import {
   Tag,
   Globe,
   Link,
-  Edit,
-  CheckCircle,
+  SquarePen,
+  CircleCheckBig,
   Clock,
-  XCircle,
+  CircleX,
   Share2,
   ChevronLeft,
   Heart,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
+import { supportsWebShare } from '../../utils/browser-support';
 
 /** Event page: hero, status banners, key info and the booking sidebar.
  *
@@ -38,9 +46,14 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 @Component({
   selector: 'app-event-detail',
   standalone: true,
-  imports: [MoneyPipe, 
-    CommonModule, RouterModule, LucideAngularModule,
-    EventReviewsComponent, EventCheckoutModalComponent, RefundRequestModalComponent,
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    EventReviewsComponent,
+    EventCheckoutModalComponent,
+    RefundRequestModalComponent,
   ],
   template: `
     <!-- Loading -->
@@ -64,21 +77,31 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 
     @if (!loading && event) {
       <div class="page-root-white pb-16">
-
         <!-- ── Pending banner ── -->
         @if (event.status === 'pending') {
           <div class="bg-[color:var(--warning-50)] border-b border-transparent">
             <div class="container py-3 flex items-center gap-3">
-              <lucide-icon [img]="icons.Clock" class="w-4 h-4 text-warning flex-shrink-0" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.Clock"
+                class="w-4 h-4 text-warning flex-shrink-0"
+                aria-hidden="true"
+              />
               <p class="text-sm text-warning font-medium">
                 This event is pending approval and is not yet visible to the public.
               </p>
               @if (isAdmin) {
                 <div class="ml-auto flex gap-2">
-                  <button (click)="approve()" class="btn btn-sm" style="background:#15803d;color:#fff;border-color:#15803d">
+                  <button
+                    (click)="approve()"
+                    class="btn btn-sm"
+                    style="background:#15803d;color:#fff;border-color:#15803d"
+                  >
                     Approve
                   </button>
-                  <button (click)="reject()" class="btn btn-sm btn-danger border border-transparent">
+                  <button
+                    (click)="reject()"
+                    class="btn btn-sm btn-danger border border-transparent"
+                  >
                     Reject
                   </button>
                 </div>
@@ -91,11 +114,19 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         @if (event.status === 'draft' && isOwner) {
           <div class="bg-muted border-b border-border">
             <div class="container py-3 flex items-center gap-3 flex-wrap">
-              <lucide-icon [img]="icons.Edit" class="w-4 h-4 text-muted-foreground flex-shrink-0" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.SquarePen"
+                class="w-4 h-4 text-muted-foreground flex-shrink-0"
+                aria-hidden="true"
+              />
               <p class="text-sm text-foreground font-medium">
                 This is a draft — only you can see it. Submit it for review to get it published.
               </p>
-              <button (click)="submitForReview()" [disabled]="submittingForReview" class="btn btn-sm btn-primary ml-auto">
+              <button
+                (click)="submitForReview()"
+                [disabled]="submittingForReview"
+                class="btn btn-sm btn-primary ml-auto"
+              >
                 {{ submittingForReview ? 'Submitting…' : 'Submit for review' }}
               </button>
             </div>
@@ -106,7 +137,11 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         @if (event.status === 'cancelled') {
           <div class="bg-[color:var(--destructive-50)] border-b border-transparent">
             <div class="container py-3 flex items-center gap-3">
-              <lucide-icon [img]="icons.XCircle" class="w-4 h-4 text-[color:var(--destructive)] flex-shrink-0" aria-hidden="true"></lucide-icon>
+              <lucide-icon
+                [img]="icons.CircleX"
+                class="w-4 h-4 text-[color:var(--destructive)] flex-shrink-0"
+                aria-hidden="true"
+              />
               <p class="text-sm text-[color:var(--destructive)] font-medium">
                 This event has been cancelled by the organizer. Paid tickets were refunded.
               </p>
@@ -117,33 +152,56 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         <!-- ── Editorial hero ── -->
         <div class="container mt-6">
           <!-- Breadcrumb -->
-          <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-4" aria-label="Breadcrumb">
-            <a routerLink="/" class="hover:text-foreground transition-colors flex items-center gap-1">
-              <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+          <nav
+            class="flex items-center gap-1.5 text-sm text-muted-foreground mb-4"
+            aria-label="Breadcrumb"
+          >
+            <a
+              routerLink="/"
+              class="hover:text-foreground transition-colors flex items-center gap-1"
+            >
+              <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true" />
               Events
             </a>
             <span>/</span>
             <span class="text-foreground font-medium truncate max-w-xs">{{ event.title }}</span>
           </nav>
 
-          <div class="relative rounded-2xl overflow-hidden bg-muted border border-border" style="aspect-ratio:16/7;max-height:460px">
+          <div
+            class="relative rounded-2xl overflow-hidden bg-muted border border-border"
+            style="aspect-ratio:16/7;max-height:460px"
+          >
             @if (event.image && !imageError) {
-              <img [src]="event.image" [alt]="event.title" class="w-full h-full object-cover" (error)="imageError = true" />
+              <img
+                [src]="event.image"
+                [alt]="event.title"
+                class="w-full h-full object-cover"
+                (error)="imageError = true"
+              />
             } @else {
-              <div class="w-full h-full flex items-center justify-center" style="background:linear-gradient(135deg,#F4D9CC,#E8B8A2 55%,#CBB6A6)">
+              <div
+                class="w-full h-full flex items-center justify-center"
+                style="background:linear-gradient(135deg,#F4D9CC,#E8B8A2 55%,#CBB6A6)"
+              >
                 <span class="font-display text-7xl font-semibold text-white/70 select-none">
-                  {{ event.title?.charAt(0)?.toUpperCase() || 'E' }}
+                  {{ event.title.charAt(0).toUpperCase() || 'E' }}
                 </span>
               </div>
             }
             <!-- scrim -->
-            <div class="absolute inset-0 pointer-events-none" style="background:linear-gradient(to top, rgba(26,23,20,0.84), rgba(26,23,20,0.18) 48%, transparent 72%)"></div>
+            <div
+              class="absolute inset-0 pointer-events-none"
+              style="background:linear-gradient(to top, rgba(26,23,20,0.84), rgba(26,23,20,0.18) 48%, transparent 72%)"
+            ></div>
             <!-- overlay -->
             <div class="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
               <p class="kicker mb-2" style="color:rgba(255,255,255,0.82)">
-                {{ event.category?.name || 'Event' }} · {{ event.date | date:'EEE, MMM d' }}
+                {{ event.category.name || 'Event' }} · {{ event.date | date: 'EEE, MMM d' }}
               </p>
-              <h1 class="font-display font-semibold text-white leading-[1.04] max-w-3xl" style="font-size:clamp(1.9rem,3.8vw,3rem)">
+              <h1
+                class="font-display font-semibold text-white leading-[1.04] max-w-3xl"
+                style="font-size:clamp(1.9rem,3.8vw,3rem)"
+              >
                 {{ event.title }}
               </h1>
             </div>
@@ -152,24 +210,30 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 
         <!-- ── Content ── -->
         <div class="container mt-8">
-
           <div class="flex flex-col lg:flex-row gap-10">
-
             <!-- ── Left: main content ── -->
             <div class="flex-1 min-w-0">
-
               <!-- Organizer actions -->
               @if (isOwner) {
                 <div class="flex gap-2 flex-wrap mb-5">
-                  <a [routerLink]="['/edit-event', event.id]" class="btn btn-sm btn-outline flex items-center gap-1.5">
-                    <lucide-icon [img]="icons.Edit" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+                  <a
+                    [routerLink]="['/edit-event', event.id]"
+                    class="btn btn-sm btn-outline flex items-center gap-1.5"
+                  >
+                    <lucide-icon [img]="icons.SquarePen" class="w-3.5 h-3.5" aria-hidden="true" />
                     Edit
                   </a>
-                  <a [routerLink]="['/organizer/events', event.id, 'ticket-types']" class="btn btn-sm btn-outline flex items-center gap-1.5">
-                    <lucide-icon [img]="icons.Tag" class="w-3.5 h-3.5" aria-hidden="true"></lucide-icon>
+                  <a
+                    [routerLink]="['/organizer/events', event.id, 'ticket-types']"
+                    class="btn btn-sm btn-outline flex items-center gap-1.5"
+                  >
+                    <lucide-icon [img]="icons.Tag" class="w-3.5 h-3.5" aria-hidden="true" />
                     Tickets
                   </a>
-                  <a [routerLink]="['/organizer/events', event.id, 'attendees']" class="btn btn-sm btn-secondary">
+                  <a
+                    [routerLink]="['/organizer/events', event.id, 'attendees']"
+                    class="btn btn-sm btn-secondary"
+                  >
                     Attendees
                   </a>
                 </div>
@@ -191,18 +255,31 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               <!-- Key info grid -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
                 <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon [img]="icons.Calendar" class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true"></lucide-icon>
+                  <lucide-icon
+                    [img]="icons.Calendar"
+                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
                     <p class="text-xs text-muted-foreground font-medium mb-0.5">Date & Time</p>
-                    <p class="text-sm font-semibold text-foreground">{{ event.date | date:'EEEE, MMM d, y' }}</p>
-                    <p class="text-xs text-muted-foreground">{{ event.date | date:'h:mm a' }}
-                      @if (event.end_date) { – {{ event.end_date | date:'h:mm a' }} }
+                    <p class="text-sm font-semibold text-foreground">
+                      {{ event.date | date: 'EEEE, MMM d, y' }}
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      {{ event.date | date: 'h:mm a' }}
+                      @if (event.end_date) {
+                        – {{ event.end_date | date: 'h:mm a' }}
+                      }
                     </p>
                   </div>
                 </div>
 
                 <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon [img]="icons.MapPin" class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true"></lucide-icon>
+                  <lucide-icon
+                    [img]="icons.MapPin"
+                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
                     <p class="text-xs text-muted-foreground font-medium mb-0.5">Location</p>
                     <p class="text-sm font-semibold text-foreground">{{ event.location }}</p>
@@ -213,85 +290,118 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 </div>
 
                 <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon [img]="icons.Users" class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true"></lucide-icon>
+                  <lucide-icon
+                    [img]="icons.Users"
+                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
                     <p class="text-xs text-muted-foreground font-medium mb-0.5">Capacity</p>
-                    <p class="text-sm font-semibold text-foreground">{{ event.available_spots }} spots left</p>
-                    <p class="text-xs text-muted-foreground">{{ event.registered_count }} / {{ event.max_participants }} registered</p>
+                    <p class="text-sm font-semibold text-foreground">
+                      {{ event.available_spots }} spots left
+                    </p>
+                    <p class="text-xs text-muted-foreground">
+                      {{ event.registered_count }} / {{ event.max_participants }} registered
+                    </p>
                   </div>
                 </div>
 
                 <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon [img]="icons.Tag" class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" aria-hidden="true"></lucide-icon>
+                  <lucide-icon
+                    [img]="icons.Tag"
+                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
+                    aria-hidden="true"
+                  />
                   <div>
                     <p class="text-xs text-muted-foreground font-medium mb-0.5">Category</p>
-                    <p class="text-sm font-semibold text-foreground">{{ event.category?.name || '—' }}</p>
+                    <p class="text-sm font-semibold text-foreground">
+                      {{ event.category.name || '—' }}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <!-- Online link -->
               @if (event.is_online && event.online_link) {
-                <div class="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/40 mb-6">
-                  <lucide-icon [img]="icons.Link" class="w-4 h-4 text-primary flex-shrink-0" aria-hidden="true"></lucide-icon>
+                <div
+                  class="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/40 mb-6"
+                >
+                  <lucide-icon
+                    [img]="icons.Link"
+                    class="w-4 h-4 text-primary flex-shrink-0"
+                    aria-hidden="true"
+                  />
                   <a
                     [href]="event.online_link"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="text-sm text-primary font-medium hover:underline truncate"
-                  >{{ event.online_link }}</a>
+                    >{{ event.online_link }}</a
+                  >
                 </div>
               }
 
               <!-- Organizer -->
               <div class="mb-8">
-                <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Organizer</h2>
+                <h2
+                  class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3"
+                >
+                  Organizer
+                </h2>
                 <div class="flex items-center gap-3">
-                  <div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0">
-                    {{ event.organizer?.username?.charAt(0)?.toUpperCase() || 'O' }}
+                  <div
+                    class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0"
+                  >
+                    {{ event.organizer.username.charAt(0).toUpperCase() || 'O' }}
                   </div>
                   <div>
                     <p class="text-sm font-semibold text-foreground">
-                      {{ event.organizer?.first_name || event.organizer?.username }}
-                      {{ event.organizer?.last_name }}
+                      {{ event.organizer.first_name || event.organizer.username }}
+                      {{ event.organizer.last_name }}
                     </p>
-                    <p class="text-xs text-muted-foreground">@{{ event.organizer?.username }}</p>
+                    <p class="text-xs text-muted-foreground">@{{ event.organizer.username }}</p>
                   </div>
                 </div>
               </div>
 
               <!-- Description -->
               <div class="mb-8">
-                <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">About this event</h2>
+                <h2
+                  class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3"
+                >
+                  About this event
+                </h2>
                 <div class="prose-sm text-foreground leading-relaxed whitespace-pre-wrap text-sm">
                   {{ event.description }}
                 </div>
               </div>
 
               <!-- Reviews -->
-              <app-event-reviews [event]="event" [myRegistration]="myRegistration"></app-event-reviews>
-
+              <app-event-reviews [event]="event" [myRegistration]="myRegistration" />
             </div>
 
             <!-- ── Right: booking sidebar ── -->
             <aside class="w-full lg:w-80 xl:w-96 flex-shrink-0">
               <div class="sticky top-20 space-y-3">
-
                 <!-- ── Price card ── -->
                 <div class="rounded-2xl overflow-hidden border border-border shadow-md bg-card">
-
                   <!-- Gradient top bar -->
                   <div class="h-1 w-full" [class]="priceBarClass()"></div>
 
                   <div class="p-5">
                     <!-- Price + demand badge -->
                     <div class="mb-1">
-                      <p class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                      <p
+                        class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2"
+                      >
                         {{ event.has_ticket_types ? 'Tickets from' : 'Price' }}
                       </p>
                       <div class="flex items-center gap-3 flex-wrap">
-                        <span class="text-3xl font-extrabold text-foreground tracking-tight leading-none">
-                          @if (event.is_free) { Free
+                        <span
+                          class="text-3xl font-extrabold text-foreground tracking-tight leading-none"
+                        >
+                          @if (event.is_free) {
+                            Free
                           } @else if (event.has_ticket_types) {
                             {{ event.price_from | money: event.currency }}
                           } @else if (pricingData && pricingData.multiplier !== 1.0) {
@@ -300,18 +410,28 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                             {{ event.price | money: event.currency }}
                           }
                         </span>
-                        @if (!event.has_ticket_types && pricingData && !event.is_free && pricingData.base_price !== pricingData.current_price) {
-                          <span class="text-sm text-muted-foreground line-through">{{ pricingData.base_price | money: event.currency }}</span>
+                        @if (
+                          !event.has_ticket_types &&
+                          pricingData &&
+                          !event.is_free &&
+                          pricingData.base_price !== pricingData.current_price
+                        ) {
+                          <span class="text-sm text-muted-foreground line-through">{{
+                            pricingData.base_price | money: event.currency
+                          }}</span>
                         }
                         @if (!event.has_ticket_types && pricingData && !event.is_free) {
                           <span
                             class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
                             [class]="demandBadgeClass(pricingData.demand_level)"
-                          >{{ pricingData.demand_level }}</span>
+                            >{{ pricingData.demand_level }}</span
+                          >
                         }
                       </div>
                       @if (event.has_ticket_types) {
-                        <p class="text-xs text-muted-foreground mt-1">{{ event.ticket_types?.length }} ticket types available</p>
+                        <p class="text-xs text-muted-foreground mt-1">
+                          {{ event.ticket_types.length }} ticket types available
+                        </p>
                       } @else if (!event.is_free) {
                         <p class="text-xs text-muted-foreground mt-1">per ticket</p>
                       }
@@ -324,14 +444,24 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                     @if (event.max_participants > 0) {
                       <div class="mb-5">
                         <div class="flex justify-between text-xs mb-1.5">
-                          <span class="font-semibold text-foreground">{{ event.available_spots }} spots left</span>
-                          <span class="text-muted-foreground">{{ event.registered_count }} / {{ event.max_participants }}</span>
+                          <span class="font-semibold text-foreground"
+                            >{{ event.available_spots }} spots left</span
+                          >
+                          <span class="text-muted-foreground"
+                            >{{ event.registered_count }} / {{ event.max_participants }}</span
+                          >
                         </div>
                         <div class="h-1.5 bg-muted rounded-full overflow-hidden">
                           <div
                             class="h-full rounded-full transition-all duration-700"
                             [style.width.%]="spotsPercent"
-                            [class]="spotsPercent > 80 ? 'bg-red-400' : spotsPercent > 50 ? 'bg-amber-400' : 'bg-[color:var(--pine-50)]0'"
+                            [class]="
+                              spotsPercent > 80
+                                ? 'bg-red-400'
+                                : spotsPercent > 50
+                                  ? 'bg-amber-400'
+                                  : 'bg-[color:var(--pine-50)]0'
+                            "
                           ></div>
                         </div>
                       </div>
@@ -341,7 +471,11 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                     @if (event.status === 'cancelled' || event.status === 'completed') {
                       <div class="text-center py-3 px-3 rounded-xl bg-muted">
                         <p class="text-sm text-muted-foreground">
-                          {{ event.status === 'cancelled' ? 'This event was cancelled — sales are closed.' : 'This event has ended.' }}
+                          {{
+                            event.status === 'cancelled'
+                              ? 'This event was cancelled — sales are closed.'
+                              : 'This event has ended.'
+                          }}
                         </p>
                       </div>
                     } @else if (!authService.isLoggedIn) {
@@ -350,15 +484,27 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       </a>
                     } @else if (isOwner) {
                       <div class="text-center py-3 px-3 rounded-xl bg-muted">
-                        <p class="text-sm text-muted-foreground">You're the organizer of this event</p>
+                        <p class="text-sm text-muted-foreground">
+                          You're the organizer of this event
+                        </p>
                       </div>
                     } @else if (registrationStatus === 'confirmed') {
                       <!-- Already registered -->
-                      <div class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--pine-50)] mb-4">
-                        <lucide-icon [img]="icons.CheckCircle" class="w-5 h-5 text-[color:var(--pine-600)] flex-shrink-0" aria-hidden="true"></lucide-icon>
+                      <div
+                        class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--pine-50)] mb-4"
+                      >
+                        <lucide-icon
+                          [img]="icons.CircleCheckBig"
+                          class="w-5 h-5 text-[color:var(--pine-600)] flex-shrink-0"
+                          aria-hidden="true"
+                        />
                         <div>
-                          <p class="text-sm font-semibold text-[color:var(--pine-600)]">You're registered!</p>
-                          <p class="text-xs text-[color:var(--pine-600)]">Ticket is in My Tickets</p>
+                          <p class="text-sm font-semibold text-[color:var(--pine-600)]">
+                            You're registered!
+                          </p>
+                          <p class="text-xs text-[color:var(--pine-600)]">
+                            Ticket is in My Tickets
+                          </p>
                         </div>
                       </div>
                       <a routerLink="/my-registrations" class="btn btn-primary btn-full mb-2">
@@ -369,8 +515,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                            the client — paid ones can only request a refund,
                            free ones have no exit action. -->
                       @if (myRegistration?.refund_request?.status === 'pending') {
-                        <div class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] border border-transparent text-warning text-xs">
-                          <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0"></lucide-icon>
+                        <div
+                          class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] border border-transparent text-warning text-xs"
+                        >
+                          <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
                           Refund requested — awaiting organizer review.
                         </div>
                       } @else if (myRegistration?.is_checked_in) {
@@ -387,100 +535,171 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         </p>
                       } @else {
                         <!-- Paid, refundable → request refund -->
-                        <button (click)="showRefundModal = true"
-                          class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive">
+                        <button
+                          (click)="showRefundModal = true"
+                          class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
+                        >
                           Request a refund
                         </button>
                       }
-
                     } @else if (registrationStatus === 'pending') {
-                      <div class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--warning-50)] mb-4">
-                        <lucide-icon [img]="icons.Clock" class="w-5 h-5 text-warning flex-shrink-0" aria-hidden="true"></lucide-icon>
+                      <div
+                        class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--warning-50)] mb-4"
+                      >
+                        <lucide-icon
+                          [img]="icons.Clock"
+                          class="w-5 h-5 text-warning flex-shrink-0"
+                          aria-hidden="true"
+                        />
                         <div>
                           <p class="text-sm font-semibold text-warning">Payment incomplete</p>
-                          <p class="text-xs text-warning">Seat held — complete payment to confirm</p>
+                          <p class="text-xs text-warning">
+                            Seat held — complete payment to confirm
+                          </p>
                         </div>
                       </div>
-                      <button (click)="resumePayment()" [disabled]="registering" class="btn btn-primary btn-full mb-2">
+                      <button
+                        (click)="resumePayment()"
+                        [disabled]="registering"
+                        class="btn btn-primary btn-full mb-2"
+                      >
                         {{ registering ? 'Processing...' : 'Complete payment' }}
                       </button>
-                      <button (click)="cancelRegistration()" [disabled]="cancelling" class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive">
+                      <button
+                        (click)="cancelRegistration()"
+                        [disabled]="cancelling"
+                        class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
+                      >
                         {{ cancelling ? 'Cancelling...' : 'Release seat' }}
                       </button>
-
                     } @else if (registrationStatus === 'rejected') {
-                      <div class="flex items-center gap-3 p-3.5 rounded-xl bg-[color:var(--destructive-50)] border border-transparent">
-                        <lucide-icon [img]="icons.XCircle" class="w-5 h-5 text-[color:var(--destructive)] flex-shrink-0" aria-hidden="true"></lucide-icon>
+                      <div
+                        class="flex items-center gap-3 p-3.5 rounded-xl bg-[color:var(--destructive-50)] border border-transparent"
+                      >
+                        <lucide-icon
+                          [img]="icons.CircleX"
+                          class="w-5 h-5 text-[color:var(--destructive)] flex-shrink-0"
+                          aria-hidden="true"
+                        />
                         <div>
                           @if (myRegistration?.refund_request?.status === 'rejected') {
-                            <p class="text-sm font-bold text-[color:var(--destructive)]">Refund request declined</p>
+                            <p class="text-sm font-bold text-[color:var(--destructive)]">
+                              Refund request declined
+                            </p>
                             <p class="text-xs text-[color:var(--destructive)]">
-                              {{ myRegistration?.refund_request?.organizer_note || 'The organizer declined your refund.' }}
+                              {{
+                                myRegistration?.refund_request?.organizer_note ||
+                                  'The organizer declined your refund.'
+                              }}
                             </p>
                           } @else {
-                            <p class="text-sm font-bold text-[color:var(--destructive)]">Registration declined</p>
-                            <p class="text-xs text-[color:var(--destructive)]">Contact the organizer for more info</p>
+                            <p class="text-sm font-bold text-[color:var(--destructive)]">
+                              Registration declined
+                            </p>
+                            <p class="text-xs text-[color:var(--destructive)]">
+                              Contact the organizer for more info
+                            </p>
                           }
                         </div>
                       </div>
-
                     } @else if (!canBuy) {
                       <!-- Organizers/admins manage events, they don't buy tickets -->
                       <div class="text-center py-3 px-3 rounded-xl bg-muted">
                         <p class="text-sm text-muted-foreground">
-                          Only attendee accounts can buy tickets — organizer and admin accounts can't register.
+                          Only attendee accounts can buy tickets — organizer and admin accounts
+                          can't register.
                         </p>
                       </div>
                     } @else if (waitlist?.status === 'offered') {
                       <!-- Waitlist offer — reserved spot, shown regardless of the public counter -->
-                      <div class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--pine-50)] mb-3">
-                        <lucide-icon [img]="icons.CheckCircle" class="w-5 h-5 text-[color:var(--pine-600)] flex-shrink-0"></lucide-icon>
+                      <div
+                        class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--pine-50)] mb-3"
+                      >
+                        <lucide-icon
+                          [img]="icons.CircleCheckBig"
+                          class="w-5 h-5 text-[color:var(--pine-600)] flex-shrink-0"
+                        />
                         <div>
-                          <p class="text-sm font-bold text-[color:var(--pine-600)]">A spot opened up for you!</p>
-                          <p class="text-xs text-[color:var(--pine-600)]">It's reserved for a limited time — grab it before it passes on.</p>
+                          <p class="text-sm font-bold text-[color:var(--pine-600)]">
+                            A spot opened up for you!
+                          </p>
+                          <p class="text-xs text-[color:var(--pine-600)]">
+                            It's reserved for a limited time — grab it before it passes on.
+                          </p>
                         </div>
                       </div>
-                      <button (click)="showCheckout = true" class="btn btn-primary btn-full btn-lg font-bold">
+                      <button
+                        (click)="showCheckout = true"
+                        class="btn btn-primary btn-full btn-lg font-bold"
+                      >
                         Claim my spot
                       </button>
                     } @else if (queueInfo && queueInfo.status === 'queued') {
                       <!-- Virtual waiting room -->
-                      <div class="flex items-center gap-3 p-3 rounded-xl border border-ember/30 bg-ember/10 mb-3">
+                      <div
+                        class="flex items-center gap-3 p-3 rounded-xl border border-ember/30 bg-ember/10 mb-3"
+                      >
                         <span class="spinner spinner-sm flex-shrink-0"></span>
                         <div>
                           <p class="text-sm font-bold text-foreground">You're in the queue</p>
                           <p class="text-xs text-ember">
-                            Position #{{ queueInfo.position }} of {{ queueInfo.total }} · ~{{ queueInfo.wait_minutes }} min.
-                            We'll start your checkout automatically.
+                            Position #{{ queueInfo.position }} of {{ queueInfo.total }} · ~{{
+                              queueInfo.wait_minutes
+                            }}
+                            min. We'll start your checkout automatically.
                           </p>
                         </div>
                       </div>
-                      <button (click)="leaveQueue()" class="btn btn-ghost btn-full btn-sm text-muted-foreground">
+                      <button
+                        (click)="leaveQueue()"
+                        class="btn btn-ghost btn-full btn-sm text-muted-foreground"
+                      >
                         Leave queue
                       </button>
                     } @else if (event.available_spots === 0) {
                       <!-- Sold out → waitlist -->
                       @if (waitlist?.status === 'waiting') {
-                        <div class="flex items-center gap-3 p-3 rounded-xl border border-ember/30 bg-ember/10 mb-3">
-                          <lucide-icon [img]="icons.Clock" class="w-5 h-5 text-ember flex-shrink-0"></lucide-icon>
+                        <div
+                          class="flex items-center gap-3 p-3 rounded-xl border border-ember/30 bg-ember/10 mb-3"
+                        >
+                          <lucide-icon
+                            [img]="icons.Clock"
+                            class="w-5 h-5 text-ember flex-shrink-0"
+                          />
                           <div>
                             <p class="text-sm font-bold text-foreground">You're on the waitlist</p>
-                            <p class="text-xs text-ember">Position #{{ waitlist?.position }} · we'll notify you when a spot frees up.</p>
+                            <p class="text-xs text-ember">
+                              Position #{{ waitlist?.position }} · we'll notify you when a spot
+                              frees up.
+                            </p>
                           </div>
                         </div>
-                        <button (click)="leaveWaitlist()" [disabled]="waitlisting" class="btn btn-ghost btn-full btn-sm text-muted-foreground">
+                        <button
+                          (click)="leaveWaitlist()"
+                          [disabled]="waitlisting"
+                          class="btn btn-ghost btn-full btn-sm text-muted-foreground"
+                        >
                           Leave waitlist
                         </button>
                       } @else {
-                        <button disabled class="btn btn-full btn-lg opacity-50 cursor-not-allowed bg-muted text-muted-foreground mb-2">
+                        <button
+                          disabled
+                          class="btn btn-full btn-lg opacity-50 cursor-not-allowed bg-muted text-muted-foreground mb-2"
+                        >
                           Sold out
                         </button>
                         @if (authService.isLoggedIn) {
-                          <button (click)="joinWaitlist()" [disabled]="waitlisting" class="btn btn-secondary btn-full">
+                          <button
+                            (click)="joinWaitlist()"
+                            [disabled]="waitlisting"
+                            class="btn btn-secondary btn-full"
+                          >
                             {{ waitlisting ? 'Joining…' : '🔔 Join the waitlist' }}
                           </button>
                         } @else {
-                          <a routerLink="/login" class="btn btn-secondary btn-full">Sign in to join waitlist</a>
+                          <a routerLink="/login" class="btn btn-secondary btn-full"
+                            >Sign in to join waitlist</a
+                          >
                         }
                       }
                     } @else {
@@ -494,7 +713,11 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         } @else if (event.has_ticket_types) {
                           Choose tickets
                         } @else {
-                          {{ event.is_free ? 'Register for free' : 'Get tickets — ' + (currentGaPrice | money: event.currency) }}
+                          {{
+                            event.is_free
+                              ? 'Register for free'
+                              : 'Get tickets — ' + (currentGaPrice | money: event.currency)
+                          }}
                         }
                       </button>
                       @if (!event.is_free && !event.has_ticket_types) {
@@ -502,7 +725,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                           [routerLink]="['/events', event.id, 'group']"
                           class="btn btn-secondary btn-full mt-2 flex items-center justify-center gap-2 text-sm"
                         >
-                          <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                          <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
                           Book seats for a group
                         </a>
                       }
@@ -514,9 +737,13 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         <button
                           (click)="toggleFavorite()"
                           class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors border"
-                          [class]="favorited ? 'border-transparent bg-[color:var(--destructive-50)] text-ember' : 'border-border hover:bg-muted text-muted-foreground'"
+                          [class]="
+                            favorited
+                              ? 'border-transparent bg-[color:var(--destructive-50)] text-ember'
+                              : 'border-border hover:bg-muted text-muted-foreground'
+                          "
                         >
-                          <lucide-icon [img]="icons.Heart" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                          <lucide-icon [img]="icons.Heart" class="w-4 h-4" aria-hidden="true" />
                           {{ favorited ? 'Saved' : 'Save' }}
                         </button>
                       }
@@ -524,16 +751,14 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         (click)="shareEvent()"
                         class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted border border-border transition-colors"
                       >
-                        <lucide-icon [img]="icons.Share2" class="w-4 h-4" aria-hidden="true"></lucide-icon>
+                        <lucide-icon [img]="icons.Share2" class="w-4 h-4" aria-hidden="true" />
                         Share
                       </button>
                     </div>
                   </div>
                 </div>
-
               </div>
             </aside>
-
           </div>
         </div>
 
@@ -545,7 +770,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             [registering]="registering"
             (closed)="showCheckout = false"
             (confirmed)="registerForEvent($event)"
-          ></app-event-checkout-modal>
+          />
         }
 
         <!-- Refund request modal -->
@@ -554,14 +779,22 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             [event]="event"
             (closed)="showRefundModal = false"
             (submitted)="onRefundSubmitted()"
-          ></app-refund-request-modal>
+          />
         }
-
       </div>
     }
   `,
 })
 export class EventDetailComponent implements OnInit, OnDestroy {
+  private eventService = inject(EventService);
+  private paymentService = inject(PaymentService);
+  authService = inject(AuthService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private toastService = inject(ToastService);
+  private modalService = inject(ModalService);
+  private seoService = inject(SeoService);
+
   event: Event | null = null;
   loading = false;
   registering = false;
@@ -573,12 +806,12 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   myRegistration: Registration | null = null;
   showRefundModal = false;
   showCheckout = false;
-  pricingData: any = null;
+  pricingData: DynamicPrice | null = null;
 
   // Virtual waiting queue
   queueInfo: QueueStatus | null = null;
   private queueTimer?: ReturnType<typeof setInterval>;
-  private pendingQueuePayload: Record<string, any> | null = null;
+  private pendingQueuePayload: RegisterPayload | null = null;
 
   // Draft → review
   submittingForReview = false;
@@ -594,8 +827,9 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   favorited = false;
 
   get isOwner(): boolean {
-    return !!this.authService.currentUser &&
-      this.authService.currentUser.id === this.event?.organizer?.id;
+    return (
+      !!this.authService.currentUser && this.authService.currentUser.id === this.event?.organizer.id
+    );
   }
 
   get isAdmin(): boolean {
@@ -605,29 +839,30 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   /** Business rule: only attendee accounts buy tickets. */
   get canBuy(): boolean {
     const u = this.authService.currentUser;
-    return !!u && !u.is_staff && !u.is_superuser && u.profile?.role !== 'organizer';
+    return !!u && !u.is_staff && !u.is_superuser && u.profile.role !== 'organizer';
   }
 
   get spotsPercent(): number {
-    if (!this.event || !this.event.max_participants) return 0;
+    if (!this.event?.max_participants) return 0;
     return (this.event.registered_count / this.event.max_participants) * 100;
   }
 
   readonly icons = {
-    Calendar, MapPin, Users, Tag, Globe, Link, Edit,
-    CheckCircle, Clock, XCircle, Share2, ChevronLeft, Heart, UsersGroup: Users,
+    Calendar,
+    MapPin,
+    Users,
+    Tag,
+    Globe,
+    Link,
+    SquarePen,
+    CircleCheckBig,
+    Clock,
+    CircleX,
+    Share2,
+    ChevronLeft,
+    Heart,
+    UsersGroup: Users,
   };
-
-  constructor(
-    private eventService: EventService,
-    private paymentService: PaymentService,
-    public authService: AuthService,
-    private route: ActivatedRoute,
-    private router: Router,
-    private toastService: ToastService,
-    private modalService: ModalService,
-    private seoService: SeoService,
-  ) {}
 
   ngOnInit(): void {
     // Capture an affiliate referral (?ref=CODE): record a click and remember
@@ -640,7 +875,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       const clickKey = `aff_click_${id}_${ref}`;
       if (!sessionStorage.getItem(clickKey)) {
         sessionStorage.setItem(clickKey, '1');
-        this.eventService.trackAffiliateClick(Number(id), ref).subscribe({ error: () => {} });
+        this.eventService.trackAffiliateClick(Number(id), ref).subscribe({
+          error: () => {
+            // Click analytics only: never disturb the visitor over it.
+          },
+        });
       }
     }
     this.loadEvent();
@@ -654,10 +893,13 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     if (!quiet) this.loading = true;
 
     const id = this.route.snapshot.paramMap.get('id');
-    if (!id) { this.loading = false; return; }
+    if (!id) {
+      this.loading = false;
+      return;
+    }
 
     this.eventService.getEvent(Number(id)).subscribe({
-      next: ev => {
+      next: (ev) => {
         this.event = ev;
         this.seoService.setEvent(ev);
         if (!quiet) this.loading = false;
@@ -667,34 +909,46 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         // Load dynamic pricing for paid events
         if (!ev.is_free) {
           this.eventService.getEventPricing(ev.id).subscribe({
-            next: p => { this.pricingData = p; },
-            error: () => {},
+            next: (p) => {
+              this.pricingData = p;
+            },
+            error: () => {
+              // No dynamic quote: the page shows the event's base price.
+            },
           });
         }
         // Load favorite status
         if (this.authService.isLoggedIn) {
           this.eventService.getFavoriteStatus(ev.id).subscribe({
-            next: res => { this.favorited = res.favorited; },
-            error: () => {},
+            next: (res) => {
+              this.favorited = res.favorited;
+            },
+            error: () => {
+              // The heart just stays empty.
+            },
           });
         }
       },
-      error: () => { if (!quiet) this.loading = false; },
+      error: () => {
+        if (!quiet) this.loading = false;
+      },
     });
 
     if (this.authService.isLoggedIn) {
       // Server-side filter — immune to pagination (a user with many tickets
       // would otherwise "lose" their registration past page one).
       this.eventService.getMyRegistrations({ event: Number(id) }).subscribe({
-        next: res => {
-          const reg = res.results.find(r => r.event.id === Number(id));
+        next: (res) => {
+          const reg = res.results.find((r) => r.event.id === Number(id));
           if (reg) {
             this.registrationStatus = reg.status;
             this.registrationId = reg.id;
             this.myRegistration = reg;
           }
         },
-        error: () => {},
+        error: () => {
+          // Without it the page offers registration; the backend still refuses duplicates.
+        },
       });
     }
   }
@@ -708,9 +962,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   toggleFavorite(): void {
     if (!this.event) return;
     this.eventService.toggleFavorite(this.event.id).subscribe({
-      next: res => {
+      next: (res) => {
         this.favorited = res.favorited;
-        this.toastService.success(res.favorited ? '❤ Added to favorites' : 'Removed from favorites');
+        this.toastService.success(
+          res.favorited ? '❤ Added to favorites' : 'Removed from favorites',
+        );
       },
       error: () => this.toastService.error('Failed to update favorites'),
     });
@@ -718,10 +974,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
 
   demandBadgeClass(level: string): string {
     const map: Record<string, string> = {
-      low:    'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]',
+      low: 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]',
       medium: 'bg-[color:var(--warning-50)] text-warning',
-      high:   'bg-orange-100 text-orange-700',
-      surge:  'bg-[color:var(--destructive-50)] text-[color:var(--destructive)] animate-pulse',
+      high: 'bg-orange-100 text-orange-700',
+      surge: 'bg-[color:var(--destructive-50)] text-[color:var(--destructive)] animate-pulse',
     };
     return map[level] ?? 'bg-muted text-muted-foreground';
   }
@@ -730,15 +986,19 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     if (this.event?.is_free) return 'bg-gradient-to-r from-emerald-400 to-teal-500';
     const d = this.pricingData?.demand_level;
     if (d === 'surge') return 'bg-gradient-to-r from-red-500 to-orange-500';
-    if (d === 'high')  return 'bg-gradient-to-r from-orange-400 to-amber-400';
+    if (d === 'high') return 'bg-gradient-to-r from-orange-400 to-amber-400';
     return 'bg-gradient-to-r from-ember to-pine';
   }
 
   loadWaitlistStatus(): void {
     if (!this.event || !this.authService.isLoggedIn || this.isOwner) return;
     this.eventService.getWaitlistStatus(this.event.id).subscribe({
-      next: s => { this.waitlist = s; },
-      error: () => {},
+      next: (s) => {
+        this.waitlist = s;
+      },
+      error: () => {
+        // The waitlist block stays hidden.
+      },
     });
   }
 
@@ -746,7 +1006,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     if (!this.event) return;
     this.waitlisting = true;
     this.eventService.joinWaitlist(this.event.id).subscribe({
-      next: s => {
+      next: (s) => {
         this.waitlist = s;
         this.waitlisting = false;
         if (s.status === 'spots_available') {
@@ -758,7 +1018,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
           this.toastService.success(`You're on the waitlist (position #${s.position}).`);
         }
       },
-      error: () => { this.waitlisting = false; this.toastService.error('Could not join waitlist.'); },
+      error: () => {
+        this.waitlisting = false;
+        this.toastService.error('Could not join waitlist.');
+      },
     });
   }
 
@@ -771,14 +1034,17 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         this.waitlisting = false;
         this.toastService.success('Left the waitlist.');
       },
-      error: () => { this.waitlisting = false; this.toastService.error('Could not leave waitlist.'); },
+      error: () => {
+        this.waitlisting = false;
+        this.toastService.error('Could not leave waitlist.');
+      },
     });
   }
 
   /** Run the registration with the payload assembled by the checkout modal. */
-  registerForEvent(payload: Record<string, any>): void {
+  registerForEvent(payload: RegisterPayload): void {
     if (!this.event) return;
-    if (this.affiliateRef) payload['affiliate_code'] = this.affiliateRef;
+    if (this.affiliateRef) payload.affiliate_code = this.affiliateRef;
 
     this.registering = true;
 
@@ -791,11 +1057,15 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         // This correctly handles free tiers (confirmed) and paid (pending).
         if (registration.status === 'pending') {
           this.paymentService.createCheckoutSession(registration.id).subscribe({
-            next: res => { window.location.href = res.checkout_url; },
+            next: (res) => {
+              window.location.href = res.checkout_url;
+            },
             error: () => {
               this.registering = false;
               this.showCheckout = false;
-              this.toastService.error('Payment setup failed. Your spot is held for 10 minutes — try again.');
+              this.toastService.error(
+                'Payment setup failed. Your spot is held for 10 minutes — try again.',
+              );
               this.loadEvent(true);
             },
           });
@@ -803,22 +1073,23 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         } else {
           this.registering = false;
           this.showCheckout = false;
-          this.toastService.success('You\'re registered!');
-          if (this.event) this.event.available_spots--;
+          this.toastService.success("You're registered!");
+          if (this.event)
+            this.event = { ...this.event, available_spots: this.event.available_spots - 1 };
           this.loadEvent(true);
         }
       },
-      error: err => {
+      error: (err) => {
         this.registering = false;
         // High-demand event → enter the virtual waiting room and retry
         // automatically once admitted.
-        if (err.error?.code === 'QUEUE_REQUIRED') {
+        if (apiErrorBody(err)?.['code'] === 'QUEUE_REQUIRED') {
           this.showCheckout = false;
           this.enterQueue(payload);
           return;
         }
         this.toastService.error(
-          err.error?.detail || err.error?.error || 'Registration failed. Please try again.'
+          apiErrorMessage(err, 'Registration failed. Please try again.', 'detail', 'error'),
         );
       },
     });
@@ -826,11 +1097,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
 
   // ── Virtual waiting queue ──
 
-  private enterQueue(payload: Record<string, any>): void {
+  private enterQueue(payload: RegisterPayload): void {
     if (!this.event) return;
     this.pendingQueuePayload = payload;
     this.eventService.queueJoin(this.event.id).subscribe({
-      next: s => {
+      next: (s) => {
         this.queueInfo = s;
         if (s.status === 'queued') {
           this.toastService.info(`High demand — you're #${s.position} in the queue.`);
@@ -849,16 +1120,18 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     this.queueTimer = setInterval(() => {
       if (!this.event) return;
       this.eventService.queueStatus(this.event.id).subscribe({
-        next: s => {
+        next: (s) => {
           this.queueInfo = s;
           if (s.status === 'admitted' || s.status === 'not_needed') {
             this.stopQueuePolling();
             this.queueInfo = null;
-            this.toastService.success('You\'re in! Completing your registration…');
+            this.toastService.success("You're in! Completing your registration…");
             this.retryAfterQueue();
           }
         },
-        error: () => {},
+        error: () => {
+          // Transient poll failure: the next tick asks again.
+        },
       });
     }, 5000);
   }
@@ -881,22 +1154,28 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         this.registrationId = registration.id;
         if (registration.status === 'pending') {
           this.paymentService.createCheckoutSession(registration.id).subscribe({
-            next: res => { window.location.href = res.checkout_url; },
+            next: (res) => {
+              window.location.href = res.checkout_url;
+            },
             error: () => {
               this.registering = false;
-              this.toastService.error('Payment setup failed. Your spot is held for 10 minutes — try again.');
+              this.toastService.error(
+                'Payment setup failed. Your spot is held for 10 minutes — try again.',
+              );
               this.loadEvent(true);
             },
           });
         } else {
           this.registering = false;
-          this.toastService.success('You\'re registered!');
+          this.toastService.success("You're registered!");
           this.loadEvent(true);
         }
       },
-      error: err => {
+      error: (err) => {
         this.registering = false;
-        this.toastService.error(err.error?.error || 'Registration failed — please try again.');
+        this.toastService.error(
+          apiErrorMessage(err, 'Registration failed — please try again.', 'error'),
+        );
         this.loadEvent(true);
       },
     });
@@ -918,9 +1197,9 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         this.toastService.success('Submitted for review — an admin will approve it.');
         this.loadEvent(true);
       },
-      error: err => {
+      error: (err) => {
         this.submittingForReview = false;
-        this.toastService.error(err.error?.error || 'Could not submit for review.');
+        this.toastService.error(apiErrorMessage(err, 'Could not submit for review.', 'error'));
       },
     });
   }
@@ -930,12 +1209,14 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     if (!this.registrationId) return;
     this.registering = true;
     this.paymentService.createCheckoutSession(this.registrationId).subscribe({
-      next: res => { window.location.href = res.checkout_url; },
-      error: err => {
+      next: (res) => {
+        window.location.href = res.checkout_url;
+      },
+      error: (err) => {
         this.registering = false;
         // Payment already went through but the registration was stuck as
         // pending — the backend now reconciles it, so refresh to show it.
-        if (err.error?.error === 'Payment already completed') {
+        if (apiErrorBody(err)?.['error'] === 'Payment already completed') {
           this.toastService.success('Payment already completed — your ticket is confirmed.');
         } else {
           this.toastService.error('Could not start payment. Your seat hold may have expired.');
@@ -965,7 +1246,8 @@ export class EventDetailComponent implements OnInit, OnDestroy {
 
     this.eventService.cancelRegistration(this.event.id).subscribe({
       next: () => {
-        if (this.event) this.event.available_spots++;
+        if (this.event)
+          this.event = { ...this.event, available_spots: this.event.available_spots + 1 };
         this.registrationStatus = null;
         this.cancelling = false;
         this.toastService.success('Seat released.');
@@ -973,7 +1255,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.cancelling = false;
-        this.toastService.error(err.error?.error || 'Failed to release the seat.');
+        this.toastService.error(apiErrorMessage(err, 'Failed to release the seat.', 'error'));
       },
     });
   }
@@ -1023,13 +1305,19 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   async shareEvent(): Promise<void> {
     if (!this.event) return;
     const url = window.location.href;
-    if (navigator.share) {
-      try { await navigator.share({ title: this.event.title, url }); } catch {}
+    if (supportsWebShare()) {
+      try {
+        await navigator.share({ title: this.event.title, url });
+      } catch {
+        // The visitor closed the share sheet: nothing to report.
+      }
     } else {
       try {
         await navigator.clipboard.writeText(url);
         this.toastService.success('Link copied!');
-      } catch { this.toastService.error('Failed to copy link.'); }
+      } catch {
+        this.toastService.error('Failed to copy link.');
+      }
     }
   }
 }

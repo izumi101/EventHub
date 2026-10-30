@@ -7,19 +7,43 @@ from django.db import transaction
 from django.db.models import F
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from jobs.handlers import enqueue_email
-
-from .models import MAX_CODE_ATTEMPTS, EmailVerificationCode, PasswordResetCode
 from common.auth import (
     email_in_use,
     get_user_by_identifier,
     password_meets_policy,
     revoke_all_refresh_tokens,
 )
+from jobs.handlers import enqueue_email
+
+from .models import MAX_CODE_ATTEMPTS, EmailVerificationCode, PasswordResetCode
 
 logger = logging.getLogger(__name__)
 
 INVALID_CODE_MESSAGE = 'Invalid or expired code.'
+
+WELCOME_EMAIL = (
+    'Hey there 👋\n\n'
+    'Welcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\n'
+    "We're really excited to have you here 🚀\n\n"
+    'From now on, you can explore events around you, join communities, and never miss something '
+    'interesting again.\n\n'
+    "This is just the beginning — let's build something awesome together 🔥\n\n"
+    'See you inside,\nEventHub Team'
+)
+
+ORGANIZER_ACCOUNT_EMAIL = (
+    'Hello!\n\n'
+    'An administrator created an organizer account for you on EventHub.\n\n'
+    'Username: {username}\n\n'
+    'Sign in and start creating events. Remember to change your password after the first login.\n\n'
+    'EventHub Team'
+)
+
+RESET_CODE_EMAIL = (
+    'Your password reset code is: {code}\n\n'
+    'This code expires in 15 minutes.\n\n'
+    'If you did not request this, please ignore this email.'
+)
 
 
 def _code_matches(model, entry, code) -> bool:
@@ -29,7 +53,9 @@ def _code_matches(model, entry, code) -> bool:
     if entry is None or entry.is_used or entry.is_expired:
         return False
     counted = model.objects.filter(
-        pk=entry.pk, is_used=False, attempts__lt=MAX_CODE_ATTEMPTS,
+        pk=entry.pk,
+        is_used=False,
+        attempts__lt=MAX_CODE_ATTEMPTS,
     ).update(attempts=F('attempts') + 1)
     if not counted:
         return False
@@ -42,6 +68,7 @@ def _code_matches(model, entry, code) -> bool:
 def build_auth_payload(user):
     refresh = RefreshToken.for_user(user)
     from .serializers import UserSerializer
+
     return {
         'user': UserSerializer(user).data,
         'tokens': {
@@ -80,7 +107,7 @@ def register_user(validated_data):
 
     enqueue_email(
         'Welcome to EventHub 🎉',
-        'Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe\'re really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let\'s build something awesome together 🔥\n\nSee you inside,\nEventHub Team',
+        WELCOME_EMAIL,
         user.email,
     )
 
@@ -105,7 +132,7 @@ def create_organizer(validated_data):
 
     enqueue_email(
         'Your EventHub organizer account',
-        f'Hello!\n\nAn administrator created an organizer account for you on EventHub.\n\nUsername: {user.username}\n\nSign in and start creating events. Remember to change your password after the first login.\n\nEventHub Team',
+        ORGANIZER_ACCOUNT_EMAIL.format(username=user.username),
         user.email,
     )
 
@@ -138,9 +165,9 @@ def send_registration_code(email: str):
 
 def verify_registration_code(email: str, code: str) -> EmailVerificationCode:
     verification = (
-        EmailVerificationCode.objects
-        .filter(email__iexact=(email or '').strip(), is_used=False)
-        .order_by('-created_at').first()
+        EmailVerificationCode.objects.filter(email__iexact=(email or '').strip(), is_used=False)
+        .order_by('-created_at')
+        .first()
     )
     if not _code_matches(EmailVerificationCode, verification, code):
         raise ValueError('Invalid or expired verification code.')
@@ -164,7 +191,7 @@ def request_password_reset(identifier: str):
     reset_code = PasswordResetCode.create_for_user(user)
     enqueue_email(
         'EventHub — Password Reset Code',
-        f'Your password reset code is: {reset_code.code}\n\nThis code expires in 15 minutes.\n\nIf you did not request this, please ignore this email.',
+        RESET_CODE_EMAIL.format(code=reset_code.code),
         user.email,
     )
     return reset_code
@@ -174,10 +201,7 @@ def verify_password_reset_code(identifier: str, code: str):
     user = get_user_by_identifier(identifier)
     reset_entry = None
     if user is not None:
-        reset_entry = (
-            PasswordResetCode.objects.filter(user=user, is_used=False)
-            .order_by('-created_at').first()
-        )
+        reset_entry = PasswordResetCode.objects.filter(user=user, is_used=False).order_by('-created_at').first()
     # Same answer for "no such account" and "wrong code" (no enumeration).
     if not _code_matches(PasswordResetCode, reset_entry, code):
         raise ValueError(INVALID_CODE_MESSAGE)
@@ -194,9 +218,10 @@ def confirm_password_reset(reset_token: str, new_password: str, new_password2: s
         raise ValueError('Passwords do not match.')
 
     reset_entry = (
-        PasswordResetCode.objects.select_for_update()
-        .filter(reset_token=reset_token, is_used=False).first()
-    ) if reset_token else None
+        (PasswordResetCode.objects.select_for_update().filter(reset_token=reset_token, is_used=False).first())
+        if reset_token
+        else None
+    )
 
     if not reset_entry or reset_entry.is_expired:
         raise ValueError('Invalid or expired reset token.')

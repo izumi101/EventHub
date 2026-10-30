@@ -5,6 +5,7 @@ register_for_event used select_for_update() in autocommit mode (500 on
 PostgreSQL). These tests use TransactionTestCase and real threads with their
 own DB connections, like concurrent requests in production.
 """
+
 import threading
 from datetime import timedelta
 
@@ -26,7 +27,7 @@ def _run_concurrently(fn, args_list):
         try:
             barrier.wait()
             results[i] = ('ok', fn(*args))
-        except Exception as exc:  # noqa: BLE001 — the test inspects it
+        except Exception as exc:
             results[i] = ('error', exc)
         finally:
             connection.close()
@@ -44,20 +45,23 @@ class RegistrationConcurrencyTests(TransactionTestCase):
         self.organizer = User.objects.create_user('org', 'org@example.com', 'pw-Strong-123')
         self.organizer.profile.role = 'organizer'
         self.organizer.profile.save()
-        self.buyers = [
-            User.objects.create_user(f'buyer{i}', f'b{i}@example.com', 'pw-Strong-123') for i in range(2)
-        ]
+        self.buyers = [User.objects.create_user(f'buyer{i}', f'b{i}@example.com', 'pw-Strong-123') for i in range(2)]
         self.event = Event.objects.create(
-            title='Last seat', description='d', organizer=self.organizer,
-            date=timezone.now() + timedelta(days=3), location='Hall',
-            price=10, max_participants=1, status='published',
+            title='Last seat',
+            description='d',
+            organizer=self.organizer,
+            date=timezone.now() + timedelta(days=3),
+            location='Hall',
+            price=10,
+            max_participants=1,
+            status='published',
         )
 
     def test_register_endpoint_works_without_outer_transaction(self):
         # K1: used to raise TransactionManagementError → HTTP 500.
         client = APIClient()
         client.force_authenticate(self.buyers[0])
-        response = client.post(f'/api/events/{self.event.id}/register/', {}, format='json')
+        response = client.post(f'/api/v1/events/{self.event.id}/register/', {}, format='json')
         self.assertEqual(response.status_code, 201, response.content)
 
     def test_two_buyers_cannot_both_take_the_last_spot(self):
@@ -67,14 +71,14 @@ class RegistrationConcurrencyTests(TransactionTestCase):
         )
         self.assertEqual(sum(1 for kind, _ in results if kind == 'ok'), 1, results)
         self.assertEqual(
-            Registration.objects.filter(event=self.event).exclude(status='cancelled').count(), 1,
+            Registration.objects.filter(event=self.event).exclude(status='cancelled').count(),
+            1,
         )
 
     def test_single_use_promo_code_cannot_be_used_twice_concurrently(self):
         self.event.max_participants = 10
         self.event.save()
-        PromoCode.objects.create(event=self.event, code='ONCE', discount_type='percent',
-                                 discount_value=50, max_uses=1)
+        PromoCode.objects.create(event=self.event, code='ONCE', discount_type='percent', discount_value=50, max_uses=1)
         results = _run_concurrently(
             lambda user: register_for_event(user=user, event=self.event, promo_code='once'),
             [(u,) for u in self.buyers],

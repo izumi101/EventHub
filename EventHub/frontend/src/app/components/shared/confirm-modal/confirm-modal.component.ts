@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ModalService } from '../../../services/modal.service';
 
@@ -15,9 +15,11 @@ import { ModalService } from '../../../services/modal.service';
         [attr.aria-labelledby]="'modal-title'"
         (keydown.escape)="modalService.cancel()"
       >
-        <!-- Backdrop -->
+        <!-- Backdrop: decorative for assistive tech; keyboard users close with
+             Escape or the Cancel button. -->
         <div
           class="absolute inset-0 bg-black/40 animate-fade-in"
+          aria-hidden="true"
           (click)="modalService.cancel()"
         ></div>
 
@@ -31,18 +33,17 @@ import { ModalService } from '../../../services/modal.service';
           </p>
 
           <div class="flex gap-2 justify-end">
-            <button
-              (click)="modalService.cancel()"
-              class="btn btn-secondary btn-sm"
-            >
+            <button (click)="modalService.cancel()" class="btn btn-secondary btn-sm">
               {{ modalService.config()?.cancelText || 'Cancel' }}
             </button>
             <button
               (click)="modalService.confirm()"
               class="btn btn-sm"
-              [class]="modalService.config()?.isDestructive
-                ? 'bg-destructive text-destructive-foreground border-destructive hover:opacity-90'
-                : 'btn-primary'"
+              [class]="
+                modalService.config()?.isDestructive
+                  ? 'bg-destructive text-destructive-foreground border-destructive hover:opacity-90'
+                  : 'btn-primary'
+              "
             >
               {{ modalService.config()?.confirmText || 'Confirm' }}
             </button>
@@ -53,5 +54,5 @@ import { ModalService } from '../../../services/modal.service';
   `,
 })
 export class ConfirmModalComponent {
-  constructor(public modalService: ModalService) {}
+  modalService = inject(ModalService);
 }

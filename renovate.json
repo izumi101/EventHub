@@ -1,0 +1,151 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate for EventHub. Needs the Renovate GitHub App installed on the repository. Automerge (platformAutomerge) relies on branch protection for main with required status checks: without it GitHub merges immediately. See EventHub/docs/HANDOFF.md.",
+  "extends": [
+    "config:best-practices",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    ":enablePreCommit"
+  ],
+  "timezone": "Asia/Almaty",
+  "schedule": ["before 6am on monday"],
+  "labels": ["dependencies"],
+  "minimumReleaseAge": "14 days",
+  "internalChecksFilter": "strict",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "separateMinorPatch": true,
+  "rangeStrategy": "auto",
+  "semanticCommitType": "build",
+  "semanticCommitScope": "deps",
+  "automerge": false,
+  "platformAutomerge": true,
+  "automergeType": "pr",
+  "automergeStrategy": "squash",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "labels": ["dependencies", "security"],
+    "semanticCommitType": "fix",
+    "automerge": false
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"],
+    "commitMessageAction": "refresh",
+    "semanticCommitType": "chore",
+    "automerge": false
+  },
+  "pip_requirements": {
+    "managerFilePatterns": ["/(^|/)requirements[\\w-]*\\.(txt|lock)$/"]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Keep the ruff version installed by the backend CI job in step with the ruff pre-commit hook",
+      "managerFilePatterns": ["/^\\.github/workflows/ci\\.yml$/"],
+      "matchStrings": ["ruff==(?<currentValue>[0-9][0-9A-Za-z.\\-]*)"],
+      "datasourceTemplate": "pypi",
+      "depNameTemplate": "ruff"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Frontend: keep the caret ranges from package.json (also for devDependencies, overriding :pinDevDependencies) and let the lock file carry the exact versions",
+      "matchManagers": ["npm"],
+      "rangeStrategy": "update-lockfile",
+      "addLabels": ["frontend"]
+    },
+    {
+      "description": "Backend: pins live in requirements*.lock, ranges in requirements*.txt",
+      "matchManagers": ["pip_requirements"],
+      "addLabels": ["backend"]
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["ci"]
+    },
+    {
+      "description": "Generic rules come first: in Renovate the LAST matching rule wins, so the specific rules below (groups, ruff) can override them. Automerge low-risk updates once the required checks pass",
+      "matchUpdateTypes": ["patch", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Major updates wait for approval on the Dependency Dashboard and are never merged automatically",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "addLabels": ["major"]
+    },
+    {
+      "description": "Dev-only npm dependencies use the chore type",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["devDependencies"],
+      "semanticCommitType": "chore"
+    },
+    {
+      "description": "Angular, its tooling and its runtime pieces move together",
+      "groupName": "angular",
+      "matchManagers": ["npm"],
+      "matchPackageNames": [
+        "@angular/**",
+        "@angular-devkit/**",
+        "@angular-eslint/**",
+        "angular-eslint",
+        "zone.js",
+        "typescript"
+      ]
+    },
+    {
+      "description": "Angular 21 supports TypeScript >=5.9 <6.1 (peer range of @angular/compiler-cli). Revisit together with the next Angular major.",
+      "matchManagers": ["npm"],
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": ">=5.9 <6.1"
+    },
+    {
+      "description": "requirements*.lock pins every transitive package. The pip-compile manager cannot read the headers written by `uv pip compile --python-platform ...` (checked against the Renovate source: it rejects -o, --python-platform and space-separated option values), so the locks are updated as plain pins (pip resolves anything new at install time; CI builds the images and runs the tests). Everything that has no group of its own goes into one weekly PR instead of one PR per transitive package.",
+      "groupName": "python dependencies",
+      "matchManagers": ["pip_requirements"],
+      "matchFileNames": ["**/requirements*.lock"]
+    },
+    {
+      "description": "Django, DRF and Channels: framework releases are tested together (later rules win, so this overrides the catch-all python group)",
+      "groupName": "django",
+      "matchManagers": ["pip_requirements"],
+      "matchPackageNames": [
+        "django",
+        "django-*",
+        "djangorestframework",
+        "djangorestframework-*",
+        "drf-spectacular",
+        "drf-spectacular-*",
+        "channels",
+        "channels-*"
+      ]
+    },
+    {
+      "description": "ruff (CI pin and pre-commit hook) updates as one PR; formatter changes need a human look, so no automerge",
+      "groupName": "ruff",
+      "matchPackageNames": ["ruff", "astral-sh/ruff-pre-commit"],
+      "automerge": false
+    },
+    {
+      "description": "All GitHub Actions in one PR, pinned by digest with the tag kept as a comment",
+      "groupName": "github-actions",
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "semanticCommitType": "ci"
+    },
+    {
+      "description": "pre-commit hook revisions are frozen SHAs (# frozen: vX.Y.Z), which Renovate keeps; do not re-pin",
+      "matchManagers": ["pre-commit"],
+      "groupName": "pre-commit hooks",
+      "pinDigests": false,
+      "semanticCommitType": "chore"
+    },
+    {
+      "description": "Base images and docker-compose services",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "addLabels": ["docker"]
+    }
+  ]
+}

@@ -34,9 +34,12 @@ ENV HF_HUB_OFFLINE=1
 
 COPY . .
 RUN chmod +x /app/entrypoint.sh
+# Static files (admin, Swagger UI) are part of the image; nginx proxies
+# /static/ to WhiteNoise. Build-time settings only: nothing here runs.
+RUN DJANGO_DEBUG=1 DJANGO_SECRET_KEY=collectstatic-build-only python manage.py collectstatic --noinput
 
 EXPOSE 8000
 ENTRYPOINT ["/app/entrypoint.sh"]
-# ASGI server: serves both the REST API and the seat-map WebSockets
-# (gunicorn + WSGI would silently drop the WebSocket routes).
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "eventhub_backend.asgi:application"]
+# Gunicorn supervising uvicorn workers: ASGI, so the same process serves the
+# REST API and the seat-map WebSockets (settings in gunicorn.conf.py).
+CMD ["gunicorn", "eventhub_backend.asgi:application", "-c", "gunicorn.conf.py"]
