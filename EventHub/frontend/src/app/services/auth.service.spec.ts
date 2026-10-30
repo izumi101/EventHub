@@ -63,4 +63,32 @@ describe('AuthService', () => {
     expect(localStorage.getItem('access_token')).toBe('fresh-access');
     expect(localStorage.getItem('refresh_token')).toBe('fresh-refresh');
   });
+
+  describe('cached user restore', () => {
+    function createService(): AuthService {
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting()],
+      });
+      return TestBed.inject(AuthService);
+    }
+
+    it('restores a cached user that has a profile', () => {
+      const cached = { id: 1, username: 'anna', profile: { role: 'organizer' } };
+      localStorage.setItem('user', JSON.stringify(cached));
+      expect(createService().currentUser).toEqual(cached);
+    });
+
+    it('drops a stale cached user without a profile', () => {
+      localStorage.setItem('user', JSON.stringify({ id: 1, username: 'anna' }));
+      expect(createService().currentUser).toBeNull();
+      expect(localStorage.getItem('user')).toBeNull();
+    });
+
+    it('survives a corrupted cache entry', () => {
+      localStorage.setItem('user', '{not json');
+      expect(createService().currentUser).toBeNull();
+      expect(localStorage.getItem('user')).toBeNull();
+    });
+  });
 });
