@@ -6,7 +6,7 @@ import { EventService } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { BookingDto, BookingService } from '../../services/booking.service';
-import { Event as EventModel, EventStatsResponse, Registration } from '../../models/models';
+import { Event as EventModel, EventAttendee, EventStatsResponse } from '../../models/models';
 import { LucideAngularModule, Search, Users, CheckCircle, ScanLine, Download, RotateCcw, DollarSign, Mail } from 'lucide-angular';
 import { DialogDirective } from '../../directives/dialog.directive';
 
@@ -331,8 +331,8 @@ import { DialogDirective } from '../../directives/dialog.directive';
 export class AttendeeListComponent implements OnInit {
   eventId: number | null = null;
   event: EventModel | null = null;
-  registrations: Registration[] = [];
-  filtered: Registration[] = [];
+  registrations: EventAttendee[] = [];
+  filtered: EventAttendee[] = [];
   stats: EventStatsResponse | null = null;
   loading = true;
   searchQuery = '';
@@ -340,7 +340,7 @@ export class AttendeeListComponent implements OnInit {
   actingId: number | null = null;
 
   // Refund modal
-  refundReg: Registration | null = null;
+  refundReg: EventAttendee | null = null;
   refundAmount: string | number = '';
   refundReason = '';
   refunding = false;
@@ -439,7 +439,7 @@ export class AttendeeListComponent implements OnInit {
     });
   }
 
-  markPaid(reg: Registration): void {
+  markPaid(reg: EventAttendee): void {
     this.actingId = reg.id;
     this.eventService.markOfflinePaid(reg.id).subscribe({
       next: () => { this.toastService.success('Marked as paid.'); this.actingId = null; this.loadData(); },
@@ -447,7 +447,7 @@ export class AttendeeListComponent implements OnInit {
     });
   }
 
-  openRefund(reg: Registration): void {
+  openRefund(reg: EventAttendee): void {
     this.refundReg = reg;
     this.refundAmount = reg.payment?.net_amount || '';
     this.refundReason = '';

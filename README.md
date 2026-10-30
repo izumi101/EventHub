@@ -183,15 +183,33 @@ cp EventHub/.env.example EventHub/.env
 
 ## API
 
-Полное описание эндпоинтов и готовые запросы — в [`EventHub/postman_collection.json`](EventHub/postman_collection.json). Основные группы:
+API версионирован: актуальная версия — **`/api/v1/`**. Контракт описан схемой OpenAPI, которая генерируется из кода:
 
-- `/api/auth/` — регистрация, логин, профиль, обновление токена.
-- `/api/events/` — CRUD событий, категории, поиск, регистрации.
-- `/api/payments/` — Stripe checkout, вебхуки, проверка статуса оплаты.
-- `/api/bookings/` — групповые брони; организатор видит брони события (`/api/bookings/event/<id>/`) и может вернуть деньги за бронь (`POST /api/bookings/<id>/refund/`).
+- интерактивная документация — `/api/v1/docs/` (Swagger UI, работает и через nginx со строгим CSP);
+- схема — `/api/v1/schema/` и файл [`EventHub/backend/openapi.yaml`](EventHub/backend/openapi.yaml) в репозитории. Для Postman достаточно импортировать её: получится полная коллекция. В [`EventHub/postman_collection.json`](EventHub/postman_collection.json) лежат только основные сценарии.
+
+Основные группы:
+
+- `/api/v1/auth/` — регистрация, логин, профиль, обновление токена.
+- `/api/v1/events/` — CRUD событий, категории, поиск, регистрации.
+- `/api/v1/payments/` — Stripe checkout, проверка статуса оплаты, возвраты.
+- `/api/v1/bookings/` — групповые брони; организатор видит брони события (`/api/v1/bookings/event/<id>/`) и может вернуть деньги за бронь (`POST /api/v1/bookings/<id>/refund/`).
 - `/ws/seats/<id>/` — обновления карты мест. JWT передаётся не в URL, а в подпротоколе: `new WebSocket(url, ['eventhub.jwt', accessToken])`.
 
 Ошибки бизнес-правил приходят как `{"error": "<текст для человека>"}`; там, где клиенту нужно ветвиться, добавлен стабильный `code` (например, `QUEUE_REQUIRED` — сначала встаньте в очередь ожидания).
+
+**Старые адреса без версии** (`/api/events/` и т. д.) пока работают, но отвечают заголовками `Deprecation`, `Sunset` (дата отключения) и `Link` на адрес в `/api/v1/`. Неизменными остаются только адреса, зарегистрированные во внешних системах: вебхук Stripe `/api/payments/webhook/` и `/api/health/`.
+
+**Как меняется контракт:**
+
+1. После изменения API пересоберите схему и типы фронта:
+   ```bash
+   cd EventHub/backend  && python manage.py spectacular --file openapi.yaml --validate --fail-on-warn
+   cd EventHub/frontend && npm run api:types
+   ```
+   Фронт использует типы, сгенерированные из схемы (`src/app/api/openapi.ts`, псевдонимы — в `src/app/models/models.ts`), поэтому расхождение с бэкендом становится ошибкой компиляции.
+2. CI проверяет, что схема и типы закоммичены в актуальном виде.
+3. В каждом PR job `API contract` публикует список изменений API, а **ломающие изменения v1 блокируются**, пока на PR нет метки `breaking-api`. Ломать v1 без необходимости нельзя: новое добавляется совместимо, а несовместимое — в следующей версии.
 
 Технические спецификации отдельных фич — в [`EventHub/docs/`](EventHub/docs/).
 

@@ -804,7 +804,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
           this.registering = false;
           this.showCheckout = false;
           this.toastService.success('You\'re registered!');
-          if (this.event) this.event.available_spots--;
+          if (this.event) this.event = { ...this.event, available_spots: this.event.available_spots - 1 };
           this.loadEvent(true);
         }
       },
@@ -965,7 +965,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
 
     this.eventService.cancelRegistration(this.event.id).subscribe({
       next: () => {
-        if (this.event) this.event.available_spots++;
+        if (this.event) this.event = { ...this.event, available_spots: this.event.available_spots + 1 };
         this.registrationStatus = null;
         this.cancelling = false;
         this.toastService.success('Seat released.');
