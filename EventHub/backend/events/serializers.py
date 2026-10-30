@@ -6,10 +6,25 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from django.utils import timezone
 from .models import (
-    Category, Event, Registration, SeatMap, EventSeat, Favorite, Review,
-    Notification, PromoCode, EventQuestion, QuestionAnswer, WaitlistEntry,
-    TicketType, EventStaff, Webhook, Affiliate, RefundRequest,
-    CheckInList, CheckInLog,
+    Category,
+    Event,
+    Registration,
+    SeatMap,
+    EventSeat,
+    Favorite,
+    Review,
+    Notification,
+    PromoCode,
+    EventQuestion,
+    QuestionAnswer,
+    WaitlistEntry,
+    TicketType,
+    EventStaff,
+    Webhook,
+    Affiliate,
+    RefundRequest,
+    CheckInList,
+    CheckInLog,
 )
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 from payments.models import Payment
@@ -19,20 +34,22 @@ CURRENCY_RE = re.compile(r'^[A-Z]{3}$')
 logger = logging.getLogger(__name__)
 
 
-
 def documented_json(schema_field, **kwargs):
     """A JSONField whose content the OpenAPI schema describes precisely
     (`schema_field`) instead of as untyped JSON. Validation is unchanged."""
+
     @extend_schema_field(schema_field)
     class DocumentedJSONField(serializers.JSONField):
         pass
+
     return DocumentedJSONField(**kwargs)
 
 
 class SeatMapLayoutSerializer(serializers.Serializer):
     price_zones = serializers.DictField(
         child=serializers.ListField(child=serializers.IntegerField()),
-        required=False, help_text='Price zone → row numbers.',
+        required=False,
+        help_text='Price zone → row numbers.',
     )
 
 
@@ -116,6 +133,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class CategoryMiniSerializer(serializers.ModelSerializer):
     """Nested in every event card — no per-event count query."""
+
     class Meta:
         model = Category
         fields = ['id', 'name', 'description', 'icon']
@@ -128,15 +146,31 @@ class EventCreateSerializer(serializers.ModelSerializer):
         queryset=Category.objects.all(),
         write_only=True,
     )
-    
+
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'description', 'category_id', 'date',
-            'end_date', 'location', 'address', 'image', 'price',
-            'max_participants', 'status', 'is_online', 'online_link',
-            'tax_percent', 'service_fee_percent', 'fees_passed_to_buyer', 'currency',
-            'refundable', 'seo_title', 'seo_description',
+            'id',
+            'title',
+            'description',
+            'category_id',
+            'date',
+            'end_date',
+            'location',
+            'address',
+            'image',
+            'price',
+            'max_participants',
+            'status',
+            'is_online',
+            'online_link',
+            'tax_percent',
+            'service_fee_percent',
+            'fees_passed_to_buyer',
+            'currency',
+            'refundable',
+            'seo_title',
+            'seo_description',
         ]
         read_only_fields = ['id', 'status']
         extra_kwargs = {
@@ -225,10 +259,23 @@ class TicketTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = TicketType
         fields = [
-            'id', 'name', 'description', 'kind', 'price', 'quantity',
-            'min_per_order', 'max_per_order', 'sale_start', 'sale_end',
-            'is_active', 'order', 'sold', 'available', 'is_sold_out',
-            'on_sale', 'sale_state',
+            'id',
+            'name',
+            'description',
+            'kind',
+            'price',
+            'quantity',
+            'min_per_order',
+            'max_per_order',
+            'sale_start',
+            'sale_end',
+            'is_active',
+            'order',
+            'sold',
+            'available',
+            'is_sold_out',
+            'on_sale',
+            'sale_state',
         ]
         read_only_fields = ['id', 'sold', 'available', 'is_sold_out', 'on_sale', 'sale_state']
 
@@ -267,14 +314,35 @@ class EventListSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'description', 'organizer', 'category',
-            'date', 'end_date', 'location', 'address', 'image',
-            'price', 'max_participants', 'status', 'is_online',
-            'online_link', 'available_spots', 'is_free',
-            'has_ticket_types', 'price_from', 'ticket_types',
-            'tax_percent', 'service_fee_percent', 'fees_passed_to_buyer', 'currency',
-            'refundable', 'registered_count', 'created_at',
-            'seo_title', 'seo_description',
+            'id',
+            'title',
+            'description',
+            'organizer',
+            'category',
+            'date',
+            'end_date',
+            'location',
+            'address',
+            'image',
+            'price',
+            'max_participants',
+            'status',
+            'is_online',
+            'online_link',
+            'available_spots',
+            'is_free',
+            'has_ticket_types',
+            'price_from',
+            'ticket_types',
+            'tax_percent',
+            'service_fee_percent',
+            'fees_passed_to_buyer',
+            'currency',
+            'refundable',
+            'registered_count',
+            'created_at',
+            'seo_title',
+            'seo_description',
         ]
 
     def get_registered_count(self, obj) -> int:
@@ -294,9 +362,14 @@ class EventListSerializer(serializers.ModelSerializer):
         if user.is_superuser or obj.organizer_id == user.id:
             return obj.online_link
         from common.permissions import can_manage_event
-        if can_manage_event(obj, user) or obj.registrations.filter(
-            user=user, status=RegistrationStatusChoices.CONFIRMED,
-        ).exists():
+
+        if (
+            can_manage_event(obj, user)
+            or obj.registrations.filter(
+                user=user,
+                status=RegistrationStatusChoices.CONFIRMED,
+            ).exists()
+        ):
             return obj.online_link
         return ''
 
@@ -314,9 +387,24 @@ class RegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Registration
         fields = [
-            'id', 'event', 'username', 'email', 'full_name', 'status', 'registered_at',
-            'notes', 'ticket_uuid', 'is_checked_in', 'checked_in_at', 'seat',
-            'payment', 'promo', 'ticket_type', 'answers', 'breakdown', 'refund_request',
+            'id',
+            'event',
+            'username',
+            'email',
+            'full_name',
+            'status',
+            'registered_at',
+            'notes',
+            'ticket_uuid',
+            'is_checked_in',
+            'checked_in_at',
+            'seat',
+            'payment',
+            'promo',
+            'ticket_type',
+            'answers',
+            'breakdown',
+            'refund_request',
         ]
         read_only_fields = ['id', 'registered_at', 'status', 'ticket_uuid', 'is_checked_in', 'checked_in_at']
 
@@ -363,10 +451,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
     @extend_schema_field(AnswerSummarySerializer(many=True))
     def get_answers(self, obj):
         rows = obj.answers.all()  # prefetch_related('answers__question') upstream
-        return [
-            {'label': a.question.label, 'answer': a.answer, 'type': a.question.question_type}
-            for a in rows
-        ]
+        return [{'label': a.question.label, 'answer': a.answer, 'type': a.question.question_type} for a in rows]
 
     breakdown = serializers.SerializerMethodField()
 
@@ -376,6 +461,7 @@ class RegistrationSerializer(serializers.ModelSerializer):
             return None
         try:
             from .billing import price_breakdown
+
             return price_breakdown(obj)
         except Exception:
             # Don't break the ticket list over one bad row, but a pricing
@@ -420,6 +506,7 @@ class EventSeatSerializer(serializers.ModelSerializer):
         if event is None:
             return None
         from .seat_pricing import seat_price
+
         try:
             return str(seat_price(event, obj))
         except Exception:
@@ -443,6 +530,7 @@ class SeatMapSerializer(serializers.ModelSerializer):
     @extend_schema_field(ZonePriceSerializer(many=True))
     def get_zone_prices(self, obj):
         from .seat_pricing import zone_price_table
+
         return zone_price_table(obj.event)
 
 
@@ -495,7 +583,8 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('You can review an event after it has taken place.')
 
         attended = Registration.objects.filter(
-            event_id=event_id, user=request.user,
+            event_id=event_id,
+            user=request.user,
             status=RegistrationStatusChoices.CONFIRMED,
         ).exists()
         if not attended:
@@ -522,8 +611,18 @@ class RefundRequestSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RefundRequest
-        fields = ['id', 'username', 'full_name', 'amount', 'ticket_type',
-                  'status', 'reason', 'organizer_note', 'created_at', 'resolved_at']
+        fields = [
+            'id',
+            'username',
+            'full_name',
+            'amount',
+            'ticket_type',
+            'status',
+            'reason',
+            'organizer_note',
+            'created_at',
+            'resolved_at',
+        ]
         read_only_fields = fields
 
     def get_full_name(self, obj) -> str:
@@ -570,7 +669,9 @@ class EventStaffSerializer(serializers.ModelSerializer):
         event = self.context['event']
         user = validated_data.pop('_invited_user')
         staff, _ = EventStaff.objects.update_or_create(
-            event=event, user=user, defaults={'role': validated_data.get('role', EventStaff.ROLE_CHECK_IN)},
+            event=event,
+            user=user,
+            defaults={'role': validated_data.get('role', EventStaff.ROLE_CHECK_IN)},
         )
         return staff
 
@@ -585,8 +686,17 @@ class WebhookSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Webhook
-        fields = ['id', 'url', 'secret', 'triggers', 'is_active', 'created_at',
-                  'last_triggered_at', 'last_status', 'deliveries_count']
+        fields = [
+            'id',
+            'url',
+            'secret',
+            'triggers',
+            'is_active',
+            'created_at',
+            'last_triggered_at',
+            'last_status',
+            'deliveries_count',
+        ]
         read_only_fields = ['id', 'created_at', 'last_triggered_at', 'last_status', 'deliveries_count']
 
     def get_deliveries_count(self, obj) -> int:
@@ -594,22 +704,23 @@ class WebhookSerializer(serializers.ModelSerializer):
 
     def validate_url(self, value):
         from .webhooks import is_public_url
+
         if not is_public_url(value):
-            raise serializers.ValidationError(
-                'Webhook URLs must be http(s) and resolve to a public internet address.'
-            )
+            raise serializers.ValidationError('Webhook URLs must be http(s) and resolve to a public internet address.')
         return value
 
     def validate_secret(self, value):
         # Every delivery is signed: generate a secret when none is given.
         if not (value or '').strip():
             import secrets
+
             return secrets.token_hex(32)
         return value.strip()
 
     def create(self, validated_data):
         if not validated_data.get('secret'):
             import secrets
+
             validated_data['secret'] = secrets.token_hex(32)
         return super().create(validated_data)
 
@@ -650,6 +761,7 @@ class AffiliateSerializer(serializers.ModelSerializer):
     @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2))
     def get_revenue(self, obj):
         from decimal import Decimal
+
         total = Decimal('0')
         for r in obj.registrations.select_related('payment').all():
             pay = getattr(r, 'payment', None)
@@ -667,9 +779,18 @@ class PromoCodeSerializer(serializers.ModelSerializer):
     class Meta:
         model = PromoCode
         fields = [
-            'id', 'code', 'discount_type', 'discount_value', 'max_uses',
-            'times_used', 'expires_at', 'is_active', 'created_at',
-            'is_valid', 'is_expired', 'is_exhausted',
+            'id',
+            'code',
+            'discount_type',
+            'discount_value',
+            'max_uses',
+            'times_used',
+            'expires_at',
+            'is_active',
+            'created_at',
+            'is_valid',
+            'is_expired',
+            'is_exhausted',
         ]
         read_only_fields = ['id', 'times_used', 'created_at']
 
@@ -692,9 +813,11 @@ class PromoCodeSerializer(serializers.ModelSerializer):
 # ---- Custom checkout questions ---- #
 class EventQuestionSerializer(serializers.ModelSerializer):
     options = documented_json(
-        serializers.ListField(child=serializers.CharField()), required=False,
+        serializers.ListField(child=serializers.CharField()),
+        required=False,
         help_text='Choices for dropdown questions.',
     )
+
     class Meta:
         model = EventQuestion
         fields = ['id', 'label', 'question_type', 'options', 'is_required', 'order']
@@ -734,8 +857,7 @@ class CheckInListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CheckInList
-        fields = ['id', 'name', 'description', 'color', 'is_default',
-                  'log_count', 'checked_in_count', 'created_at']
+        fields = ['id', 'name', 'description', 'color', 'is_default', 'log_count', 'checked_in_count', 'created_at']
         read_only_fields = ['id', 'log_count', 'checked_in_count', 'created_at']
 
     def get_log_count(self, obj) -> int:
@@ -745,7 +867,9 @@ class CheckInListSerializer(serializers.ModelSerializer):
         # Currently-checked-in = registrations whose most-recent action in this
         # list is a check-in (an 'undo' afterwards cancels it).
         latest = {}
-        for reg_id, action in obj.logs.order_by('registration_id', '-created_at').values_list('registration_id', 'action'):
+        for reg_id, action in obj.logs.order_by('registration_id', '-created_at').values_list(
+            'registration_id', 'action'
+        ):
             if reg_id not in latest:
                 latest[reg_id] = action
         return sum(1 for a in latest.values() if a == CheckInLog.ACTION_CHECK_IN)
@@ -768,13 +892,17 @@ class WaitlistEntrySerializer(serializers.ModelSerializer):
 
     class Meta:
         model = WaitlistEntry
-        fields = ['id', 'username', 'event', 'event_title', 'status', 'position',
-                  'offer_expires_at', 'created_at']
+        fields = ['id', 'username', 'event', 'event_title', 'status', 'position', 'offer_expires_at', 'created_at']
         read_only_fields = fields
 
     def get_position(self, obj) -> int:
         if obj.status != WaitlistEntry.STATUS_WAITING:
             return 0
-        return WaitlistEntry.objects.filter(
-            event=obj.event, status=WaitlistEntry.STATUS_WAITING, created_at__lt=obj.created_at,
-        ).count() + 1
+        return (
+            WaitlistEntry.objects.filter(
+                event=obj.event,
+                status=WaitlistEntry.STATUS_WAITING,
+                created_at__lt=obj.created_at,
+            ).count()
+            + 1
+        )

@@ -1,4 +1,5 @@
 """Request/response shapes of the payment endpoints, for the OpenAPI schema."""
+
 from rest_framework import serializers
 
 from common.choices import PaymentStatusChoices
@@ -23,7 +24,9 @@ class PaymentVerificationSerializer(serializers.Serializer):
 
 class RefundRequestSerializer(serializers.Serializer):
     amount = serializers.DecimalField(
-        required=False, allow_null=True, **MONEY,
+        required=False,
+        allow_null=True,
+        **MONEY,
         help_text='Amount to refund; omit for a full refund of what is left.',
     )
     reason = serializers.CharField(required=False, allow_blank=True)
@@ -37,7 +40,9 @@ class RefundResultSerializer(serializers.Serializer):
 
 class OfflinePaymentRequestSerializer(serializers.Serializer):
     amount = serializers.DecimalField(
-        required=False, allow_null=True, **MONEY,
+        required=False,
+        allow_null=True,
+        **MONEY,
         help_text='Amount received; defaults to the ticket price.',
     )
 

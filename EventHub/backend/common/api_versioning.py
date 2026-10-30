@@ -6,6 +6,7 @@ move from every response. Paths that third parties call at a fixed address
 (payment provider callbacks) and infrastructure probes stay unversioned and
 are never marked deprecated.
 """
+
 from datetime import datetime, timezone
 
 from django.conf import settings
@@ -27,11 +28,7 @@ def _timestamp(iso_date: str) -> int:
 
 
 def is_legacy_api_path(path: str) -> bool:
-    return (
-        path.startswith(LEGACY_PREFIX)
-        and not path.startswith(CURRENT_PREFIX)
-        and not path.startswith(STABLE_PATHS)
-    )
+    return path.startswith(LEGACY_PREFIX) and not path.startswith(CURRENT_PREFIX) and not path.startswith(STABLE_PATHS)
 
 
 class DeprecatedApiMiddleware:
@@ -43,7 +40,7 @@ class DeprecatedApiMiddleware:
     def __call__(self, request):
         response = self.get_response(request)
         if is_legacy_api_path(request.path):
-            successor = CURRENT_PREFIX + request.path[len(LEGACY_PREFIX):]
+            successor = CURRENT_PREFIX + request.path[len(LEGACY_PREFIX) :]
             response['Deprecation'] = self.deprecation
             response['Sunset'] = self.sunset
             response['Link'] = f'<{successor}>; rel="successor-version"'

@@ -5,6 +5,7 @@ server logs. The SPA therefore offers two subprotocols, ['eventhub.jwt',
 '<access token>']; this middleware turns a valid token into scope['user'] and
 the consumer answers with the 'eventhub.jwt' subprotocol.
 """
+
 from channels.db import database_sync_to_async
 from channels.middleware import BaseMiddleware
 
@@ -16,6 +17,7 @@ def _user_for(token: str):
     from django.contrib.auth.models import User
     from rest_framework_simplejwt.exceptions import TokenError
     from rest_framework_simplejwt.tokens import AccessToken
+
     try:
         user_id = AccessToken(token)['user_id']
     except (TokenError, KeyError):

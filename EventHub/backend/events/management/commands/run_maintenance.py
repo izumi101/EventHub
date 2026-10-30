@@ -4,6 +4,7 @@ Run it every minute (the `scheduler` service in docker-compose does):
     python manage.py run_maintenance            # one pass
     python manage.py run_maintenance --loop 60  # forever, every 60 s
 """
+
 import logging
 import time
 
@@ -20,8 +21,7 @@ class Command(BaseCommand):
     help = 'Release expired seat holds and group bookings, advance waitlists, complete past events.'
 
     def add_arguments(self, parser):
-        parser.add_argument('--loop', type=int, default=0,
-                            help='Repeat every N seconds instead of running once.')
+        parser.add_argument('--loop', type=int, default=0, help='Repeat every N seconds instead of running once.')
 
     def handle(self, *args, **options):
         interval = options['loop']
@@ -47,9 +47,9 @@ class Command(BaseCommand):
 
         # Offers that timed out pass to the next person in line.
         waiting_events = (
-            WaitlistEntry.objects
-            .filter(status__in=[WaitlistEntry.STATUS_WAITING, WaitlistEntry.STATUS_OFFERED])
-            .values_list('event_id', flat=True).distinct()
+            WaitlistEntry.objects.filter(status__in=[WaitlistEntry.STATUS_WAITING, WaitlistEntry.STATUS_OFFERED])
+            .values_list('event_id', flat=True)
+            .distinct()
         )
         for event in Event.objects.filter(id__in=list(waiting_events), status=EventStatusChoices.PUBLISHED):
             promote_waitlist(event)

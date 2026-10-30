@@ -5,17 +5,20 @@ from events.models import Event, EventSeat, Registration, SeatMap
 
 
 class Command(BaseCommand):
-    help = 'Generate seat maps for events that don\'t have them.'
+    help = "Generate seat maps for events that don't have them."
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--force',
             action='store_true',
-            help='Regenerate the seat map of the events given with --event '
-                 '(refused when any seat is sold or held).',
+            help='Regenerate the seat map of the events given with --event (refused when any seat is sold or held).',
         )
         parser.add_argument(
-            '--event', type=int, action='append', dest='event_ids', default=[],
+            '--event',
+            type=int,
+            action='append',
+            dest='event_ids',
+            default=[],
             help='Only process this event id (repeatable). Required with --force.',
         )
 
@@ -63,8 +66,7 @@ class Command(BaseCommand):
             }
 
             seat_map, created = SeatMap.objects.get_or_create(
-                event=event,
-                defaults={'rows': rows, 'cols': cols, 'layout': layout}
+                event=event, defaults={'rows': rows, 'cols': cols, 'layout': layout}
             )
 
             if created:
@@ -86,9 +88,7 @@ class Command(BaseCommand):
                         )
 
                 created_count += 1
-                self.stdout.write(
-                    self.style.SUCCESS(f'✓ Created seat map for "{event.title}" ({rows}x{cols})')
-                )
+                self.stdout.write(self.style.SUCCESS(f'✓ Created seat map for "{event.title}" ({rows}x{cols})'))
             else:
                 self.stdout.write(f'- Seat map already exists for "{event.title}"')
 

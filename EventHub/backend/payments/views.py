@@ -33,15 +33,24 @@ class CreateCheckoutSessionView(APIView):
     Creates a Stripe Checkout Session for a paid event registration.
     Returns the session ID and the checkout URL to redirect the user to Stripe.
     """
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=None, responses={200: schema.CheckoutSessionResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND, 502: ERROR})
+    @extend_schema(
+        request=None,
+        responses={
+            200: schema.CheckoutSessionResponseSerializer,
+            400: ERROR,
+            401: UNAUTHENTICATED,
+            404: NOT_FOUND,
+            502: ERROR,
+        },
+    )
     def post(self, request, registration_id):
-        registration = get_object_or_404(
-            Registration, id=registration_id, user=request.user
-        )
+        registration = get_object_or_404(Registration, id=registration_id, user=request.user)
 
         from events.billing import registration_amount
+
         if registration_amount(registration) <= 0:
             return Response(
                 {'error': 'This registration is free, no payment needed'},
@@ -52,17 +61,21 @@ class CreateCheckoutSessionView(APIView):
             # Local dev with explicit STRIPE_MOCK_MODE: simulate a successful payment.
             if settings.STRIPE_MOCK_MODE:
                 success_url, _payment = create_mock_checkout_session(registration=registration)
-                return Response({
-                    'checkout_url': success_url,
-                    'session_id': _payment.stripe_checkout_session_id,
-                    'mock': True,
-                })
+                return Response(
+                    {
+                        'checkout_url': success_url,
+                        'session_id': _payment.stripe_checkout_session_id,
+                        'mock': True,
+                    }
+                )
 
             checkout_session, _payment = create_checkout_session(registration=registration)
-            return Response({
-                'checkout_url': checkout_session.url,
-                'session_id': checkout_session.id,
-            })
+            return Response(
+                {
+                    'checkout_url': checkout_session.url,
+                    'session_id': checkout_session.id,
+                }
+            )
         except ValueError as exc:
             # Not payable any more: paid already, cancelled, hold expired.
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -79,6 +92,7 @@ class StripeWebhookView(APIView):
     Listens to Stripe webhooks.
     When checkout.session.completed event is received, marks the corresponding payment as completed and confirms the registration.
     """
+
     permission_classes = [AllowAny]
     # Signed by Stripe; bursts from Stripe's few IPs must not hit the
     # anonymous rate limit (a 429 just delays every confirmation).
@@ -90,9 +104,7 @@ class StripeWebhookView(APIView):
         sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
 
         try:
-            event = stripe.Webhook.construct_event(
-                payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
-            )
+            event = stripe.Webhook.construct_event(payload, sig_header, settings.STRIPE_WEBHOOK_SECRET)
         except (ValueError, stripe.error.SignatureVerificationError) as e:
             logger.warning('Invalid Stripe webhook signature or payload: %s', e)
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -110,6 +122,7 @@ class StripeWebhookView(APIView):
                 confirm_stripe_checkout_session(session)
             if metadata.get('booking_id'):
                 from bookings.payments import confirm_booking_by_session
+
                 confirm_booking_by_session(session)
 
         return Response(status=status.HTTP_200_OK)
@@ -119,9 +132,20 @@ class VerifyPaymentView(APIView):
     """
     Verifies the payment status of a registration given the checkout session_id.
     """
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(parameters=[OpenApiParameter('session_id', OpenApiTypes.STR, required=True, description='Payment provider session id from the success redirect.')], responses={200: schema.PaymentVerificationSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: ERROR})
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                'session_id',
+                OpenApiTypes.STR,
+                required=True,
+                description='Payment provider session id from the success redirect.',
+            )
+        ],
+        responses={200: schema.PaymentVerificationSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: ERROR},
+    )
     def get(self, request):
         session_id = request.query_params.get('session_id')
         if not session_id:
@@ -129,21 +153,27 @@ class VerifyPaymentView(APIView):
 
         try:
             payment = verify_payment_service(session_id, request.user)
-            return Response({
-                'status': payment.status,
-                'event_title': payment.registration.event.title,
-                'amount': str(payment.amount),
-                'currency': (payment.currency or 'usd').upper(),
-            })
+            return Response(
+                {
+                    'status': payment.status,
+                    'event_title': payment.registration.event.title,
+                    'amount': str(payment.amount),
+                    'currency': (payment.currency or 'usd').upper(),
+                }
+            )
         except Payment.DoesNotExist:
             return Response({'error': 'Payment not found'}, status=status.HTTP_404_NOT_FOUND)
 
 
 class RefundPaymentView(APIView):
     """Organizer refunds a registration's payment (full or partial)."""
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=schema.RefundRequestSerializer, responses={200: schema.RefundResultSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: ERROR})
+    @extend_schema(
+        request=schema.RefundRequestSerializer,
+        responses={200: schema.RefundResultSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: ERROR},
+    )
     def post(self, request, registration_id):
         registration = get_object_or_404(Registration, id=registration_id)
         if not can_manage_event(registration.event, request.user):
@@ -162,18 +192,30 @@ class RefundPaymentView(APIView):
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({
-            'status': payment.status,
-            'refunded_amount': str(payment.refunded_amount),
-            'net_amount': str(payment.net_amount),
-        })
+        return Response(
+            {
+                'status': payment.status,
+                'refunded_amount': str(payment.refunded_amount),
+                'net_amount': str(payment.net_amount),
+            }
+        )
 
 
 class MarkOfflinePaidView(APIView):
     """Organizer manually marks a registration as paid (cash / bank transfer)."""
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=schema.OfflinePaymentRequestSerializer, responses={200: schema.OfflinePaymentResultSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
+    @extend_schema(
+        request=schema.OfflinePaymentRequestSerializer,
+        responses={
+            200: schema.OfflinePaymentResultSerializer,
+            400: ERROR,
+            401: UNAUTHENTICATED,
+            403: ERROR,
+            404: NOT_FOUND,
+        },
+    )
     def post(self, request, registration_id):
         registration = get_object_or_404(Registration, id=registration_id)
         if not can_manage_event(registration.event, request.user):
@@ -196,9 +238,17 @@ class InvoiceView(APIView):
     Authorization header (the SPA fetches it as a blob). Tokens are never
     accepted in the query string: URLs end up in logs, history and Referer.
     """
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(responses={(200, 'text/html'): OpenApiResponse(OpenApiTypes.STR, description='Printable HTML invoice.'), 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
+    @extend_schema(
+        responses={
+            (200, 'text/html'): OpenApiResponse(OpenApiTypes.STR, description='Printable HTML invoice.'),
+            401: UNAUTHENTICATED,
+            403: ERROR,
+            404: NOT_FOUND,
+        }
+    )
     def get(self, request, registration_id):
         registration = get_object_or_404(
             Registration.objects.select_related('event', 'user', 'ticket_type', 'seat', 'promo_code', 'payment'),
@@ -209,4 +259,5 @@ class InvoiceView(APIView):
             return Response({'error': 'Not allowed.'}, status=status.HTTP_403_FORBIDDEN)
 
         from .invoice import invoice_response
+
         return invoice_response(registration)

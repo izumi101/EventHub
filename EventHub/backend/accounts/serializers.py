@@ -10,6 +10,7 @@ from .services import register_user, verify_registration_code
 # ---- Serializer (manual) ---- #
 class RegisterSerializer(serializers.Serializer):
     """Manual Serializer for user registration."""
+
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -47,7 +48,8 @@ class RegisterSerializer(serializers.Serializer):
             raise serializers.ValidationError({'email': 'Email already registered.'})
 
         is_valid, message = password_meets_policy(
-            data['password'], User(username=data['username'], email=data['email']),
+            data['password'],
+            User(username=data['username'], email=data['email']),
         )
         if not is_valid:
             raise serializers.ValidationError({'password': message})
@@ -64,6 +66,7 @@ class RegisterSerializer(serializers.Serializer):
 # ---- Serializer (manual) ---- #
 class LoginSerializer(serializers.Serializer):
     """Manual Serializer for login."""
+
     username = serializers.CharField()
     password = serializers.CharField(write_only=True)
 
@@ -71,6 +74,7 @@ class LoginSerializer(serializers.Serializer):
 # ---- Serializer (manual) ---- #
 class OrganizerCreateSerializer(serializers.Serializer):
     """Admin-only: create an organizer account directly (no email code)."""
+
     username = serializers.CharField(max_length=150)
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True, min_length=8)
@@ -97,6 +101,7 @@ class OrganizerCreateSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         from .services import create_organizer
+
         try:
             return create_organizer(validated_data)
         except IntegrityError:

@@ -54,9 +54,7 @@ def get_dynamic_price(event) -> dict:
 
     base = event.price
     total = event.max_participants or 1
-    registered = event.registrations.exclude(
-        status__in=['cancelled', 'rejected']
-    ).count()
+    registered = event.registrations.exclude(status__in=['cancelled', 'rejected']).count()
 
     fill_rate = registered / total if total else 0
     fill_factor = fill_rate * 0.5  # 0 → 0.5
@@ -75,9 +73,7 @@ def get_dynamic_price(event) -> dict:
         urgency_factor = 0.3
 
     # Velocity: registrations in last 24h
-    recent = event.registrations.filter(
-        registered_at__gte=now - timedelta(hours=24)
-    ).count()
+    recent = event.registrations.filter(registered_at__gte=now - timedelta(hours=24)).count()
     velocity_factor = min(recent / 20, 0.2)  # cap at 0.2
 
     multiplier = 1.0 + fill_factor + urgency_factor + velocity_factor

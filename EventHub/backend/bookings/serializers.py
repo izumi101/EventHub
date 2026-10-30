@@ -16,8 +16,17 @@ class BookingSeatSerializer(serializers.ModelSerializer):
     class Meta:
         model = BookingSeat
         fields = [
-            'id', 'seat_id', 'row', 'col', 'zone', 'price',
-            'attendee_name', 'claimed', 'claimed_by_me', 'ticket_uuid', 'is_checked_in',
+            'id',
+            'seat_id',
+            'row',
+            'col',
+            'zone',
+            'price',
+            'attendee_name',
+            'claimed',
+            'claimed_by_me',
+            'ticket_uuid',
+            'is_checked_in',
         ]
 
     def get_claimed(self, obj) -> bool:
@@ -60,10 +69,25 @@ class BookingSerializer(serializers.ModelSerializer):
     class Meta:
         model = Booking
         fields = [
-            'id', 'status', 'share_token', 'hold_expires_at',
-            'event_id', 'event_title', 'event_date', 'event_location',
-            'owner_username', 'seats', 'seat_count', 'total_price', 'total_due', 'currency',
-            'amount_paid', 'refunded_at', 'is_expired', 'is_owner', 'created_at',
+            'id',
+            'status',
+            'share_token',
+            'hold_expires_at',
+            'event_id',
+            'event_title',
+            'event_date',
+            'event_location',
+            'owner_username',
+            'seats',
+            'seat_count',
+            'total_price',
+            'total_due',
+            'currency',
+            'amount_paid',
+            'refunded_at',
+            'is_expired',
+            'is_owner',
+            'created_at',
         ]
 
     def _viewer(self):
@@ -90,18 +114,18 @@ class BookingSerializer(serializers.ModelSerializer):
     def get_total_due(self, obj):
         # Seat prices plus tax & service fee — what checkout actually charges.
         from .payments import booking_amount
+
         return str(booking_amount(obj))
 
     def get_currency(self, obj) -> str:
         from events.billing import event_currency
+
         return event_currency(obj.event)
 
 
 class BookingCreateSerializer(serializers.Serializer):
     event = serializers.IntegerField()
-    seat_ids = serializers.ListField(
-        child=serializers.IntegerField(), allow_empty=False, max_length=8
-    )
+    seat_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False, max_length=8)
 
 
 class ClaimSeatSerializer(serializers.Serializer):

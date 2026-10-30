@@ -25,18 +25,23 @@ class FavoritesListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return (
-            Favorite.objects.filter(user=self.request.user)
-            .prefetch_related(
-                Prefetch('event', queryset=Event.objects.select_related('organizer', 'category').with_capacity()),
-            )
+        return Favorite.objects.filter(user=self.request.user).prefetch_related(
+            Prefetch('event', queryset=Event.objects.select_related('organizer', 'category').with_capacity()),
         )
 
 
 class FavoriteToggleView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(request=None, responses={200: api.FavoriteStateSerializer, 201: api.FavoriteStateSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND})
+    @extend_schema(
+        request=None,
+        responses={
+            200: api.FavoriteStateSerializer,
+            201: api.FavoriteStateSerializer,
+            401: UNAUTHENTICATED,
+            404: NOT_FOUND,
+        },
+    )
     def post(self, request, event_id):
         # Only events the user may see (no favouriting someone else's draft).
         event = get_object_or_404(event_queryset_for_user(request.user), pk=event_id)
@@ -83,10 +88,12 @@ class NotificationsListView(generics.ListAPIView):
 
 class NotificationMarkReadView(generics.GenericAPIView):
     """Mark one notification (by id) — or, via the subclass below, all — as read."""
+
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(operation_id='notification_mark_read', request=None,
-                   responses={200: api.OkSerializer, 401: UNAUTHENTICATED})
+    @extend_schema(
+        operation_id='notification_mark_read', request=None, responses={200: api.OkSerializer, 401: UNAUTHENTICATED}
+    )
     def post(self, request, pk=None):
         if pk:
             Notification.objects.filter(pk=pk, user=request.user).update(is_read=True)
@@ -96,7 +103,10 @@ class NotificationMarkReadView(generics.GenericAPIView):
 
 
 class NotificationMarkAllReadView(NotificationMarkReadView):
-    @extend_schema(operation_id='notifications_mark_all_read', request=None,
-                   responses={200: api.OkSerializer, 401: UNAUTHENTICATED})
+    @extend_schema(
+        operation_id='notifications_mark_all_read',
+        request=None,
+        responses={200: api.OkSerializer, 401: UNAUTHENTICATED},
+    )
     def post(self, request, pk=None):
         return super().post(request)

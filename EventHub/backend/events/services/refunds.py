@@ -48,8 +48,10 @@ def request_refund(*, user, event: Event, reason: str = ''):
     # Notify the organizer in-app.
     try:
         from ..notify import notify
+
         notify(
-            event.organizer, 'event_updated',
+            event.organizer,
+            'event_updated',
             f'💸 Refund requested: {event.title}',
             f'{user.username} requested a refund of {payment.net_amount} {event.currency}.'
             + (f' Reason: {reason}' if reason else ''),
@@ -68,6 +70,7 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
     from ..models import RefundRequest
 
     from common.permissions import can_manage_event
+
     if not can_manage_event(refund_request.registration.event, actor):
         raise PermissionError('Only the organizer can resolve refund requests.')
 
@@ -83,6 +86,7 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
         payment = getattr(registration, 'payment', None)
         if payment and payment.is_refundable:
             from payments.services import refund_payment
+
             # Suppress the low-level "Refund issued" notice — we send the
             # user-facing "Refund approved" message below, avoiding duplicates.
             refund_payment(
@@ -106,8 +110,8 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
 
     try:
         from ..notify import notify
-        notify(registration.user, notify_type, title,
-               body + (f' Note: {note}' if note else ''), event=event)
+
+        notify(registration.user, notify_type, title, body + (f' Note: {note}' if note else ''), event=event)
     except Exception:
         pass
 

@@ -1,5 +1,6 @@
 """The API contract: versioned URLs, the deprecated alias, and the committed
 OpenAPI schema staying in step with the code."""
+
 import tempfile
 from pathlib import Path
 
@@ -45,6 +46,7 @@ class SchemaTests(TestCase):
             generated = Path(tmp) / 'openapi.yaml'
             call_command('spectacular', '--file', str(generated), '--validate', '--fail-on-warn')
             self.assertEqual(
-                generated.read_text(), SCHEMA_FILE.read_text(),
+                generated.read_text(),
+                SCHEMA_FILE.read_text(),
                 f'openapi.yaml is out of date; regenerate it in EventHub/backend: {REGENERATE}',
             )

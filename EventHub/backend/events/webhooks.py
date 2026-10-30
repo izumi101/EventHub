@@ -5,6 +5,7 @@ trigger and queues one delivery job per webhook (jobs app), signed with
 HMAC-SHA256. The worker POSTs it, retries failures with backoff, and logs
 every attempt to WebhookDelivery for the organizer to inspect.
 """
+
 import hashlib
 import hmac
 import http.client
@@ -98,8 +99,9 @@ def _post(url: str, body: bytes, headers: dict) -> int:
     parts, port = _split(url)
     ip = _public_ips(parts.hostname, port)[0]
     if parts.scheme == 'https':
-        conn = _PinnedHTTPSConnection(parts.hostname, port, timeout=TIMEOUT_SECONDS,
-                                      context=ssl.create_default_context(), pinned_ip=ip)
+        conn = _PinnedHTTPSConnection(
+            parts.hostname, port, timeout=TIMEOUT_SECONDS, context=ssl.create_default_context(), pinned_ip=ip
+        )
     else:
         conn = _PinnedHTTPConnection(parts.hostname, port, timeout=TIMEOUT_SECONDS, pinned_ip=ip)
     path = (parts.path or '/') + (f'?{parts.query}' if parts.query else '')
@@ -127,12 +129,16 @@ def deliver_job(*, webhook_id: int, trigger: str, body: str, signature: str):
 
     status_code, success, error = None, False, ''
     try:
-        status_code = _post(webhook.url, body.encode(), {
-            'Content-Type': 'application/json',
-            'X-EventHub-Event': trigger,
-            'X-EventHub-Signature': signature,
-            'User-Agent': 'EventHub-Webhooks/1.0',
-        })
+        status_code = _post(
+            webhook.url,
+            body.encode(),
+            {
+                'Content-Type': 'application/json',
+                'X-EventHub-Event': trigger,
+                'X-EventHub-Signature': signature,
+                'User-Agent': 'EventHub-Webhooks/1.0',
+            },
+        )
         success = 200 <= status_code < 300
         if not success:
             error = f'HTTP {status_code}'
@@ -143,11 +149,15 @@ def deliver_job(*, webhook_id: int, trigger: str, body: str, signature: str):
         error = str(exc)[:300]
 
     Webhook.objects.filter(id=webhook_id).update(
-        last_triggered_at=timezone.now(), last_status=status_code,
+        last_triggered_at=timezone.now(),
+        last_status=status_code,
     )
     WebhookDelivery.objects.create(
-        webhook_id=webhook_id, trigger=trigger,
-        status_code=status_code, success=success, error=error,
+        webhook_id=webhook_id,
+        trigger=trigger,
+        status_code=status_code,
+        success=success,
+        error=error,
     )
     if error.startswith('Blocked'):
         raise PermanentJobError(error)
@@ -180,10 +190,18 @@ def fire(event, trigger: str, payload: dict):
     body = json.dumps(envelope, default=str)
 
     from jobs.queue import enqueue
+
     for hook in hooks:
         if trigger not in (hook.triggers or []):
             continue
         signature = _sign(hook.secret, body.encode())
-        enqueue('deliver_webhook', {
-            'webhook_id': hook.id, 'trigger': trigger, 'body': body, 'signature': signature,
-        }, max_attempts=6)
+        enqueue(
+            'deliver_webhook',
+            {
+                'webhook_id': hook.id,
+                'trigger': trigger,
+                'body': body,
+                'signature': signature,
+            },
+            max_attempts=6,
+        )

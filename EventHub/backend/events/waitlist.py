@@ -7,6 +7,7 @@ spot and notified. Offers have a TTL; if not claimed, the spot passes on.
 Like the seat-hold system, this runs lazily — `promote_waitlist` is called
 whenever a spot might have freed, so there is no background worker to babysit.
 """
+
 from datetime import timedelta
 
 from django.db import transaction
@@ -25,7 +26,8 @@ OFFER_TTL_MINUTES = 30
 def join_waitlist(*, user, event: Event) -> WaitlistEntry:
     """Add `user` to the waitlist for `event` (idempotent)."""
     entry, created = WaitlistEntry.objects.get_or_create(
-        user=user, event=event,
+        user=user,
+        event=event,
         defaults={'status': WaitlistEntry.STATUS_WAITING},
     )
     if not created and entry.status == WaitlistEntry.STATUS_EXPIRED:
@@ -53,7 +55,9 @@ def position(*, user, event: Event):
     if entry.status != WaitlistEntry.STATUS_WAITING:
         return {'status': entry.status, 'position': None}
     ahead = WaitlistEntry.objects.filter(
-        event=event, status=WaitlistEntry.STATUS_WAITING, created_at__lt=entry.created_at,
+        event=event,
+        status=WaitlistEntry.STATUS_WAITING,
+        created_at__lt=entry.created_at,
     ).count()
     return {'status': 'waiting', 'position': ahead + 1}
 
@@ -73,14 +77,17 @@ def promote_waitlist(event: Event):
 
     # 1. Expire offers that timed out so their spot can pass on.
     WaitlistEntry.objects.filter(
-        event=event, status=WaitlistEntry.STATUS_OFFERED, offer_expires_at__lt=now,
+        event=event,
+        status=WaitlistEntry.STATUS_OFFERED,
+        offer_expires_at__lt=now,
     ).update(status=WaitlistEntry.STATUS_EXPIRED)
 
     # 2. How many spots are genuinely free right now?
     free = event.available_spots
     # Outstanding (still valid) offers already claim some of those spots.
     outstanding = WaitlistEntry.objects.filter(
-        event=event, status=WaitlistEntry.STATUS_OFFERED,
+        event=event,
+        status=WaitlistEntry.STATUS_OFFERED,
     ).count()
     open_spots = free - outstanding
     if open_spots <= 0:
@@ -88,8 +95,7 @@ def promote_waitlist(event: Event):
 
     # 3. Offer to the next waiting people, FIFO.
     next_up = list(
-        WaitlistEntry.objects
-        .select_for_update()
+        WaitlistEntry.objects.select_for_update()
         .filter(event=event, status=WaitlistEntry.STATUS_WAITING)
         .order_by('created_at')[:open_spots]
     )
@@ -99,7 +105,8 @@ def promote_waitlist(event: Event):
         entry.offer_expires_at = now + timedelta(minutes=OFFER_TTL_MINUTES)
         entry.save(update_fields=['status', 'offered_at', 'offer_expires_at'])
         notify(
-            entry.user, 'seat_available',
+            entry.user,
+            'seat_available',
             f'🎉 A spot opened up: {event.title}',
             f'You have {OFFER_TTL_MINUTES} minutes to grab your ticket before it passes to the next person.',
             event=event,

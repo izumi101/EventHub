@@ -59,41 +59,73 @@ def clone_event(*, event: Event, actor):
     src_map = SeatMap.objects.filter(event=event).first()
     if src_map:
         new_map = SeatMap.objects.create(
-            event=clone, rows=src_map.rows, cols=src_map.cols, layout=src_map.layout,
+            event=clone,
+            rows=src_map.rows,
+            cols=src_map.cols,
+            layout=src_map.layout,
         )
-        EventSeat.objects.bulk_create([
-            EventSeat(seat_map=new_map, row=s.row, col=s.col, price_zone=s.price_zone, is_available=True)
-            for s in src_map.seats.all()
-        ])
+        EventSeat.objects.bulk_create(
+            [
+                EventSeat(seat_map=new_map, row=s.row, col=s.col, price_zone=s.price_zone, is_available=True)
+                for s in src_map.seats.all()
+            ]
+        )
 
     # Copy promo codes with counters reset.
-    PromoCode.objects.bulk_create([
-        PromoCode(
-            event=clone, code=p.code, discount_type=p.discount_type,
-            discount_value=p.discount_value, max_uses=p.max_uses,
-            expires_at=p.expires_at, is_active=p.is_active,
-        ) for p in event.promo_codes.all()
-    ])
+    PromoCode.objects.bulk_create(
+        [
+            PromoCode(
+                event=clone,
+                code=p.code,
+                discount_type=p.discount_type,
+                discount_value=p.discount_value,
+                max_uses=p.max_uses,
+                expires_at=p.expires_at,
+                is_active=p.is_active,
+            )
+            for p in event.promo_codes.all()
+        ]
+    )
 
     # Copy ticket types (sold counts reset naturally — no registrations copied).
     from ..models import TicketType
-    TicketType.objects.bulk_create([
-        TicketType(
-            event=clone, name=t.name, description=t.description, kind=t.kind,
-            price=t.price, quantity=t.quantity, min_per_order=t.min_per_order,
-            max_per_order=t.max_per_order, sale_start=t.sale_start,
-            sale_end=t.sale_end, is_active=t.is_active, order=t.order,
-        ) for t in event.ticket_types.all()
-    ])
+
+    TicketType.objects.bulk_create(
+        [
+            TicketType(
+                event=clone,
+                name=t.name,
+                description=t.description,
+                kind=t.kind,
+                price=t.price,
+                quantity=t.quantity,
+                min_per_order=t.min_per_order,
+                max_per_order=t.max_per_order,
+                sale_start=t.sale_start,
+                sale_end=t.sale_end,
+                is_active=t.is_active,
+                order=t.order,
+            )
+            for t in event.ticket_types.all()
+        ]
+    )
 
     # Copy custom questions.
     from ..models import EventQuestion
-    EventQuestion.objects.bulk_create([
-        EventQuestion(
-            event=clone, label=q.label, question_type=q.question_type,
-            options=q.options, is_required=q.is_required, order=q.order,
-        ) for q in event.questions.all()
-    ])
+
+    EventQuestion.objects.bulk_create(
+        [
+            EventQuestion(
+                event=clone,
+                label=q.label,
+                question_type=q.question_type,
+                options=q.options,
+                is_required=q.is_required,
+                order=q.order,
+            )
+            for q in event.questions.all()
+        ]
+    )
 
     return clone
 
@@ -122,6 +154,7 @@ def reject_event(event: Event):
 def submit_event(*, event: Event, actor):
     """Organizer sends a draft (e.g. a clone) to admin review."""
     from common.permissions import can_manage_event
+
     if not can_manage_event(event, actor):
         raise PermissionError('You do not manage this event.')
     if event.status not in (EventStatusChoices.DRAFT, EventStatusChoices.REJECTED):
@@ -155,8 +188,7 @@ def cancel_event(*, event: Event, actor):
         event.save(update_fields=['status'])
 
     regs = list(
-        event.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES)
-        .select_related('payment', 'user')
+        event.registrations.exclude(status__in=INACTIVE_REGISTRATION_STATUSES).select_related('payment', 'user')
     )
 
     refunded, failed = 0, 0
@@ -166,8 +198,7 @@ def cancel_event(*, event: Event, actor):
         try:
             with transaction.atomic():
                 if payment and payment.is_refundable:
-                    refund_payment(payment=payment, reason='Event cancelled by the organizer',
-                                   notify_user=False)
+                    refund_payment(payment=payment, reason='Event cancelled by the organizer', notify_user=False)
                     refunded += 1
                     outcome[reg.id] = 'refunded'
                 # Free / unpaid / already-refunded tickets are voided too, so
@@ -190,7 +221,8 @@ def cancel_event(*, event: Event, actor):
         else:
             extra = ''
         notify(
-            reg.user, 'event_cancelled',
+            reg.user,
+            'event_cancelled',
             f'❌ Event cancelled: {event.title}',
             'The organizer has cancelled this event.' + extra,
             event=event,
@@ -209,14 +241,16 @@ def _cancel_group_bookings(event, actor):
 
     refunded, failed = 0, 0
     for booking in Booking.objects.filter(
-        event=event, status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
+        event=event,
+        status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
     ):
         try:
             with transaction.atomic():
                 if booking.status == Booking.Status.CONFIRMED:
                     # Notifies the owner and fires the refund webhook.
-                    refund_booking(booking, actor=actor, reason='Event cancelled by the organizer',
-                                   event_cancelled=True)
+                    refund_booking(
+                        booking, actor=actor, reason='Event cancelled by the organizer', event_cancelled=True
+                    )
                     refunded += 1
                 else:
                     cancel_booking(booking)

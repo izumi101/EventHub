@@ -1,6 +1,7 @@
 """Request/response shapes of event endpoints that don't map onto one model
 serializer, for the OpenAPI schema. Documentation only: the views keep
 parsing and building these payloads themselves."""
+
 from rest_framework import serializers
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
@@ -24,8 +25,7 @@ class EventStatsSerializer(serializers.Serializer):
     checked_in = serializers.IntegerField()
     remaining = serializers.IntegerField()
     check_in_rate = serializers.FloatField(help_text='Percent, 0–100.')
-    net_revenue = serializers.DecimalField(
-        **MONEY, help_text='Tickets and group bookings, net of refunds.')
+    net_revenue = serializers.DecimalField(**MONEY, help_text='Tickets and group bookings, net of refunds.')
     currency = serializers.CharField(min_length=3, max_length=3)
 
 
@@ -104,8 +104,7 @@ class SeatMapCreateRequestSerializer(serializers.Serializer):
     cols = serializers.IntegerField(min_value=1, max_value=30, default=8)
     vip_rows = serializers.IntegerField(min_value=0, default=0)
     premium_rows = serializers.IntegerField(min_value=0, default=0)
-    sync_capacity = serializers.BooleanField(
-        default=True, help_text='Set the event capacity to rows × cols.')
+    sync_capacity = serializers.BooleanField(default=True, help_text='Set the event capacity to rows × cols.')
 
 
 class BroadcastRequestSerializer(serializers.Serializer):
@@ -130,11 +129,13 @@ class RegisterRequestSerializer(serializers.Serializer):
     seat_id = serializers.IntegerField(required=False, allow_null=True)
     promo_code = serializers.CharField(required=False, allow_blank=True)
     donation_amount = serializers.DecimalField(
-        required=False, allow_null=True, **MONEY,
-        help_text='Pay-what-you-want amount for donation tiers.')
+        required=False, allow_null=True, **MONEY, help_text='Pay-what-you-want amount for donation tiers.'
+    )
     answers = serializers.DictField(
-        child=serializers.JSONField(), required=False,
-        help_text='Answers to the organizer\'s questions: question id → answer.')
+        child=serializers.JSONField(),
+        required=False,
+        help_text="Answers to the organizer's questions: question id → answer.",
+    )
     affiliate_code = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
 
@@ -195,7 +196,8 @@ class QueueStatusSerializer(serializers.Serializer):
 class WaitlistStatusSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=WAITLIST_STATUSES)
     position = serializers.IntegerField(
-        required=False, allow_null=True, help_text='1-based while waiting; 0 once a spot is offered.')
+        required=False, allow_null=True, help_text='1-based while waiting; 0 once a spot is offered.'
+    )
     offer_expires_at = serializers.DateTimeField(required=False)
     message = serializers.CharField(required=False)
 

@@ -27,4 +27,3 @@ class PaymentStatusChoices(models.TextChoices):
     COMPLETED = 'completed', 'Completed'
     FAILED = 'failed', 'Failed'
     REFUNDED = 'refunded', 'Refunded'
-
