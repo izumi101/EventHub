@@ -65,6 +65,18 @@
       "addLabels": ["ci"]
     },
     {
+      "description": "Generic rules come first: in Renovate the LAST matching rule wins, so the specific rules below (groups, ruff) can override them. Automerge low-risk updates once the required checks pass",
+      "matchUpdateTypes": ["patch", "pin", "pinDigest"],
+      "automerge": true
+    },
+    {
+      "description": "Major updates wait for approval on the Dependency Dashboard and are never merged automatically",
+      "matchUpdateTypes": ["major"],
+      "dependencyDashboardApproval": true,
+      "automerge": false,
+      "addLabels": ["major"]
+    },
+    {
       "description": "Dev-only npm dependencies use the chore type",
       "matchManagers": ["npm"],
       "matchDepTypes": ["devDependencies"],
@@ -134,18 +146,6 @@
       "description": "Base images and docker-compose services",
       "matchManagers": ["dockerfile", "docker-compose"],
       "addLabels": ["docker"]
-    },
-    {
-      "description": "Automerge low-risk updates once the required checks pass",
-      "matchUpdateTypes": ["patch", "pin", "pinDigest"],
-      "automerge": true
-    },
-    {
-      "description": "Major updates wait for approval on the Dependency Dashboard and are never merged automatically",
-      "matchUpdateTypes": ["major"],
-      "dependencyDashboardApproval": true,
-      "automerge": false,
-      "addLabels": ["major"]
     }
   ]
 }
