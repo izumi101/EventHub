@@ -4,11 +4,12 @@ import { Router, RouterModule } from '@angular/router';
 import { LucideAngularModule, Twitter, Linkedin, Github, ChevronUp, X } from 'lucide-angular';
 import { AuthService } from '../../services/auth.service';
 import { SearchService } from '../../services/search.service';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, CommonModule, RouterModule, LucideAngularModule],
   template: `
     <footer class="bg-card border-t border-border mt-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -102,6 +103,7 @@ import { SearchService } from '../../services/search.service';
         <div
           class="bg-card border border-border rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
           (click)="$event.stopPropagation()"
+          appDialog (dismiss)="closeModal()"
         >
           <!-- Modal Header -->
           <div class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-2xl z-10">

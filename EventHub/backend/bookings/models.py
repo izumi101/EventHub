@@ -16,6 +16,7 @@ class Booking(models.Model):
         CONFIRMED = 'confirmed', 'Confirmed'  # paid
         CANCELLED = 'cancelled', 'Cancelled'  # released by owner
         EXPIRED = 'expired', 'Expired'        # hold timed out
+        REFUNDED = 'refunded', 'Refunded'     # paid, then refunded by the organizer
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='bookings')
@@ -30,6 +31,8 @@ class Booking(models.Model):
     # Needed to refund a group payment (event cancelled, late payment, …).
     stripe_payment_intent_id = models.CharField(max_length=255, blank=True)
     amount_paid = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
+    refund_reason = models.CharField(max_length=255, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

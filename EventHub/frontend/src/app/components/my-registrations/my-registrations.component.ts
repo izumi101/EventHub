@@ -17,11 +17,13 @@ import {
   FileText,
 } from 'lucide-angular';
 import * as QRCode from 'qrcode';
+import { MoneyPipe } from '../../pipes/money.pipe';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-my-registrations',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -267,6 +269,7 @@ import * as QRCode from 'qrcode';
         <div
           class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up"
           (click)="$event.stopPropagation()"
+          appDialog (dismiss)="qrModalReg = null"
         >
           <span class="badge badge-confirmed mb-3">Confirmed</span>
           <h3 class="text-base font-bold text-foreground leading-tight">{{ qrModalReg.event.title }}</h3>
@@ -300,14 +303,14 @@ import * as QRCode from 'qrcode';
     <!-- Refund request modal -->
     @if (refundReg) {
       <div class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-fade-in" (click)="refundReg = null">
-        <div class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
+        <div class="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="refundReg = null">
           <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
           <p class="text-sm text-muted-foreground mb-4">
-            For "{{ refundReg.event.title }}" — {{ '$' + refundReg.payment?.net_amount }}.
+            For "{{ refundReg.event.title }}" — {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}.
             The organizer reviews and approves or declines it.
           </p>
-          <label class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
-          <textarea [(ngModel)]="refundReason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
+          <label for="my-registrations-refund-reason" class="block text-sm font-medium text-foreground mb-1.5">Reason <span class="text-muted-foreground font-normal">(optional)</span></label>
+          <textarea id="my-registrations-refund-reason" [(ngModel)]="refundReason" rows="3" placeholder="Why are you requesting a refund?" class="input resize-none w-full mb-4"></textarea>
           <div class="flex gap-2">
             <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
             <button (click)="submitRefundRequest()" [disabled]="submittingRefund" class="btn btn-primary flex-1">

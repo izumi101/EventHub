@@ -6,11 +6,12 @@ import { EventService, PromoCode } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-promo-codes',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -47,18 +48,18 @@ import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign }
             <h2 class="font-semibold text-foreground mb-4">Create a promo code</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Code</label>
-                <input [(ngModel)]="form.code" placeholder="SAVE20" class="input w-full uppercase" />
+                <label for="promo-codes-code" class="block text-sm font-medium text-foreground mb-1.5">Code</label>
+                <input id="promo-codes-code" [(ngModel)]="form.code" placeholder="SAVE20" class="input w-full uppercase" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Type</label>
-                <div class="flex gap-2">
-                  <button type="button" (click)="form.discount_type = 'percent'"
+                <p id="promo-type-caption" class="block text-sm font-medium text-foreground mb-1.5">Type</p>
+                <div class="flex gap-2" role="group" aria-labelledby="promo-type-caption">
+                  <button type="button" (click)="form.discount_type = 'percent'" [attr.aria-pressed]="form.discount_type === 'percent'"
                     class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm font-medium transition-colors"
                     [class]="form.discount_type === 'percent' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'">
                     <lucide-icon [img]="icons.Percent" class="w-4 h-4"></lucide-icon> Percent
                   </button>
-                  <button type="button" (click)="form.discount_type = 'fixed'"
+                  <button type="button" (click)="form.discount_type = 'fixed'" [attr.aria-pressed]="form.discount_type === 'fixed'"
                     class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border text-sm font-medium transition-colors"
                     [class]="form.discount_type === 'fixed' ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground'">
                     <lucide-icon [img]="icons.DollarSign" class="w-4 h-4"></lucide-icon> Fixed
@@ -66,18 +67,18 @@ import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign }
                 </div>
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">
+                <label for="promo-codes-discount-value" class="block text-sm font-medium text-foreground mb-1.5">
                   {{ form.discount_type === 'percent' ? 'Discount (%)' : 'Discount ($)' }}
                 </label>
-                <input type="number" [(ngModel)]="form.discount_value" min="0" step="0.01" class="input w-full" />
+                <input id="promo-codes-discount-value" type="number" [(ngModel)]="form.discount_value" min="0" step="0.01" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Max uses <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
-                <input type="number" [(ngModel)]="form.max_uses" min="1" placeholder="Unlimited" class="input w-full" />
+                <label for="promo-codes-max-uses" class="block text-sm font-medium text-foreground mb-1.5">Max uses <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
+                <input id="promo-codes-max-uses" type="number" [(ngModel)]="form.max_uses" min="1" placeholder="Unlimited" class="input w-full" />
               </div>
               <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-foreground mb-1.5">Expires <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input type="datetime-local" [(ngModel)]="form.expires_at" class="input w-full" />
+                <label for="promo-codes-expires-at" class="block text-sm font-medium text-foreground mb-1.5">Expires <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="promo-codes-expires-at" type="datetime-local" [(ngModel)]="form.expires_at" class="input w-full" />
               </div>
             </div>
             <div class="flex gap-2 mt-4">
@@ -107,7 +108,7 @@ import { LucideAngularModule, Tag, Plus, Trash2, Check, X, Percent, DollarSign }
                 <div class="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-lg"
                      [class]="c.discount_type === 'percent' ? 'bg-ember/10 text-ember' : 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]'">
                   @if (c.discount_type === 'percent') { {{ c.discount_value }}% }
-                  @else { {{ '$' + c.discount_value }} }
+                  @else { {{ c.discount_value | money: event?.currency }} }
                 </div>
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">

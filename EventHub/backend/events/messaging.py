@@ -7,9 +7,10 @@ so organizers can, say, email only VIPs or only confirmed buyers.
 import logging
 
 from django.conf import settings
-from django.core.mail import send_mail
+from django.db import transaction
 
 from common.choices import RegistrationStatusChoices
+from jobs.handlers import enqueue_email
 from .models import Notification
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ def _audience_queryset(event, audience: str):
     return qs
 
 
+@transaction.atomic
 def broadcast_to_attendees(*, event, subject: str, body: str, audience: str = 'all') -> dict:
     """Send `subject`/`body` to the chosen audience. Returns delivery counts."""
     regs = _audience_queryset(event, audience)
@@ -69,19 +71,11 @@ def broadcast_to_attendees(*, event, subject: str, body: str, audience: str = 'a
     email_enabled = bool(recipients) and (smtp_ready or non_smtp_ok)
 
     if email_enabled:
-        from_addr = getattr(settings, 'DEFAULT_FROM_EMAIL', 'no-reply@eventhub.local')
+        # One queued job per recipient: the worker sends them (and retries a
+        # failed address) without holding up the organizer's request.
         for addr in recipients:
-            try:
-                send_mail(
-                    subject=f'{event.title}: {subject}',
-                    message=body,
-                    from_email=from_addr,
-                    recipient_list=[addr],
-                    fail_silently=True,
-                )
-                emailed += 1
-            except Exception as exc:
-                logger.warning('Bulk email failed for event %s: %s', event.id, exc)
+            enqueue_email(f'{event.title}: {subject}', body, addr)
+            emailed += 1
 
     return {
         'recipients': len(users),

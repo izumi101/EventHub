@@ -15,12 +15,14 @@ from rest_framework.permissions import (
     IsAdminUser,
     AllowAny,
 )
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
 from common.permissions import can_manage_event
+from common.exceptions import error_response
 
-from ..analytics import event_analytics
+from ..analytics import event_analytics, net_revenue
 from ..exports import attendees_csv_response
 from ..messaging import broadcast_to_attendees
 from ..models import Category, Event, EventSeat, SeatMap, TicketType
@@ -50,6 +52,12 @@ from ..waitlist import join_waitlist, leave_waitlist, position, promote_waitlist
 from .base import IsOrganizerOrReadOnly, event_queryset_for_user, restrict_status_list
 
 logger = logging.getLogger(__name__)
+
+
+class AttendeePagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 200
 
 
 class CategoryListCreateView(generics.ListCreateAPIView):
@@ -147,9 +155,9 @@ class EventViewSet(viewsets.ModelViewSet):
                 'Ask an administrator to create an organizer account for you.'
             )
         event = serializer.save()
-        # Index the new event in the background once it is committed.
+        # Queued for the worker (semantic-search embedding).
         from ..search import index_event_async
-        transaction.on_commit(lambda: index_event_async(event))
+        index_event_async(event)
 
     def destroy(self, request, *args, **kwargs):
         event = self.get_object()
@@ -180,11 +188,17 @@ class EventViewSet(viewsets.ModelViewSet):
             .select_related('user', 'seat', 'payment', 'promo_code', 'ticket_type', 'refund_request')
             .prefetch_related('answers__question')
         )
+        context = {'request': request, 'omit_event': True}
+        # Opt-in pagination (?page=N, ?page_size=M) for big events; without
+        # it the endpoint keeps returning the plain list the attendee table uses.
+        if 'page' in request.query_params:
+            paginator = AttendeePagination()
+            page = paginator.paginate_queryset(registrations.order_by('-registered_at'), request, view=self)
+            serializer = RegistrationSerializer(page, many=True, context=context)
+            return paginator.get_paginated_response(serializer.data)
         # The organizer's attendee table doesn't need the full event nested
         # in every row (it was re-serialising the same event N times).
-        serializer = RegistrationSerializer(
-            registrations, many=True, context={'request': request, 'omit_event': True},
-        )
+        serializer = RegistrationSerializer(registrations, many=True, context=context)
         return Response(serializer.data)
 
     # Custom action: get stats for an event dashboard
@@ -201,7 +215,11 @@ class EventViewSet(viewsets.ModelViewSet):
             'total_registrations': total_regs,
             'checked_in': checked_in,
             'remaining': total_regs - checked_in,
-            'check_in_rate': round((checked_in / total_regs * 100), 2) if total_regs > 0 else 0
+            'check_in_rate': round((checked_in / total_regs * 100), 2) if total_regs > 0 else 0,
+            # Money actually taken (tickets + group bookings, net of refunds),
+            # in the event's currency — not price × registrations.
+            'net_revenue': str(net_revenue(event)),
+            'currency': event.currency,
         })
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
@@ -244,7 +262,7 @@ class EventViewSet(viewsets.ModelViewSet):
                 affiliate_code=request.data.get('affiliate_code', ''),
             )
         except ValueError as exc:
-            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(exc)
 
         serializer = RegistrationSerializer(registration, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)

@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { Event } from '../../models/models';
 import { LucideAngularModule, MapPin, Users, ArrowRight } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-event-card',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, RouterModule, LucideAngularModule],
   template: `
     <article
       class="card-ticket card-hover flex flex-col cursor-pointer focus-ring h-full"
@@ -90,7 +91,7 @@ import { LucideAngularModule, MapPin, Users, ArrowRight } from 'lucide-angular';
           <div class="flex items-center justify-between pt-3.5 mt-auto"
                [class.border-t]="featured" [class.border-border]="featured">
             <span class="font-display text-base font-semibold num" [class.text-pine-600]="event.is_free">
-              {{ event.is_free ? 'Free' : '$' + event.price }}
+              {{ event.is_free ? 'Free' : (event.price | money: event.currency) }}
             </span>
             <span class="text-xs font-semibold text-ember inline-flex items-center gap-1 cta">
               {{ featured ? 'Get tickets' : 'View event' }}

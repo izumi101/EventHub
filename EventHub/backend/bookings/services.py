@@ -221,6 +221,49 @@ def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
 
 
 @transaction.atomic
+def refund_booking(booking, *, actor, reason='', event_cancelled=False):
+    """Organizer refunds a paid group booking in full: the money goes back
+    through Stripe, the seats return to sale and the QR tickets stop working."""
+    from common.permissions import can_manage_event
+    from payments.services import _refund_payment_intent
+
+    booking = Booking.objects.select_for_update().select_related('event', 'owner').get(pk=booking.pk)
+    if not can_manage_event(booking.event, actor):
+        raise PermissionError('Only the event team can refund group bookings.')
+    if booking.status != Booking.Status.CONFIRMED:
+        raise ValueError('Only a paid booking can be refunded.')
+    if not event_cancelled and booking.seats.filter(is_checked_in=True).exists():
+        raise ValueError('Some of these tickets were already used for entry.')
+
+    if booking.stripe_payment_intent_id:
+        # Idempotent: a retry after a crash can't refund twice.
+        _refund_payment_intent(booking.stripe_payment_intent_id, key=f'booking-refund-{booking.pk}')
+    if booking.amount_paid is None:
+        from .payments import booking_amount
+        booking.amount_paid = booking_amount(booking)
+
+    _release_booking_seats(booking)
+    booking.status = Booking.Status.REFUNDED
+    booking.refunded_at = timezone.now()
+    booking.refund_reason = (reason or '')[:255]
+    booking.save(update_fields=['status', 'refunded_at', 'refund_reason', 'amount_paid'])
+
+    from events.notify import notify
+    notify(booking.owner, 'payment_failed', f'💸 Group booking refunded: {booking.event.title}',
+           'Your group booking was refunded by the organizer.' + (f' Reason: {reason}' if reason else ''),
+           booking.event)
+    from events.webhooks import fire
+    fire(booking.event, 'refund_issued', {
+        'booking_id': str(booking.pk),
+        'user': booking.owner.username,
+        'refunded_amount': str(booking.amount_paid),
+        'full_refund': True,
+    })
+    logger.info('Booking %s refunded by %s', booking.pk, actor.pk)
+    return booking
+
+
+@transaction.atomic
 def cancel_booking(booking):
     """Owner releases a holding booking before payment."""
     booking = Booking.objects.select_for_update().get(pk=booking.pk)

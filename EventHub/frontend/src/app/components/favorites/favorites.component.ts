@@ -4,11 +4,12 @@ import { RouterModule } from '@angular/router';
 import { EventService } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { LucideAngularModule, Heart, Calendar, MapPin, Ticket } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-favorites',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
@@ -76,7 +77,7 @@ import { LucideAngularModule, Heart, Calendar, MapPin, Ticket } from 'lucide-ang
 
                   <div class="flex items-center justify-between mt-3 pt-3 border-t border-border">
                     <span class="text-sm font-semibold text-foreground">
-                      {{ fav.event.is_free ? 'Free' : '$' + fav.event.price }}
+                      {{ fav.event.is_free ? 'Free' : (fav.event.price | money: fav.event.currency) }}
                     </span>
                     <a [routerLink]="['/events', fav.event.id]" class="btn btn-sm btn-primary">
                       Get tickets

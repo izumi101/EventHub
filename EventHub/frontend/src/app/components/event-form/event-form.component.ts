@@ -62,7 +62,7 @@ import { Category } from '../../models/models';
 
               <!-- Cover image -->
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">
+                <label for="cover-image" class="block text-sm font-medium text-foreground mb-1.5">
                   Cover image <span class="text-muted-foreground font-normal">(optional, up to 5 MB)</span>
                 </label>
                 @if (imagePreview) {
@@ -74,7 +74,7 @@ import { Category } from '../../models/models';
                     </button>
                   </div>
                 }
-                <input type="file" accept="image/*" (change)="onImageSelected($event)"
+                <input id="cover-image" type="file" accept="image/*" (change)="onImageSelected($event)"
                   class="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground file:cursor-pointer hover:file:bg-muted/70" />
               </div>
 

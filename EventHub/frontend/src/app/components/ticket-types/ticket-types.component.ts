@@ -6,11 +6,12 @@ import { EventService, TicketType, TicketKind } from '../../services/event.servi
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-ticket-types',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -44,39 +45,39 @@ import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angu
             <h2 class="font-semibold text-foreground mb-4">New ticket tier</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-foreground mb-1.5">Name</label>
-                <input [(ngModel)]="form.name" placeholder="e.g. VIP, Early Bird, General Admission" class="input w-full" />
+                <label for="ticket-types-name" class="block text-sm font-medium text-foreground mb-1.5">Name</label>
+                <input id="ticket-types-name" [(ngModel)]="form.name" placeholder="e.g. VIP, Early Bird, General Admission" class="input w-full" />
               </div>
               <div class="sm:col-span-2">
-                <label class="block text-sm font-medium text-foreground mb-1.5">Description <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input [(ngModel)]="form.description" placeholder="What's included with this tier?" class="input w-full" />
+                <label for="ticket-types-description" class="block text-sm font-medium text-foreground mb-1.5">Description <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="ticket-types-description" [(ngModel)]="form.description" placeholder="What's included with this tier?" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Type</label>
-                <select [(ngModel)]="form.kind" class="input w-full">
+                <label for="ticket-types-kind" class="block text-sm font-medium text-foreground mb-1.5">Type</label>
+                <select id="ticket-types-kind" [(ngModel)]="form.kind" class="input w-full">
                   <option value="paid">Paid</option>
                   <option value="free">Free</option>
                   <option value="donation">Donation (pay what you want)</option>
                 </select>
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">
+                <label for="ticket-types-price" class="block text-sm font-medium text-foreground mb-1.5">
                   {{ form.kind === 'donation' ? 'Minimum ($)' : 'Price ($)' }}
                 </label>
-                <input type="number" [(ngModel)]="form.price" min="0" step="0.01" [disabled]="form.kind === 'free'" class="input w-full" />
+                <input id="ticket-types-price" type="number" [(ngModel)]="form.price" min="0" step="0.01" [disabled]="form.kind === 'free'" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Quantity <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
-                <input type="number" [(ngModel)]="form.quantity" min="1" placeholder="Unlimited" class="input w-full" />
+                <label for="ticket-types-quantity" class="block text-sm font-medium text-foreground mb-1.5">Quantity <span class="text-muted-foreground font-normal">(blank = ∞)</span></label>
+                <input id="ticket-types-quantity" type="number" [(ngModel)]="form.quantity" min="1" placeholder="Unlimited" class="input w-full" />
               </div>
               <div></div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Sales start <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input type="datetime-local" [(ngModel)]="form.sale_start" class="input w-full" />
+                <label for="ticket-types-sale-start" class="block text-sm font-medium text-foreground mb-1.5">Sales start <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="ticket-types-sale-start" type="datetime-local" [(ngModel)]="form.sale_start" class="input w-full" />
               </div>
               <div>
-                <label class="block text-sm font-medium text-foreground mb-1.5">Sales end <span class="text-muted-foreground font-normal">(optional)</span></label>
-                <input type="datetime-local" [(ngModel)]="form.sale_end" class="input w-full" />
+                <label for="ticket-types-sale-end" class="block text-sm font-medium text-foreground mb-1.5">Sales end <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <input id="ticket-types-sale-end" type="datetime-local" [(ngModel)]="form.sale_end" class="input w-full" />
               </div>
             </div>
             <div class="flex gap-2 mt-4">
@@ -105,7 +106,7 @@ import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angu
                 <div class="w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold"
                      [class]="t.kind === 'donation' ? 'bg-ember/10 text-ember' : t.kind === 'free' ? 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]' : 'bg-primary/10 text-primary'">
                   @if (t.kind === 'free') { <span class="text-sm">Free</span> }
-                  @else { <span class="text-base">{{ '$' + t.price }}</span> }
+                  @else { <span class="text-base">{{ t.price | money: event?.currency }}</span> }
                   @if (t.kind === 'donation') { <span class="text-[9px] uppercase">min</span> }
                 </div>
                 <div class="flex-1 min-w-0">

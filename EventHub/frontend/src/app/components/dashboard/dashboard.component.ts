@@ -25,6 +25,7 @@ import {
   TrendingUp,
   DollarSign,
 } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 type EventTab = 'upcoming' | 'past' | 'drafts';
 type SortKey = 'date' | 'registrations' | 'checkin' | 'capacity';
@@ -45,7 +46,7 @@ interface EventWithStats extends Event {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule, MoneyPipe],
   template: `
     <div class="page-root">
       <div class="container max-w-6xl py-8">
@@ -105,7 +106,11 @@ interface EventWithStats extends Event {
               </div>
               <div class="card p-4">
                 <p class="text-xs text-muted-foreground font-medium mb-1">Revenue</p>
-                <p class="text-2xl font-bold text-foreground num">{{ totalRevenue | number:'1.0-0' }} KZT</p>
+                @for (r of revenueByCurrency; track r.currency) {
+                  <p class="text-2xl font-bold text-foreground num">{{ r.amount | money: r.currency }}</p>
+                } @empty {
+                  <p class="text-2xl font-bold text-foreground num">—</p>
+                }
               </div>
             </div>
           }
@@ -337,8 +342,8 @@ interface EventWithStats extends Event {
                           <lucide-icon [img]="icons.DollarSign" class="w-3 h-3" aria-hidden="true"></lucide-icon>
                           <span>Revenue</span>
                         </div>
-                        <p class="text-lg font-bold text-foreground">{{ event.revenue | number:'1.0-0' }}</p>
-                        <p class="text-xs text-muted-foreground mt-1">{{ event.price }} × {{ event.stats?.total_registrations || 0 }}</p>
+                        <p class="text-lg font-bold text-foreground">{{ event.revenue | money: event.currency }}</p>
+                        <p class="text-xs text-muted-foreground mt-1">net of refunds</p>
                       </div>
                     }
                   </div>
@@ -404,7 +409,8 @@ export class DashboardComponent implements OnInit {
   // Stats
   totalRegistrations = 0;
   totalCheckinRate = 0;
-  totalRevenue = 0;
+  /** Revenue totals, one per currency — amounts in different currencies don't add up. */
+  revenueByCurrency: { currency: string; amount: number }[] = [];
   eventsTrend = '+0';
   regTrend = '+0';
 
@@ -482,7 +488,7 @@ export class DashboardComponent implements OnInit {
           this.events[i].capacityPercent = Math.round(
             ((s.total_registrations || 0) / this.events[i].max_participants) * 100
           );
-          this.events[i].revenue = (Number(this.events[i].price) || 0) * (s.total_registrations || 0);
+          this.events[i].revenue = Number(s.net_revenue) || 0;
         });
         this.applyFilters();
         this.buildActivityFeed();
@@ -563,7 +569,13 @@ export class DashboardComponent implements OnInit {
     this.totalCheckinRate = this.totalRegistrations > 0
       ? Math.round((totalCheckins / this.totalRegistrations) * 100)
       : 0;
-    this.totalRevenue = this.filteredEvents.reduce((sum, e) => sum + (e.revenue || 0), 0);
+    const totals = new Map<string, number>();
+    for (const e of this.filteredEvents) {
+      if (!e.revenue) continue;
+      const currency = e.stats?.currency || e.currency || 'USD';
+      totals.set(currency, (totals.get(currency) || 0) + e.revenue);
+    }
+    this.revenueByCurrency = [...totals].map(([currency, amount]) => ({ currency, amount }));
   }
 
   private buildActivityFeed(): void {

@@ -103,3 +103,14 @@ class PasswordChangeTests(APITestCase):
             'old_password': 'Old-pass-123', 'new_password': 'password123', 'new_password2': 'password123',
         })
         self.assertEqual(response.status_code, 400)  # too common
+
+
+class UniqueEmailTests(APITestCase):
+    def test_database_refuses_a_second_account_with_the_same_email(self):
+        from django.db import IntegrityError, transaction
+        User.objects.create_user('first', 'Same@Example.com', 'Str0ng-pass!')
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            User.objects.create_user('second', 'same@example.com', 'Str0ng-pass!')
+        # Accounts without an email are not affected.
+        User.objects.create_user('noemail1', '', 'Str0ng-pass!')
+        User.objects.create_user('noemail2', '', 'Str0ng-pass!')
