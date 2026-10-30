@@ -7,6 +7,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 from accounts.models import EmailVerificationCode, PasswordResetCode
+from jobs.queue import run_due_jobs
 
 
 class AccountsTests(APITestCase):
@@ -41,6 +42,9 @@ class AccountsTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertNotIn("dev_code", response.data)
         self.assertFalse(EmailVerificationCode.objects.filter(email="testuser@example.com").exists())
+        # Emails go through the job queue; the worker sends them.
+        self.assertEqual(len(mail.outbox), 0)
+        run_due_jobs()
         self.assertEqual(len(mail.outbox), 1)
 
     def test_verify_registration_code_success(self):

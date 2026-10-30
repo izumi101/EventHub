@@ -13,3 +13,7 @@ certs/
 .DS_Store
 .claude/
 npm-debug.log*
+
+# Test output
+test-results/
+playwright-report/

@@ -172,6 +172,9 @@ export interface EventStatsResponse {
   checked_in: number;
   remaining: number;
   check_in_rate: number;
+  /** Money taken (tickets + group bookings, net of refunds), decimal string. */
+  net_revenue: string;
+  currency: string;
 }
 
 export interface CheckoutSessionResponse {

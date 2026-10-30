@@ -261,6 +261,16 @@ class BookingRuleTests(Base):
         self.assertEqual(response.status_code, 400)
 
 
+    def test_waiting_room_refusal_carries_a_stable_code(self):
+        # The SPA branches on `code`, not on the human-readable message.
+        with patch('events.queue.is_queue_active', return_value=True), \
+                patch('events.queue.validate_queue_token', return_value=False):
+            response = self.register()
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data['code'], 'QUEUE_REQUIRED')
+        self.assertNotEqual(response.data['error'], 'QUEUE_REQUIRED')
+        self.assertFalse(Registration.objects.filter(event=self.event).exists())
+
 class ExportTests(Base):
     def test_formula_injection_is_neutralised(self):
         # Important #3.
@@ -316,6 +326,19 @@ class WaitlistTests(Base):
         self.client.post(f'/api/events/{self.event.id}/cancel-event/')
         self.assertEqual(WaitlistEntry.objects.get(user=self.other).status, 'waiting')
         self.assertFalse(self.other.notifications.filter(type='seat_available').exists())
+
+
+class AttendeeListTests(Base):
+    def test_plain_list_by_default_paginated_on_request(self):
+        for i in range(3):
+            Registration.objects.create(user=self.make_user(f'p{i}'), event=self.event, status='confirmed')
+        self.client.force_authenticate(self.organizer)
+        url = f'/api/events/{self.event.id}/registrations/'
+        plain = self.client.get(url).data
+        self.assertEqual(len(plain), 3)
+        self.assertNotIn('event', plain[0])  # not re-serialised per row
+        page = self.client.get(url, {'page': 1, 'page_size': 2}).data
+        self.assertEqual((page['count'], len(page['results'])), (3, 2))
 
 
 class CommandTests(Base):

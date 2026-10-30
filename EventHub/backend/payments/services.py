@@ -68,12 +68,10 @@ def _confirm_paid_registration(registration, payment):
     registration.seat_held_until = None
     registration.save(update_fields=['status', 'seat_held_until'])
 
-    def after_commit():
-        _fire_ticket_sold(registration, payment.amount)
-        from events.notify import notify_ticket_purchased
-        notify_ticket_purchased(registration.user, registration.event)
-
-    transaction.on_commit(after_commit)
+    # Webhook job + in-app notification are rows in this same transaction.
+    _fire_ticket_sold(registration, payment.amount)
+    from events.notify import notify_ticket_purchased
+    notify_ticket_purchased(registration.user, registration.event)
 
 
 @transaction.atomic
@@ -258,15 +256,10 @@ def confirm_stripe_checkout_session(session):
             'status', 'stripe_payment_intent_id', 'stripe_checkout_session_id',
             'refunded_amount', 'refunded_at', 'refund_reason',
         ])
-        user, event = registration.user, registration.event
-
-        def notify_late_payment():
-            from events.notify import notify
-            notify(user, 'payment_failed', f'💸 Payment refunded: {event.title}',
-                   'Your payment arrived after the ticket hold expired, so it was refunded '
-                   'automatically. Please book again.', event=event)
-
-        transaction.on_commit(notify_late_payment)
+        from events.notify import notify
+        notify(registration.user, 'payment_failed', f'💸 Payment refunded: {registration.event.title}',
+               'Your payment arrived after the ticket hold expired, so it was refunded '
+               'automatically. Please book again.', event=registration.event)
         return payment
 
     payment.status = PaymentStatusChoices.COMPLETED
@@ -340,26 +333,22 @@ def refund_payment(*, payment, amount=None, reason='', notify_user=True):
         cancel_registration(registration=registration)
 
     event, user = registration.event, registration.user
-
-    def after_commit():
-        if notify_user:
-            from events.notify import notify
-            notify(
-                user, 'payment_failed',
-                f'💸 Refund issued: {event.title}',
-                f'You were refunded {refund_amount} {currency}.' + (f' Reason: {reason}' if reason else ''),
-                event=event,
-            )
-        from events.webhooks import fire
-        fire(event, 'refund_issued', {
-            'registration_id': registration.id,
-            'user': user.username,
-            'refunded_amount': str(refund_amount),
-            'currency': currency,
-            'full_refund': is_full,
-        })
-
-    transaction.on_commit(after_commit)
+    if notify_user:
+        from events.notify import notify
+        notify(
+            user, 'payment_failed',
+            f'💸 Refund issued: {event.title}',
+            f'You were refunded {refund_amount} {currency}.' + (f' Reason: {reason}' if reason else ''),
+            event=event,
+        )
+    from events.webhooks import fire
+    fire(event, 'refund_issued', {
+        'registration_id': registration.id,
+        'user': user.username,
+        'refunded_amount': str(refund_amount),
+        'currency': currency,
+        'full_refund': is_full,
+    })
 
     logger.info('Refunded %s %s on payment %s (full=%s)', refund_amount, currency, payment.id, is_full)
     return payment

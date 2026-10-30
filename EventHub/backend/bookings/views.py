@@ -1,5 +1,6 @@
 import logging
 
+import stripe
 from django.shortcuts import get_object_or_404
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -15,7 +16,7 @@ from .serializers import (
     BookingCreateSerializer,
     ClaimSeatSerializer,
 )
-from .services import create_booking, claim_seat, cancel_booking
+from .services import create_booking, claim_seat, cancel_booking, refund_booking
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,6 @@ class VerifyBookingView(APIView):
         booking = get_object_or_404(Booking, stripe_session_id=session_id, owner=request.user)
 
         if booking.status == Booking.Status.HOLDING and not settings.STRIPE_MOCK_MODE:
-            import stripe
             stripe.api_key = settings.STRIPE_SECRET_KEY
             from payments.services import stripe_to_dict
             try:
@@ -152,3 +152,41 @@ class MyBookingsView(APIView):
             .select_related('event', 'owner')
         )
         return Response(BookingSerializer(bookings, many=True, context=_ctx(request)).data)
+
+
+class EventBookingsView(APIView):
+    """GET /api/bookings/event/{event_id}/  — the event team lists group bookings."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, event_id):
+        from common.permissions import can_manage_event
+        event = get_object_or_404(Event, pk=event_id)
+        if not can_manage_event(event, request.user):
+            return Response({'error': 'You do not manage this event.'}, status=status.HTTP_403_FORBIDDEN)
+        bookings = (
+            Booking.objects.filter(event=event)
+            .exclude(status__in=[Booking.Status.CANCELLED, Booking.Status.EXPIRED])
+            .select_related('event', 'owner')
+        )
+        # The organizer isn't the owner: ticket UUIDs and share links stay hidden.
+        return Response(BookingSerializer(bookings, many=True, context=_ctx(request)).data)
+
+
+class BookingRefundView(APIView):
+    """POST /api/bookings/{id}/refund/  — the event team refunds one paid group booking."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        booking = get_object_or_404(Booking, pk=pk)
+        try:
+            booking = refund_booking(booking, actor=request.user,
+                                     reason=str(request.data.get('reason', '') or ''))
+        except PermissionError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except ValueError as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except stripe.error.StripeError as exc:
+            logger.error('Stripe refund failed for booking %s: %s', pk, exc)
+            return Response({'error': 'The payment provider refused the refund. Try again later.'},
+                            status=status.HTTP_502_BAD_GATEWAY)
+        return Response(BookingSerializer(booking, context=_ctx(request)).data)

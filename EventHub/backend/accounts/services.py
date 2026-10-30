@@ -1,13 +1,13 @@
 import logging
 import secrets
 
-from django.conf import settings
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from django.core.mail import send_mail
 from django.db import transaction
 from django.db.models import F
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from jobs.handlers import enqueue_email
 
 from .models import MAX_CODE_ATTEMPTS, EmailVerificationCode, PasswordResetCode
 from common.auth import (
@@ -20,10 +20,6 @@ from common.auth import (
 logger = logging.getLogger(__name__)
 
 INVALID_CODE_MESSAGE = 'Invalid or expired code.'
-
-
-def _from_email():
-    return settings.DEFAULT_FROM_EMAIL
 
 
 def _code_matches(model, entry, code) -> bool:
@@ -82,16 +78,11 @@ def register_user(validated_data):
         verification.is_used = True
         verification.save(update_fields=['is_used'])
 
-    try:
-        send_mail(
-            'Welcome to EventHub 🎉',
-            'Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe\'re really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let\'s build something awesome together 🔥\n\nSee you inside,\nEventHub Team',
-            _from_email(),
-            [user.email],
-            fail_silently=True,
-        )
-    except Exception as exc:
-        logger.warning('Welcome email failed for user %s: %s', user.username, exc)
+    enqueue_email(
+        'Welcome to EventHub 🎉',
+        'Hey there 👋\n\nWelcome to EventHub — your space for discovering, creating, and sharing amazing events.\n\nWe\'re really excited to have you here 🚀\n\nFrom now on, you can explore events around you, join communities, and never miss something interesting again.\n\nThis is just the beginning — let\'s build something awesome together 🔥\n\nSee you inside,\nEventHub Team',
+        user.email,
+    )
 
     return user
 
@@ -112,43 +103,35 @@ def create_organizer(validated_data):
     profile.role = 'organizer'
     profile.save()
 
-    try:
-        send_mail(
-            'Your EventHub organizer account',
-            f'Hello!\n\nAn administrator created an organizer account for you on EventHub.\n\nUsername: {user.username}\n\nSign in and start creating events. Remember to change your password after the first login.\n\nEventHub Team',
-            _from_email(),
-            [user.email],
-            fail_silently=True,
-        )
-    except Exception as exc:
-        logger.warning('Organizer welcome email failed for %s: %s', user.username, exc)
+    enqueue_email(
+        'Your EventHub organizer account',
+        f'Hello!\n\nAn administrator created an organizer account for you on EventHub.\n\nUsername: {user.username}\n\nSign in and start creating events. Remember to change your password after the first login.\n\nEventHub Team',
+        user.email,
+    )
 
     return user
 
 
+@transaction.atomic
 def send_registration_code(email: str):
     """Email a sign-up code. Returns the code row, or None when the address
     already has an account — the API answers the same in both cases so it
     can't be used to find out who is registered; the owner gets a heads-up."""
     if email_in_use(email):
-        send_mail(
+        enqueue_email(
             'EventHub — sign-up attempt',
             'Someone tried to create an EventHub account with this email address, '
             'but you already have one. If it was you, sign in or reset your password. '
             'Otherwise you can ignore this email.',
-            _from_email(),
-            [email],
-            fail_silently=True,
+            email,
         )
         return None
 
     verification = EmailVerificationCode.create_for_email(email)
-    send_mail(
+    enqueue_email(
         'EventHub — Registration Verification Code',
         f'Your verification code is: {verification.code}\n\nThis code expires in 15 minutes.',
-        _from_email(),
-        [email],
-        fail_silently=False,
+        email,
     )
     return verification
 
@@ -172,18 +155,17 @@ def login_user(identifier: str, password: str):
     return authenticate(username=user_obj.username, password=password)
 
 
+@transaction.atomic
 def request_password_reset(identifier: str):
     user = get_user_by_identifier(identifier)
     if not user:
         return None
 
     reset_code = PasswordResetCode.create_for_user(user)
-    send_mail(
+    enqueue_email(
         'EventHub — Password Reset Code',
         f'Your password reset code is: {reset_code.code}\n\nThis code expires in 15 minutes.\n\nIf you did not request this, please ignore this email.',
-        _from_email(),
-        [user.email],
-        fail_silently=True,
+        user.email,
     )
     return reset_code
 

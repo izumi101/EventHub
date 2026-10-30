@@ -35,6 +35,8 @@ services:
   backend:
     build:
       context: ./backend
+      args:
+        INSTALL_SEMANTIC_SEARCH: ${INSTALL_SEMANTIC_SEARCH:-1}
     container_name: eventhub_backend
     restart: unless-stopped
     # daphne = ASGI server needed for Django Channels / WebSocket
@@ -63,6 +65,7 @@ services:
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-EventHub <no-reply@eventhub.local>}
+      JOBS_RUN_INLINE: ${JOBS_RUN_INLINE:-0}
     # Only nginx (frontend container) should talk to Django. The port is
     # published on localhost for `npm start` development only.
     ports:
@@ -82,15 +85,21 @@ services:
       retries: 10
       start_period: 40s
 
-  # Periodic jobs that used to run inside GET requests: release expired seat
-  # holds and group bookings, advance waitlists, mark past events completed.
-  scheduler:
+  # Background worker: sends emails, delivers webhooks (with retries) and
+  # indexes events for search from the job queue; once a minute it also
+  # releases expired seat holds and group bookings, advances waitlists and
+  # marks past events completed.
+  worker:
     build:
       context: ./backend
-    container_name: eventhub_scheduler
+      args:
+        INSTALL_SEMANTIC_SEARCH: ${INSTALL_SEMANTIC_SEARCH:-1}
+    container_name: eventhub_worker
     restart: unless-stopped
-    entrypoint: ["python", "manage.py", "run_maintenance", "--loop", "60"]
+    entrypoint: ["python", "manage.py", "run_worker"]
     environment: *backend-env
+    volumes:
+      - backend_media:/app/media
     depends_on:
       backend:
         condition: service_healthy

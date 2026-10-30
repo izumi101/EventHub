@@ -73,10 +73,12 @@ jobs:
           cache: npm
           cache-dependency-path: EventHub/frontend/package-lock.json
       - run: npm ci --no-audit --no-fund
+      - name: Unit tests (Vitest)
+        run: npm test
       - name: Production build (type-checks templates, enforces bundle budgets)
         run: npm run build -- --configuration production
-      - name: Audit runtime dependencies
-        run: npm audit --omit=dev --audit-level=high
+      - name: Audit dependencies (runtime and dev)
+        run: npm audit --audit-level=high
 
   docker:
     runs-on: ubuntu-latest
@@ -97,3 +99,68 @@ jobs:
         run: >-
           docker run --rm --add-host backend:127.0.0.1 eventhub-frontend
           sh -c '/docker-entrypoint.d/10-self-signed-cert.sh && nginx -t'
+
+  search-image:
+    # The full backend image: CPU-only PyTorch and the embedding model baked
+    # in, so semantic search works without network access at runtime.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image with semantic search
+        run: docker build --build-arg INSTALL_SEMANTIC_SEARCH=1 -t eventhub-backend-search EventHub/backend
+      - name: CPU-only torch, model works offline
+        run: >-
+          docker run --rm --network none --entrypoint python eventhub-backend-search -c
+          "import torch; assert not torch.cuda.is_available() and '+cpu' in torch.__version__, torch.__version__;
+          from sentence_transformers import SentenceTransformer;
+          v = SentenceTransformer('all-MiniLM-L6-v2').encode('concert in Almaty');
+          assert len(v) == 384; print('torch', torch.__version__, 'embedding', len(v))"
+      - name: Image size
+        run: docker image ls eventhub-backend-search --format '{{.Size}}'
+
+  e2e:
+    # The whole stack as a developer runs it: docker compose up with the
+    # example .env (DEBUG, mock payments, demo data), then a browser test.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: EventHub
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack
+        run: |
+          cp .env.example .env
+          sed -i 's/^INSTALL_SEMANTIC_SEARCH=.*/INSTALL_SEMANTIC_SEARCH=0/' .env
+          docker compose up -d --build --wait --wait-timeout 600
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: EventHub/frontend/package-lock.json
+      - name: Install Playwright
+        working-directory: EventHub/frontend
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Browser tests against the running stack
+        working-directory: EventHub/frontend
+        env:
+          E2E_BASE_URL: http://localhost:4200
+        run: npx playwright test
+      - name: The worker sent the queued sign-up email
+        # The worker polls every 2 s; give it a moment after the last test.
+        run: |
+          for i in $(seq 1 30); do
+            docker compose logs worker | grep -q "Your verification code is" && exit 0
+            sleep 1
+          done
+          docker compose logs worker
+          exit 1
+      - name: Stack logs
+        if: failure()
+        run: docker compose logs --tail 200
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: EventHub/frontend/playwright-report

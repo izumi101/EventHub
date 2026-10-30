@@ -7,11 +7,12 @@ import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash2, Copy, Check, Link2, RotateCcw, Armchair, AlertTriangle } from 'lucide-angular';
+import { MoneyPipe } from '../../pipes/money.pipe';
 
 @Component({
   selector: 'app-event-settings',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -135,7 +136,7 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
                       <p class="text-[10px] uppercase text-muted-foreground">sales</p>
                     </div>
                     <div class="text-center px-3">
-                      <p class="font-bold text-[color:var(--pine-600)]">{{ '$' + a.revenue }}</p>
+                      <p class="font-bold text-[color:var(--pine-600)]">{{ a.revenue | money: event?.currency }}</p>
                       <p class="text-[10px] uppercase text-muted-foreground">revenue</p>
                     </div>
                     <button (click)="removeAffiliate(a)" class="btn btn-ghost btn-sm text-ember hover:text-[color:var(--destructive)]">
@@ -159,12 +160,12 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
         @if (tab === 'webhooks') {
           <div class="card p-5 mb-5">
             <h2 class="font-semibold text-foreground mb-3">New webhook</h2>
-            <label class="block text-sm font-medium text-foreground mb-1.5">Endpoint URL</label>
-            <input [(ngModel)]="hookUrl" placeholder="https://your-server.com/webhook" class="input w-full mb-3" />
-            <label class="block text-sm font-medium text-foreground mb-1.5">Secret <span class="text-muted-foreground font-normal">(optional, signs payloads)</span></label>
-            <input [(ngModel)]="hookSecret" placeholder="A shared secret" class="input w-full mb-3" />
-            <label class="block text-sm font-medium text-foreground mb-2">Trigger on</label>
-            <div class="grid grid-cols-2 gap-2 mb-4">
+            <label for="event-settings-hook-url" class="block text-sm font-medium text-foreground mb-1.5">Endpoint URL</label>
+            <input id="event-settings-hook-url" [(ngModel)]="hookUrl" placeholder="https://your-server.com/webhook" class="input w-full mb-3" />
+            <label for="event-settings-hook-secret" class="block text-sm font-medium text-foreground mb-1.5">Secret <span class="text-muted-foreground font-normal">(optional, signs payloads)</span></label>
+            <input id="event-settings-hook-secret" [(ngModel)]="hookSecret" placeholder="A shared secret" class="input w-full mb-3" />
+            <p id="hook-triggers-caption" class="block text-sm font-medium text-foreground mb-2">Trigger on</p>
+            <div class="grid grid-cols-2 gap-2 mb-4" role="group" aria-labelledby="hook-triggers-caption">
               @for (t of allTriggers; track t.key) {
                 <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer p-2 rounded-lg border border-border">
                   <input type="checkbox" [checked]="hookTriggers.includes(t.key)" (change)="toggleTrigger(t.key)" class="w-4 h-4 rounded" />
@@ -231,20 +232,20 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
               </p>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Rows</label>
-                  <input type="number" [(ngModel)]="smRows" min="1" max="26" class="input" />
+                  <label for="event-settings-sm-rows" class="block text-sm font-medium text-foreground mb-1.5">Rows</label>
+                  <input id="event-settings-sm-rows" type="number" [(ngModel)]="smRows" min="1" max="26" class="input" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Seats per row</label>
-                  <input type="number" [(ngModel)]="smCols" min="1" max="30" class="input" />
+                  <label for="event-settings-sm-cols" class="block text-sm font-medium text-foreground mb-1.5">Seats per row</label>
+                  <input id="event-settings-sm-cols" type="number" [(ngModel)]="smCols" min="1" max="30" class="input" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">Premium rows</label>
-                  <input type="number" [(ngModel)]="smPremium" min="0" class="input" />
+                  <label for="event-settings-sm-premium" class="block text-sm font-medium text-foreground mb-1.5">Premium rows</label>
+                  <input id="event-settings-sm-premium" type="number" [(ngModel)]="smPremium" min="0" class="input" />
                 </div>
                 <div>
-                  <label class="block text-sm font-medium text-foreground mb-1.5">VIP rows</label>
-                  <input type="number" [(ngModel)]="smVip" min="0" class="input" />
+                  <label for="event-settings-sm-vip" class="block text-sm font-medium text-foreground mb-1.5">VIP rows</label>
+                  <input id="event-settings-sm-vip" type="number" [(ngModel)]="smVip" min="0" class="input" />
                 </div>
               </div>
               <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer mb-4">
@@ -287,7 +288,7 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
                   <div class="flex items-start justify-between gap-3 mb-2">
                     <div class="min-w-0">
                       <p class="font-semibold text-foreground">{{ r.full_name }}
-                        <span class="text-xs font-normal text-muted-foreground">· {{ '$' + r.amount }}@if (r.ticket_type) { · {{ r.ticket_type }} }</span>
+                        <span class="text-xs font-normal text-muted-foreground">· {{ r.amount | money: event?.currency }}@if (r.ticket_type) { · {{ r.ticket_type }} }</span>
                       </p>
                       <p class="text-xs text-muted-foreground">Requested {{ r.created_at | date:'MMM d, HH:mm' }}</p>
                     </div>
@@ -300,7 +301,7 @@ import { LucideAngularModule, Users, Share2, Webhook as WebhookIcon, Plus, Trash
                     <div class="flex gap-2">
                       <button (click)="resolveRefund(r, false)" [disabled]="resolvingId === r.id" class="btn btn-secondary flex-1 text-sm">Decline</button>
                       <button (click)="resolveRefund(r, true)" [disabled]="resolvingId === r.id" class="btn btn-primary flex-1 text-sm">
-                        {{ resolvingId === r.id ? '…' : 'Approve & refund $' + r.amount }}
+                        {{ resolvingId === r.id ? '…' : 'Approve & refund ' + (r.amount | money: event?.currency) }}
                       </button>
                     </div>
                   } @else if (r.organizer_note) {

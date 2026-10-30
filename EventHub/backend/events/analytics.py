@@ -20,12 +20,10 @@ def _active_regs(event):
     ).select_related('payment', 'ticket_type', 'affiliate')
 
 
-def event_analytics(event) -> dict:
-    regs = list(_active_regs(event))
-
-    confirmed = [r for r in regs if r.status == RegistrationStatusChoices.CONFIRMED]
-    checked_in = [r for r in confirmed if r.is_checked_in]
-
+def _revenue(event):
+    """Money taken for the event: (gross, refunded, paid_count, group_confirmed).
+    Ticket payments plus group bookings; `group_confirmed` lists
+    (booking, amount, seats) of the bookings still in force."""
     # ── Revenue (net of refunds) from every payment of the event ──
     # Includes cancelled registrations: a full refund cancels the ticket, and
     # skipping those rows would make the "refunded" figure leave them out.
@@ -41,9 +39,44 @@ def event_analytics(event) -> dict:
         refunded += pay.refunded_amount
         if pay.status == PaymentStatusChoices.COMPLETED:
             paid_count += 1
+
+    # ── Group bookings (no Registration/Payment rows of their own) ──
+    from bookings.models import Booking
+    from bookings.payments import booking_amount
+    group_confirmed = []
+    for booking in Booking.objects.filter(
+        event=event, status__in=[Booking.Status.CONFIRMED, Booking.Status.REFUNDED],
+    ).prefetch_related('seats'):
+        amount = booking.amount_paid if booking.amount_paid is not None else booking_amount(booking)
+        gross += amount
+        if booking.status == Booking.Status.REFUNDED:
+            refunded += amount
+        else:
+            paid_count += 1
+            group_confirmed.append((booking, amount, len(booking.seats.all())))
+    return gross, refunded, paid_count, group_confirmed
+
+
+def net_revenue(event) -> Decimal:
+    gross, refunded, _, _ = _revenue(event)
+    return gross - refunded
+
+
+def event_analytics(event) -> dict:
+    regs = list(_active_regs(event))
+
+    confirmed = [r for r in regs if r.status == RegistrationStatusChoices.CONFIRMED]
+    checked_in = [r for r in confirmed if r.is_checked_in]
+
+    gross, refunded, paid_count, group_confirmed = _revenue(event)
+    group_seats = sum(seats for _, _, seats in group_confirmed)
+    group_checked_in = sum(
+        1 for booking, _, _ in group_confirmed for bs in booking.seats.all() if bs.is_checked_in
+    )
+
     net = gross - refunded
 
-    tickets_sold = len(confirmed)
+    tickets_sold = len(confirmed) + group_seats
     avg_order = (net / paid_count) if paid_count else Decimal('0')
 
     # ── Daily timeline (last 30 days up to event or today) ──
@@ -59,6 +92,11 @@ def event_analytics(event) -> dict:
         pay = getattr(r, 'payment', None)
         if pay:
             by_day_revenue[d] += pay.net_amount
+
+    for booking, amount, seats in group_confirmed:
+        d = max(booking.created_at.date(), start)
+        by_day_count[d] += seats
+        by_day_revenue[d] += amount
 
     timeline = []
     for i in range(30):
@@ -78,6 +116,9 @@ def event_analytics(event) -> dict:
         pay = getattr(r, 'payment', None)
         if pay:
             tier_revenue[name] += pay.net_amount
+    if group_confirmed:
+        tier_count['Group booking'] += group_seats
+        tier_revenue['Group booking'] += sum((amount for _, amount, _ in group_confirmed), Decimal('0'))
     by_ticket_type = [
         {'name': k, 'count': tier_count[k], 'revenue': float(tier_revenue[k])}
         for k in sorted(tier_count, key=lambda x: -tier_revenue[x])
@@ -100,7 +141,8 @@ def event_analytics(event) -> dict:
     # ── Capacity & conversion ──
     capacity = event.max_participants or 0
     sold_through = round((tickets_sold / capacity) * 100, 1) if capacity else 0
-    checkin_rate = round((len(checked_in) / tickets_sold) * 100, 1) if tickets_sold else 0
+    total_checked_in = len(checked_in) + group_checked_in
+    checkin_rate = round((total_checked_in / tickets_sold) * 100, 1) if tickets_sold else 0
 
     return {
         'currency': event.currency or 'USD',
@@ -113,9 +155,11 @@ def event_analytics(event) -> dict:
             'avg_order_value': float(avg_order),
             'capacity': capacity,
             'sold_through_pct': sold_through,
-            'checked_in': len(checked_in),
+            'checked_in': total_checked_in,
             'checkin_rate_pct': checkin_rate,
             'pending': len([r for r in regs if r.status == RegistrationStatusChoices.PENDING]),
+            'group_bookings': len(group_confirmed),
+            'group_seats': group_seats,
         },
         'timeline': timeline,
         'by_ticket_type': by_ticket_type,

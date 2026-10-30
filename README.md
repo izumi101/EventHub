@@ -83,14 +83,19 @@ admin / <пароль из DJANGO_SEED_ADMIN_PASSWORD или из лога backe
 
 ### Фоновые задачи
 
-Сервис `scheduler` раз в минуту запускает `python manage.py run_maintenance`: освобождает места с истёкшим удержанием, закрывает просроченные групповые брони, двигает лист ожидания и переводит прошедшие события в `completed`. GET-запросы в базу больше не пишут.
+Сервис `worker` (`python manage.py run_worker`) выполняет очередь задач и раз в минуту — обслуживание: освобождает места с истёкшим удержанием, закрывает просроченные групповые брони, двигает лист ожидания и переводит прошедшие события в `completed`. GET-запросы в базу не пишут.
+
+Письма, вебхуки и индексация для семантического поиска не выполняются внутри запроса: они записываются в таблицу `jobs_job` в той же транзакции, что и бизнес-изменение (transactional outbox). Если транзакция откатилась, письма не будет; если SMTP или сервер вебхука недоступен, задача повторится с растущей паузой (30 с … 1 ч, 3–6 попыток в зависимости от типа). Задачи, которые так и не выполнились, видны в Django admin → Jobs, оттуда их можно перезапустить действием «Retry». Несколько воркеров можно запускать параллельно: задачи забираются через `SELECT … FOR UPDATE SKIP LOCKED`.
+
+Без воркера (например, `daphne` локально) задайте `JOBS_RUN_INLINE=1`: задачи будут выполняться сразу после коммита запроса.
 
 ### Облегчённый образ без семантического поиска
 
-`sentence-transformers` тянет PyTorch, это несколько гигабайт. Без него поиск работает по ключевым словам:
+Образ ставит CPU-сборку PyTorch (без CUDA) и заранее скачивает модель, поэтому семантический поиск работает без доступа в интернет. Если он не нужен, поиск работает по ключевым словам, а образ собирается заметно быстрее — задайте в `.env`:
 
 ```bash
-docker compose build --build-arg INSTALL_SEMANTIC_SEARCH=0 backend scheduler
+INSTALL_SEMANTIC_SEARCH=0
+docker compose build backend worker
 ```
 
 Остановить контейнеры:
@@ -118,7 +123,7 @@ export DJANGO_DEBUG=1 STRIPE_MOCK_MODE=1
 python manage.py migrate
 python manage.py seed_data --noinput
 daphne -p 8000 eventhub_backend.asgi:application # HTTP + WebSocket
-python manage.py run_maintenance --loop 60       # в отдельном терминале
+python manage.py run_worker                      # в отдельном терминале (или JOBS_RUN_INLINE=1)
 
 # Frontend (dev-сервер проксирует /api, /ws и /media на backend)
 cd EventHub/frontend
@@ -134,11 +139,18 @@ python manage.py test        # нужен PostgreSQL: часть тестов п
 ruff check --select F,E9 --exclude "*/migrations/*" .
 
 cd EventHub/frontend
-npm run build                # сборка с проверкой шаблонов и бюджетов бандла
-npm audit --omit=dev
+npm test                     # unit-тесты (Vitest)
+npm run build                # сборка в strict-режиме TypeScript с проверкой шаблонов и бюджетов бандла
+npm audit                    # и runtime-, и dev-зависимости
+
+# End-to-end тесты (Playwright) против запущенного стека: docker compose up
+npx playwright install chromium
+E2E_BASE_URL=http://localhost:4200 npx playwright test
 ```
 
-Те же проверки запускает GitHub Actions (`.github/workflows/ci.yml`) на каждый push и pull request.
+E2E-тесты проверяют покупку билета (с mock-оплатой), CSP на реальной сборке, WebSocket карты мест через nginx и то, что письмо с кодом уходит через очередь, а не из запроса. Для них нужны демо-данные и mock-оплата из `.env.example`.
+
+Те же проверки запускает GitHub Actions (`.github/workflows/ci.yml`) на каждый push и pull request; задача `e2e` поднимает весь `docker compose` и прогоняет Playwright, `search-image` собирает полный образ с PyTorch и проверяет модель без сети.
 
 Зависимости Python зафиксированы в `requirements.lock` и `requirements-search.lock`. Диапазоны версий задаются в `requirements*.txt`, lock-файлы пересобираются командой из их заголовка (`uv pip compile …`).
 
@@ -163,6 +175,8 @@ cp EventHub/.env.example EventHub/.env
 | `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` | ключи Stripe; при `DJANGO_DEBUG=0` обязательны |
 | `STRIPE_MOCK_MODE` | `1` — оплата без Stripe (только для разработки, только с `DJANGO_DEBUG=1`) |
 | `EMAIL_HOST_USER`, `EMAIL_HOST_PASSWORD`, `DEFAULT_FROM_EMAIL` | SMTP для кодов подтверждения; при `DJANGO_DEBUG=0` обязательны |
+| `JOBS_RUN_INLINE` | `1` — выполнять фоновые задачи сразу после запроса, без воркера (только для локальной разработки) |
+| `INSTALL_SEMANTIC_SEARCH` | `0` — собрать backend без PyTorch и семантического поиска (по умолчанию `1`) |
 | `DJANGO_NUM_PROXIES` | сколько прокси стоит перед Django (по умолчанию `1` — nginx); нужно для корректного rate limiting |
 | `GRAFANA_ADMIN_PASSWORD` | пароль Grafana для `docker-compose.monitoring.yml` (обязателен) |
 
@@ -173,6 +187,10 @@ cp EventHub/.env.example EventHub/.env
 - `/api/auth/` — регистрация, логин, профиль, обновление токена.
 - `/api/events/` — CRUD событий, категории, поиск, регистрации.
 - `/api/payments/` — Stripe checkout, вебхуки, проверка статуса оплаты.
+- `/api/bookings/` — групповые брони; организатор видит брони события (`/api/bookings/event/<id>/`) и может вернуть деньги за бронь (`POST /api/bookings/<id>/refund/`).
+- `/ws/seats/<id>/` — обновления карты мест. JWT передаётся не в URL, а в подпротоколе: `new WebSocket(url, ['eventhub.jwt', accessToken])`.
+
+Ошибки бизнес-правил приходят как `{"error": "<текст для человека>"}`; там, где клиенту нужно ветвиться, добавлен стабильный `code` (например, `QUEUE_REQUIRED` — сначала встаньте в очередь ожидания).
 
 Технические спецификации отдельных фич — в [`EventHub/docs/`](EventHub/docs/).
 
@@ -186,3 +204,4 @@ cp EventHub/.env.example EventHub/.env
 - Поставить настоящий TLS-сертификат и включить HSTS (строка закомментирована в `frontend/nginx-security-headers.conf`).
 - Использовать managed PostgreSQL или защищённый Docker-инстанс.
 - Хранить продовые ключи Stripe в секретах деплоя, не в Git.
+- Миграция `accounts.0006` создаёт уникальный индекс по `lower(email)`. Если в базе уже есть аккаунты с одинаковым email, она остановится и выведет их список — объедините или переименуйте эти аккаунты и запустите `migrate` снова.

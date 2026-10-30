@@ -44,6 +44,7 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
                   [eventId]="eventId"
                   [maxSelection]="8"
                   [zonePrices]="zonePrices"
+                  [currency]="currency"
                   (selectionChange)="onSelection($event)"
                 ></app-seat-map-svg>
               } @else {
@@ -122,9 +123,9 @@ import { LucideAngularModule, ChevronLeft, Users, Copy, Check, Clock, Ticket } f
 
                   <!-- Share link -->
                   <div class="mb-4">
-                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim a seat</label>
+                    <label for="group-booking-share-url" class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim a seat</label>
                     <div class="flex gap-2">
-                      <input readonly [value]="shareUrl" class="input flex-1 text-xs" />
+                      <input id="group-booking-share-url" readonly [value]="shareUrl" class="input flex-1 text-xs" />
                       <button (click)="copyLink()" class="btn btn-secondary btn-sm flex-shrink-0">
                         <lucide-icon [img]="copied ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
                       </button>

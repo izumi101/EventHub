@@ -48,10 +48,26 @@ def index_event(event) -> None:
 
 
 def index_event_async(event) -> None:
-    """Embed in a background thread — loading the model and encoding can
-    take seconds and must not hold up the HTTP request that saved the event."""
-    import threading
-    threading.Thread(target=index_event, args=(event,), daemon=True).start()
+    """Queue the embedding — loading the model and encoding can take seconds
+    and must not hold up the HTTP request that saved the event."""
+    from jobs.queue import enqueue
+    enqueue('index_event', {'event_id': event.pk}, max_attempts=3)
+
+
+def index_event_job(*, event_id: int) -> None:
+    """Job handler. Without sentence-transformers installed (slim image)
+    there is nothing to retry: search falls back to keywords."""
+    from jobs.queue import PermanentJobError
+    from .models import Event
+    try:
+        import sentence_transformers  # noqa: F401
+    except ImportError:
+        raise PermanentJobError('sentence-transformers is not installed (keyword search only)')
+    event = Event.objects.filter(pk=event_id).select_related('category').first()
+    if event is None:
+        return
+    event.embedding = embed_text(event_text(event))
+    event.save(update_fields=['embedding'])
 
 
 def semantic_search(query: str, limit: int = 20, extra_qs=None, max_distance: float = 0.79):

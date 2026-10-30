@@ -61,7 +61,7 @@ class BookingSerializer(serializers.ModelSerializer):
             'id', 'status', 'share_token', 'hold_expires_at',
             'event_id', 'event_title', 'event_date', 'event_location',
             'owner_username', 'seats', 'seat_count', 'total_price', 'total_due', 'currency',
-            'is_expired', 'is_owner', 'created_at',
+            'amount_paid', 'refunded_at', 'is_expired', 'is_owner', 'created_at',
         ]
 
     def _viewer(self):

@@ -5,11 +5,12 @@ import { BookingService, BookingDto, BookingSeatDto } from '../../services/booki
 import { ToastService } from '../../services/toast.service';
 import { LucideAngularModule, Users, Copy, Check, Clock, Armchair, Ticket } from 'lucide-angular';
 import * as QRCode from 'qrcode';
+import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({
   selector: 'app-my-bookings',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, CommonModule, RouterModule, LucideAngularModule],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
@@ -66,9 +67,9 @@ import * as QRCode from 'qrcode';
                       <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0"></lucide-icon>
                       Seats are held until {{ b.hold_expires_at | date:'h:mm a' }} — complete the payment from the event page.
                     </div>
-                    <label class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim their seats</label>
+                    <label [attr.for]="'share-' + b.id" class="block text-xs font-medium text-muted-foreground mb-1.5">Invite friends to claim their seats</label>
                     <div class="flex gap-2">
-                      <input readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
+                      <input [id]="'share-' + b.id" readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
                       <button (click)="copyLink(b)" class="btn btn-secondary btn-sm flex-shrink-0">
                         <lucide-icon [img]="copiedId === b.id ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
                       </button>
@@ -113,7 +114,7 @@ import * as QRCode from 'qrcode';
                       Each seat has its own QR ticket — share the invite link and friends see theirs too.
                     </p>
                     <div class="flex gap-2 mt-2">
-                      <input readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
+                      <input aria-label="Invite link" readonly [value]="shareUrl(b)" class="input flex-1 text-xs" />
                       <button (click)="copyLink(b)" class="btn btn-secondary btn-sm flex-shrink-0">
                         <lucide-icon [img]="copiedId === b.id ? icons.Check : icons.Copy" class="w-4 h-4"></lucide-icon>
                       </button>
@@ -130,7 +131,7 @@ import * as QRCode from 'qrcode';
     <!-- QR zoom modal -->
     @if (zoomSeat) {
       <div class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in" (click)="zoomSeat = null">
-        <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()">
+        <div class="bg-card rounded-2xl p-6 max-w-xs w-full text-center shadow-xl ring-1 ring-border animate-slide-up" (click)="$event.stopPropagation()" appDialog (dismiss)="zoomSeat = null">
           <h3 class="text-base font-bold text-foreground leading-tight">Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}</h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">{{ zoomSeat.attendee_name || 'Unclaimed seat' }} — show at the entrance</p>
           @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
