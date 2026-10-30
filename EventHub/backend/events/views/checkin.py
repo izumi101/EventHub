@@ -8,10 +8,14 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 from common.permissions import can_check_in_event, can_manage_event
 
+from common.schema import FORBIDDEN, NOT_FOUND, UNAUTHENTICATED
+
+from .. import schema as api
 from ..models import INACTIVE_REGISTRATION_STATUSES, CheckInList, CheckInLog, Event, Registration
 from ..serializers import CheckInListSerializer, CheckInLogSerializer
 
@@ -64,7 +68,9 @@ class CheckInListDetailView(generics.RetrieveUpdateDestroyAPIView):
 class CheckInListAttendeesView(generics.ListAPIView):
     """Return all registrations for an event with their check-in status for a specific list."""
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # the scanner needs the whole list
 
+    @extend_schema(responses={200: api.CheckInListAttendeeSerializer(many=True), 401: UNAUTHENTICATED, 403: FORBIDDEN, 404: NOT_FOUND})
     def get(self, request, pk, **kwargs):
         checkin_list = get_object_or_404(CheckInList.objects.select_related('event'), pk=pk)
         if not can_check_in_event(checkin_list.event, request.user):
@@ -106,6 +112,7 @@ class CheckInListCheckInView(generics.GenericAPIView):
     """POST ticket_uuid to check in (or undo) within a specific list."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=api.CheckInScanRequestSerializer, responses={200: api.CheckInScanResultSerializer, 201: api.CheckInScanResultSerializer, 400: api.TicketRefusedSerializer, 401: UNAUTHENTICATED, 403: FORBIDDEN, 404: api.TicketRefusedSerializer})
     def post(self, request, pk, **kwargs):
         checkin_list = get_object_or_404(CheckInList.objects.select_related('event'), pk=pk)
         if not can_check_in_event(checkin_list.event, request.user):

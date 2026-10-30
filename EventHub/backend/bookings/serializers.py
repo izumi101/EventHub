@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Booking, BookingSeat
@@ -19,16 +20,17 @@ class BookingSeatSerializer(serializers.ModelSerializer):
             'attendee_name', 'claimed', 'claimed_by_me', 'ticket_uuid', 'is_checked_in',
         ]
 
-    def get_claimed(self, obj):
+    def get_claimed(self, obj) -> bool:
         return bool(obj.attendee_name or obj.claimed_by_id)
 
     def _viewer(self):
         return self.context.get('viewer')
 
-    def get_claimed_by_me(self, obj):
+    def get_claimed_by_me(self, obj) -> bool:
         viewer = self._viewer()
         return bool(viewer and viewer.is_authenticated and obj.claimed_by_id == viewer.id)
 
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_ticket_uuid(self, obj):
         # The UUID *is* the QR ticket. Only the buyer and the friend who
         # claimed this seat may see it — never everyone holding the invite link.
@@ -67,14 +69,16 @@ class BookingSerializer(serializers.ModelSerializer):
     def _viewer(self):
         return self.context.get('viewer')
 
+    @extend_schema_field(BookingSeatSerializer(many=True))
     def get_seats(self, obj):
         seats = obj.seats.select_related('seat', 'booking')
         return BookingSeatSerializer(seats, many=True, context=self.context).data
 
-    def get_is_owner(self, obj):
+    def get_is_owner(self, obj) -> bool:
         viewer = self._viewer()
         return bool(viewer and viewer.is_authenticated and viewer.id == obj.owner_id)
 
+    @extend_schema_field(serializers.UUIDField(allow_null=True))
     def get_share_token(self, obj):
         # Whoever opened the share link already knows it; everyone else
         # only sees it if they own the booking.
@@ -82,12 +86,13 @@ class BookingSerializer(serializers.ModelSerializer):
             return str(obj.share_token)
         return None
 
+    @extend_schema_field(serializers.DecimalField(max_digits=12, decimal_places=2))
     def get_total_due(self, obj):
         # Seat prices plus tax & service fee — what checkout actually charges.
         from .payments import booking_amount
         return str(booking_amount(obj))
 
-    def get_currency(self, obj):
+    def get_currency(self, obj) -> str:
         from events.billing import event_currency
         return event_currency(obj.event)
 

@@ -54,6 +54,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     'corsheaders',
     'channels',
     'django.contrib.postgres',
@@ -70,6 +72,7 @@ MIDDLEWARE = [
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'common.api_versioning.DeprecatedApiMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -160,6 +163,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
     'EXCEPTION_HANDLER': 'common.exceptions.exception_handler',
+    'DEFAULT_SCHEMA_CLASS': 'common.openapi.AutoSchema',
     # Only nginx talks to Django; it appends the real client address as the
     # last X-Forwarded-For entry. Without this DRF would trust the whole,
     # client-supplied header and every request could fake a new identity.
@@ -180,6 +184,54 @@ REST_FRAMEWORK = {
         'promo': '10/min',
         'claim': '10/min',
         'affiliate_click': '30/min',
+    },
+}
+
+# ---- API contract ---- #
+# /api/v1/ is canonical; the unversioned /api/ alias answers with Deprecation
+# and Sunset headers until it is removed (common/api_versioning.py).
+API_LEGACY_DEPRECATED_ON = '2026-10-30'
+API_LEGACY_SUNSET_ON = '2027-04-30'
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'EventHub API',
+    'DESCRIPTION': (
+        'Events, tickets, seat maps, payments and check-in. Authenticate with '
+        '`Authorization: Bearer <access token>` from `POST /api/v1/auth/login/`. '
+        'Errors are `{"error": "<message>"}`, with a stable `code` where clients '
+        'branch on it.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Swagger UI from our own static files: the CSP allows no CDNs.
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    # Separate request/response components, so generated clients don't make
+    # read-only fields required on input.
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/v1',
+    'PREPROCESSING_HOOKS': ['common.openapi.only_current_version'],
+    # Stable, readable names for value sets that share a field name
+    # (`status`, `type`, ...) — generated clients use them as type names.
+    'ENUM_NAME_OVERRIDES': {
+        'EventStatusEnum': 'common.choices.EventStatusChoices',
+        'RegistrationStatusEnum': 'common.choices.RegistrationStatusChoices',
+        'PaymentStatusEnum': 'common.choices.PaymentStatusChoices',
+        'PaymentMethodEnum': 'payments.models.Payment.METHOD_CHOICES',
+        'BookingStatusEnum': 'bookings.models.Booking.Status',
+        'RefundRequestStatusEnum': 'events.models.RefundRequest.STATUS_CHOICES',
+        'WaitlistEntryStatusEnum': 'events.models.WaitlistEntry.STATUS_CHOICES',
+        'WaitlistStatusEnum': 'events.schema.WAITLIST_STATUSES',
+        'QueueStatusEnum': 'events.schema.QUEUE_STATUSES',
+        'DemandLevelEnum': 'events.schema.DEMAND_LEVELS',
+        'TicketScanResultEnum': 'events.schema.SCAN_RESULTS',
+        'TicketScanRefusalEnum': 'events.schema.SCAN_REFUSALS',
+        'QuestionTypeEnum': 'events.models.EventQuestion.TYPE_CHOICES',
+        'PriceZoneEnum': 'events.models.EventSeat.PRICE_ZONE_CHOICES',
+        'NotificationTypeEnum': 'events.models.Notification.TYPE_CHOICES',
+        'TicketKindEnum': 'events.models.TicketType.KIND_CHOICES',
+        'CheckInActionEnum': 'events.models.CheckInLog.ACTION_CHOICES',
+        'WebhookTriggerEnum': 'events.models.Webhook.TRIGGER_CHOICES',
     },
 }
 

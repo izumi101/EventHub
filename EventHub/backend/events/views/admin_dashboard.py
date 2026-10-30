@@ -3,9 +3,13 @@
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
 
+from common.schema import ERROR, UNAUTHENTICATED
+
+from .. import schema as api
 from ..models import INACTIVE_REGISTRATION_STATUSES, Event, Registration
 from ..serializers import EventListSerializer
 
@@ -13,6 +17,7 @@ from ..serializers import EventListSerializer
 class AdminDashboardView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: api.AdminDashboardSerializer, 401: UNAUTHENTICATED, 403: ERROR})
     def get(self, request):
         from collections import defaultdict
         from decimal import Decimal

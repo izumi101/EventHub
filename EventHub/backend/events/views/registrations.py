@@ -8,11 +8,15 @@ from rest_framework import generics, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 
 from common.choices import RegistrationStatusChoices
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 
 from django.db.models import Prefetch
 
+from .. import schema as api
 from ..models import Event, Registration
 from ..serializers import RegistrationSerializer
 from ..services import check_in_registration
@@ -23,6 +27,13 @@ class RegistrationViewSet(viewsets.GenericViewSet):
     serializer_class = RegistrationSerializer
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        parameters=[OpenApiParameter('uuid', OpenApiTypes.UUID, OpenApiParameter.PATH,
+                                     description='Ticket code from the QR (single or group-booking seat).')],
+        responses={200: api.TicketCheckInResultSerializer, 400: api.TicketRefusedSerializer,
+                   401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND},
+    )
     @action(detail=False, methods=['post'], url_path='check-in/(?P<uuid>[^/.]+)')
     def check_in(self, request, uuid=None):
         try:

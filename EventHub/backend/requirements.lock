@@ -8,6 +8,10 @@ asgiref==3.13.0
     #   channels-redis
     #   django
     #   django-cors-headers
+attrs==26.1.0
+    # via
+    #   jsonschema
+    #   referencing
 certifi==2026.10.23
     # via requests
 channels==4.3.2
@@ -27,13 +31,20 @@ django==5.2.18
     #   django-cors-headers
     #   djangorestframework
     #   djangorestframework-simplejwt
+    #   drf-spectacular
+    #   drf-spectacular-sidecar
 django-cors-headers==4.9.0
     # via -r requirements.txt
 djangorestframework==3.18.3
     # via
     #   -r requirements.txt
     #   djangorestframework-simplejwt
+    #   drf-spectacular
 djangorestframework-simplejwt==5.5.1
+    # via -r requirements.txt
+drf-spectacular==0.30.0
+    # via -r requirements.txt
+drf-spectacular-sidecar==2026.10.1
     # via -r requirements.txt
 et-xmlfile==2.0.0
     # via openpyxl
@@ -49,6 +60,12 @@ idna==3.20
     # via
     #   anyio
     #   requests
+inflection==0.5.1
+    # via drf-spectacular
+jsonschema==4.26.0
+    # via drf-spectacular
+jsonschema-specifications==2025.9.1
+    # via jsonschema
 msgpack==1.2.3
     # via channels-redis
 openpyxl==3.1.5
@@ -68,13 +85,23 @@ python-dotenv==1.2.4
     #   -r requirements.txt
     #   uvicorn
 pyyaml==6.0.3
-    # via uvicorn
+    # via
+    #   drf-spectacular
+    #   uvicorn
 redis==8.1.0
     # via
     #   -r requirements.txt
     #   channels-redis
+referencing==0.37.0
+    # via
+    #   jsonschema
+    #   jsonschema-specifications
 requests==2.34.2
     # via stripe
+rpds-py==2026.9.1
+    # via
+    #   jsonschema
+    #   referencing
 sqlparse==0.6.0
     # via django
 stripe==16.0.0
@@ -83,7 +110,10 @@ typing-extensions==4.16.0
     # via
     #   anyio
     #   psycopg
+    #   referencing
     #   stripe
+uritemplate==4.2.0
+    # via drf-spectacular
 urllib3==2.8.0
     # via requests
 uvicorn==0.54.0

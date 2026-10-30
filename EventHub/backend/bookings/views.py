@@ -6,9 +6,14 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 
 from events.models import Event
 
+from . import schema
 from .models import Booking
 from .payments import create_booking_checkout
 from .serializers import (
@@ -29,6 +34,7 @@ class BookingCreateView(APIView):
     """POST /api/bookings/  — hold a group of seats."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=BookingCreateSerializer, responses={201: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     def post(self, request):
         ser = BookingCreateSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
@@ -48,6 +54,7 @@ class BookingDetailView(APIView):
     """GET /api/bookings/{id}/  — owner views their booking."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: BookingSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     def get(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         return Response(BookingSerializer(booking, context=_ctx(request)).data)
@@ -57,6 +64,7 @@ class BookingCheckoutView(APIView):
     """POST /api/bookings/{id}/checkout/  — pay for the whole group."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=None, responses={200: schema.BookingCheckoutResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     def post(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         try:
@@ -70,6 +78,7 @@ class BookingCancelView(APIView):
     """POST /api/bookings/{id}/cancel/  — release the held seats."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=None, responses={200: schema.BookingStatusSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     def post(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         try:
@@ -83,6 +92,7 @@ class SharedBookingView(APIView):
     """GET /api/bookings/shared/{token}/  — friends open the invite link."""
     permission_classes = [AllowAny]
 
+    @extend_schema(auth=[], responses={200: BookingSerializer, 404: NOT_FOUND})
     def get(self, request, token):
         booking = get_object_or_404(Booking, share_token=token)
         return Response(BookingSerializer(booking, context=_ctx(request, via_share_link=True)).data)
@@ -93,6 +103,7 @@ class ClaimSeatView(APIView):
     permission_classes = [AllowAny]
     throttle_scope = 'claim'
 
+    @extend_schema(request=ClaimSeatSerializer, responses={200: BookingSerializer, 400: ERROR, 404: NOT_FOUND})
     def post(self, request, token):
         booking = get_object_or_404(Booking, share_token=token)
         ser = ClaimSeatSerializer(data=request.data)
@@ -115,6 +126,7 @@ class VerifyBookingView(APIView):
     booking even when the Stripe webhook is not forwarded (local dev)."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(parameters=[OpenApiParameter('session_id', OpenApiTypes.STR, required=True, description='Payment provider session id from the success redirect.')], responses={200: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     def get(self, request):
         from django.conf import settings
 
@@ -144,6 +156,7 @@ class MyBookingsView(APIView):
     """GET /api/bookings/  — list the user's confirmed/holding bookings."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: BookingSerializer(many=True), 401: UNAUTHENTICATED})
     def get(self, request):
         bookings = (
             Booking.objects
@@ -158,6 +171,7 @@ class EventBookingsView(APIView):
     """GET /api/bookings/event/{event_id}/  — the event team lists group bookings."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(responses={200: BookingSerializer(many=True), 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
     def get(self, request, event_id):
         from common.permissions import can_manage_event
         event = get_object_or_404(Event, pk=event_id)
@@ -176,6 +190,7 @@ class BookingRefundView(APIView):
     """POST /api/bookings/{id}/refund/  — the event team refunds one paid group booking."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=schema.BookingRefundRequestSerializer, responses={200: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND, 502: ERROR})
     def post(self, request, pk):
         booking = get_object_or_404(Booking, pk=pk)
         try:

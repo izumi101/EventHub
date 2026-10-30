@@ -17,11 +17,17 @@ from rest_framework.permissions import (
 )
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    OpenApiParameter, OpenApiResponse, PolymorphicProxySerializer, extend_schema, extend_schema_view,
+)
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
 from common.permissions import can_manage_event
 from common.exceptions import error_response
+from common.schema import ERROR, MessageSerializer, NOT_FOUND, UNAUTHENTICATED
 
+from .. import schema as api
 from ..analytics import event_analytics, net_revenue
 from ..exports import attendees_csv_response
 from ..messaging import broadcast_to_attendees
@@ -31,6 +37,7 @@ from ..promo import quote, PromoError
 from ..queue import get_queue_status, is_queue_active, join_queue
 from ..seat_pricing import seat_price
 from ..serializers import (
+    AttendeeRegistrationSerializer,
     CategorySerializer,
     EventCreateSerializer,
     EventListSerializer,
@@ -73,6 +80,19 @@ class CategoryListCreateView(generics.ListCreateAPIView):
         return [AllowAny()]
 
 
+
+@extend_schema_view(
+    list=extend_schema(parameters=[
+        OpenApiParameter('status', OpenApiTypes.STR, description='Event status; defaults to published. Other statuses only for their organizers/admins.'),
+        OpenApiParameter('upcoming', OpenApiTypes.BOOL, description='true hides events that already happened.'),
+        OpenApiParameter('category', OpenApiTypes.INT, description='Category id.'),
+        OpenApiParameter('is_free', OpenApiTypes.BOOL, description='true: free events only.'),
+        OpenApiParameter('is_online', OpenApiTypes.BOOL, description='true: online events only.'),
+        OpenApiParameter('location', OpenApiTypes.STR, description='Substring of the location.'),
+        OpenApiParameter('q', OpenApiTypes.STR, description='Semantic search (falls back to keyword search).'),
+    ]),
+    destroy=extend_schema(responses={204: None, 401: UNAUTHENTICATED, 404: NOT_FOUND, 409: ERROR}),
+)
 class EventViewSet(viewsets.ModelViewSet):
     queryset = Event.objects.filter(status=EventStatusChoices.PUBLISHED)
     permission_classes = [IsAuthenticatedOrReadOnly, IsOrganizerOrReadOnly]
@@ -177,6 +197,17 @@ class EventViewSet(viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
     # Custom action: get registrations for an event
+    @extend_schema(
+        parameters=[OpenApiParameter('page', OpenApiTypes.INT, description='Opt-in pagination.'),
+                    OpenApiParameter('page_size', OpenApiTypes.INT, description='Up to 200.')],
+        responses={200: PolymorphicProxySerializer(
+            component_name='EventRegistrations',
+            serializers=[AttendeeRegistrationSerializer(many=True), api.AttendeePageSerializer],
+            resource_type_field_name=None,
+            many=False,
+        ), 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+        description='Attendees of the event: a plain list, or a page when `page` is given.',
+    )
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def registrations(self, request, pk=None):
         event = self.get_object()
@@ -188,20 +219,21 @@ class EventViewSet(viewsets.ModelViewSet):
             .select_related('user', 'seat', 'payment', 'promo_code', 'ticket_type', 'refund_request')
             .prefetch_related('answers__question')
         )
-        context = {'request': request, 'omit_event': True}
+        context = {'request': request}
         # Opt-in pagination (?page=N, ?page_size=M) for big events; without
         # it the endpoint keeps returning the plain list the attendee table uses.
         if 'page' in request.query_params:
             paginator = AttendeePagination()
             page = paginator.paginate_queryset(registrations.order_by('-registered_at'), request, view=self)
-            serializer = RegistrationSerializer(page, many=True, context=context)
+            serializer = AttendeeRegistrationSerializer(page, many=True, context=context)
             return paginator.get_paginated_response(serializer.data)
         # The organizer's attendee table doesn't need the full event nested
         # in every row (it was re-serialising the same event N times).
-        serializer = RegistrationSerializer(registrations, many=True, context=context)
+        serializer = AttendeeRegistrationSerializer(registrations, many=True, context=context)
         return Response(serializer.data)
 
     # Custom action: get stats for an event dashboard
+    @extend_schema(responses={200: api.EventStatsSerializer, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def stats(self, request, pk=None):
         event = self.get_object()
@@ -222,6 +254,7 @@ class EventViewSet(viewsets.ModelViewSet):
             'currency': event.currency,
         })
 
+    @extend_schema(request=None, responses={200: api.EventStatusResultSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def approve(self, request, pk=None):
         if not request.user.is_superuser:
@@ -233,6 +266,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Event approved and published', 'status': EventStatusChoices.PUBLISHED})
 
+    @extend_schema(request=None, responses={200: api.EventStatusResultSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def reject(self, request, pk=None):
         if not request.user.is_superuser:
@@ -244,6 +278,11 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Event rejected', 'status': EventStatusChoices.REJECTED})
 
+    @extend_schema(request=api.RegisterRequestSerializer, responses={
+        201: RegistrationSerializer,
+        400: OpenApiResponse(ERROR.response, description='Refused; `code` is QUEUE_REQUIRED when the buyer must join the waiting room first.'),
+        401: UNAUTHENTICATED, 404: NOT_FOUND,
+    })
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def register(self, request, pk=None):
         event = self.get_object()
@@ -267,6 +306,7 @@ class EventViewSet(viewsets.ModelViewSet):
         serializer = RegistrationSerializer(registration, context={'request': request})
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(request=None, responses={200: MessageSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def cancel(self, request, pk=None):
         event = self.get_object()
@@ -278,6 +318,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Registration cancelled'})
 
+    @extend_schema(request=api.RefundRequestCreateSerializer, responses={201: api.RefundRequestCreatedSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='request-refund')
     def request_refund(self, request, pk=None):
         """Attendee submits a refund request for the organizer to review."""
@@ -293,12 +334,14 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Refund request submitted.', 'status': req.status}, status=status.HTTP_201_CREATED)
 
+    @extend_schema(auth=[], responses={200: api.DynamicPriceSerializer, 404: NOT_FOUND})
     @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def pricing(self, request, pk=None):
         """Dynamic pricing info for an event."""
         event = self.get_object()
         return Response(get_dynamic_price(event))
 
+    @extend_schema(request=None, responses={200: api.EventStatusResultSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def submit(self, request, pk=None):
         """Send a draft (e.g. a clone) to admin review."""
@@ -311,6 +354,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Event submitted for review.', 'status': event.status})
 
+    @extend_schema(request=None, responses={200: api.EventCancelResultSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='cancel-event')
     def cancel_event(self, request, pk=None):
         """Organizer cancels the event: refunds paid tickets, notifies attendees."""
@@ -323,6 +367,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Event cancelled.', 'status': EventStatusChoices.CANCELLED, **result})
 
+    @extend_schema(request=api.SeatMapCreateRequestSerializer, responses={201: SeatMapSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='seat-map/create')
     def create_seat_map(self, request, pk=None):
         """Organizer generates a seat map (rows × cols with optional VIP/premium rows)."""
@@ -369,6 +414,7 @@ class EventViewSet(viewsets.ModelViewSet):
         serializer = SeatMapSerializer(seat_map)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    @extend_schema(request=None, responses={200: api.QueueStatusSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def queue_join(self, request, pk=None):
         """Join the waiting queue for a high-demand event."""
@@ -378,6 +424,7 @@ class EventViewSet(viewsets.ModelViewSet):
         result = join_queue(event.id, request.user.id)
         return Response(result)
 
+    @extend_schema(responses={200: api.QueueStatusSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def queue_status(self, request, pk=None):
         """Check queue position / admission status."""
@@ -387,6 +434,8 @@ class EventViewSet(viewsets.ModelViewSet):
         result = get_queue_status(event.id, request.user.id)
         return Response(result)
 
+    @extend_schema(methods=['GET', 'DELETE'], responses={200: api.WaitlistStatusSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND})
+    @extend_schema(methods=['POST'], request=None, responses={200: api.WaitlistStatusSerializer, 201: api.WaitlistStatusSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['get', 'post', 'delete'], permission_classes=[IsAuthenticated])
     def waitlist(self, request, pk=None):
         """GET = my status · POST = join · DELETE = leave the waitlist."""
@@ -416,6 +465,7 @@ class EventViewSet(viewsets.ModelViewSet):
         pos = position(user=request.user, event=event)
         return Response(pos or {'status': 'not_joined'})
 
+    @extend_schema(auth=[], request=api.PromoValidateRequestSerializer, responses={200: api.PromoQuoteSerializer, 400: ERROR, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[AllowAny], url_path='validate-promo',
             throttle_scope='promo')
     def validate_promo(self, request, pk=None):
@@ -448,6 +498,7 @@ class EventViewSet(viewsets.ModelViewSet):
         except PromoError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
+    @extend_schema(request=None, responses={201: EventListSerializer, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def clone(self, request, pk=None):
         """Duplicate an event (organizer only). Copies seat map + promo codes."""
@@ -460,6 +511,7 @@ class EventViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
         )
 
+    @extend_schema(responses={200: api.EventAnalyticsSerializer, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated])
     def analytics(self, request, pk=None):
         """Sales analytics for the organizer's dashboard."""
@@ -468,6 +520,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
         return Response(event_analytics(event))
 
+    @extend_schema(request=api.BroadcastRequestSerializer, responses={200: api.BroadcastResultSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def broadcast(self, request, pk=None):
         """Send a message to attendees (in-app + email). Organizer only."""
@@ -484,6 +537,7 @@ class EventViewSet(viewsets.ModelViewSet):
         result = broadcast_to_attendees(event=event, subject=subject, body=body, audience=audience)
         return Response(result)
 
+    @extend_schema(responses={(200, 'text/csv'): OpenApiResponse(OpenApiTypes.STR, description='Attendee list as CSV.'), 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated], url_path='export-attendees')
     def export_attendees(self, request, pk=None):
         """CSV of all attendees for the organizer to download."""
@@ -492,6 +546,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
         return attendees_csv_response(event)
 
+    @extend_schema(auth=[], responses={200: SeatMapSerializer, 404: ERROR})
     @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def seat_map(self, request, pk=None):
         """Seat map for an event (read only — expired holds are released by
@@ -523,6 +578,8 @@ class RecommendationsView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
+        if getattr(self, 'swagger_fake_view', False):  # OpenAPI generation, no real user
+            return Event.objects.none()
         try:
             from ..recommendations import get_recommendations
             return get_recommendations(self.request.user, limit=10)

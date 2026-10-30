@@ -8,8 +8,12 @@ from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
 
 from common.permissions import can_manage_event
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
+
+from .. import schema as api
 
 from ..models import (
     Affiliate,
@@ -194,6 +198,7 @@ class AffiliateClickView(generics.GenericAPIView):
     permission_classes = [AllowAny]
     throttle_scope = 'affiliate_click'
 
+    @extend_schema(auth=[], request=api.AffiliateClickRequestSerializer, responses={200: api.OkSerializer})
     def post(self, request, event_id):
         code = (request.data.get('code') or '').strip()
         if code:
@@ -225,6 +230,7 @@ class ResolveRefundRequestView(generics.GenericAPIView):
     """Organizer approves or rejects a refund request."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=api.RefundResolutionRequestSerializer, responses={200: api.RefundResolutionSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
     def post(self, request, pk):
         rr = get_object_or_404(RefundRequest.objects.select_related('registration__event', 'registration__user'), pk=pk)
         approve = request.data.get('approve') in (True, 'true', 'True', '1', 1)
