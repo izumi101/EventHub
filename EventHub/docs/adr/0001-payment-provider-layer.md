@@ -259,3 +259,19 @@ them and runs the contract step.
   that greps for direct `Payment.status` assignments also belongs to WP1b.
 - The admin dashboard keeps counting group bookings from `Booking` and skips
   their ledger rows until WP1b moves it to `Payment`.
+- Provider package `payments/providers/`: `base.py` (interface, frozen value
+  types, errors), `registry.py`, `conf.py` (dependency-free provider table
+  that `settings.py` uses for the start-up guard), `mock.py`. Additions to
+  the interface: `PaymentOrder.idempotency_key` (the provider call needs it),
+  `OrderLine` for `lines`, `CheckoutResult.immediate` (how the mock provider
+  reports `paid` synchronously), `StatusResult.as_callback()` (a status poll
+  settles through the callback path), and `PaymentRef`, the protocol a
+  provider reads from a payment (a stand-in serves orphan refunds). Success
+  and cancel URLs in the order carry no provider placeholders; each provider
+  adds its own.
+- `PAYMENT_PROVIDERS_ENABLED` (default `stripe`) and `PAYMENTS_MOCK_MODE`
+  (adds `mock`; `STRIPE_MOCK_MODE` is read only while it is empty and the
+  setting of that name mirrors it for the legacy services). Unknown provider
+  codes are refused in every environment; with `DJANGO_DEBUG=0` every
+  enabled provider must be configured, at least one real provider must be
+  enabled and the mock provider is refused.

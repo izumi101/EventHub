@@ -55,9 +55,14 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      # Payments (docs/adr/0001-payment-provider-layer.md): every enabled
+      # provider must be configured when DJANGO_DEBUG=0.
+      PAYMENT_PROVIDERS_ENABLED: ${PAYMENT_PROVIDERS_ENABLED:-stripe}
+      PAYMENTS_MOCK_MODE: ${PAYMENTS_MOCK_MODE:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      # Deprecated name of PAYMENTS_MOCK_MODE, read only while that is empty.
       STRIPE_MOCK_MODE: ${STRIPE_MOCK_MODE:-0}
       EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
