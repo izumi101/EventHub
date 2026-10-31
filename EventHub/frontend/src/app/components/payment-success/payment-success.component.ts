@@ -8,7 +8,7 @@ import { LucideAngularModule, CircleCheckBig, CircleAlert } from 'lucide-angular
 import { apiErrorMessage } from '../../api/api-error';
 
 /** What the page tells the buyer, from a ticket payment or a group booking. */
-type Outcome = 'paid' | 'processing' | 'refunded';
+type Outcome = 'paid' | 'processing' | 'refunded' | 'failed';
 
 interface PaymentResult {
   outcome: Outcome;
@@ -23,7 +23,12 @@ const PAYMENT_OUTCOME: Record<PaymentStatus, Outcome> = {
   completed: 'paid',
   refunded: 'refunded',
   pending: 'processing',
-  failed: 'processing',
+  // The provider declined the payment or the payment page timed out: no
+  // money was taken and the buyer can start the payment again.
+  failed: 'failed',
+  expired: 'failed',
+  // The buyer's bank is reviewing a paid ticket; it stays valid meanwhile.
+  disputed: 'processing',
 };
 
 // A booking that ended (expired/cancelled) by the time the money arrived is
@@ -99,7 +104,7 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             </a>
           </div>
         } @else if (data) {
-          <!-- Not (yet) paid: still processing, or refunded because the hold had ended -->
+          <!-- Not (yet) paid: processing, failed / expired, or refunded because the hold had ended -->
           <div class="flex flex-col items-center gap-3 mb-6">
             <div
               class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
@@ -115,6 +120,12 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               <p class="text-sm text-muted-foreground">
                 Your seat hold had ended before the payment arrived, so the money was returned
                 automatically. Please book again.
+              </p>
+            } @else if (data.outcome === 'failed') {
+              <h1 class="text-xl font-bold text-foreground">Payment did not go through</h1>
+              <p class="text-sm text-muted-foreground">
+                The payment was not completed and no money was taken. You can try again from your
+                tickets while your seat is still held.
               </p>
             } @else {
               <h1 class="text-xl font-bold text-foreground">Payment is processing</h1>
