@@ -23,10 +23,18 @@ class RegistrationStatusChoices(models.TextChoices):
 
 
 class PaymentStatusChoices(models.TextChoices):
+    """Payment states; the allowed moves are in payments/state.py.
+
+    A partial refund keeps `completed` (with `refunded_amount > 0`);
+    `refunded` means fully refunded.
+    """
+
     PENDING = 'pending', 'Pending'
     COMPLETED = 'completed', 'Completed'
     FAILED = 'failed', 'Failed'
+    EXPIRED = 'expired', 'Expired'
     REFUNDED = 'refunded', 'Refunded'
+    DISPUTED = 'disputed', 'Disputed'
 
 
 class PaymentProviderChoices(models.TextChoices):

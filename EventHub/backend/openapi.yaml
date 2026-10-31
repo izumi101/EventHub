@@ -6397,13 +6397,17 @@ components:
       - pending
       - completed
       - failed
+      - expired
       - refunded
+      - disputed
       type: string
       description: |-
         * `pending` - Pending
         * `completed` - Completed
         * `failed` - Failed
+        * `expired` - Expired
         * `refunded` - Refunded
+        * `disputed` - Disputed
     PaymentVerification:
       type: object
       properties:

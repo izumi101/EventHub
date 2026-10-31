@@ -234,3 +234,28 @@ and checkout), refund idempotency and retry, partial refunds, event
 cancellation with a failing provider, illegal transitions rejected by the DB
 trigger, migrations with legacy rows. Provider modules are tested against HTTP
 level fakes (no `unittest.mock.patch` of SDK internals for the happy paths).
+
+## Addendum: implementation notes (WP1a, expand step)
+
+WP1a adds the new structures without switching the services; WP1b switches
+them and runs the contract step.
+
+- `payments/0004` adds the columns and tables, `payments/0005` copies the
+  legacy data (rules in its docstring), `payments/0006` adds the `expired`
+  and `disputed` choices. The new `Payment` columns have database defaults
+  so the previous release can keep inserting rows during a deploy. Currency
+  case is not normalised yet; copied booking rows use lower case like the
+  existing rows. WP1b re-runs the idempotent copy before the contract step.
+- `Refund` has a UUID primary key, so `idempotency_key = refund-<id>` exists
+  before the insert. It also snapshots `provider` and `provider_payment_id`:
+  an orphan refund (callback for an unknown payment) has no `Payment`, and a
+  CheckConstraint allows a missing `payment` only for `kind = orphan` with
+  both provider values set.
+- The status trigger is generated from `payments/state.py:TRANSITIONS`
+  (`status_trigger_sql()`) and tested inside a test transaction, but not
+  installed: the legacy services still move `pending -> refunded` in one step
+  (late payment). WP1b installs it with `RunSQL` together with the
+  `refunded_amount` and status CheckConstraints, after the switch. The test
+  that greps for direct `Payment.status` assignments also belongs to WP1b.
+- The admin dashboard keeps counting group bookings from `Booking` and skips
+  their ledger rows until WP1b moves it to `Payment`.

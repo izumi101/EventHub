@@ -2499,10 +2499,12 @@ export interface components {
          * @description * `pending` - Pending
          *     * `completed` - Completed
          *     * `failed` - Failed
+         *     * `expired` - Expired
          *     * `refunded` - Refunded
+         *     * `disputed` - Disputed
          * @enum {string}
          */
-        PaymentStatusEnum: "pending" | "completed" | "failed" | "refunded";
+        PaymentStatusEnum: "pending" | "completed" | "failed" | "expired" | "refunded" | "disputed";
         PaymentVerification: {
             status: components["schemas"]["PaymentStatusEnum"];
             event_title: string;

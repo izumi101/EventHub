@@ -46,6 +46,39 @@ describe('PaymentSuccessComponent', () => {
     expect(text).not.toContain('Payment confirmed');
   });
 
+  for (const status of ['failed', 'expired']) {
+    it(`asks the buyer to try again when the payment is ${status}`, () => {
+      const text = render(
+        { session_id: 'cs_1' },
+        { verifyPayment: () => of({ status, event_title: 'Gig', amount: '10' }) },
+        {},
+      );
+      expect(text).toContain('Payment did not go through');
+      expect(text).toContain('no money was taken');
+      expect(text).not.toContain('Payment confirmed');
+      expect(text).not.toContain('Payment is processing');
+    });
+  }
+
+  it('keeps a disputed payment as processing, never as confirmed', () => {
+    const text = render(
+      { session_id: 'cs_1' },
+      { verifyPayment: () => of({ status: 'disputed', event_title: 'Gig', amount: '10' }) },
+      {},
+    );
+    expect(text).toContain('Payment is processing');
+    expect(text).not.toContain('Payment confirmed');
+  });
+
+  it('still shows a pending payment as processing', () => {
+    const text = render(
+      { session_id: 'cs_1' },
+      { verifyPayment: () => of({ status: 'pending', event_title: 'Gig', amount: '10' }) },
+      {},
+    );
+    expect(text).toContain('Payment is processing');
+  });
+
   it('shows an error when a group booking cannot be verified', () => {
     const text = render(
       { booking_id: 'b1', session_id: 'cs_2' },
