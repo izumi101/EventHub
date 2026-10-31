@@ -275,3 +275,14 @@ them and runs the contract step.
   codes are refused in every environment; with `DJANGO_DEBUG=0` every
   enabled provider must be configured, at least one real provider must be
   enabled and the mock provider is refused.
+- `providers/stripe.py` uses its own `stripe.StripeClient` (API key, API
+  version pinned to the one of the locked SDK, 2 network retries that reuse
+  the idempotency key, 5 s connect / 30 s read timeouts) instead of setting
+  `stripe.api_key` / `stripe.api_version` globally, so the legacy services
+  keep their exact behaviour until WP1b; only the SDK's app info is global.
+  `STRIPE_API_BASE` can point it at a fake. `checkout.session.completed`
+  with `payment_status = unpaid` is `ignored` (the async events follow);
+  `charge.dispute.closed` with `won`, `warning_closed` or `prevented` is
+  `dispute_won`. An amount that does not fit two decimal places (a 3-decimal
+  currency whose last digit is not zero) is reported as `None`, never
+  rounded. `refund(amount=None)` refunds what is left.

@@ -11,7 +11,7 @@ gunicorn>=23.0
 uvicorn[standard]>=0.32
 uvicorn-worker>=0.3
 whitenoise>=6.6
-stripe>=7.0
+stripe>=16.0,<17
 Pillow>=10.0
 python-dotenv>=1.0.0
 # Real-time WebSocket + shared throttling cache
