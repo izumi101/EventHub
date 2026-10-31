@@ -10,6 +10,10 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+from payments.providers.conf import parse_enabled as parse_enabled_providers
+from payments.providers.conf import production_problems as payment_production_problems
+from payments.providers.conf import unknown_codes as unknown_payment_providers
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
@@ -260,20 +264,34 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:4200').rstrip('/')
 
+# ---- Payments (docs/adr/0001-payment-provider-layer.md) ---- #
+# Providers that may take money, comma separated. Each enabled provider must
+# be fully configured when DJANGO_DEBUG=0 (see the guard at the bottom).
+PAYMENT_PROVIDERS_ENABLED = parse_enabled_providers(os.environ.get('PAYMENT_PROVIDERS_ENABLED', 'stripe'))
+
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
-
-def _is_placeholder(value):
-    return not value or 'your_' in value or value.endswith('_here')
-
-
 # Simulated payments (tickets confirmed without charging anyone) are an
-# explicit local-development opt-in. A missing Stripe key never turns them on.
-STRIPE_MOCK_MODE = env_bool('STRIPE_MOCK_MODE', False)
-if STRIPE_MOCK_MODE and not DEBUG and not TESTING:
-    raise ImproperlyConfigured('STRIPE_MOCK_MODE=1 is only allowed together with DJANGO_DEBUG=1.')
+# explicit local-development opt-in. A missing provider key never turns them
+# on. STRIPE_MOCK_MODE is the deprecated name, used while PAYMENTS_MOCK_MODE
+# is unset or empty; the legacy services still read the STRIPE_MOCK_MODE
+# setting, which always mirrors PAYMENTS_MOCK_MODE.
+PAYMENTS_MOCK_MODE = (
+    env_bool('PAYMENTS_MOCK_MODE', False)
+    if os.environ.get('PAYMENTS_MOCK_MODE', '').strip()
+    else env_bool('STRIPE_MOCK_MODE', False)
+)
+STRIPE_MOCK_MODE = PAYMENTS_MOCK_MODE
+if PAYMENTS_MOCK_MODE and not DEBUG and not TESTING:
+    raise ImproperlyConfigured(
+        'PAYMENTS_MOCK_MODE=1 (or the deprecated STRIPE_MOCK_MODE=1) is only allowed together with DJANGO_DEBUG=1.'
+    )
+if _unknown_providers := unknown_payment_providers(PAYMENT_PROVIDERS_ENABLED):
+    raise ImproperlyConfigured(
+        f'PAYMENT_PROVIDERS_ENABLED lists unknown payment providers: {", ".join(_unknown_providers)}'
+    )
 
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
@@ -399,8 +417,9 @@ if not DEBUG and not TESTING:
     _problems = []
     if '*' in ALLOWED_HOSTS:
         _problems.append('DJANGO_ALLOWED_HOSTS must list real host names, not "*"')
-    if _is_placeholder(STRIPE_SECRET_KEY) or _is_placeholder(STRIPE_WEBHOOK_SECRET):
-        _problems.append('STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set')
+    _problems += payment_production_problems(
+        PAYMENT_PROVIDERS_ENABLED, mock_mode=PAYMENTS_MOCK_MODE, get_setting=lambda name: globals().get(name)
+    )
     if 'console' in EMAIL_BACKEND or 'locmem' in EMAIL_BACKEND:
         _problems.append(
             'EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
