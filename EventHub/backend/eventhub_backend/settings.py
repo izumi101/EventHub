@@ -272,6 +272,9 @@ PAYMENT_PROVIDERS_ENABLED = parse_enabled_providers(os.environ.get('PAYMENT_PROV
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+# Only for pointing the Stripe provider at a local fake (e.g. stripe-mock);
+# empty means Stripe's own API address.
+STRIPE_API_BASE = os.environ.get('STRIPE_API_BASE', '').strip()
 
 # Simulated payments (tickets confirmed without charging anyone) are an
 # explicit local-development opt-in. A missing provider key never turns them
