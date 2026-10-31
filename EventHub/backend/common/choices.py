@@ -27,3 +27,25 @@ class PaymentStatusChoices(models.TextChoices):
     COMPLETED = 'completed', 'Completed'
     FAILED = 'failed', 'Failed'
     REFUNDED = 'refunded', 'Refunded'
+
+
+class PaymentProviderChoices(models.TextChoices):
+    """Who moved (or will move) the money of a payment (ADR 0001)."""
+
+    STRIPE = 'stripe', 'Stripe'
+    FREEDOMPAY = 'freedompay', 'Freedom Pay'
+    MOCK = 'mock', 'Mock (development only)'
+    OFFLINE = 'offline', 'Offline / manual'
+
+
+class PaymentCallbackKind(models.TextChoices):
+    """Provider callbacks normalised to what they mean for a payment."""
+
+    PAID = 'paid', 'Paid'
+    FAILED = 'failed', 'Failed'
+    EXPIRED = 'expired', 'Expired'
+    REFUNDED = 'refunded', 'Refunded'
+    DISPUTE_OPENED = 'dispute_opened', 'Dispute opened'
+    DISPUTE_WON = 'dispute_won', 'Dispute won'
+    DISPUTE_LOST = 'dispute_lost', 'Dispute lost'
+    IGNORED = 'ignored', 'Ignored'
