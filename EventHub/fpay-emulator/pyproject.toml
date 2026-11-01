@@ -1,0 +1,57 @@
+# Tooling configuration for the Freedom Pay gateway emulator (not packaged:
+# the Docker image runs it from source with `python -m fpay_emulator`).
+# Ruff settings and rule set are identical to EventHub/backend/pyproject.toml;
+# CI and pre-commit use ruff 0.17.1.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["*/migrations/*", "staticfiles"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # import order
+    "B",        # bugbear: likely bugs
+    "UP",       # pyupgrade: modern syntax for the target Python
+    "DJ",       # Django conventions (kept for parity with the backend; no Django here)
+    "C4",       # comprehensions
+    "SIM",      # simplifications
+    "PIE",
+    "RUF",      # ruff-specific
+    "S",        # bandit: security
+]
+ignore = [
+    # Kept identical to the backend configuration.
+    "RUF012",
+]
+# Typography in user-facing strings is intentional.
+allowed-confusables = ["—", "–", "’", "×"]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests use fixed passwords and plain asserts on purpose.
+"**/test*.py" = ["S101", "S105", "S106"]
+"**/conftest.py" = ["S101", "S105", "S106"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["fpay_emulator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["fpay_emulator"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = ["if __name__ == .__main__.:", "pragma: no cover"]
