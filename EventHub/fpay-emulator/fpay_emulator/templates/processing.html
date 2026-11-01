@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Processing{% endblock %}
+{% block head %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block content %}
+{% include "_order.html" %}
+<section aria-live="polite">
+  <h2>{% if payment.status == 'process' %}Processing your payment…{% else %}Waiting for the payment{% endif %}</h2>
+  <p class="spinner" aria-hidden="true"></p>
+  <p>The payment system has not answered yet. This page checks again every few seconds.</p>
+  <p class="hint">If nothing happens the payment expires at {{ expires_at }} ({{ timezone }}).</p>
+</section>
+{% endblock %}

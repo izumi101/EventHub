@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}3-D Secure{% endblock %}
+{% block content %}
+{% include "_order.html" %}
+<section aria-labelledby="tds-title">
+  <h2 id="tds-title">3-D Secure verification</h2>
+  <p>Your bank asks you to confirm this payment of <strong>{{ amount }}</strong>.</p>
+  <form method="post" action="{{ base }}/3ds">
+    <div class="field">
+      <label for="password">One-time password</label>
+      <input id="password" name="password" type="password" autocomplete="one-time-code" required aria-describedby="password-hint">
+      <p id="password-hint" class="hint">Test password: {{ tds_password }}. Any other value fails authentication.</p>
+    </div>
+    <div class="buttons">
+      <button type="submit" name="action" value="confirm" class="primary">Confirm</button>
+      <button type="submit" name="action" value="cancel">Cancel</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

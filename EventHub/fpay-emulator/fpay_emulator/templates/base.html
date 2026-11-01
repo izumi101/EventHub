@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>{% block title %}Payment{% endblock %} · Freedom Pay emulator</title>
+  <link rel="stylesheet" href="/static/style.css">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="banner">
+    <span class="brand">Freedom Pay <span class="badge">emulator</span></span>
+    {% if payment and payment.testing_mode %}<span class="badge badge-test">Test payment</span>{% endif %}
+  </header>
+  <main id="main" class="card" tabindex="-1">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="foot">
+    Gateway emulator for development and tests. No real money moves and no card data is stored.
+  </footer>
+</body>
+</html>
