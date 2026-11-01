@@ -1,4 +1,5 @@
-"""payments/0004 + 0005 on a database holding legacy-shaped rows (ADR 0001).
+"""payments/0004, 0005 and 0007 on a database holding legacy-shaped rows
+(ADR 0001).
 
 The rows are written with the historical models of the state before the
 expand step (payments 0003, bookings 0003), then the real migrations run
@@ -23,8 +24,11 @@ from payments.models import Payment
 LEGACY = [('payments', '0003_payment_protect_registration'), ('bookings', '0003_booking_refunds')]
 SCHEMA = [('payments', '0004_ledger_models')]
 COPIED = [('payments', '0005_copy_legacy_payments')]
+STATES = [('payments', '0006_payment_status_choices')]
+RESYNCED = [('payments', '0007_resync_legacy_payments')]
 
 copy_module = import_module('payments.migrations.0005_copy_legacy_payments')
+resync_module = import_module('payments.migrations.0007_resync_legacy_payments')
 
 
 def _migrate(targets):
@@ -291,6 +295,135 @@ class LegacyCopyMigrationTests(TransactionTestCase):
         )
         with self.assertRaises(IntegrityError), transaction.atomic():
             Payment.objects.filter(booking_id=self.b_confirmed).update(registration_id=reg.pk)
+
+
+class ResyncMigrationTests(TransactionTestCase):
+    """0007: what the legacy services wrote after 0005 reaches the ledger."""
+
+    def setUp(self):
+        old = _migrate(LEGACY)
+        User_ = old.get_model('auth', 'User')
+        self.event_pk = (
+            old.get_model('events', 'Event')
+            .objects.create(
+                title='Gig',
+                description='d',
+                organizer=User_.objects.create(username='org'),
+                date=timezone.now() + timedelta(days=5),
+                location='Club',
+                price=Decimal('100.00'),
+                currency='KZT',
+            )
+            .pk
+        )
+        reg = old.get_model('events', 'Registration').objects.create(
+            user=User_.objects.create(username='a'), event_id=self.event_pk, status='pending'
+        )
+        self.reopened = (
+            old.get_model('payments', 'Payment')
+            .objects.create(
+                registration=reg, amount=Decimal('100.00'), currency='kzt', stripe_checkout_session_id='cs_a1'
+            )
+            .pk
+        )
+        self.apps = _migrate(STATES)
+
+    def tearDown(self):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def legacy_writes(self):
+        """What the previous release does between 0005 and 0007."""
+        apps = self.apps
+        Payment = apps.get_model('payments', 'Payment')
+        Registration = apps.get_model('events', 'Registration')
+        User_ = apps.get_model('auth', 'User')
+        # The buyer reopened checkout (new session), then paid it.
+        Payment.objects.filter(pk=self.reopened).update(
+            stripe_checkout_session_id='cs_a2', stripe_payment_intent_id='pi_a2', status='completed'
+        )
+        # A ticket that started checkout after 0005 ran.
+        reg = Registration.objects.create(user=User_.objects.create(username='c'), event_id=self.event_pk)
+        self.fresh = Payment.objects.create(
+            registration=reg, amount=Decimal('100.00'), currency='kzt', stripe_checkout_session_id='cs_c'
+        ).pk
+        # A group booking paid after 0005 ran.
+        self.booking = (
+            apps.get_model('bookings', 'Booking')
+            .objects.create(
+                owner=User_.objects.create(username='b'),
+                event_id=self.event_pk,
+                status='confirmed',
+                stripe_session_id='cs_b',
+                stripe_payment_intent_id='pi_b',
+                amount_paid=Decimal('40.00'),
+            )
+            .pk
+        )
+        # A payment already written by the provider-neutral code: never touched.
+        reg = Registration.objects.create(user=User_.objects.create(username='n'), event_id=self.event_pk)
+        self.newer = Payment.objects.create(
+            registration=reg,
+            amount=Decimal('100.00'),
+            currency='KZT',
+            provider='stripe',
+            provider_session_id='cs_n2',
+            stripe_checkout_session_id='cs_stale',
+        ).pk
+
+    def test_the_resync_catches_up_and_refreshes_moved_ids(self):
+        self.legacy_writes()
+        apps = _migrate(RESYNCED)
+        Payment = apps.get_model('payments', 'Payment')
+
+        reopened = Payment.objects.get(pk=self.reopened)
+        self.assertEqual(
+            (reopened.provider, reopened.provider_session_id, reopened.provider_payment_id, reopened.status),
+            ('stripe', 'cs_a2', 'pi_a2', 'completed'),
+        )
+        note = reopened.provider_payload['legacy_import']
+        self.assertEqual(note['previous_session_ids'], ['cs_a1'])
+        self.assertEqual(note['resynced_by'], '0007_resync_legacy_payments')
+        self.assertEqual(reopened.attempt, 2)
+
+        fresh = Payment.objects.get(pk=self.fresh)
+        self.assertEqual((fresh.provider, fresh.provider_session_id, fresh.attempt), ('stripe', 'cs_c', 1))
+
+        booked = Payment.objects.get(booking_id=self.booking)
+        self.assertEqual(
+            (booked.provider_session_id, booked.provider_payment_id, booked.status, booked.amount),
+            ('cs_b', 'pi_b', 'completed', Decimal('40.00')),
+        )
+
+        newer = Payment.objects.get(pk=self.newer)
+        self.assertEqual((newer.provider_session_id, newer.provider_payload), ('cs_n2', {}))
+
+    def test_the_resync_is_idempotent(self):
+        self.legacy_writes()
+        apps = _migrate(RESYNCED)
+        Payment = apps.get_model('payments', 'Payment')
+        before = list(Payment.objects.order_by('pk').values())
+        counters = resync_module.resync_legacy_payments(apps)
+        self.assertEqual(counters['ticket_payments_refreshed'], 0)
+        self.assertEqual(counters['ticket_payments_updated'], 0)
+        self.assertEqual(counters['booking_payments_created'] + counters['booking_payments_updated'], 0)
+        self.assertEqual(list(Payment.objects.order_by('pk').values()), before)
+
+    def test_a_session_already_taken_is_not_moved(self):
+        self.legacy_writes()
+        Payment = self.apps.get_model('payments', 'Payment')
+        Payment.objects.filter(pk=self.reopened).update(stripe_checkout_session_id='cs_n2')
+        apps = _migrate(RESYNCED)
+        reopened = apps.get_model('payments', 'Payment').objects.get(pk=self.reopened)
+        self.assertEqual(reopened.provider_session_id, 'cs_a1')
+        self.assertEqual(reopened.provider_payload['legacy_import']['session_id_conflict'], 'cs_n2')
+        # Reverse is a no-op and forward again changes nothing.
+        _migrate(STATES)
+        apps = _migrate(RESYNCED)
+        self.assertEqual(
+            apps.get_model('payments', 'Payment').objects.get(pk=self.reopened).provider_session_id, 'cs_a1'
+        )
 
 
 class DashboardCountsBookingsOnceTests(APITestCase):
