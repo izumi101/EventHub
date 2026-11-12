@@ -1,7 +1,10 @@
 """
 Checkout for a whole group booking.
 
-Mirrors the single-seat payment flow:
+Mirrors the single-seat payment flow (payments.views.CreateCheckoutSessionView):
+  - KZT event with Freedom Pay enabled → one Freedom Pay payment for the whole
+    group (payments.freedompay_flow) with a QR code of the payment page. Mock
+    mode does not shortcut it: the gateway (or its emulator) is always called.
   - Mock mode (explicit dev opt-in) → confirm instantly, return success URL.
   - Real mode → one Stripe Checkout Session with N line items.
 """
@@ -42,25 +45,60 @@ def booking_amount(booking) -> Decimal:
     return sum((seat_total(bs) for bs in booking.seats.select_related('booking__event')), Decimal('0.00'))
 
 
-@transaction.atomic
 def create_booking_checkout(booking: Booking) -> dict:
-    """Return {checkout_url, mock} for a holding booking."""
+    """Open the payment of a holding booking; the answer has the shape of
+    `schema.BookingCheckoutResponseSerializer`.
+
+    Raises ValueError (not payable), a PaymentProviderError (Freedom Pay
+    unavailable) or a Stripe error.
+    """
+    from payments import freedompay_flow
+
     release_expired_bookings(booking.event)
+    # Routing reads without a lock; start_checkout validates again under its
+    # own locks. A booking with nothing to pay keeps the legacy path.
+    if freedompay_flow.provider_for(booking) == freedompay_flow.PROVIDER and booking_amount(booking) > 0:
+        # Not inside a transaction: the gateway is called with no row locked.
+        checkout = freedompay_flow.start_checkout(booking)
+        return {
+            'checkout_url': checkout.result.redirect_url,
+            'mock': False,
+            'session_id': checkout.result.session_id,
+            'provider': freedompay_flow.PROVIDER,
+            'payment_id': checkout.payment.pk,
+            'qr_code': checkout.qr_data_url,
+            'amount': str(checkout.payment.amount),
+            'currency': checkout.payment.currency.upper(),
+        }
+    return _legacy_checkout(booking)
+
+
+@transaction.atomic
+def _legacy_checkout(booking: Booking) -> dict:
+    """Mock or Stripe Checkout (every currency Freedom Pay does not take)."""
     booking = Booking.objects.select_for_update().select_related('event').get(pk=booking.pk)
     if booking.status != Booking.Status.HOLDING:
         raise ValueError('This booking is not awaiting payment.')
     if not booking.seats.exists():
         raise ValueError('This booking has no seats.')
+    currency = event_currency(booking.event)
+    amount = booking_amount(booking)
+    summary = {'payment_id': None, 'qr_code': None, 'amount': str(amount), 'currency': currency}
 
     # ── Mock mode: simulate instant success ──
     if settings.STRIPE_MOCK_MODE:
         booking.stripe_session_id = f'mock_booking_{booking.id}_{int(time.time())}'
         booking.save(update_fields=['stripe_session_id'])
-        confirm_booking(booking, amount_paid=booking_amount(booking))
-        return {'checkout_url': _success_url(booking), 'mock': True}
+        confirm_booking(booking, amount_paid=amount)
+        return {
+            'checkout_url': _success_url(booking),
+            'mock': True,
+            'session_id': booking.stripe_session_id,
+            'provider': 'mock',
+            **summary,
+        }
 
     # ── Real Stripe ──
-    currency = event_currency(booking.event)
     line_items = []
     for bs in booking.seats.select_related('seat', 'booking__event'):
         line_items.append(
@@ -93,7 +131,7 @@ def create_booking_checkout(booking: Booking) -> dict:
     )
     booking.stripe_session_id = session.id
     booking.save(update_fields=['stripe_session_id', 'hold_expires_at'])
-    return {'checkout_url': session.url, 'mock': False, 'session_id': session.id}
+    return {'checkout_url': session.url, 'mock': False, 'session_id': session.id, 'provider': 'stripe', **summary}
 
 
 def confirm_booking_by_session(session):

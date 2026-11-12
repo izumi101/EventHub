@@ -777,7 +777,12 @@ paths:
   /api/v1/bookings/{id}/checkout/:
     post:
       operationId: bookings_checkout_create
-      description: POST /api/bookings/{id}/checkout/  — pay for the whole group.
+      description: |-
+        POST /api/bookings/{id}/checkout/  — pay for the whole group.
+
+        KZT events go to Freedom Pay when it is enabled (the answer carries a QR
+        code of the payment page, like a single ticket); other currencies keep
+        the Stripe path (real, or simulated with PAYMENTS_MOCK_MODE).
       parameters:
       - in: path
         name: id
@@ -814,6 +819,12 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: No such object (or not visible to you).
+        '502':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
   /api/v1/bookings/{id}/refund/:
     post:
       operationId: bookings_refund_create
@@ -3475,8 +3486,9 @@ paths:
       operationId: payments_status_retrieve
       description: |-
         The buyer's payment, provider-neutral, for the success page and the QR
-        dialog to poll. A Freedom Pay payment that is still pending after a
-        few seconds is re-checked with the gateway (rate-limited).
+        dialog to poll: a single ticket's or a group booking's. A Freedom Pay
+        payment that is still pending after a few seconds is re-checked with
+        the gateway (rate-limited).
       parameters:
       - in: path
         name: payment_id
@@ -4577,20 +4589,58 @@ components:
       - total_price
     BookingCheckoutResponse:
       type: object
+      description: |-
+        Same shape as the single-ticket checkout (a Freedom Pay answer carries
+        the QR code of the payment page); the group's payment record exists only
+        on the Freedom Pay path.
       properties:
         checkout_url:
           type: string
           format: uri
           description: Redirect the buyer here to pay.
-        mock:
-          type: boolean
-          description: True when payments run in local mock mode.
         session_id:
           type: string
           description: Payment provider session id.
+        mock:
+          type: boolean
+          description: True when payments run in local mock mode.
+        provider:
+          allOf:
+          - $ref: '#/components/schemas/ProviderEnum'
+          description: |-
+            Who takes the money: KZT events use Freedom Pay.
+
+            * `stripe` - Stripe
+            * `freedompay` - Freedom Pay
+            * `mock` - Mock (development only)
+            * `offline` - Offline / manual
+        payment_id:
+          type: integer
+          nullable: true
+          description: Our payment reference for GET /payments/status/{payment_id}/;
+            null on the mock and Stripe paths.
+        qr_code:
+          type: string
+          nullable: true
+          description: '`data:image/png;base64,...` QR code of the payment page (pay
+            with a phone), or null.'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Amount charged, in `currency`.
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
       required:
+      - amount
       - checkout_url
+      - currency
       - mock
+      - payment_id
+      - provider
+      - qr_code
     BookingCreateRequest:
       type: object
       properties:
@@ -5822,6 +5872,9 @@ components:
         - ⏰ Event reminder\n* `seat_available` - \U0001F4BA Seat available\n* `event_updated`
         - \U0001F4DD Event updated\n* `event_cancelled` - ❌ Event cancelled\n* `payment_failed`
         - ⚠️ Payment failed\n* `review_reminder` - ⭐ Leave a review"
+    NullEnum:
+      enum:
+      - null
     OfflinePaymentRequestRequest:
       type: object
       properties:
@@ -6481,6 +6534,9 @@ components:
         * `disputed` - Disputed
     PaymentStatusResponse:
       type: object
+      description: |-
+        A payment pays for either a single ticket (`registration_*` set,
+        `booking_*` null) or a group booking (the other way round).
       properties:
         payment_id:
           type: integer
@@ -6491,7 +6547,7 @@ components:
           allOf:
           - $ref: '#/components/schemas/PaymentStatusEnum'
           description: |-
-            Provider-neutral state. `completed` with a registration that is not `confirmed` means the money arrived after the hold ended and is being refunded.
+            Provider-neutral state. `completed` with a registration that is not `confirmed` (or a booking that is not `confirmed`) means the money arrived after the hold ended and is being refunded.
 
             * `pending` - Pending
             * `completed` - Completed
@@ -6501,8 +6557,21 @@ components:
             * `disputed` - Disputed
         registration_id:
           type: integer
+          nullable: true
         registration_status:
-          $ref: '#/components/schemas/RegistrationStatusEnum'
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/RegistrationStatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
+        booking_id:
+          type: string
+          format: uuid
+          nullable: true
+        booking_status:
+          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/BookingStatusEnum'
+          - $ref: '#/components/schemas/NullEnum'
         event_id:
           type: integer
         event_title:
@@ -6517,6 +6586,8 @@ components:
           minLength: 3
       required:
       - amount
+      - booking_id
+      - booking_status
       - currency
       - event_id
       - event_title
