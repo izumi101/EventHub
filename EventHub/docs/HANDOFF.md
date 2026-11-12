@@ -2,8 +2,8 @@
 
 Read this first when continuing the production-readiness work in a new session.
 
-- **Branch:** `claude/laughing-lamport-n3z4dz` (all work below is pushed there; `main` has everything up to PR #2).
-- **Full roadmap:** the owner keeps `PLAN.md` (Russian, 11 phases + 1Б). Ask for it if you need task-level detail; the summary below is enough to continue Phase 0.
+- **Branch:** `phase-1/payment-providers` (local; phase 0 is merged into `main` as PR #3, merge commit `ab08b10`).
+- **Full roadmap:** the owner keeps `PLAN.md` (private, Russian, 11 phases + 1Б). Ask for it if you need task-level detail.
 - **Principle agreed with the owner:** everything at production level — no "minimal" variants.
 
 ## Working rules
@@ -22,13 +22,26 @@ Read this first when continuing the production-readiness work in a new session.
 | 0.2 repo tooling: ESLint + Prettier, pre-commit, gitleaks, PR title check, release-please, Renovate, SHA-pinned actions | done | `19fe845`, `f74feee`, then the 0.2 commits listed in `git log` (`build(frontend): add ESLint`, `style(frontend): format with prettier`, `ci: …`) |
 | 0.4 feature flags (self-hosted Unleash, opt-in compose profile `flags`) | done | `feat(flags)`, `feat(frontend): feature flag service`, `docs: feature flags guide` — see `FEATURE_FLAGS.md` |
 
-Phase 0 is complete. Next is **Phase 1 (payments)**.
+Phase 0 is complete.
+
+## Phase 1 — payments (in progress, demo-ready)
+
+| Step | Status |
+|---|---|
+| ADR 0001 provider layer, Freedom Pay protocol spec | done |
+| Provider-neutral ledger (`Payment` provider fields, `Refund`, `PaymentEvent`), state machine, `PaymentProvider` interface, mock + Stripe providers | done (Stripe provider not yet on the live path) |
+| Freedom Pay emulator (`fpay-emulator/`, in compose) | done |
+| Freedom Pay provider on the live single-ticket path for KZT events: checkout with QR (`pg_generate_qr`), signed result callback confirmed by `get_status3`, owner-only status endpoint, refunds through the outbox | done, demo mode against the emulator |
+| Least-privilege PostgreSQL roles (`docs/DATABASE_ROLES.md`), SQL data checks (`manage.py run_sql_checks`), Kazakhstan demo data (`seed_demo_kz`) | done |
+| Group bookings on Freedom Pay, Stripe moved onto the provider layer, contract migration (drop `stripe_*`), routing/circuit breaker, reconciliation job, full Stripe event set | open |
+
+The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. Open review findings (2026-11-11) on the legacy Stripe path are listed in `docs/reports/backend-payment-test-report.md`.
 
 ### Owner actions still required (GitHub settings, cannot be done from code)
 
 1. **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** (release-please opens its release PR).
 2. **Install the Renovate GitHub App** on the repository.
-3. **Branch protection on `main`**: PR required; required checks: `backend`, `frontend`, `docker`, `e2e`, `search-image`, `API contract`, `PR title`, `gitleaks`, `pre-commit`. Renovate runs with `platformAutomerge`, which merges immediately if no checks are required; without branch protection set `platformAutomerge` to `false` in `renovate.json`.
+3. **Branch protection on `main`**: PR required; required checks (the check-run names GitHub shows): `backend`, `frontend`, `docker`, `e2e`, `search-image`, `api-changes`, `PR title`, `gitleaks`, `pre-commit`. Renovate runs with `platformAutomerge`, which merges immediately if no checks are required; without branch protection set `platformAutomerge` to `false` in `renovate.json`.
 4. PRs opened with the default `GITHUB_TOKEN` (release PRs) do not trigger other workflows; to run required checks on them, give release-please a PAT or GitHub App token via its `token` input.
 5. First release: the repo has no tags. Tag the baseline `v1.0.0` after merging to `main` (or set `bootstrap-sha` in `release-please-config.json`), otherwise the first release PR walks the whole history.
 6. Locally, once per clone: `pre-commit install` (hooks: ruff, whitespace/EOF/yaml/json, gitleaks, ESLint, Prettier, Conventional Commits) and `npm ci` in `EventHub/frontend`.

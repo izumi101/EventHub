@@ -15,28 +15,13 @@ Tax/fee are added on top when `fees_passed_to_buyer`, otherwise absorbed
 
 from decimal import ROUND_HALF_UP, Decimal
 
-# Stripe amounts are integers in the currency's minor unit; these currencies
-# have no minor unit (or a 3-digit one) and must not be multiplied by 100.
-# https://docs.stripe.com/currencies#zero-decimal
-ZERO_DECIMAL_CURRENCIES = {
-    'BIF',
-    'CLP',
-    'DJF',
-    'GNF',
-    'JPY',
-    'KMF',
-    'KRW',
-    'MGA',
-    'PYG',
-    'RWF',
-    'UGX',
-    'VND',
-    'VUV',
-    'XAF',
-    'XOF',
-    'XPF',
-}
-THREE_DECIMAL_CURRENCIES = {'BHD', 'JOD', 'KWD', 'OMR', 'TND'}
+# Stripe's minor-unit tables and conversion moved to the Stripe provider
+# (ADR 0001); re-exported for the callers that still import them from here.
+from payments.providers.stripe import (  # noqa: F401
+    THREE_DECIMAL_CURRENCIES,
+    ZERO_DECIMAL_CURRENCIES,
+    to_minor_units,
+)
 
 
 def _q(value) -> Decimal:
@@ -46,19 +31,6 @@ def _q(value) -> Decimal:
 def event_currency(event) -> str:
     """ISO code of the money the event is priced in (upper case)."""
     return (getattr(event, 'currency', '') or 'USD').upper()
-
-
-def to_minor_units(amount, currency: str) -> int:
-    """Convert a decimal amount to the integer Stripe expects for `currency`."""
-    currency = (currency or 'USD').upper()
-    amount = Decimal(str(amount))
-    if currency in ZERO_DECIMAL_CURRENCIES:
-        return int(amount.quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-    cents = int((amount * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
-    if currency in THREE_DECIMAL_CURRENCIES:
-        # Stripe requires the last digit of 3-decimal amounts to be zero.
-        return cents * 10
-    return cents
 
 
 def _base_price(registration) -> Decimal:

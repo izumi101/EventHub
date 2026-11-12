@@ -340,14 +340,23 @@ def attendee_cancel(*, user, event: Event):
     if payment and payment.status == PaymentStatusChoices.COMPLETED:
         raise ValueError('This ticket is already paid — request a refund instead.')
 
-    cancel_registration(registration=registration)
+    # The checks above ran without a lock: cancel_registration repeats them
+    # under the row lock, so a payment confirmed meanwhile is never voided.
+    cancel_registration(registration=registration, only_unpaid_pending=True)
     return 'cancelled', None
 
 
 @transaction.atomic
-def cancel_registration(*, registration: Registration):
+def cancel_registration(*, registration: Registration, only_unpaid_pending: bool = False):
     """Void a registration: free its seat, give back its promo use and offer
-    the spot to the waitlist. Idempotent."""
+    the spot to the waitlist. Idempotent.
+
+    `only_unpaid_pending` (the buyer releasing their hold): after taking the
+    row lock, refuse unless the registration is still pending and its
+    payment has not completed. A payment confirmation locks the same row
+    (Payment, then Registration), so it either finished before this check
+    or finds the registration cancelled and refunds the late payment.
+    """
     registration = (
         Registration.objects.select_for_update(of=('self',))
         .select_related(
@@ -359,6 +368,14 @@ def cancel_registration(*, registration: Registration):
     )
     if registration.status in INACTIVE_REGISTRATION_STATUSES:
         return registration
+    if only_unpaid_pending:
+        from payments.models import Payment
+
+        if registration.status != RegistrationStatusChoices.PENDING:
+            raise ValueError('Tickets cannot be cancelled. Paid tickets can be refunded via a refund request.')
+        # A fresh read after the lock: sees a confirmation committed meanwhile.
+        if Payment.objects.filter(registration_id=registration.pk, status=PaymentStatusChoices.COMPLETED).exists():
+            raise ValueError('This ticket is already paid — request a refund instead.')
 
     released_seat = registration.seat
     if released_seat:

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{% if outcome == 'success' %}Payment successful{% else %}Payment failed{% endif %}{% endblock %}
+{% block head %}
+{% if back and back.method == 'AUTOGET' %}<meta http-equiv="refresh" content="{{ back.delay }};url={{ back.url }}">{% endif %}
+<script src="/static/autosubmit.js" defer></script>
+{% endblock %}
+{% block content %}
+{% include "_order.html" %}
+<section aria-live="polite" class="outcome outcome-{{ outcome }}">
+  {% if outcome == 'success' %}
+    <h2>Payment successful</h2>
+    <p>{{ amount }} has been paid.</p>
+  {% elif outcome == 'expired' %}
+    <h2>Payment expired</h2>
+    <p>This payment link is no longer valid. Nothing was charged.</p>
+  {% else %}
+    <h2>Payment failed</h2>
+    <p>{{ failure[1] }} <span class="hint">(code {{ failure[0] }})</span></p>
+  {% endif %}
+
+  {% if back %}
+    {% if back.http_method == 'get' %}
+      {% if back.auto %}<p class="hint">You will be returned to the shop in {{ back.delay }} seconds.</p>{% endif %}
+      <p><a class="button primary" href="{{ back.url }}">Return to the shop</a></p>
+    {% else %}
+      <form method="post" action="{{ back.url }}" {% if back.auto %}data-autosubmit="{{ back.delay }}"{% endif %}>
+        {% for name, value in back.fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        {% if back.auto %}<p class="hint">You will be returned to the shop in {{ back.delay }} seconds.</p>{% endif %}
+        <button type="submit" class="primary">Return to the shop</button>
+      </form>
+    {% endif %}
+  {% else %}
+    <p class="hint">You can close this window.</p>
+  {% endif %}
+</section>
+{% endblock %}

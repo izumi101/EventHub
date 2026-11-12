@@ -1,7 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { CheckoutSessionResponse, PaymentVerificationResponse } from '../models/models';
+import {
+  CheckoutSessionResponse,
+  PaymentStatusResponse,
+  PaymentVerificationResponse,
+} from '../models/models';
 import { environment } from '../../environments/environment';
 
 @Injectable({ providedIn: 'root' })
@@ -21,5 +25,10 @@ export class PaymentService {
     return this.http.get<PaymentVerificationResponse>(`${this.apiUrl}/verify/`, {
       params: { session_id: sessionId },
     });
+  }
+
+  /** Provider-neutral state of one of the buyer's payments (owner only). */
+  getPaymentStatus(paymentId: number): Observable<PaymentStatusResponse> {
+    return this.http.get<PaymentStatusResponse>(`${this.apiUrl}/status/${paymentId}/`);
   }
 }

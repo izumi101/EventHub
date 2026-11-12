@@ -10,6 +10,10 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+from payments.providers.conf import parse_enabled as parse_enabled_providers
+from payments.providers.conf import production_problems as payment_production_problems
+from payments.providers.conf import unknown_codes as unknown_payment_providers
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
 
@@ -125,12 +129,42 @@ CACHES = {
     ),
 }
 
+# ---- Database roles (docs/DATABASE_ROLES.md) ---- #
+# POSTGRES_USER owns the schema: it runs the migrations and creates the roles
+# below (`manage.py setup_db_roles`, run by entrypoint.sh after `migrate`).
+# Everything else (gunicorn, the worker, ordinary manage.py commands) connects
+# as the least-privilege POSTGRES_APP_USER (data only, no DDL) once
+# POSTGRES_APP_PASSWORD is set. Without it (an .env from before the roles
+# existed) the app keeps connecting as the owner and prints a warning.
+# The owner is always used by the test runner (it needs CREATEDB), by the
+# commands in DB_OWNER_COMMANDS and by a process started with
+# DJANGO_DB_AS_OWNER=1.
+DB_OWNER_USER = os.environ.get('POSTGRES_USER', 'eventhub_user')
+DB_OWNER_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'eventhub_password')
+DB_APP_USER = os.environ.get('POSTGRES_APP_USER', '').strip() or 'eventhub_app'
+DB_APP_PASSWORD = os.environ.get('POSTGRES_APP_PASSWORD', '')
+DB_READONLY_USER = os.environ.get('POSTGRES_READONLY_USER', '').strip() or 'eventhub_readonly'
+DB_READONLY_PASSWORD = os.environ.get('POSTGRES_READONLY_PASSWORD', '')
+DB_OWNER_COMMANDS = {'migrate', 'setup_db_roles', 'verify_db_roles'}
+DB_AS_OWNER = (
+    TESTING
+    or env_bool('DJANGO_DB_AS_OWNER', False)
+    or (len(sys.argv) > 1 and Path(sys.argv[0]).name == 'manage.py' and sys.argv[1] in DB_OWNER_COMMANDS)
+)
+DB_USES_APP_ROLE = bool(DB_APP_PASSWORD) and not DB_AS_OWNER
+if not DB_APP_PASSWORD and not DB_AS_OWNER:
+    sys.stderr.write(
+        f'WARNING: POSTGRES_APP_PASSWORD is not set, so the app connects to PostgreSQL as the schema owner '
+        f'"{DB_OWNER_USER}". Set POSTGRES_APP_PASSWORD (and POSTGRES_READONLY_PASSWORD) to use the '
+        f'least-privilege roles (docs/DATABASE_ROLES.md).\n'
+    )
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('POSTGRES_DB', 'eventhub'),
-        'USER': os.environ.get('POSTGRES_USER', 'eventhub_user'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'eventhub_password'),
+        'USER': DB_APP_USER if DB_USES_APP_ROLE else DB_OWNER_USER,
+        'PASSWORD': DB_APP_PASSWORD if DB_USES_APP_ROLE else DB_OWNER_PASSWORD,
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
@@ -260,20 +294,51 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:4200').rstrip('/')
 
+# ---- Payments (docs/adr/0001-payment-provider-layer.md) ---- #
+# Providers that may take money, comma separated. Each enabled provider must
+# be fully configured when DJANGO_DEBUG=0 (see the guard at the bottom).
+PAYMENT_PROVIDERS_ENABLED = parse_enabled_providers(os.environ.get('PAYMENT_PROVIDERS_ENABLED', 'stripe'))
+
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_PUBLISHABLE_KEY = os.environ.get('STRIPE_PUBLISHABLE_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+# Only for pointing the Stripe provider at a local fake (e.g. stripe-mock);
+# empty means Stripe's own API address.
+STRIPE_API_BASE = os.environ.get('STRIPE_API_BASE', '').strip()
 
-
-def _is_placeholder(value):
-    return not value or 'your_' in value or value.endswith('_here')
-
+# Freedom Pay (KZT, docs/payments/freedompay-protocol.md). No default API
+# address: the demo points it at the emulator (http://fpay-emulator:8080).
+# FREEDOMPAY_RESULT_URL is the callback address the gateway can reach,
+# e.g. https://eventhub.example/api/v1/payments/callback/freedompay/.
+FREEDOMPAY_API_URL = os.environ.get('FREEDOMPAY_API_URL', '').strip().rstrip('/')
+FREEDOMPAY_MERCHANT_ID = os.environ.get('FREEDOMPAY_MERCHANT_ID', '').strip()
+FREEDOMPAY_SECRET_KEY = os.environ.get('FREEDOMPAY_SECRET_KEY', '')
+FREEDOMPAY_RESULT_URL = os.environ.get('FREEDOMPAY_RESULT_URL', '').strip()
+# pg_testing_mode=1 on every payment (test transactions only).
+FREEDOMPAY_TESTING_MODE = env_bool('FREEDOMPAY_TESTING_MODE', False)
+# Lets a DJANGO_DEBUG=0 deployment use the emulator and demo keys (a demo
+# that never takes real money); the start-up guard refuses them otherwise.
+FREEDOMPAY_DEMO_MODE = env_bool('FREEDOMPAY_DEMO_MODE', False)
 
 # Simulated payments (tickets confirmed without charging anyone) are an
-# explicit local-development opt-in. A missing Stripe key never turns them on.
-STRIPE_MOCK_MODE = env_bool('STRIPE_MOCK_MODE', False)
-if STRIPE_MOCK_MODE and not DEBUG and not TESTING:
-    raise ImproperlyConfigured('STRIPE_MOCK_MODE=1 is only allowed together with DJANGO_DEBUG=1.')
+# explicit local-development opt-in. A missing provider key never turns them
+# on. STRIPE_MOCK_MODE is the deprecated name, used while PAYMENTS_MOCK_MODE
+# is unset or empty; the legacy services still read the STRIPE_MOCK_MODE
+# setting, which always mirrors PAYMENTS_MOCK_MODE.
+PAYMENTS_MOCK_MODE = (
+    env_bool('PAYMENTS_MOCK_MODE', False)
+    if os.environ.get('PAYMENTS_MOCK_MODE', '').strip()
+    else env_bool('STRIPE_MOCK_MODE', False)
+)
+STRIPE_MOCK_MODE = PAYMENTS_MOCK_MODE
+if PAYMENTS_MOCK_MODE and not DEBUG and not TESTING:
+    raise ImproperlyConfigured(
+        'PAYMENTS_MOCK_MODE=1 (or the deprecated STRIPE_MOCK_MODE=1) is only allowed together with DJANGO_DEBUG=1.'
+    )
+if _unknown_providers := unknown_payment_providers(PAYMENT_PROVIDERS_ENABLED):
+    raise ImproperlyConfigured(
+        f'PAYMENT_PROVIDERS_ENABLED lists unknown payment providers: {", ".join(_unknown_providers)}'
+    )
 
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
@@ -399,12 +464,18 @@ if not DEBUG and not TESTING:
     _problems = []
     if '*' in ALLOWED_HOSTS:
         _problems.append('DJANGO_ALLOWED_HOSTS must list real host names, not "*"')
-    if _is_placeholder(STRIPE_SECRET_KEY) or _is_placeholder(STRIPE_WEBHOOK_SECRET):
-        _problems.append('STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET must be set')
+    _problems += payment_production_problems(
+        PAYMENT_PROVIDERS_ENABLED, mock_mode=PAYMENTS_MOCK_MODE, get_setting=lambda name: globals().get(name)
+    )
     if 'console' in EMAIL_BACKEND or 'locmem' in EMAIL_BACKEND:
         _problems.append(
             'EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
             'sign-up and password-reset codes are delivered by email'
+        )
+    if DB_APP_PASSWORD and DB_APP_USER in (DB_OWNER_USER, DB_READONLY_USER):
+        _problems.append(
+            'POSTGRES_APP_USER must be its own role, not POSTGRES_USER or POSTGRES_READONLY_USER '
+            '(docs/DATABASE_ROLES.md)'
         )
     if _problems:
         raise ImproperlyConfigured(

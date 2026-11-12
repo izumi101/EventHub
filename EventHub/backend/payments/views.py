@@ -2,7 +2,11 @@ import logging
 
 import stripe
 from django.conf import settings
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.utils.decorators import method_decorator
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
@@ -16,6 +20,7 @@ from events.models import Registration
 
 from . import schema
 from .models import Payment
+from .providers.base import PaymentProviderError
 from .services import (
     confirm_stripe_checkout_session,
     create_checkout_session,
@@ -38,8 +43,11 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class CreateCheckoutSessionView(APIView):
     """
-    Creates a Stripe Checkout Session for a paid event registration.
-    Returns the session ID and the checkout URL to redirect the user to Stripe.
+    Opens a payment page for a paid event registration and returns its URL.
+
+    KZT events go to Freedom Pay when it is enabled (the answer also carries
+    a QR code of the payment page); every other currency keeps the Stripe
+    path (real, or simulated with PAYMENTS_MOCK_MODE).
     """
 
     permission_classes = [IsAuthenticated]
@@ -55,7 +63,9 @@ class CreateCheckoutSessionView(APIView):
         },
     )
     def post(self, request, registration_id):
-        registration = get_object_or_404(Registration, id=registration_id, user=request.user)
+        registration = get_object_or_404(
+            Registration.objects.select_related('event'), id=registration_id, user=request.user
+        )
 
         from events.billing import registration_amount
 
@@ -65,7 +75,23 @@ class CreateCheckoutSessionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        from . import freedompay_flow
+
         try:
+            if freedompay_flow.provider_for(registration) == freedompay_flow.PROVIDER:
+                checkout = freedompay_flow.start_checkout(registration)
+                return Response(
+                    {
+                        'checkout_url': checkout.result.redirect_url,
+                        'session_id': checkout.result.session_id,
+                        'provider': freedompay_flow.PROVIDER,
+                        'payment_id': checkout.payment.pk,
+                        'qr_code': checkout.qr_data_url,
+                        'amount': str(checkout.payment.amount),
+                        'currency': checkout.payment.currency.upper(),
+                    }
+                )
+
             # Local dev with explicit STRIPE_MOCK_MODE: simulate a successful payment.
             if settings.STRIPE_MOCK_MODE:
                 success_url, _payment = create_mock_checkout_session(registration=registration)
@@ -74,6 +100,11 @@ class CreateCheckoutSessionView(APIView):
                         'checkout_url': success_url,
                         'session_id': _payment.stripe_checkout_session_id,
                         'mock': True,
+                        'provider': 'mock',
+                        'payment_id': _payment.pk,
+                        'qr_code': None,
+                        'amount': str(_payment.amount),
+                        'currency': _payment.currency.upper(),
                     }
                 )
 
@@ -82,11 +113,22 @@ class CreateCheckoutSessionView(APIView):
                 {
                     'checkout_url': checkout_session.url,
                     'session_id': checkout_session.id,
+                    'provider': 'stripe',
+                    'payment_id': _payment.pk,
+                    'qr_code': None,
+                    'amount': str(_payment.amount),
+                    'currency': _payment.currency.upper(),
                 }
             )
         except ValueError as exc:
             # Not payable any more: paid already, cancelled, hold expired.
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except PaymentProviderError as exc:
+            logger.error('Payment provider error creating checkout: %s', exc)
+            return Response(
+                {'error': 'The payment provider is unavailable. Please try again.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         except stripe.error.StripeError as e:
             logger.error('Stripe error creating checkout session: %s', e)
             return Response(
@@ -269,3 +311,83 @@ class InvoiceView(APIView):
         from .invoice import invoice_response
 
         return invoice_response(registration)
+
+
+class PaymentStatusView(APIView):
+    """The buyer's payment, provider-neutral, for the success page and the QR
+    dialog to poll. A Freedom Pay payment that is still pending after a
+    few seconds is re-checked with the gateway (rate-limited)."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={200: schema.PaymentStatusResponseSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+    )
+    def get(self, request, payment_id):
+        # Owner only: anybody else gets the same 404 as a missing payment.
+        payment = get_object_or_404(
+            Payment.objects.select_related('registration__event'),
+            pk=payment_id,
+            registration__user=request.user,
+        )
+        from .freedompay_flow import refresh_status
+
+        payment = refresh_status(payment)
+        registration = payment.registration
+        registration.refresh_from_db(fields=['status'])
+        return Response(
+            {
+                'payment_id': payment.pk,
+                'provider': payment.provider
+                or ('mock' if payment.stripe_checkout_session_id.startswith('mock_') else 'stripe'),
+                'status': payment.status,
+                'registration_id': registration.pk,
+                'registration_status': registration.status,
+                'event_id': registration.event_id,
+                'event_title': registration.event.title,
+                'amount': str(payment.amount),
+                'currency': (payment.currency or 'usd').upper(),
+            }
+        )
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class FreedomPayCallbackView(View):
+    """Freedom Pay Result notifications (server to server).
+
+    Public and without CSRF (the gateway has no session); authenticity is
+    the `pg_sig` signature plus a `get_status3.php` confirmation before a
+    ticket is issued. Every answer is the signed XML the gateway expects;
+    a notification we cannot authenticate is answered `error` with HTTP 400
+    and changes nothing.
+    """
+
+    http_method_names = ['post']
+
+    def post(self, request):
+        from .freedompay_flow import PaymentNotConfirmed, handle_notification
+        from .freedompay_flow import provider as freedompay_provider
+        from .providers.base import InvalidCallback
+        from .providers.freedompay import MAX_CALLBACK_BYTES
+
+        gateway = freedompay_provider()
+        try:
+            declared = int(request.META.get('CONTENT_LENGTH') or 0)
+        except ValueError:
+            declared = 0
+        if declared > MAX_CALLBACK_BYTES:
+            return HttpResponse(status=413)
+        try:
+            result = gateway.handle_callback(request)
+        except InvalidCallback as exc:
+            logger.warning('Rejected Freedom Pay notification: %s', exc)
+            if exc.code == 'too_large':
+                return HttpResponse(status=413)
+            return gateway.invalid_callback_response(request, 'Invalid notification')
+        try:
+            outcome = handle_notification(gateway, result)
+        except PaymentNotConfirmed as exc:
+            # Not applied: answering `error` makes the gateway retry later.
+            logger.warning('Freedom Pay payment %s not confirmed yet: %s', result.provider_payment_id, exc)
+            return gateway.callback_response(result, 'error')
+        return gateway.callback_response(result, outcome)

@@ -1278,8 +1278,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * @description Creates a Stripe Checkout Session for a paid event registration.
-         *     Returns the session ID and the checkout URL to redirect the user to Stripe.
+         * @description Opens a payment page for a paid event registration and returns its URL.
+         *
+         *     KZT events go to Freedom Pay when it is enabled (the answer also carries
+         *     a QR code of the payment page); every other currency keeps the Stripe
+         *     path (real, or simulated with PAYMENTS_MOCK_MODE).
          */
         post: operations["payments_create_checkout_create"];
         delete?: never;
@@ -1339,6 +1342,27 @@ export interface paths {
         put?: never;
         /** @description Organizer refunds a registration's payment (full or partial). */
         post: operations["payments_refund_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/status/{payment_id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description The buyer's payment, provider-neutral, for the success page and the QR
+         *     dialog to poll. A Freedom Pay payment that is still pending after a
+         *     few seconds is re-checked with the gateway (rate-limited).
+         */
+        get: operations["payments_status_retrieve"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1825,6 +1849,25 @@ export interface components {
             session_id: string;
             /** @description Present (true) in local mock mode. */
             mock?: boolean;
+            /**
+             * @description Who takes the money: KZT events use Freedom Pay.
+             *
+             *     * `stripe` - Stripe
+             *     * `freedompay` - Freedom Pay
+             *     * `mock` - Mock (development only)
+             *     * `offline` - Offline / manual
+             */
+            provider: components["schemas"]["ProviderEnum"];
+            /** @description Our payment reference, for GET /payments/status/{payment_id}/. */
+            payment_id: number;
+            /** @description `data:image/png;base64,...` QR code of the payment page (pay with a phone), or null. */
+            qr_code: string | null;
+            /**
+             * Format: decimal
+             * @description Amount charged, in `currency`.
+             */
+            amount: string;
+            currency: string;
         };
         ClaimSeatRequest: {
             seat_id: number;
@@ -2499,10 +2542,35 @@ export interface components {
          * @description * `pending` - Pending
          *     * `completed` - Completed
          *     * `failed` - Failed
+         *     * `expired` - Expired
          *     * `refunded` - Refunded
+         *     * `disputed` - Disputed
          * @enum {string}
          */
-        PaymentStatusEnum: "pending" | "completed" | "failed" | "refunded";
+        PaymentStatusEnum: "pending" | "completed" | "failed" | "expired" | "refunded" | "disputed";
+        PaymentStatusResponse: {
+            payment_id: number;
+            /** @description Payment provider code (`freedompay`, `stripe`, `mock`, ...). */
+            provider: string;
+            /**
+             * @description Provider-neutral state. `completed` with a registration that is not `confirmed` means the money arrived after the hold ended and is being refunded.
+             *
+             *     * `pending` - Pending
+             *     * `completed` - Completed
+             *     * `failed` - Failed
+             *     * `expired` - Expired
+             *     * `refunded` - Refunded
+             *     * `disputed` - Disputed
+             */
+            status: components["schemas"]["PaymentStatusEnum"];
+            registration_id: number;
+            registration_status: components["schemas"]["RegistrationStatusEnum"];
+            event_id: number;
+            event_title: string;
+            /** Format: decimal */
+            amount: string;
+            currency: string;
+        };
         PaymentVerification: {
             status: components["schemas"]["PaymentStatusEnum"];
             event_title: string;
@@ -2590,6 +2658,14 @@ export interface components {
             ticket_type_id?: number | null;
             seat_id?: number | null;
         };
+        /**
+         * @description * `stripe` - Stripe
+         *     * `freedompay` - Freedom Pay
+         *     * `mock` - Mock (development only)
+         *     * `offline` - Offline / manual
+         * @enum {string}
+         */
+        ProviderEnum: "stripe" | "freedompay" | "mock" | "offline";
         /**
          * @description * `text` - Short text
          *     * `textarea` - Long text
@@ -6718,6 +6794,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    payments_status_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                payment_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentStatusResponse"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description No such object (or not visible to you). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
                 };
             };
         };

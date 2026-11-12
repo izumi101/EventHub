@@ -9,4 +9,6 @@ urlpatterns = [
     path('refund/<int:registration_id>/', views.RefundPaymentView.as_view(), name='refund-payment'),
     path('mark-offline/<int:registration_id>/', views.MarkOfflinePaidView.as_view(), name='mark-offline-paid'),
     path('invoice/<int:registration_id>/', views.InvoiceView.as_view(), name='invoice'),
+    path('status/<int:payment_id>/', views.PaymentStatusView.as_view(), name='payment-status'),
+    path('callback/freedompay/', views.FreedomPayCallbackView.as_view(), name='freedompay-callback'),
 ]

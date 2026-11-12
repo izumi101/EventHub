@@ -1,0 +1,19 @@
+# Direct runtime dependencies (version ranges). The Docker image installs the
+# pinned requirements.lock generated from this file (run in this directory):
+#   uv pip compile requirements.txt --python-version 3.12 --python-platform x86_64-manylinux_2_28 --exclude-newer 2026-10-17 -o requirements.lock
+# --exclude-newer keeps every pin at least two weeks old at lock time; move the
+# date forward when you regenerate.
+starlette>=0.46
+# Form and multipart request bodies (Starlette's form parser).
+python-multipart>=0.0.20
+jinja2>=3.1
+# Outbound Check/Result callbacks.
+httpx>=0.28
+# Plain uvicorn (h11): pure Python, so the lock is platform independent.
+uvicorn>=0.34
+# Safe XML parsing of pg_xml requests and of merchant callback replies.
+defusedxml>=0.7
+# pg_generate_qr: QR code PNG of the payment page URL.
+segno>=1.6
+# IANA time zones for FPAY_TIMEZONE, independent of the image's system tzdata.
+tzdata>=2025.1

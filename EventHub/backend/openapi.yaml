@@ -3268,8 +3268,11 @@ paths:
     post:
       operationId: payments_create_checkout_create
       description: |-
-        Creates a Stripe Checkout Session for a paid event registration.
-        Returns the session ID and the checkout URL to redirect the user to Stripe.
+        Opens a payment page for a paid event registration and returns its URL.
+
+        KZT events go to Freedom Pay when it is enabled (the answer also carries
+        a QR code of the payment page); every other currency keeps the Stripe
+        path (real, or simulated with PAYMENTS_MOCK_MODE).
       parameters:
       - in: path
         name: registration_id
@@ -3467,6 +3470,42 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
           description: The request was refused; see `error`.
+  /api/v1/payments/status/{payment_id}/:
+    get:
+      operationId: payments_status_retrieve
+      description: |-
+        The buyer's payment, provider-neutral, for the success page and the QR
+        dialog to poll. A Freedom Pay payment that is still pending after a
+        few seconds is re-checked with the gateway (rate-limited).
+      parameters:
+      - in: path
+        name: payment_id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - payments
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatusResponse'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: No such object (or not visible to you).
   /api/v1/payments/verify/:
     get:
       operationId: payments_verify_retrieve
@@ -4959,8 +4998,40 @@ components:
         mock:
           type: boolean
           description: Present (true) in local mock mode.
+        provider:
+          allOf:
+          - $ref: '#/components/schemas/ProviderEnum'
+          description: |-
+            Who takes the money: KZT events use Freedom Pay.
+
+            * `stripe` - Stripe
+            * `freedompay` - Freedom Pay
+            * `mock` - Mock (development only)
+            * `offline` - Offline / manual
+        payment_id:
+          type: integer
+          description: Our payment reference, for GET /payments/status/{payment_id}/.
+        qr_code:
+          type: string
+          nullable: true
+          description: '`data:image/png;base64,...` QR code of the payment page (pay
+            with a phone), or null.'
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Amount charged, in `currency`.
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
       required:
+      - amount
       - checkout_url
+      - currency
+      - payment_id
+      - provider
+      - qr_code
       - session_id
     ClaimSeatRequest:
       type: object
@@ -6397,13 +6468,63 @@ components:
       - pending
       - completed
       - failed
+      - expired
       - refunded
+      - disputed
       type: string
       description: |-
         * `pending` - Pending
         * `completed` - Completed
         * `failed` - Failed
+        * `expired` - Expired
         * `refunded` - Refunded
+        * `disputed` - Disputed
+    PaymentStatusResponse:
+      type: object
+      properties:
+        payment_id:
+          type: integer
+        provider:
+          type: string
+          description: Payment provider code (`freedompay`, `stripe`, `mock`, ...).
+        status:
+          allOf:
+          - $ref: '#/components/schemas/PaymentStatusEnum'
+          description: |-
+            Provider-neutral state. `completed` with a registration that is not `confirmed` means the money arrived after the hold ended and is being refunded.
+
+            * `pending` - Pending
+            * `completed` - Completed
+            * `failed` - Failed
+            * `expired` - Expired
+            * `refunded` - Refunded
+            * `disputed` - Disputed
+        registration_id:
+          type: integer
+        registration_status:
+          $ref: '#/components/schemas/RegistrationStatusEnum'
+        event_id:
+          type: integer
+        event_title:
+          type: string
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+      required:
+      - amount
+      - currency
+      - event_id
+      - event_title
+      - payment_id
+      - provider
+      - registration_id
+      - registration_status
+      - status
     PaymentVerification:
       type: object
       properties:
@@ -6615,6 +6736,18 @@ components:
           nullable: true
       required:
       - code
+    ProviderEnum:
+      enum:
+      - stripe
+      - freedompay
+      - mock
+      - offline
+      type: string
+      description: |-
+        * `stripe` - Stripe
+        * `freedompay` - Freedom Pay
+        * `mock` - Mock (development only)
+        * `offline` - Offline / manual
     QuestionTypeEnum:
       enum:
       - text

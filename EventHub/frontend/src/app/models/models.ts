@@ -50,6 +50,7 @@ export type PaymentStatus = Schemas['PaymentStatusEnum'];
 export type BookingStatus = Schemas['BookingStatusEnum'];
 export type CheckoutSessionResponse = Schemas['CheckoutSessionResponse'];
 export type PaymentVerificationResponse = Schemas['PaymentVerification'];
+export type PaymentStatusResponse = Schemas['PaymentStatusResponse'];
 
 export type CheckInList = Schemas['CheckInList'];
 export type CheckInAttendee = Schemas['CheckInListAttendee'];

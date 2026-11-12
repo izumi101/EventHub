@@ -1,0 +1,8 @@
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal

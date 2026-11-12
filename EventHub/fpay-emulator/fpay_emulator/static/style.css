@@ -1,0 +1,132 @@
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --text: #1c1f24;
+  --muted: #5a6270;
+  --border: #d5d9e0;
+  --accent: #0b6b4f;
+  --accent-text: #ffffff;
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+  --focus: #1f5fd1;
+  --radius: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121417;
+    --surface: #1c1f24;
+    --text: #eceef2;
+    --muted: #a7aebb;
+    --border: #3a3f48;
+    --accent: #36b38a;
+    --accent-text: #0c1a14;
+    --danger: #ff8a80;
+    --danger-bg: #3a1d1b;
+    --focus: #8ab4ff;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 16px; top: 8px; background: var(--surface); padding: 8px; z-index: 1; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;
+}
+
+.banner {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between;
+  max-width: 560px; margin: 24px auto 12px; padding: 0 16px;
+}
+.brand { font-weight: 700; }
+.badge {
+  display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px;
+  border-radius: 999px; border: 1px solid var(--border); color: var(--muted);
+}
+.badge-test { color: var(--danger); border-color: var(--danger); }
+
+.card {
+  max-width: 560px; margin: 0 auto; padding: 24px 16px 32px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+@media (min-width: 600px) { .card { padding: 28px 32px 36px; } }
+.card:focus { outline: none; }
+
+.foot { max-width: 560px; margin: 16px auto 32px; padding: 0 16px; color: var(--muted); font-size: 13px; }
+
+h1, h2 { line-height: 1.25; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 18px; margin: 28px 0 12px; }
+.description { margin: 0 0 12px; color: var(--muted); }
+
+.facts { display: flex; flex-wrap: wrap; gap: 8px 24px; margin: 0; }
+.facts div { min-width: 120px; }
+.facts dt { font-size: 13px; color: var(--muted); }
+.facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.facts .amount { font-size: 24px; }
+
+form { margin: 0; }
+fieldset { border: 0; padding: 0; margin: 0; }
+legend { font-weight: 600; margin-bottom: 4px; }
+.row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.field { margin-bottom: 14px; }
+label { display: block; font-size: 14px; margin-bottom: 4px; }
+input {
+  width: 100%; font: inherit; padding: 10px 12px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.invalid input { border-color: var(--danger); }
+.error { color: var(--danger); font-size: 14px; margin: 4px 0 0; }
+.alert { background: var(--danger-bg); color: var(--danger); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
+.alert p { margin: 0; }
+.note { background: var(--bg); padding: 8px 12px; border-radius: 8px; }
+.hint { color: var(--muted); font-size: 14px; }
+
+button, .button {
+  display: inline-block; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer;
+  padding: 10px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); min-height: 44px;
+}
+.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+form > .primary { width: 100%; }
+.buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+
+.testcards { margin-top: 24px; }
+.testcards summary { cursor: pointer; font-weight: 600; }
+.testcards table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+.testcards th, .testcards td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.testcards code { overflow-wrap: anywhere; }
+.testcards .table-scroll { overflow-x: auto; }
+.testcards td { white-space: nowrap; }
+.testcards td:nth-child(5) { white-space: normal; min-width: 10em; }
+/* Phones: expiry, CVV and cardholder are in the summary line and "Use" fills them in. */
+@media (max-width: 640px) {
+  .testcards .detail { display: none; }
+  .testcards table { font-size: 13px; }
+  .testcards td, .testcards th { padding: 6px 2px; }
+}
+.testcards .use-card { min-height: 36px; padding: 4px 12px; }
+
+.outcome-success h2 { color: var(--accent); }
+.outcome-error h2, .outcome-expired h2 { color: var(--danger); }
+
+.spinner {
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 4px solid var(--border); border-top-color: var(--accent);
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }

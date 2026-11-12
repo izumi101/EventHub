@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import {
@@ -13,7 +13,8 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { SeoService } from '../../services/seo.service';
-import { Event, Registration } from '../../models/models';
+import { CheckoutSessionResponse, Event, Registration, ZonePrice } from '../../models/models';
+import { PaymentQrComponent } from '../payment-qr/payment-qr.component';
 import { EventReviewsComponent } from './event-reviews.component';
 import { EventCheckoutModalComponent } from './event-checkout-modal.component';
 import { RefundRequestModalComponent } from './refund-request-modal.component';
@@ -37,6 +38,12 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
 import { supportsWebShare } from '../../utils/browser-support';
 
+/** The cheapest zone of a seat map, or null without zones (the price a seated event starts "from"). */
+export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined): string | null {
+  if (!zones?.length) return null;
+  return zones.reduce((min, z) => (Number(z.price) < Number(min.price) ? z : min)).price;
+}
+
 /** Event page: hero, status banners, key info and the booking sidebar.
  *
  *  Checkout selections live in EventCheckoutModalComponent, reviews in
@@ -54,6 +61,7 @@ import { supportsWebShare } from '../../utils/browser-support';
     EventReviewsComponent,
     EventCheckoutModalComponent,
     RefundRequestModalComponent,
+    PaymentQrComponent,
   ],
   template: `
     <!-- Loading -->
@@ -404,6 +412,9 @@ import { supportsWebShare } from '../../utils/browser-support';
                             Free
                           } @else if (event.has_ticket_types) {
                             {{ event.price_from | money: event.currency }}
+                          } @else if (seatPriceFrom) {
+                            <span class="text-base font-semibold text-muted-foreground">from</span>
+                            {{ seatPriceFrom | money: event.currency }}
                           } @else if (pricingData && pricingData.multiplier !== 1.0) {
                             {{ pricingData.current_price | money: event.currency }}
                           } @else {
@@ -411,20 +422,12 @@ import { supportsWebShare } from '../../utils/browser-support';
                           }
                         </span>
                         @if (
-                          !event.has_ticket_types &&
-                          pricingData &&
-                          !event.is_free &&
-                          pricingData.base_price !== pricingData.current_price
+                          !event.has_ticket_types && !seatPriceFrom && pricingData && !event.is_free
                         ) {
-                          <span class="text-sm text-muted-foreground line-through">{{
-                            pricingData.base_price | money: event.currency
-                          }}</span>
-                        }
-                        @if (!event.has_ticket_types && pricingData && !event.is_free) {
                           <span
                             class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
                             [class]="demandBadgeClass(pricingData.demand_level)"
-                            >{{ pricingData.demand_level }}</span
+                            >{{ pricingData.demand_level }} demand</span
                           >
                         }
                       </div>
@@ -432,8 +435,20 @@ import { supportsWebShare } from '../../utils/browser-support';
                         <p class="text-xs text-muted-foreground mt-1">
                           {{ event.ticket_types.length }} ticket types available
                         </p>
+                      } @else if (seatPriceFrom) {
+                        <p class="text-xs text-muted-foreground mt-1">
+                          per seat; the price depends on the seat zone
+                        </p>
                       } @else if (!event.is_free) {
-                        <p class="text-xs text-muted-foreground mt-1">per ticket</p>
+                        <p class="text-xs text-muted-foreground mt-1">
+                          per ticket
+                          @if (
+                            pricingData && pricingData.base_price !== pricingData.current_price
+                          ) {
+                            · base price {{ pricingData.base_price | money: event.currency }},
+                            demand ×{{ pricingData.multiplier }}
+                          }
+                        </p>
                       }
                     </div>
 
@@ -712,6 +727,8 @@ import { supportsWebShare } from '../../utils/browser-support';
                           <span class="spinner spinner-sm"></span> Processing...
                         } @else if (event.has_ticket_types) {
                           Choose tickets
+                        } @else if (seatPriceFrom) {
+                          {{ 'Choose a seat — from ' + (seatPriceFrom | money: event.currency) }}
                         } @else {
                           {{
                             event.is_free
@@ -773,6 +790,11 @@ import { supportsWebShare } from '../../utils/browser-support';
           />
         }
 
+        <!-- Pay with a phone: QR code of the provider's payment page (Freedom Pay) -->
+        @if (qrCheckout) {
+          <app-payment-qr [checkout]="qrCheckout" (closed)="onQrClosed()" />
+        }
+
         <!-- Refund request modal -->
         @if (showRefundModal) {
           <app-refund-request-modal
@@ -806,7 +828,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   myRegistration: Registration | null = null;
   showRefundModal = false;
   showCheckout = false;
+  /** Checkout answer with a QR code, shown in the QR payment dialog. */
+  qrCheckout: CheckoutSessionResponse | null = null;
   pricingData: DynamicPrice | null = null;
+  /** Cheapest seat zone of an event with a seat map: seats are priced by zone, not by demand. */
+  seatPriceFrom: string | null = null;
 
   // Virtual waiting queue
   queueInfo: QueueStatus | null = null;
@@ -889,6 +915,32 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     this.stopQueuePolling();
   }
 
+  /** Back from the payment page via the browser's Back button: the page
+   *  comes from the back/forward cache with `registering` still true. */
+  @HostListener('window:pageshow', ['$event'])
+  onPageShow(event: PageTransitionEvent): void {
+    if (!event.persisted) return;
+    this.registering = false;
+    this.qrCheckout = null;
+    this.loadEvent(true);
+  }
+
+  /** Send the buyer to the payment page, or show its QR code when there is one. */
+  private startCheckout(res: CheckoutSessionResponse): void {
+    if (res.qr_code) {
+      this.showCheckout = false;
+      this.qrCheckout = res;
+      return;
+    }
+    window.location.href = res.checkout_url;
+  }
+
+  onQrClosed(): void {
+    this.qrCheckout = null;
+    this.registering = false;
+    this.loadEvent(true);
+  }
+
   loadEvent(quiet = false): void {
     if (!quiet) this.loading = true;
 
@@ -916,6 +968,17 @@ export class EventDetailComponent implements OnInit, OnDestroy {
               // No dynamic quote: the page shows the event's base price.
             },
           });
+          if (!ev.has_ticket_types) {
+            this.eventService.getSeatMap(ev.id).subscribe({
+              next: (sm) => {
+                this.seatPriceFrom = cheapestZonePrice(sm.zone_prices);
+              },
+              error: () => {
+                // 404: general admission, priced by demand.
+                this.seatPriceFrom = null;
+              },
+            });
+          }
         }
         // Load favorite status
         if (this.authService.isLoggedIn) {
@@ -1058,7 +1121,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         if (registration.status === 'pending') {
           this.paymentService.createCheckoutSession(registration.id).subscribe({
             next: (res) => {
-              window.location.href = res.checkout_url;
+              this.startCheckout(res);
             },
             error: () => {
               this.registering = false;
@@ -1155,7 +1218,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         if (registration.status === 'pending') {
           this.paymentService.createCheckoutSession(registration.id).subscribe({
             next: (res) => {
-              window.location.href = res.checkout_url;
+              this.startCheckout(res);
             },
             error: () => {
               this.registering = false;
@@ -1210,7 +1273,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     this.registering = true;
     this.paymentService.createCheckoutSession(this.registrationId).subscribe({
       next: (res) => {
-        window.location.href = res.checkout_url;
+        this.startCheckout(res);
       },
       error: (err) => {
         this.registering = false;

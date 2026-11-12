@@ -1,14 +1,34 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, convertToParamMap } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
+import { AuthService } from '../../services/auth.service';
+import {
+  PaymentOutcome,
+  PaymentPollingService,
+  paymentOutcome,
+} from '../../services/payment-polling.service';
 import { BookingStatus, PaymentStatus } from '../../models/models';
-import { LucideAngularModule, CircleCheckBig, CircleAlert } from 'lucide-angular';
+import { LucideAngularModule, CircleCheckBig, CircleAlert, Smartphone } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
 
+// A Freedom Pay return is confirmed by its server notification, which can
+// lag the browser by a few seconds: poll for this long, then offer a button.
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_MS = 60 * 1000;
+
 /** What the page tells the buyer, from a ticket payment or a group booking. */
-type Outcome = 'paid' | 'processing' | 'refunded';
+type Outcome = 'paid' | 'processing' | 'refunded' | 'failed';
+
+const POLL_OUTCOME: Record<PaymentOutcome, Outcome> = {
+  paid: 'paid',
+  waiting: 'processing',
+  failed: 'failed',
+  refunded: 'refunded',
+};
 
 interface PaymentResult {
   outcome: Outcome;
@@ -23,7 +43,12 @@ const PAYMENT_OUTCOME: Record<PaymentStatus, Outcome> = {
   completed: 'paid',
   refunded: 'refunded',
   pending: 'processing',
-  failed: 'processing',
+  // The provider declined the payment or the payment page timed out: no
+  // money was taken and the buyer can start the payment again.
+  failed: 'failed',
+  expired: 'failed',
+  // The buyer's bank is reviewing a paid ticket; it stays valid meanwhile.
+  disputed: 'processing',
 };
 
 // A booking that ended (expired/cancelled) by the time the money arrived is
@@ -48,6 +73,25 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             <span class="spinner spinner-lg"></span>
             <p class="text-sm text-muted-foreground">Confirming your payment...</p>
           </div>
+        } @else if (otherDevice) {
+          <!-- Paid from a second device (QR code): the buyer is signed in elsewhere -->
+          <div class="flex flex-col items-center gap-3 mb-6">
+            <div
+              class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center"
+            >
+              <lucide-icon
+                [img]="icons.Smartphone"
+                class="w-8 h-8 text-[color:var(--pine-600)]"
+                aria-hidden="true"
+              />
+            </div>
+            <h1 class="text-xl font-bold text-foreground">Payment sent</h1>
+            <p class="text-sm text-muted-foreground">
+              Go back to the device where you started the purchase: the ticket appears there as soon
+              as the payment provider confirms it. You can close this page.
+            </p>
+          </div>
+          <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">Back to events</a>
         } @else if (data && data.outcome === 'paid') {
           <div class="flex flex-col items-center gap-3 mb-6">
             <div
@@ -99,7 +143,7 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             </a>
           </div>
         } @else if (data) {
-          <!-- Not (yet) paid: still processing, or refunded because the hold had ended -->
+          <!-- Not (yet) paid: processing, failed / expired, or refunded because the hold had ended -->
           <div class="flex flex-col items-center gap-3 mb-6">
             <div
               class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
@@ -116,6 +160,12 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
                 Your seat hold had ended before the payment arrived, so the money was returned
                 automatically. Please book again.
               </p>
+            } @else if (data.outcome === 'failed') {
+              <h1 class="text-xl font-bold text-foreground">Payment did not go through</h1>
+              <p class="text-sm text-muted-foreground">
+                The payment was not completed and no money was taken. You can try again from your
+                tickets while your seat is still held.
+              </p>
             } @else {
               <h1 class="text-xl font-bold text-foreground">Payment is processing</h1>
               <p class="text-sm text-muted-foreground">
@@ -125,6 +175,17 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             }
           </div>
           <div class="flex flex-col gap-2">
+            @if (data.outcome === 'processing' && !isBooking) {
+              @if (polling) {
+                <p class="text-xs text-muted-foreground" role="status">
+                  Checking with the payment provider…
+                </p>
+              } @else {
+                <button type="button" class="btn btn-primary btn-full" (click)="refresh()">
+                  Check again
+                </button>
+              }
+            }
             <a
               [routerLink]="isBooking ? '/my-bookings' : '/my-registrations'"
               class="btn btn-secondary btn-full"
@@ -169,14 +230,25 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
 export class PaymentSuccessComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private bookingService = inject(BookingService);
+  private auth = inject(AuthService);
+  private poller = inject(PaymentPollingService);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   loading = true;
   data: PaymentResult | null = null;
   error = '';
   isBooking = false;
+  /** The payment page sent a signed-out device here (a phone that paid by QR code). */
+  otherDevice = false;
+  /** True while a Freedom Pay payment is being polled. */
+  polling = false;
 
-  readonly icons = { CircleCheckBig, CircleAlert };
+  private sessionId: string | null = null;
+  private paymentId: number | null = null;
+  private pollSubscription?: Subscription;
+
+  readonly icons = { CircleCheckBig, CircleAlert, Smartphone };
 
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
@@ -217,26 +289,84 @@ export class PaymentSuccessComponent implements OnInit {
         return;
       }
 
+      // Freedom Pay return (success page of the provider): our payment id.
+      const paymentId = Number(query.get('payment'));
+      if (query.get('provider') === 'freedompay' && Number.isInteger(paymentId) && paymentId > 0) {
+        // The status endpoint is owner-only: a phone that scanned the QR code
+        // is not signed in, and the ticket shows up on the buyer's device.
+        if (!this.auth.getToken()) {
+          this.otherDevice = true;
+          this.loading = false;
+          return;
+        }
+        this.paymentId = paymentId;
+        this.watchPayment();
+        return;
+      }
+
       if (!sessionId) {
         this.error = 'No payment session found.';
         this.loading = false;
         return;
       }
-      this.paymentService.verifyPayment(sessionId).subscribe({
-        next: (d) => {
+      this.sessionId = sessionId;
+      this.verify(sessionId);
+    });
+  }
+
+  /** "Check again" on a payment that is still processing. */
+  refresh(): void {
+    if (this.paymentId) {
+      this.watchPayment();
+    } else if (this.sessionId) {
+      this.verify(this.sessionId);
+    }
+  }
+
+  private verify(sessionId: string): void {
+    this.paymentService.verifyPayment(sessionId).subscribe({
+      next: (d) => {
+        this.data = {
+          outcome: PAYMENT_OUTCOME[d.status],
+          event_title: d.event_title,
+          amount: d.amount,
+          currency: d.currency,
+        };
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = apiErrorMessage(err, 'Verification failed.', 'error', 'detail');
+        this.loading = false;
+      },
+    });
+  }
+
+  /** Poll the payment until it settles (max POLL_MAX_MS), never forever. */
+  private watchPayment(): void {
+    if (this.paymentId === null) return;
+    this.pollSubscription?.unsubscribe();
+    this.polling = true;
+    this.pollSubscription = this.poller
+      .poll(this.paymentId, POLL_INTERVAL_MS, POLL_MAX_MS)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (status) => {
           this.data = {
-            outcome: PAYMENT_OUTCOME[d.status],
-            event_title: d.event_title,
-            amount: d.amount,
-            currency: d.currency,
+            outcome: POLL_OUTCOME[paymentOutcome(status)],
+            event_title: status.event_title,
+            amount: status.amount,
+            currency: status.currency,
           };
           this.loading = false;
         },
-        error: (err) => {
-          this.error = apiErrorMessage(err, 'Verification failed.', 'error', 'detail');
-          this.loading = false;
+        complete: () => {
+          this.polling = false;
+          if (!this.data) {
+            this.error =
+              'We could not reach the payment service yet. Check your tickets in a moment.';
+            this.loading = false;
+          }
         },
       });
-    });
   }
 }
