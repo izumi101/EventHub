@@ -12,6 +12,7 @@ import type { Event, Seat } from '../../models/models';
 class SeatSelectorStub {
   @Input() seats: Seat[] = [];
   @Input() eventId: number | null = null;
+  @Input() currency = 'USD';
   @Output() readonly seatSelected = new EventEmitter<Seat | null>();
 }
 
