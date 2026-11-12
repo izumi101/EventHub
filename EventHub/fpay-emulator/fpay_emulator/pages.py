@@ -35,6 +35,10 @@ BUTTON_SCENARIOS = {
 }
 
 
+# The test cards and the details that go with them, shown under the card form.
+_TEST_CARDS = {'cards': cards.known_cards(), 'test_card': cards.TEST_CARD_DETAILS}
+
+
 class PaymentPages:
     def __init__(self, gateway: Gateway, templates: Jinja2Templates) -> None:
         self.gw = gateway
@@ -110,9 +114,7 @@ class PaymentPages:
         if (redirect := self._route_final(payment)) is not None:
             return redirect
         self.gw.mark_waiting(payment)
-        return self._render(
-            request, 'pay.html', self._context(payment, form={}, problems={}, cards=cards.known_cards())
-        )
+        return self._render(request, 'pay.html', self._context(payment, form={}, problems={}, **_TEST_CARDS))
 
     async def submit_card(self, request: Request) -> Response:
         payment = self._load(request.path_params['customer'])
@@ -136,7 +138,7 @@ class PaymentPages:
             problems['owner'] = 'Enter the cardholder name as printed on the card: at least two Latin words.'
         if problems:
             safe = {k: v for k, v in data.items() if k in ('exp_month', 'exp_year', 'owner')}
-            context = self._context(payment, form=safe, problems=problems, cards=cards.known_cards())
+            context = self._context(payment, form=safe, problems=problems, **_TEST_CARDS)
             return self._render(request, 'pay.html', context, status=422)
         record = cards.card_record(pan, data['exp_month'], data['exp_year'], data['owner'].upper())
         if payment.scenario:

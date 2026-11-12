@@ -47,6 +47,27 @@ async def test_page_shows_order_and_marks_waiting(emu: Emu) -> None:
     assert "default-src 'self'" in response.headers['content-security-policy']
 
 
+async def test_test_cards_list_every_detail_needed_to_pay(emu: Emu) -> None:
+    _, customer = await open_page(emu)
+    page = (await emu.client.get(f'/pay.html?customer={customer}')).text
+    cards_part = page.split('Test cards')[1]
+    assert 'cardholder TEST CARDHOLDER' in cards_part
+    assert '<th scope="col" class="detail">Cardholder</th>' in cards_part
+    assert 'data-pan="4716047261941981"' in cards_part
+    assert 'data-owner="TEST CARDHOLDER"' in cards_part
+    assert '<script src="/static/testcards.js" defer>' in page
+    assert (await emu.client.get('/static/testcards.js')).status_code == 200
+
+
+async def test_test_card_details_pass_the_card_form(emu: Emu) -> None:
+    from fpay_emulator.cards import TEST_CARD_DETAILS
+
+    payment_id, customer = await open_page(emu)
+    location = await pay_card(emu, customer, '4716047261941981', **TEST_CARD_DETAILS)
+    assert location == f'/pay/{customer}/result'
+    assert field(await emu.status(payment_id), 'pg_payment_status') == 'success'
+
+
 @pytest.mark.parametrize('customer', ['nope', '00000000-0000-0000-0000-000000000000'])
 async def test_unknown_customer(emu: Emu, customer: str) -> None:
     assert (await emu.client.get(f'/pay.html?customer={customer}')).status_code == 404

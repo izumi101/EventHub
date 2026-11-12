@@ -109,6 +109,16 @@ form > .primary { width: 100%; }
 .testcards table { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
 .testcards th, .testcards td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: top; }
 .testcards code { overflow-wrap: anywhere; }
+.testcards .table-scroll { overflow-x: auto; }
+.testcards td { white-space: nowrap; }
+.testcards td:nth-child(5) { white-space: normal; min-width: 10em; }
+/* Phones: expiry, CVV and cardholder are in the summary line and "Use" fills them in. */
+@media (max-width: 640px) {
+  .testcards .detail { display: none; }
+  .testcards table { font-size: 13px; }
+  .testcards td, .testcards th { padding: 6px 2px; }
+}
+.testcards .use-card { min-height: 36px; padding: 4px 12px; }
 
 .outcome-success h2 { color: var(--accent); }
 .outcome-error h2, .outcome-expired h2 { color: var(--danger); }

@@ -20,6 +20,16 @@ SCENARIOS = (SUCCESS, DECLINE, THREE_DS_SUCCESS, THREE_DS_FAIL, HANG, ABANDON)
 
 DEFAULT_CARD = '4716047261941981'
 
+# Details that go with every test card (spec section 7): the expiry and CVV
+# the documentation lists, and a cardholder name that passes the owner check
+# (at least two Latin words). Shown on the payment page next to the cards.
+TEST_CARD_DETAILS = {
+    'exp_month': '12',
+    'exp_year': '30',
+    'cvv': '123',
+    'owner': 'TEST CARDHOLDER',
+}
+
 
 @dataclass(frozen=True)
 class KnownCard:
