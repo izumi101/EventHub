@@ -2,7 +2,12 @@ node_modules/
 venv/
 __pycache__/
 *.pyc
+# Secrets: every env file and backup of one; only the documented example is tracked.
 .env
+.env.*
+*.env.bak*
+!.env.example
+!**/.env.example
 **/node_modules/
 **/venv/
 **/.venv/
@@ -20,6 +25,13 @@ pyrightconfig.json
 
 # Local Redis snapshots
 dump.rdb
+
+# Tool caches and local certificates
+.ruff_cache/
+.pytest_cache/
+coverage/
+*.pem
+*.key
 
 # Django collectstatic output
 EventHub/backend/staticfiles/
