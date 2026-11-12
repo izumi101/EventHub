@@ -39,7 +39,7 @@ docker compose exec backend python manage.py seed_demo_kz      # optional, volum
 4. What happened behind it: the emulator sent a signed result callback to `/api/v1/payments/callback/freedompay/`; the backend checked the MD5 signature in constant time, checked amount and currency, confirmed the payment with `get_status3` (MD5 alone is weak), and only then issued the ticket.
 5. Optional: **Decline (insufficient funds)** shows the failure path; the seat hold stays until it expires.
 
-Phone demo: set `FPAY_PUBLIC_URL=http://<laptop LAN IP>:18080`, `FPAY_EMULATOR_BIND=0.0.0.0` and a `FPAY_CONTROL_TOKEN` in `.env`, then `docker compose up -d fpay-emulator backend`. The phone and the laptop must be on the same network.
+Phone demo: by default the QR code holds `http://localhost:18080`, which a phone resolves to itself. On the network you demo on, run `scripts/demo-lan.sh on` (it detects the laptop's LAN address, points `FPAY_PUBLIC_URL` and `FRONTEND_URL` at it, publishes the emulator behind `FPAY_CONTROL_TOKEN`, allows the address in `DJANGO_ALLOWED_HOSTS` and recreates the containers), then open the site on the laptop at the printed `http://<LAN IP>:4200` and sign in there. On the phone: scan the QR code, open "Test cards", tap "Use" (fills card number, expiry 12/30, CVV 123 and cardholder TEST CARDHOLDER) and pay; the phone shows "Payment sent" and the laptop switches to "Payment confirmed" by itself. Phone and laptop must be on the same network; if the venue Wi-Fi isolates devices, connect the laptop to the phone's hotspot. `scripts/demo-lan.sh off` goes back to localhost.
 
 Security check to show:
 
