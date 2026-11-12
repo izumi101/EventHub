@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { PaymentSuccessComponent } from './payment-success.component';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
+import { AuthService } from '../../services/auth.service';
 import { PaymentStatus, PaymentStatusResponse } from '../../models/models';
 
 // The Freedom Pay return (/payment/success?provider=freedompay&payment=<id>):
@@ -26,7 +27,7 @@ function status(
   };
 }
 
-function render(answers: PaymentStatusResponse[]) {
+function render(answers: PaymentStatusResponse[], signedIn = true) {
   const getPaymentStatus = vi.fn(() => of(answers.length > 1 ? answers.shift()! : answers[0]));
   const verifyPayment = vi.fn();
   TestBed.configureTestingModule({
@@ -41,6 +42,7 @@ function render(answers: PaymentStatusResponse[]) {
       },
       { provide: PaymentService, useValue: { getPaymentStatus, verifyPayment } },
       { provide: BookingService, useValue: {} },
+      { provide: AuthService, useValue: { getToken: () => (signedIn ? 'access' : null) } },
     ],
   });
   const fixture = TestBed.createComponent(PaymentSuccessComponent);
@@ -106,5 +108,16 @@ describe('PaymentSuccessComponent (Freedom Pay return)', () => {
     const calls = getPaymentStatus.mock.calls.length;
     vi.advanceTimersByTime(30_000);
     expect(getPaymentStatus.mock.calls.length).toBe(calls);
+  });
+
+  it('tells a signed-out phone that paid by QR code to go back to the buyer device', () => {
+    const { text, tick, getPaymentStatus } = render([status('completed', 'confirmed')], false);
+    tick(0);
+    expect(text()).toContain('Payment sent');
+    expect(text()).toContain('device where you started the purchase');
+    expect(text()).not.toContain('Verification failed');
+    expect(text()).not.toContain('Payment confirmed');
+    tick(10_000);
+    expect(getPaymentStatus).not.toHaveBeenCalled();
   });
 });
