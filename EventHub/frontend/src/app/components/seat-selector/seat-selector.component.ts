@@ -13,11 +13,50 @@ import { LucideAngularModule, TriangleAlert, Wifi, WifiOff } from 'lucide-angula
 import { Seat } from '../../models/models';
 import { SeatWsService, WsSeatUpdate } from '../../services/seat-ws.service';
 import { Subscription } from 'rxjs';
+import { MoneyPipe } from '../../pipes/money.pipe';
+
+const ZONE_ORDER = ['premium', 'vip', 'standard'];
+const ZONE_LABEL: Record<string, string> = { premium: 'Premium', vip: 'VIP', standard: 'Standard' };
+
+/** One price zone of the hall: which rows it covers and what a seat there costs. */
+export interface ZoneSummary {
+  zone: string;
+  label: string;
+  rows: string;
+  price: string | null;
+}
+
+/** Zones of the seats in hall order (premium, VIP, standard), e.g. "Rows 2–3: VIP · 16,000". */
+export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
+  const byZone = new Map<string, { rows: Set<number>; price: string | null }>();
+  for (const s of seats) {
+    const entry = byZone.get(s.price_zone) ?? { rows: new Set<number>(), price: null };
+    entry.rows.add(s.row);
+    entry.price ??= s.price ?? null;
+    byZone.set(s.price_zone, entry);
+  }
+  const rank = (z: string) => (ZONE_ORDER.includes(z) ? ZONE_ORDER.indexOf(z) : ZONE_ORDER.length);
+  return [...byZone.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b))
+    .map(([zone, { rows, price }]) => {
+      const sorted = [...rows].sort((a, b) => a - b);
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const contiguous = last - first + 1 === sorted.length;
+      const rowText =
+        sorted.length === 1
+          ? `Row ${first}`
+          : contiguous
+            ? `Rows ${first}–${last}`
+            : `Rows ${sorted.join(', ')}`;
+      return { zone, label: ZONE_LABEL[zone] ?? zone, rows: rowText, price };
+    });
+}
 
 @Component({
   selector: 'app-seat-selector',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, LucideAngularModule, MoneyPipe],
   template: `
     <div class="space-y-4">
       <!-- Header + live indicator -->
@@ -55,6 +94,10 @@ import { Subscription } from 'rxjs';
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded border-2 border-blue-400 bg-blue-50"></div>
           <span>VIP</span>
+        </div>
+        <div class="flex items-center gap-1.5">
+          <div class="w-4 h-4 rounded border-2 border-purple-300 bg-purple-50"></div>
+          <span>Premium</span>
         </div>
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded bg-gray-200 border-2 border-gray-300"></div>
@@ -118,13 +161,19 @@ import { Subscription } from 'rxjs';
         </div>
       </div>
 
-      <!-- Price zone labels -->
-      <div
-        class="flex justify-center gap-6 text-xs text-muted-foreground border-t border-border pt-3"
+      <!-- Price zones, from the seats themselves -->
+      <ul
+        class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-xs text-muted-foreground border-t border-border pt-3"
       >
-        <span>Rows 1–2: <strong class="text-blue-600">VIP</strong></span>
-        <span>Rows 3–6: <strong class="text-[color:var(--pine-600)]">Standard</strong></span>
-      </div>
+        @for (z of zones; track z.zone) {
+          <li>
+            {{ z.rows }}: <strong [class]="zoneTextClass(z.zone)">{{ z.label }}</strong>
+            @if (z.price) {
+              · {{ z.price | money: currency }}
+            }
+          </li>
+        }
+      </ul>
 
       <!-- Selected seat summary -->
       @if (selectedSeat) {
@@ -137,6 +186,9 @@ import { Subscription } from 'rxjs';
             </p>
             <p class="text-xs text-[color:var(--pine-600)] capitalize">
               {{ selectedSeat.price_zone }} zone
+              @if (selectedSeat.price) {
+                · {{ selectedSeat.price | money: currency }}
+              }
             </p>
           </div>
           <button
@@ -166,12 +218,15 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
 
   @Input() seats: Seat[] = [];
   @Input() eventId: number | null = null;
+  /** Event currency, for the seat and zone prices. */
+  @Input() currency = 'USD';
   @Output() readonly seatSelected = new EventEmitter<Seat | null>();
 
   selectedSeat: Seat | null = null;
   rows: number[] = [];
   cols: number[] = [];
   seatsByRow: Record<number, Seat[]> = {};
+  zones: ZoneSummary[] = [];
   wsConnected = false;
 
   readonly icons = { TriangleAlert, Wifi, WifiOff };
@@ -201,6 +256,13 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
     for (const row of this.rows) {
       this.seatsByRow[row] = this.seats.filter((s) => s.row === row).sort((a, b) => a.col - b.col);
     }
+    this.zones = summariseZones(this.seats);
+  }
+
+  zoneTextClass(zone: string): string {
+    if (zone === 'premium') return 'text-purple-600';
+    if (zone === 'vip') return 'text-blue-600';
+    return 'text-[color:var(--pine-600)]';
   }
 
   private connectWs(): void {
@@ -208,10 +270,15 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
 
     this.seatWs.connect(this.eventId);
 
-    // Snapshot → replace seats array (full refresh on reconnect)
+    // Snapshot → refresh availability only. The socket sends ids and
+    // availability, not prices: replacing the seats would drop each seat's
+    // zone price and the checkout would fall back to the event's base price.
     this.subs.add(
       this.seatWs.snapshots$.subscribe((msg) => {
-        this.seats = msg.seats;
+        const live = new Map(msg.seats.map((s) => [s.id, s.is_available]));
+        this.seats = this.seats.map((s) =>
+          live.has(s.id) ? { ...s, is_available: live.get(s.id) ?? s.is_available } : s,
+        );
         this.buildGrid();
         this.wsConnected = true;
         // Deselect if our seat was grabbed by someone else
