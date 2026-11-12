@@ -5,13 +5,14 @@ import { RouterModule, ActivatedRoute, convertToParamMap } from '@angular/router
 import { Subscription } from 'rxjs';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
+import { AuthService } from '../../services/auth.service';
 import {
   PaymentOutcome,
   PaymentPollingService,
   paymentOutcome,
 } from '../../services/payment-polling.service';
 import { BookingStatus, PaymentStatus } from '../../models/models';
-import { LucideAngularModule, CircleCheckBig, CircleAlert } from 'lucide-angular';
+import { LucideAngularModule, CircleCheckBig, CircleAlert, Smartphone } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
 
 // A Freedom Pay return is confirmed by its server notification, which can
@@ -72,6 +73,25 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             <span class="spinner spinner-lg"></span>
             <p class="text-sm text-muted-foreground">Confirming your payment...</p>
           </div>
+        } @else if (otherDevice) {
+          <!-- Paid from a second device (QR code): the buyer is signed in elsewhere -->
+          <div class="flex flex-col items-center gap-3 mb-6">
+            <div
+              class="w-16 h-16 rounded-full bg-[color:var(--pine-50)] flex items-center justify-center"
+            >
+              <lucide-icon
+                [img]="icons.Smartphone"
+                class="w-8 h-8 text-[color:var(--pine-600)]"
+                aria-hidden="true"
+              />
+            </div>
+            <h1 class="text-xl font-bold text-foreground">Payment sent</h1>
+            <p class="text-sm text-muted-foreground">
+              Go back to the device where you started the purchase: the ticket appears there as soon
+              as the payment provider confirms it. You can close this page.
+            </p>
+          </div>
+          <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">Back to events</a>
         } @else if (data && data.outcome === 'paid') {
           <div class="flex flex-col items-center gap-3 mb-6">
             <div
@@ -210,6 +230,7 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
 export class PaymentSuccessComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private bookingService = inject(BookingService);
+  private auth = inject(AuthService);
   private poller = inject(PaymentPollingService);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
@@ -218,6 +239,8 @@ export class PaymentSuccessComponent implements OnInit {
   data: PaymentResult | null = null;
   error = '';
   isBooking = false;
+  /** The payment page sent a signed-out device here (a phone that paid by QR code). */
+  otherDevice = false;
   /** True while a Freedom Pay payment is being polled. */
   polling = false;
 
@@ -225,7 +248,7 @@ export class PaymentSuccessComponent implements OnInit {
   private paymentId: number | null = null;
   private pollSubscription?: Subscription;
 
-  readonly icons = { CircleCheckBig, CircleAlert };
+  readonly icons = { CircleCheckBig, CircleAlert, Smartphone };
 
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
@@ -269,6 +292,13 @@ export class PaymentSuccessComponent implements OnInit {
       // Freedom Pay return (success page of the provider): our payment id.
       const paymentId = Number(query.get('payment'));
       if (query.get('provider') === 'freedompay' && Number.isInteger(paymentId) && paymentId > 0) {
+        // The status endpoint is owner-only: a phone that scanned the QR code
+        // is not signed in, and the ticket shows up on the buyer's device.
+        if (!this.auth.getToken()) {
+          this.otherDevice = true;
+          this.loading = false;
+          return;
+        }
         this.paymentId = paymentId;
         this.watchPayment();
         return;
