@@ -21,7 +21,7 @@ network (gateways are faked or emulated in the tests).
 | Item | Value |
 |---|---|
 | Date | 2026-11-12 |
-| Commit | `5af93c6` (branch `phase-1/payment-providers`) plus uncommitted working-tree changes (including the new test file `payments/test_payment_report_gaps.py`) |
+| Commit | branch `phase-1/payment-providers`; the run covered the code committed as `8b5fc7d` (Freedom Pay) and `e2ac898` (new tests) |
 | Python | 3.12.16 |
 | Django / DRF | 5.2.18 / 3.18.3 |
 | stripe SDK | 16.0.0 |
