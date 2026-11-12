@@ -129,12 +129,42 @@ CACHES = {
     ),
 }
 
+# ---- Database roles (docs/DATABASE_ROLES.md) ---- #
+# POSTGRES_USER owns the schema: it runs the migrations and creates the roles
+# below (`manage.py setup_db_roles`, run by entrypoint.sh after `migrate`).
+# Everything else (gunicorn, the worker, ordinary manage.py commands) connects
+# as the least-privilege POSTGRES_APP_USER (data only, no DDL) once
+# POSTGRES_APP_PASSWORD is set. Without it (an .env from before the roles
+# existed) the app keeps connecting as the owner and prints a warning.
+# The owner is always used by the test runner (it needs CREATEDB), by the
+# commands in DB_OWNER_COMMANDS and by a process started with
+# DJANGO_DB_AS_OWNER=1.
+DB_OWNER_USER = os.environ.get('POSTGRES_USER', 'eventhub_user')
+DB_OWNER_PASSWORD = os.environ.get('POSTGRES_PASSWORD', 'eventhub_password')
+DB_APP_USER = os.environ.get('POSTGRES_APP_USER', '').strip() or 'eventhub_app'
+DB_APP_PASSWORD = os.environ.get('POSTGRES_APP_PASSWORD', '')
+DB_READONLY_USER = os.environ.get('POSTGRES_READONLY_USER', '').strip() or 'eventhub_readonly'
+DB_READONLY_PASSWORD = os.environ.get('POSTGRES_READONLY_PASSWORD', '')
+DB_OWNER_COMMANDS = {'migrate', 'setup_db_roles', 'verify_db_roles'}
+DB_AS_OWNER = (
+    TESTING
+    or env_bool('DJANGO_DB_AS_OWNER', False)
+    or (len(sys.argv) > 1 and Path(sys.argv[0]).name == 'manage.py' and sys.argv[1] in DB_OWNER_COMMANDS)
+)
+DB_USES_APP_ROLE = bool(DB_APP_PASSWORD) and not DB_AS_OWNER
+if not DB_APP_PASSWORD and not DB_AS_OWNER:
+    sys.stderr.write(
+        f'WARNING: POSTGRES_APP_PASSWORD is not set, so the app connects to PostgreSQL as the schema owner '
+        f'"{DB_OWNER_USER}". Set POSTGRES_APP_PASSWORD (and POSTGRES_READONLY_PASSWORD) to use the '
+        f'least-privilege roles (docs/DATABASE_ROLES.md).\n'
+    )
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': os.environ.get('POSTGRES_DB', 'eventhub'),
-        'USER': os.environ.get('POSTGRES_USER', 'eventhub_user'),
-        'PASSWORD': os.environ.get('POSTGRES_PASSWORD', 'eventhub_password'),
+        'USER': DB_APP_USER if DB_USES_APP_ROLE else DB_OWNER_USER,
+        'PASSWORD': DB_APP_PASSWORD if DB_USES_APP_ROLE else DB_OWNER_PASSWORD,
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
@@ -442,3 +472,8 @@ if TESTING:
     PASSWORD_HASHERS = [
         'django.contrib.auth.hashers.MD5PasswordHasher',
     ]
+    if DB_APP_PASSWORD and DB_APP_USER in (DB_OWNER_USER, DB_READONLY_USER):
+        _problems.append(
+            'POSTGRES_APP_USER must be its own role, not POSTGRES_USER or POSTGRES_READONLY_USER '
+            '(docs/DATABASE_ROLES.md)'
+        )
