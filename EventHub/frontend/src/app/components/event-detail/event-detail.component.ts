@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import {
@@ -13,7 +13,8 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { SeoService } from '../../services/seo.service';
-import { Event, Registration } from '../../models/models';
+import { CheckoutSessionResponse, Event, Registration } from '../../models/models';
+import { PaymentQrComponent } from '../payment-qr/payment-qr.component';
 import { EventReviewsComponent } from './event-reviews.component';
 import { EventCheckoutModalComponent } from './event-checkout-modal.component';
 import { RefundRequestModalComponent } from './refund-request-modal.component';
@@ -54,6 +55,7 @@ import { supportsWebShare } from '../../utils/browser-support';
     EventReviewsComponent,
     EventCheckoutModalComponent,
     RefundRequestModalComponent,
+    PaymentQrComponent,
   ],
   template: `
     <!-- Loading -->
@@ -773,6 +775,11 @@ import { supportsWebShare } from '../../utils/browser-support';
           />
         }
 
+        <!-- Pay with a phone: QR code of the provider's payment page (Freedom Pay) -->
+        @if (qrCheckout) {
+          <app-payment-qr [checkout]="qrCheckout" (closed)="onQrClosed()" />
+        }
+
         <!-- Refund request modal -->
         @if (showRefundModal) {
           <app-refund-request-modal
@@ -806,6 +813,8 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   myRegistration: Registration | null = null;
   showRefundModal = false;
   showCheckout = false;
+  /** Checkout answer with a QR code, shown in the QR payment dialog. */
+  qrCheckout: CheckoutSessionResponse | null = null;
   pricingData: DynamicPrice | null = null;
 
   // Virtual waiting queue
@@ -887,6 +896,32 @@ export class EventDetailComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopQueuePolling();
+  }
+
+  /** Back from the payment page via the browser's Back button: the page
+   *  comes from the back/forward cache with `registering` still true. */
+  @HostListener('window:pageshow', ['$event'])
+  onPageShow(event: PageTransitionEvent): void {
+    if (!event.persisted) return;
+    this.registering = false;
+    this.qrCheckout = null;
+    this.loadEvent(true);
+  }
+
+  /** Send the buyer to the payment page, or show its QR code when there is one. */
+  private startCheckout(res: CheckoutSessionResponse): void {
+    if (res.qr_code) {
+      this.showCheckout = false;
+      this.qrCheckout = res;
+      return;
+    }
+    window.location.href = res.checkout_url;
+  }
+
+  onQrClosed(): void {
+    this.qrCheckout = null;
+    this.registering = false;
+    this.loadEvent(true);
   }
 
   loadEvent(quiet = false): void {
@@ -1058,7 +1093,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         if (registration.status === 'pending') {
           this.paymentService.createCheckoutSession(registration.id).subscribe({
             next: (res) => {
-              window.location.href = res.checkout_url;
+              this.startCheckout(res);
             },
             error: () => {
               this.registering = false;
@@ -1155,7 +1190,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         if (registration.status === 'pending') {
           this.paymentService.createCheckoutSession(registration.id).subscribe({
             next: (res) => {
-              window.location.href = res.checkout_url;
+              this.startCheckout(res);
             },
             error: () => {
               this.registering = false;
@@ -1210,7 +1245,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     this.registering = true;
     this.paymentService.createCheckoutSession(this.registrationId).subscribe({
       next: (res) => {
-        window.location.href = res.checkout_url;
+        this.startCheckout(res);
       },
       error: (err) => {
         this.registering = false;

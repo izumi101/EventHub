@@ -1,14 +1,33 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, convertToParamMap } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
+import {
+  PaymentOutcome,
+  PaymentPollingService,
+  paymentOutcome,
+} from '../../services/payment-polling.service';
 import { BookingStatus, PaymentStatus } from '../../models/models';
 import { LucideAngularModule, CircleCheckBig, CircleAlert } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
 
+// A Freedom Pay return is confirmed by its server notification, which can
+// lag the browser by a few seconds: poll for this long, then offer a button.
+const POLL_INTERVAL_MS = 2000;
+const POLL_MAX_MS = 60 * 1000;
+
 /** What the page tells the buyer, from a ticket payment or a group booking. */
 type Outcome = 'paid' | 'processing' | 'refunded' | 'failed';
+
+const POLL_OUTCOME: Record<PaymentOutcome, Outcome> = {
+  paid: 'paid',
+  waiting: 'processing',
+  failed: 'failed',
+  refunded: 'refunded',
+};
 
 interface PaymentResult {
   outcome: Outcome;
@@ -136,6 +155,17 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             }
           </div>
           <div class="flex flex-col gap-2">
+            @if (data.outcome === 'processing' && !isBooking) {
+              @if (polling) {
+                <p class="text-xs text-muted-foreground" role="status">
+                  Checking with the payment provider…
+                </p>
+              } @else {
+                <button type="button" class="btn btn-primary btn-full" (click)="refresh()">
+                  Check again
+                </button>
+              }
+            }
             <a
               [routerLink]="isBooking ? '/my-bookings' : '/my-registrations'"
               class="btn btn-secondary btn-full"
@@ -180,12 +210,20 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
 export class PaymentSuccessComponent implements OnInit {
   private paymentService = inject(PaymentService);
   private bookingService = inject(BookingService);
+  private poller = inject(PaymentPollingService);
   private route = inject(ActivatedRoute);
+  private destroyRef = inject(DestroyRef);
 
   loading = true;
   data: PaymentResult | null = null;
   error = '';
   isBooking = false;
+  /** True while a Freedom Pay payment is being polled. */
+  polling = false;
+
+  private sessionId: string | null = null;
+  private paymentId: number | null = null;
+  private pollSubscription?: Subscription;
 
   readonly icons = { CircleCheckBig, CircleAlert };
 
@@ -228,26 +266,77 @@ export class PaymentSuccessComponent implements OnInit {
         return;
       }
 
+      // Freedom Pay return (success page of the provider): our payment id.
+      const paymentId = Number(query.get('payment'));
+      if (query.get('provider') === 'freedompay' && Number.isInteger(paymentId) && paymentId > 0) {
+        this.paymentId = paymentId;
+        this.watchPayment();
+        return;
+      }
+
       if (!sessionId) {
         this.error = 'No payment session found.';
         this.loading = false;
         return;
       }
-      this.paymentService.verifyPayment(sessionId).subscribe({
-        next: (d) => {
+      this.sessionId = sessionId;
+      this.verify(sessionId);
+    });
+  }
+
+  /** "Check again" on a payment that is still processing. */
+  refresh(): void {
+    if (this.paymentId) {
+      this.watchPayment();
+    } else if (this.sessionId) {
+      this.verify(this.sessionId);
+    }
+  }
+
+  private verify(sessionId: string): void {
+    this.paymentService.verifyPayment(sessionId).subscribe({
+      next: (d) => {
+        this.data = {
+          outcome: PAYMENT_OUTCOME[d.status],
+          event_title: d.event_title,
+          amount: d.amount,
+          currency: d.currency,
+        };
+        this.loading = false;
+      },
+      error: (err) => {
+        this.error = apiErrorMessage(err, 'Verification failed.', 'error', 'detail');
+        this.loading = false;
+      },
+    });
+  }
+
+  /** Poll the payment until it settles (max POLL_MAX_MS), never forever. */
+  private watchPayment(): void {
+    if (this.paymentId === null) return;
+    this.pollSubscription?.unsubscribe();
+    this.polling = true;
+    this.pollSubscription = this.poller
+      .poll(this.paymentId, POLL_INTERVAL_MS, POLL_MAX_MS)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (status) => {
           this.data = {
-            outcome: PAYMENT_OUTCOME[d.status],
-            event_title: d.event_title,
-            amount: d.amount,
-            currency: d.currency,
+            outcome: POLL_OUTCOME[paymentOutcome(status)],
+            event_title: status.event_title,
+            amount: status.amount,
+            currency: status.currency,
           };
           this.loading = false;
         },
-        error: (err) => {
-          this.error = apiErrorMessage(err, 'Verification failed.', 'error', 'detail');
-          this.loading = false;
+        complete: () => {
+          this.polling = false;
+          if (!this.data) {
+            this.error =
+              'We could not reach the payment service yet. Check your tickets in a moment.';
+            this.loading = false;
+          }
         },
       });
-    });
   }
 }
