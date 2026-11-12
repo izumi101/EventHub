@@ -8,6 +8,8 @@ import type { components } from '../api/openapi';
 export type BookingSeatDto = components['schemas']['BookingSeat'];
 export type BookingDto = components['schemas']['Booking'];
 export type BookingStatusDto = components['schemas']['BookingStatus'];
+/** Same shape as a single-ticket checkout: Freedom Pay adds the page's QR code. */
+export type BookingCheckoutResponse = components['schemas']['BookingCheckoutResponse'];
 
 @Injectable({ providedIn: 'root' })
 export class BookingService {
@@ -34,11 +36,8 @@ export class BookingService {
     });
   }
 
-  checkout(id: string): Observable<{ checkout_url: string; mock?: boolean }> {
-    return this.http.post<{ checkout_url: string; mock?: boolean }>(
-      `${this.api}/${id}/checkout/`,
-      {},
-    );
+  checkout(id: string): Observable<BookingCheckoutResponse> {
+    return this.http.post<BookingCheckoutResponse>(`${this.api}/${id}/checkout/`, {});
   }
 
   cancel(id: string): Observable<BookingStatusDto> {

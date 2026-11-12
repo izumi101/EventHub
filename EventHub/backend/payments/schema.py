@@ -2,6 +2,7 @@
 
 from rest_framework import serializers
 
+from bookings.models import Booking
 from common.choices import PaymentProviderChoices, PaymentStatusChoices, RegistrationStatusChoices
 
 from .models import Payment
@@ -26,15 +27,20 @@ class CheckoutSessionResponseSerializer(serializers.Serializer):
 
 
 class PaymentStatusResponseSerializer(serializers.Serializer):
+    """A payment pays for either a single ticket (`registration_*` set,
+    `booking_*` null) or a group booking (the other way round)."""
+
     payment_id = serializers.IntegerField()
     provider = serializers.CharField(help_text='Payment provider code (`freedompay`, `stripe`, `mock`, ...).')
     status = serializers.ChoiceField(
         choices=PaymentStatusChoices.choices,
-        help_text='Provider-neutral state. `completed` with a registration that is not `confirmed` means the '
-        'money arrived after the hold ended and is being refunded.',
+        help_text='Provider-neutral state. `completed` with a registration that is not `confirmed` (or a booking '
+        'that is not `confirmed`) means the money arrived after the hold ended and is being refunded.',
     )
-    registration_id = serializers.IntegerField()
-    registration_status = serializers.ChoiceField(choices=RegistrationStatusChoices.choices)
+    registration_id = serializers.IntegerField(allow_null=True)
+    registration_status = serializers.ChoiceField(choices=RegistrationStatusChoices.choices, allow_null=True)
+    booking_id = serializers.UUIDField(allow_null=True)
+    booking_status = serializers.ChoiceField(choices=Booking.Status.choices, allow_null=True)
     event_id = serializers.IntegerField()
     event_title = serializers.CharField()
     amount = serializers.DecimalField(**MONEY)
