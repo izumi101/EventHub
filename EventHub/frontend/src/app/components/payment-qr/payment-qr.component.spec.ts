@@ -25,6 +25,8 @@ function status(
     status: value,
     registration_id: 3,
     registration_status: registration,
+    booking_id: null,
+    booking_status: null,
     event_id: 1,
     event_title: 'Gig',
     amount: '5000.00',
@@ -32,7 +34,20 @@ function status(
   };
 }
 
-function render(answers: PaymentStatusResponse[]) {
+function bookingStatus(
+  value: PaymentStatus,
+  booking: PaymentStatusResponse['booking_status'],
+): PaymentStatusResponse {
+  return {
+    ...status(value),
+    registration_id: null,
+    registration_status: null,
+    booking_id: 'bk-1',
+    booking_status: booking,
+  };
+}
+
+function render(answers: PaymentStatusResponse[], bookingId: string | null = null) {
   const getPaymentStatus = vi.fn(() => of(answers.length > 1 ? answers.shift()! : answers[0]));
   TestBed.configureTestingModule({
     imports: [PaymentQrComponent],
@@ -41,6 +56,7 @@ function render(answers: PaymentStatusResponse[]) {
   const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
   const fixture = TestBed.createComponent(PaymentQrComponent);
   fixture.componentRef.setInput('checkout', CHECKOUT);
+  fixture.componentRef.setInput('bookingId', bookingId);
   fixture.detectChanges();
   const element = fixture.nativeElement as HTMLElement;
   const tick = (ms: number) => {
@@ -92,6 +108,31 @@ describe('PaymentQrComponent', () => {
     const calls = getPaymentStatus.mock.calls.length;
     tick(10_000);
     expect(getPaymentStatus.mock.calls.length).toBe(calls);
+  });
+
+  it('for a group booking opens the booking success page once the booking is confirmed', () => {
+    const { element, navigate, tick } = render(
+      [bookingStatus('pending', 'holding'), bookingStatus('completed', 'confirmed')],
+      'bk-1',
+    );
+    tick(0);
+    expect(element.textContent).toContain('Pay for your group booking');
+    tick(2000);
+    expect(navigate).toHaveBeenCalledWith(['/payment/success'], {
+      queryParams: { provider: 'freedompay', payment: 7, booking_id: 'bk-1' },
+    });
+    expect(element.querySelector('[data-testid="qr-status"]')!.textContent).toContain(
+      'opening your tickets',
+    );
+  });
+
+  it('for a group booking that ended before the money arrived says it is refunded', () => {
+    const { element, navigate, tick } = render([bookingStatus('completed', 'expired')], 'bk-1');
+    tick(0);
+    expect(element.querySelector('[data-testid="qr-status"]')!.textContent).toContain(
+      'being refunded',
+    );
+    expect(navigate).not.toHaveBeenCalled();
   });
 
   it('stops on a declined payment and says so', () => {

@@ -1,12 +1,18 @@
-import { Component, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, ActivatedRoute, Router } from '@angular/router';
 import { EventService } from '../../services/event.service';
-import { BookingService, BookingDto } from '../../services/booking.service';
+import {
+  BookingService,
+  BookingDto,
+  BookingCheckoutResponse,
+} from '../../services/booking.service';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
 import { Event, Seat, ZonePrice } from '../../models/models';
 import { SeatMapSvgComponent } from '../seat-map-svg/seat-map-svg.component';
+import { PaymentQrComponent, QrCheckout } from '../payment-qr/payment-qr.component';
+import { MoneyPipe } from '../../pipes/money.pipe';
 import {
   LucideAngularModule,
   ChevronLeft,
@@ -21,7 +27,14 @@ import { apiErrorMessage } from '../../api/api-error';
 @Component({
   selector: 'app-group-booking',
   standalone: true,
-  imports: [CommonModule, RouterModule, SeatMapSvgComponent, LucideAngularModule],
+  imports: [
+    CommonModule,
+    RouterModule,
+    SeatMapSvgComponent,
+    LucideAngularModule,
+    PaymentQrComponent,
+    MoneyPipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-6xl py-6">
@@ -84,9 +97,9 @@ import { apiErrorMessage } from '../../api/api-error';
                               >({{ s.price_zone }})</span
                             >
                           </span>
-                          <span class="font-semibold text-foreground"
-                            >{{ s.price }} {{ currency }}</span
-                          >
+                          <span class="font-semibold text-foreground">{{
+                            s.price | money: currency
+                          }}</span>
                         </li>
                       }
                     </ul>
@@ -94,9 +107,9 @@ import { apiErrorMessage } from '../../api/api-error';
                       <span class="text-sm text-muted-foreground"
                         >{{ selected.length }} seat(s)</span
                       >
-                      <span class="text-lg font-bold text-foreground"
-                        >{{ selectionTotal }} {{ currency }}</span
-                      >
+                      <span class="text-lg font-bold text-foreground">{{
+                        selectionTotal | money: currency
+                      }}</span>
                     </div>
                   }
                   <button
@@ -132,9 +145,9 @@ import { apiErrorMessage } from '../../api/api-error';
                             <span class="text-xs text-muted-foreground ml-1">· unclaimed</span>
                           }
                         </span>
-                        <span class="font-semibold text-foreground"
-                          >{{ s.price }} {{ currency }}</span
-                        >
+                        <span class="font-semibold text-foreground">{{
+                          s.price | money: currency
+                        }}</span>
                       </li>
                     }
                   </ul>
@@ -144,9 +157,9 @@ import { apiErrorMessage } from '../../api/api-error';
                       >{{ booking.seat_count }} seats</span
                     >
                     <span class="text-right">
-                      <span class="text-lg font-bold text-foreground"
-                        >{{ booking.total_due }} {{ booking.currency }}</span
-                      >
+                      <span class="text-lg font-bold text-foreground">{{
+                        booking.total_due | money: booking.currency
+                      }}</span>
                       @if (booking.total_due !== booking.total_price) {
                         <span class="block text-xs text-muted-foreground">incl. tax & fees</span>
                       }
@@ -177,7 +190,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     {{
                       paying
                         ? 'Processing…'
-                        : 'Pay for group — ' + booking.total_due + ' ' + booking.currency
+                        : 'Pay for group — ' + (booking.total_due | money: booking.currency)
                     }}
                   </button>
                   <button
@@ -193,6 +206,10 @@ import { apiErrorMessage } from '../../api/api-error';
         }
       </div>
     </div>
+
+    @if (qrCheckout && booking) {
+      <app-payment-qr [checkout]="qrCheckout" [bookingId]="booking.id" (closed)="onQrClosed()" />
+    }
   `,
 })
 export class GroupBookingComponent implements OnInit, OnDestroy {
@@ -215,6 +232,8 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
   holding = false;
   paying = false;
   copied = false;
+  /** Freedom Pay answer with a QR code: the payment dialog is open. */
+  qrCheckout: QrCheckout | null = null;
 
   secondsLeft = 0;
   countdown = '10:00';
@@ -247,6 +266,16 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     if (this.timer) clearInterval(this.timer);
+  }
+
+  /** Back from the payment page via the browser's Back button: the page
+   *  comes from the back/forward cache with `paying` still true. */
+  @HostListener('window:pageshow', ['$event'])
+  onPageShow(event: PageTransitionEvent): void {
+    if (!event.persisted) return;
+    this.paying = false;
+    this.qrCheckout = null;
+    this.refreshBooking();
   }
 
   get currency(): string {
@@ -290,13 +319,61 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
     if (!this.booking) return;
     this.paying = true;
     this.bookingService.checkout(this.booking.id).subscribe({
-      next: (res) => {
-        window.location.href = res.checkout_url;
+      next: (res) => this.startCheckout(res),
+      error: (err) => {
+        this.paying = false;
+        this.toast.error(apiErrorMessage(err, 'Payment could not be started.', 'error'));
+      },
+    });
+  }
+
+  /** The QR dialog was closed without a finished payment. */
+  onQrClosed(): void {
+    this.qrCheckout = null;
+    this.paying = false;
+    this.refreshBooking();
+  }
+
+  /** Show the payment page's QR code when there is one, else go to the page. */
+  private startCheckout(res: BookingCheckoutResponse): void {
+    if (res.qr_code && res.payment_id != null) {
+      this.qrCheckout = { ...res, payment_id: res.payment_id };
+      // Opening the payment extended the hold: show the new deadline.
+      this.refreshBooking();
+      return;
+    }
+    window.location.href = res.checkout_url;
+  }
+
+  /** Reload the held booking (its hold may have been extended or ended). */
+  private refreshBooking(): void {
+    const id = this.booking?.id;
+    if (!id) return;
+    this.bookingService.get(id).subscribe({
+      next: (b) => {
+        if (b.status === 'holding') {
+          this.booking = b;
+          this.startCountdown();
+        } else if (b.status === 'confirmed') {
+          void this.router.navigate(['/payment/success'], { queryParams: { booking_id: b.id } });
+        } else {
+          this.clearHold();
+        }
       },
       error: () => {
-        this.paying = false;
-        this.toast.error('Payment could not be started.');
+        // Keep what is on screen; the countdown still guards the hold.
       },
+    });
+  }
+
+  private clearHold(): void {
+    if (this.timer) clearInterval(this.timer);
+    this.booking = null;
+    this.selected = [];
+    this.qrCheckout = null;
+    this.paying = false;
+    this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
+      this.seats = sm.seats;
     });
   }
 
@@ -324,6 +401,7 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
   }
 
   private startCountdown(): void {
+    if (this.timer) clearInterval(this.timer);
     if (!this.booking?.hold_expires_at) return;
     const end = new Date(this.booking.hold_expires_at).getTime();
     const tick = () => {
@@ -332,16 +410,13 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       const s = this.secondsLeft % 60;
       this.countdown = `${m}:${s.toString().padStart(2, '0')}`;
       if (this.secondsLeft <= 0) {
-        if (this.timer) clearInterval(this.timer);
         this.toast.error('Your seat hold has expired.');
-        this.booking = null;
-        this.selected = [];
-        this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
-          this.seats = sm.seats;
-        });
+        this.clearHold();
       }
     };
-    tick();
+    // The interval exists before the first tick, so an already-ended hold
+    // stops it right away.
     this.timer = setInterval(tick, 1000);
+    tick();
   }
 }

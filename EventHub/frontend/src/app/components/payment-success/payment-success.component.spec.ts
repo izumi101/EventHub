@@ -31,7 +31,7 @@ describe('PaymentSuccessComponent', () => {
       {},
     );
     expect(text).toContain('Payment confirmed');
-    expect(text).toContain('5000.00 KZT');
+    expect(text).toContain('5,000.00');
   });
 
   it('explains an automatic refund instead of claiming success', () => {
@@ -133,7 +133,8 @@ describe('PaymentSuccessComponent verification requests', () => {
     expect(verify).toHaveBeenCalledWith('cs_2');
     expect(get).not.toHaveBeenCalled();
     expect(text).toContain('Payment confirmed');
-    expect(text).toContain('300.00 KZT');
+    expect(text).toContain('300.00');
+    expect(text).toContain('View booking & tickets');
   });
 
   it('reads the real booking state when there is no session (mock flow) and reports an expired hold as refunded', () => {

@@ -20,6 +20,8 @@ function status(
     status: value,
     registration_id: 3,
     registration_status: registration,
+    booking_id: null,
+    booking_status: null,
     event_id: 1,
     event_title: 'Gig',
     amount: '5000.00',
@@ -27,9 +29,28 @@ function status(
   };
 }
 
-function render(answers: PaymentStatusResponse[], signedIn = true) {
+function bookingStatus(
+  value: PaymentStatus,
+  booking: PaymentStatusResponse['booking_status'],
+): PaymentStatusResponse {
+  return {
+    ...status(value),
+    registration_id: null,
+    registration_status: null,
+    booking_id: 'bk-1',
+    booking_status: booking,
+    amount: '225000.00',
+  };
+}
+
+function render(
+  answers: PaymentStatusResponse[],
+  signedIn = true,
+  extraQuery: Record<string, string> = {},
+) {
   const getPaymentStatus = vi.fn(() => of(answers.length > 1 ? answers.shift()! : answers[0]));
   const verifyPayment = vi.fn();
+  const bookingService = { get: vi.fn(), verify: vi.fn() };
   TestBed.configureTestingModule({
     imports: [PaymentSuccessComponent],
     providers: [
@@ -37,11 +58,17 @@ function render(answers: PaymentStatusResponse[], signedIn = true) {
       {
         provide: ActivatedRoute,
         useValue: {
-          queryParams: of({ provider: 'freedompay', payment: '7', pg_order_id: '7', pg_sig: 'x' }),
+          queryParams: of({
+            provider: 'freedompay',
+            payment: '7',
+            pg_order_id: '7',
+            pg_sig: 'x',
+            ...extraQuery,
+          }),
         },
       },
       { provide: PaymentService, useValue: { getPaymentStatus, verifyPayment } },
-      { provide: BookingService, useValue: {} },
+      { provide: BookingService, useValue: bookingService },
       { provide: AuthService, useValue: { getToken: () => (signedIn ? 'access' : null) } },
     ],
   });
@@ -52,7 +79,7 @@ function render(answers: PaymentStatusResponse[], signedIn = true) {
     vi.advanceTimersByTime(ms);
     fixture.detectChanges();
   };
-  return { fixture, text, tick, getPaymentStatus, verifyPayment };
+  return { fixture, text, tick, getPaymentStatus, verifyPayment, bookingService };
 }
 
 describe('PaymentSuccessComponent (Freedom Pay return)', () => {
@@ -68,7 +95,8 @@ describe('PaymentSuccessComponent (Freedom Pay return)', () => {
     expect(text()).toContain('Payment is processing');
     tick(2000);
     expect(text()).toContain('Payment confirmed');
-    expect(text()).toContain('5000.00 KZT');
+    expect(text()).toContain('5,000.00');
+    expect(text()).not.toContain('5000.00 KZT');
     expect(getPaymentStatus).toHaveBeenCalledWith(7);
     expect(verifyPayment).not.toHaveBeenCalled();
     tick(10_000);
@@ -119,5 +147,53 @@ describe('PaymentSuccessComponent (Freedom Pay return)', () => {
     expect(text()).not.toContain('Payment confirmed');
     tick(10_000);
     expect(getPaymentStatus).not.toHaveBeenCalled();
+  });
+
+  it('polls a group booking payment and links to the booking once it is confirmed', () => {
+    const { text, tick, getPaymentStatus, bookingService } = render(
+      [bookingStatus('pending', 'holding'), bookingStatus('completed', 'confirmed')],
+      true,
+      { booking_id: 'bk-1' },
+    );
+    tick(0);
+    expect(text()).toContain('Payment is processing');
+    expect(text()).toContain('Your tickets will appear');
+    tick(2000);
+    expect(text()).toContain('Payment confirmed');
+    expect(text()).toContain('Your group booking is confirmed');
+    expect(text()).toContain('View booking & tickets');
+    expect(text()).toContain('225,000.00');
+    expect(text()).not.toContain('225000.00');
+    expect(getPaymentStatus).toHaveBeenCalledWith(7);
+    expect(bookingService.get).not.toHaveBeenCalled();
+  });
+
+  it('offers a manual check for a group booking payment that is still processing', () => {
+    const { text, tick } = render([bookingStatus('pending', 'holding')], true, {
+      booking_id: 'bk-1',
+    });
+    tick(60_000);
+    expect(text()).toContain('Check again');
+  });
+
+  it('explains a group payment that arrived after the hold ended as refunded', () => {
+    const { text, tick } = render([bookingStatus('completed', 'expired')], true, {
+      booking_id: 'bk-1',
+    });
+    tick(0);
+    expect(text()).toContain('Payment refunded');
+  });
+
+  it('tells a signed-out phone that paid a group booking to go back to the buyer device', () => {
+    const { text, tick, getPaymentStatus, bookingService } = render(
+      [bookingStatus('completed', 'confirmed')],
+      false,
+      { booking_id: 'bk-1' },
+    );
+    tick(0);
+    expect(text()).toContain('Payment sent');
+    expect(text()).not.toContain('Verification failed');
+    expect(getPaymentStatus).not.toHaveBeenCalled();
+    expect(bookingService.get).not.toHaveBeenCalled();
   });
 });

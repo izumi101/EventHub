@@ -14,6 +14,8 @@ function status(
     status: value,
     registration_id: 3,
     registration_status: registration,
+    booking_id: null,
+    booking_status: null,
     event_id: 1,
     event_title: 'Gig',
     amount: '5000.00',
@@ -95,5 +97,23 @@ describe('PaymentPollingService', () => {
     expect(paymentOutcome(status('failed'))).toBe('failed');
     expect(paymentOutcome(status('expired'))).toBe('failed');
     expect(paymentOutcome(status('pending'))).toBe('waiting');
+  });
+
+  it('judges a group booking payment by the booking', () => {
+    const booking = (
+      value: PaymentStatus,
+      bookingStatus: PaymentStatusResponse['booking_status'],
+    ): PaymentStatusResponse => ({
+      ...status(value),
+      registration_id: null,
+      registration_status: null,
+      booking_id: 'bk-1',
+      booking_status: bookingStatus,
+    });
+    expect(paymentOutcome(booking('completed', 'confirmed'))).toBe('paid');
+    // The hold ended (expired / released) before the money arrived.
+    expect(paymentOutcome(booking('completed', 'expired'))).toBe('refunded');
+    expect(paymentOutcome(booking('completed', 'cancelled'))).toBe('refunded');
+    expect(paymentOutcome(booking('pending', 'holding'))).toBe('waiting');
   });
 });
