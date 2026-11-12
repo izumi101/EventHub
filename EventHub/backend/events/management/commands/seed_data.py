@@ -65,6 +65,7 @@ class Command(BaseCommand):
                     'bio': 'Creates community and tech events.',
                     'phone': '+7 777 100 2000',
                     'location': 'Almaty',
+                    'role': 'organizer',
                 },
             },
             {
