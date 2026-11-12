@@ -157,6 +157,22 @@ class Command(BaseCommand):
                 'is_online': True,
                 'online_link': 'https://meet.example.com/eventhub-drf',
             },
+            {
+                # Priced in KZT: paid through Freedom Pay (the emulator in the demo).
+                'title': 'Almaty Product Conference',
+                'description': 'Product managers and engineers from Almaty startups share how they ship. '
+                'Tickets are paid in tenge through Freedom Pay, by card or by scanning a QR code.',
+                'category': categories['Technology'],
+                'date': now + timedelta(days=14),
+                'end_date': now + timedelta(days=14, hours=6),
+                'location': 'SmArt.Point, Almaty',
+                'address': 'Zheltoksan Street 115, Almaty',
+                'price': Decimal('5000.00'),
+                'currency': 'KZT',
+                'max_participants': 150,
+                'is_online': False,
+                'online_link': '',
+            },
         ]
 
         events = {}

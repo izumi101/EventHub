@@ -68,6 +68,7 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       # Payments (docs/adr/0001-payment-provider-layer.md): every enabled
       # provider must be configured when DJANGO_DEBUG=0.
+      # .env.example enables freedompay for the demo (KZT events).
       PAYMENT_PROVIDERS_ENABLED: ${PAYMENT_PROVIDERS_ENABLED:-stripe}
       PAYMENTS_MOCK_MODE: ${PAYMENTS_MOCK_MODE:-}
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
@@ -75,6 +76,17 @@ services:
       STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
       # Deprecated name of PAYMENTS_MOCK_MODE, read only while that is empty.
       STRIPE_MOCK_MODE: ${STRIPE_MOCK_MODE:-0}
+      # Freedom Pay (KZT events). The demo points FREEDOMPAY_API_URL at the
+      # fpay-emulator service below (never a real gateway); a real deployment
+      # uses https://api.freedompay.kz and an https FREEDOMPAY_RESULT_URL.
+      # With DJANGO_DEBUG=0 the emulator needs FREEDOMPAY_DEMO_MODE=1.
+      FREEDOMPAY_API_URL: ${FREEDOMPAY_API_URL:-}
+      FREEDOMPAY_MERCHANT_ID: ${FREEDOMPAY_MERCHANT_ID:?Set FREEDOMPAY_MERCHANT_ID in .env (see .env.example)}
+      FREEDOMPAY_SECRET_KEY: ${FREEDOMPAY_SECRET_KEY:?Set FREEDOMPAY_SECRET_KEY in .env (see .env.example)}
+      # Where the gateway sends Result notifications (inside compose: the backend).
+      FREEDOMPAY_RESULT_URL: ${FREEDOMPAY_RESULT_URL:-http://backend:8000/api/v1/payments/callback/freedompay/}
+      FREEDOMPAY_TESTING_MODE: ${FREEDOMPAY_TESTING_MODE:-0}
+      FREEDOMPAY_DEMO_MODE: ${FREEDOMPAY_DEMO_MODE:-0}
       EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
@@ -146,6 +158,34 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  # ---- Freedom Pay gateway emulator (fpay-emulator/README.md) ---- #
+  # Demo payments in KZT without a real gateway: the backend calls it at
+  # http://fpay-emulator:8080, it calls the backend back with signed Result
+  # notifications, and browsers open its payment page at FPAY_PUBLIC_URL.
+  # Phone (QR) demo: FPAY_PUBLIC_URL=http://<laptop LAN IP>:18080 and
+  # FPAY_EMULATOR_BIND=0.0.0.0 (then also set FPAY_CONTROL_TOKEN).
+  fpay-emulator:
+    build:
+      context: ./fpay-emulator
+    container_name: eventhub_fpay_emulator
+    restart: unless-stopped
+    environment:
+      # Same merchant id and secret as the backend's FREEDOMPAY_* settings.
+      FPAY_MERCHANTS: ${FREEDOMPAY_MERCHANT_ID:?Set FREEDOMPAY_MERCHANT_ID in .env (see .env.example)}:${FREEDOMPAY_SECRET_KEY:?Set FREEDOMPAY_SECRET_KEY in .env (see .env.example)}
+      FPAY_PUBLIC_URL: ${FPAY_PUBLIC_URL:-http://localhost:18080}
+      # Control API (/_emulator) token; empty leaves it open (localhost only by default).
+      FPAY_CONTROL_TOKEN: ${FPAY_CONTROL_TOKEN:-}
+      FPAY_LOG_LEVEL: ${FPAY_LOG_LEVEL:-INFO}
+    ports:
+      - "${FPAY_EMULATOR_BIND:-127.0.0.1}:18080:8080"
+    healthcheck:
+      # The image's own check (python:slim has no curl).
+      test: ["CMD", "python", "-c", "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/status/healthcheck', timeout=2).status == 200 else 1)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
 
   # ---- Feature flags: self-hosted Unleash (docs/FEATURE_FLAGS.md) ---- #
   # Opt-in profile (`COMPOSE_PROFILES=flags` in .env, or `--profile flags`):
