@@ -2,7 +2,7 @@
 
 Read this first when continuing the production-readiness work in a new session.
 
-- **Branch:** `phase-1/payment-providers` (local; phase 0 is merged into `main` as PR #3, merge commit `ab08b10`).
+- **Branch:** work is merged into `main` (phase 0: PR #3, phase 1: PR #4 and the group-booking follow-up); a new branch per phase from `main`.
 - **Full roadmap:** the owner keeps `PLAN.md` (private, Russian, 11 phases + 1Б). Ask for it if you need task-level detail.
 - **Principle agreed with the owner:** everything at production level — no "minimal" variants.
 
@@ -24,7 +24,7 @@ Read this first when continuing the production-readiness work in a new session.
 
 Phase 0 is complete.
 
-## Phase 1 — payments (in progress, demo-ready)
+## Phase 1 — payments (closed for the demo scope, 2026-11-12)
 
 | Step | Status |
 |---|---|
@@ -33,9 +33,16 @@ Phase 0 is complete.
 | Freedom Pay emulator (`fpay-emulator/`, in compose) | done |
 | Freedom Pay provider on the live single-ticket path for KZT events: checkout with QR (`pg_generate_qr`), signed result callback confirmed by `get_status3`, owner-only status endpoint, refunds through the outbox | done, demo mode against the emulator |
 | Least-privilege PostgreSQL roles (`docs/DATABASE_ROLES.md`), SQL data checks (`manage.py run_sql_checks`), Kazakhstan demo data (`seed_demo_kz`) | done |
-| Group bookings on Freedom Pay, Stripe moved onto the provider layer, contract migration (drop `stripe_*`), routing/circuit breaker, reconciliation job, full Stripe event set | open |
+| Group bookings of KZT events through Freedom Pay with the same QR flow and refunds | done, demo mode against the emulator |
 
-The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. Open review findings (2026-11-11) on the legacy Stripe path are listed in `docs/reports/backend-payment-test-report.md`.
+**Scope decision (owner, 2026-11-12):** the project has no Freedom Pay merchant account or API keys and no Stripe account yet, so phase 1 is closed with payments running against the emulator (KZT) and Stripe mock mode (other currencies). The following work waits for a real acquirer account and its documentation, and will be planned against the real API then:
+
+- Stripe moved onto the provider layer, contract migration (drop the legacy `stripe_*` fields), full Stripe event set (`charge.refunded`, disputes, async failures);
+- provider routing rules and circuit breaker, reconciliation job and daily provider statement matching;
+- fiscal receipts (OFD), Kaspi, the items marked UNVERIFIED in `docs/payments/freedompay-protocol.md`;
+- the open review findings (2026-11-11) on the legacy Stripe path, listed in `docs/reports/backend-payment-test-report.md`.
+
+The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. Next per the roadmap: phase 1Б (commission, ledger, payouts, with 2FA from phase 4) and phase 2 (communications).
 
 ### Owner actions still required (GitHub settings, cannot be done from code)
 
