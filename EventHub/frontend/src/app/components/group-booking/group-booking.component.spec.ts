@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { GroupBookingComponent } from './group-booking.component';
 import { EventService } from '../../services/event.service';
 import { BookingService } from '../../services/booking.service';
 import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
+import { PaymentService } from '../../services/payment.service';
 import type { Seat } from '../../models/models';
 
 const NOW = new Date('2026-11-12T10:00:00Z');
@@ -30,10 +31,13 @@ function setup() {
     getEvent: vi.fn(() => of({ id: 7, title: 'Gig', currency: 'KZT' })),
     getSeatMap: vi.fn(() => of({ seats: [], zone_prices: [] })),
   };
+  // The QR dialog polls the payment; these tests never settle it.
+  const paymentService = { getPaymentStatus: vi.fn(() => NEVER) };
   const bookingService = {
     create: vi.fn(),
     checkout: vi.fn(),
     cancel: vi.fn(),
+    get: vi.fn(),
   };
   TestBed.configureTestingModule({
     imports: [GroupBookingComponent],
@@ -42,6 +46,7 @@ function setup() {
       { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '7' } } } },
       { provide: EventService, useValue: eventService },
       { provide: BookingService, useValue: bookingService },
+      { provide: PaymentService, useValue: paymentService },
       { provide: AuthService, useValue: {} },
     ],
   });
@@ -147,6 +152,92 @@ describe('GroupBookingComponent payment flow', () => {
     s.cmp.pay();
     expect(s.bookingService.checkout).not.toHaveBeenCalled();
     expect(s.cmp.paying).toBe(false);
+  });
+
+  it('pay() shows the QR dialog for a Freedom Pay answer instead of leaving the page', () => {
+    const s = setup();
+    hold(s, 120);
+    const loc = { href: 'http://localhost/group', origin: 'http://localhost' };
+    vi.stubGlobal('location', loc);
+    s.bookingService.checkout.mockReturnValue(
+      of({
+        checkout_url: 'http://fpay.example/pay.html?customer=1',
+        mock: false,
+        session_id: '1030000000001',
+        provider: 'freedompay',
+        payment_id: 42,
+        qr_code: 'data:image/png;base64,iVBORw0KGgo=',
+        amount: '224.00',
+        currency: 'KZT',
+      }),
+    );
+    // Opening the payment page extended the hold on the server.
+    s.bookingService.get.mockReturnValue(of({ ...holdFor(900), status: 'holding' }));
+
+    s.cmp.pay();
+
+    expect(loc.href).toBe('http://localhost/group');
+    expect(s.cmp.qrCheckout).toEqual(
+      expect.objectContaining({ payment_id: 42, provider: 'freedompay', amount: '224.00' }),
+    );
+    expect(s.cmp.paying).toBe(true);
+    expect(s.bookingService.get).toHaveBeenCalledWith('bk-1');
+    expect(s.cmp.countdown).toBe('15:00');
+
+    // Closing the dialog without paying lets the buyer try again.
+    s.cmp.onQrClosed();
+    expect(s.cmp.qrCheckout).toBeNull();
+    expect(s.cmp.paying).toBe(false);
+    expect(s.cmp.booking?.id).toBe('bk-1');
+    s.cmp.ngOnDestroy();
+  });
+
+  it('renders the QR dialog for the booking with the amount formatted', () => {
+    const s = setup();
+    const fixture = TestBed.createComponent(GroupBookingComponent);
+    const cmp = fixture.componentInstance;
+    cmp.event = { id: 7, title: 'Gig', currency: 'KZT' } as never;
+    cmp.booking = holdFor(600) as never;
+    cmp.qrCheckout = {
+      checkout_url: 'http://fpay.example/pay.html?customer=1',
+      provider: 'freedompay',
+      payment_id: 42,
+      qr_code: 'data:image/png;base64,iVBORw0KGgo=',
+      amount: '225000.00',
+      currency: 'KZT',
+    };
+    s.cmp.ngOnDestroy();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('app-payment-qr')).not.toBeNull();
+    expect(el.textContent).toContain('Pay for your group booking');
+    expect(el.querySelector('[data-testid="qr-amount"]')!.textContent).toContain('225,000.00');
+    expect(el.textContent).not.toContain('225000.00');
+    fixture.destroy();
+  });
+
+  it('a page restored from the back/forward cache re-enables the pay button', () => {
+    const s = setup();
+    hold(s, 600);
+    s.cmp.paying = true;
+    s.bookingService.get.mockReturnValue(of({ ...holdFor(500), status: 'holding' }));
+
+    s.cmp.onPageShow({ persisted: true } as PageTransitionEvent);
+
+    expect(s.cmp.paying).toBe(false);
+    expect(s.cmp.qrCheckout).toBeNull();
+    expect(s.cmp.countdown).toBe('8:20');
+    s.cmp.ngOnDestroy();
+  });
+
+  it('a normal page load does not touch the payment state', () => {
+    const s = setup();
+    hold(s, 600);
+    s.cmp.paying = true;
+    s.cmp.onPageShow({ persisted: false } as PageTransitionEvent);
+    expect(s.cmp.paying).toBe(true);
+    expect(s.bookingService.get).not.toHaveBeenCalled();
+    s.cmp.ngOnDestroy();
   });
 
   it('release seats cancels the booking, clears state and reloads the seat map', () => {

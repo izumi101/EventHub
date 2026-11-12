@@ -117,3 +117,64 @@ class EmulatorEndToEndTests(LiveServerTestCase):
             self.assertEqual((payment.status, payment.refunded_amount), ('refunded', Decimal('5000.00')))
             self.assertEqual(provider().get_status(payment).state, CallbackKind.REFUNDED)
             self.assertEqual(Refund.objects.filter(payment=payment, status='succeeded').count(), 2)
+
+    def test_group_booking_pay_confirm_and_refund_through_the_emulator(self):
+        from bookings.models import Booking
+        from bookings.services import create_booking, refund_booking
+        from events.models import EventSeat, SeatMap
+
+        port = self.server_thread.port
+        result_url = f'http://{CALLBACK_HOST}:{port}/api/v1/payments/callback/freedompay/'
+        with override_settings(
+            ALLOWED_HOSTS=['*'],
+            PAYMENT_PROVIDERS_ENABLED=['stripe', 'freedompay'],
+            PAYMENTS_MOCK_MODE=True,  # must not shortcut a KZT booking
+            STRIPE_MOCK_MODE=True,
+            FREEDOMPAY_API_URL=EMULATOR,
+            FREEDOMPAY_MERCHANT_ID=MERCHANT,
+            FREEDOMPAY_SECRET_KEY=SECRET,
+            FREEDOMPAY_RESULT_URL=result_url,
+            FREEDOMPAY_TESTING_MODE=True,
+            FRONTEND_URL='http://frontend.test',
+            JOBS_RUN_INLINE=False,
+        ):
+            organizer = User.objects.create_user(username='org', password='password123')
+            buyer = User.objects.create_user(username='buyer', email='buyer@example.com', password='password123')
+            event = Event.objects.create(
+                title='Almaty Jazz Night',
+                description='Music',
+                organizer=organizer,
+                category=Category.objects.create(name='Music', icon='music'),
+                date=timezone.now() + timedelta(days=14),
+                location='Almaty',
+                price=Decimal('7500.00'),
+                currency='KZT',
+                max_participants=100,
+                status='published',
+            )
+            seat_map = SeatMap.objects.create(event=event, rows=1, cols=3)
+            seats = [EventSeat.objects.create(seat_map=seat_map, row=1, col=col) for col in (1, 2, 3)]
+            booking = create_booking(user=buyer, event=event, seat_ids=[s.pk for s in seats])
+
+            from bookings.payments import create_booking_checkout
+
+            answer = create_booking_checkout(booking)
+            self.assertEqual((answer['provider'], answer['amount']), ('freedompay', '22500.00'))
+            self.assertTrue(answer['qr_code'].startswith('data:image/png;base64,'))
+            payment = Payment.objects.get(pk=answer['payment_id'])
+            self.control('POST', f'/payments/{payment.provider_session_id}/complete', json={})
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                booking.refresh_from_db()
+                if booking.status == Booking.Status.CONFIRMED:
+                    break
+                time.sleep(0.5)
+            self.assertEqual(booking.status, Booking.Status.CONFIRMED)
+            self.assertEqual(booking.amount_paid, Decimal('22500.00'))
+            payment.refresh_from_db()
+            self.assertEqual(payment.status, 'completed')
+
+            refund_booking(booking, actor=organizer, reason='Venue change')
+            payment.refresh_from_db()
+            self.assertEqual((payment.status, payment.refunded_amount), ('refunded', Decimal('22500.00')))
+            self.assertEqual(provider().get_status(payment).state, CallbackKind.REFUNDED)

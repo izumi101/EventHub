@@ -65,20 +65,39 @@ class BookingDetailView(APIView):
 
 
 class BookingCheckoutView(APIView):
-    """POST /api/bookings/{id}/checkout/  — pay for the whole group."""
+    """POST /api/bookings/{id}/checkout/  — pay for the whole group.
+
+    KZT events go to Freedom Pay when it is enabled (the answer carries a QR
+    code of the payment page, like a single ticket); other currencies keep
+    the Stripe path (real, or simulated with PAYMENTS_MOCK_MODE).
+    """
 
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         request=None,
-        responses={200: schema.BookingCheckoutResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+        responses={
+            200: schema.BookingCheckoutResponseSerializer,
+            400: ERROR,
+            401: UNAUTHENTICATED,
+            404: NOT_FOUND,
+            502: ERROR,
+        },
     )
     def post(self, request, pk):
+        from payments.providers.base import PaymentProviderError
+
         booking = get_object_or_404(Booking, pk=pk, owner=request.user)
         try:
             result = create_booking_checkout(booking)
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except (PaymentProviderError, stripe.error.StripeError) as exc:
+            logger.error('Payment provider error opening checkout of booking %s: %s', pk, exc)
+            return Response(
+                {'error': 'The payment provider is unavailable. Please try again.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
         return Response(result)
 
 

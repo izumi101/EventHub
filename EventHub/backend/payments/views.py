@@ -315,8 +315,9 @@ class InvoiceView(APIView):
 
 class PaymentStatusView(APIView):
     """The buyer's payment, provider-neutral, for the success page and the QR
-    dialog to poll. A Freedom Pay payment that is still pending after a
-    few seconds is re-checked with the gateway (rate-limited)."""
+    dialog to poll: a single ticket's or a group booking's. A Freedom Pay
+    payment that is still pending after a few seconds is re-checked with
+    the gateway (rate-limited)."""
 
     permission_classes = [IsAuthenticated]
 
@@ -324,27 +325,32 @@ class PaymentStatusView(APIView):
         responses={200: schema.PaymentStatusResponseSerializer, 401: UNAUTHENTICATED, 404: NOT_FOUND},
     )
     def get(self, request, payment_id):
+        from django.db.models import Q
+
         # Owner only: anybody else gets the same 404 as a missing payment.
         payment = get_object_or_404(
-            Payment.objects.select_related('registration__event'),
+            Payment.objects.select_related('registration__event', 'booking__event'),
+            Q(registration__user=request.user) | Q(booking__owner=request.user),
             pk=payment_id,
-            registration__user=request.user,
         )
         from .freedompay_flow import refresh_status
 
         payment = refresh_status(payment)
-        registration = payment.registration
-        registration.refresh_from_db(fields=['status'])
+        registration, booking = payment.registration, payment.booking
+        target = registration or booking
+        target.refresh_from_db(fields=['status'])
         return Response(
             {
                 'payment_id': payment.pk,
                 'provider': payment.provider
                 or ('mock' if payment.stripe_checkout_session_id.startswith('mock_') else 'stripe'),
                 'status': payment.status,
-                'registration_id': registration.pk,
-                'registration_status': registration.status,
-                'event_id': registration.event_id,
-                'event_title': registration.event.title,
+                'registration_id': registration.pk if registration else None,
+                'registration_status': registration.status if registration else None,
+                'booking_id': booking.pk if booking else None,
+                'booking_status': booking.status if booking else None,
+                'event_id': target.event_id,
+                'event_title': target.event.title,
                 'amount': str(payment.amount),
                 'currency': (payment.currency or 'usd').upper(),
             }
