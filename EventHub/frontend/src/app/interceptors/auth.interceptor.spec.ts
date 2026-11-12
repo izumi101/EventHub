@@ -1,5 +1,10 @@
 import { TestBed } from '@angular/core/testing';
-import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
+import {
+  HttpClient,
+  HttpErrorResponse,
+  provideHttpClient,
+  withInterceptors,
+} from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Router } from '@angular/router';
 import { authInterceptor } from './auth.interceptor';
@@ -76,5 +81,80 @@ describe('authInterceptor', () => {
     expect(router.navigate).toHaveBeenCalledWith(['/login'], {
       queryParams: { returnUrl: '/my-registrations' },
     });
+  });
+
+  describe('during a payment request', () => {
+    const checkout = `${API}/payments/create-checkout/42/`;
+    const unauthorized = { status: 401, statusText: 'Unauthorized' };
+
+    it('refreshes the token once and retries the checkout POST with the same body and the new token', () => {
+      let url = '';
+      client
+        .post<{ checkout_url: string }>(checkout, { note: 'x' })
+        .subscribe((r) => (url = r.checkout_url));
+
+      http.expectOne(checkout).flush(null, unauthorized);
+      http.expectOne(`${API}/auth/token/refresh/`).flush({ access: 'fresh', refresh: 'refresh-2' });
+
+      const retry = http.expectOne(checkout);
+      expect(retry.request.method).toBe('POST');
+      expect(retry.request.body).toEqual({ note: 'x' });
+      expect(retry.request.headers.get('Authorization')).toBe('Bearer fresh');
+      retry.flush({ checkout_url: 'https://pay.example/c' });
+
+      expect(url).toBe('https://pay.example/c');
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('does not log out on a non-401 error such as a 409 when no refresh was needed', () => {
+      let status = 0;
+      client.post(checkout, {}).subscribe({ error: (e: HttpErrorResponse) => (status = e.status) });
+      http
+        .expectOne(checkout)
+        .flush({ error: 'Seat taken' }, { status: 409, statusText: 'Conflict' });
+
+      expect(status).toBe(409);
+      expect(localStorage.getItem('access_token')).toBe('expired');
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
+
+    it('gives up and logs out when the retried request is rejected with 401 again (no refresh loop)', () => {
+      let failed = false;
+      client.post(checkout, {}).subscribe({ error: () => (failed = true) });
+      http.expectOne(checkout).flush(null, unauthorized);
+      http.expectOne(`${API}/auth/token/refresh/`).flush({ access: 'fresh', refresh: 'refresh-2' });
+      http.expectOne(checkout).flush(null, unauthorized);
+
+      expect(failed).toBe(true);
+      expect(localStorage.getItem('access_token')).toBeNull();
+      http.expectNone(`${API}/auth/token/refresh/`);
+    });
+
+    // Known defect F1 from the 2026-11-11 review: the retry is inside the same
+    // catchError that handles refresh failures (auth.interceptor.ts:39-48), so a
+    // business error from the retried request (e.g. 409 "seat taken") is treated
+    // like a failed refresh: the session is wiped and the buyer is sent to /login.
+    // Expected (correct) behaviour is asserted below; `it.fails` keeps the suite
+    // green while the defect exists and turns red once it is fixed (then drop `.fails`).
+    it.fails(
+      'F1: keeps the user logged in when the retried request fails with 409 after a successful refresh',
+      () => {
+        let status = 0;
+        client
+          .post(checkout, {})
+          .subscribe({ error: (e: HttpErrorResponse) => (status = e.status) });
+        http.expectOne(checkout).flush(null, unauthorized);
+        http
+          .expectOne(`${API}/auth/token/refresh/`)
+          .flush({ access: 'fresh', refresh: 'refresh-2' });
+        http
+          .expectOne(checkout)
+          .flush({ error: 'Seat taken' }, { status: 409, statusText: 'Conflict' });
+
+        expect(status).toBe(409);
+        expect(localStorage.getItem('access_token')).toBe('fresh');
+        expect(router.navigate).not.toHaveBeenCalled();
+      },
+    );
   });
 });
