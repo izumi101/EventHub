@@ -44,7 +44,7 @@ def _load_builtins() -> None:
     global _BUILTINS_LOADED
     if _BUILTINS_LOADED:
         return
-    from . import mock, stripe  # noqa: F401
+    from . import freedompay, mock, stripe  # noqa: F401
 
     _BUILTINS_LOADED = True
 

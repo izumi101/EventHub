@@ -306,6 +306,20 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 # empty means Stripe's own API address.
 STRIPE_API_BASE = os.environ.get('STRIPE_API_BASE', '').strip()
 
+# Freedom Pay (KZT, docs/payments/freedompay-protocol.md). No default API
+# address: the demo points it at the emulator (http://fpay-emulator:8080).
+# FREEDOMPAY_RESULT_URL is the callback address the gateway can reach,
+# e.g. https://eventhub.example/api/v1/payments/callback/freedompay/.
+FREEDOMPAY_API_URL = os.environ.get('FREEDOMPAY_API_URL', '').strip().rstrip('/')
+FREEDOMPAY_MERCHANT_ID = os.environ.get('FREEDOMPAY_MERCHANT_ID', '').strip()
+FREEDOMPAY_SECRET_KEY = os.environ.get('FREEDOMPAY_SECRET_KEY', '')
+FREEDOMPAY_RESULT_URL = os.environ.get('FREEDOMPAY_RESULT_URL', '').strip()
+# pg_testing_mode=1 on every payment (test transactions only).
+FREEDOMPAY_TESTING_MODE = env_bool('FREEDOMPAY_TESTING_MODE', False)
+# Lets a DJANGO_DEBUG=0 deployment use the emulator and demo keys (a demo
+# that never takes real money); the start-up guard refuses them otherwise.
+FREEDOMPAY_DEMO_MODE = env_bool('FREEDOMPAY_DEMO_MODE', False)
+
 # Simulated payments (tickets confirmed without charging anyone) are an
 # explicit local-development opt-in. A missing provider key never turns them
 # on. STRIPE_MOCK_MODE is the deprecated name, used while PAYMENTS_MOCK_MODE
@@ -458,6 +472,11 @@ if not DEBUG and not TESTING:
             'EMAIL_HOST_USER / EMAIL_HOST_PASSWORD (or EMAIL_BACKEND) must be set — '
             'sign-up and password-reset codes are delivered by email'
         )
+    if DB_APP_PASSWORD and DB_APP_USER in (DB_OWNER_USER, DB_READONLY_USER):
+        _problems.append(
+            'POSTGRES_APP_USER must be its own role, not POSTGRES_USER or POSTGRES_READONLY_USER '
+            '(docs/DATABASE_ROLES.md)'
+        )
     if _problems:
         raise ImproperlyConfigured(
             'Refusing to start with DJANGO_DEBUG=0: '
@@ -472,8 +491,3 @@ if TESTING:
     PASSWORD_HASHERS = [
         'django.contrib.auth.hashers.MD5PasswordHasher',
     ]
-    if DB_APP_PASSWORD and DB_APP_USER in (DB_OWNER_USER, DB_READONLY_USER):
-        _problems.append(
-            'POSTGRES_APP_USER must be its own role, not POSTGRES_USER or POSTGRES_READONLY_USER '
-            '(docs/DATABASE_ROLES.md)'
-        )

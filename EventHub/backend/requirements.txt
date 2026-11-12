@@ -12,6 +12,8 @@ uvicorn[standard]>=0.32
 uvicorn-worker>=0.3
 whitenoise>=6.6
 stripe>=16.0,<17
+# HTTP client of the Freedom Pay provider (already locked as a Stripe dependency)
+requests>=2.32,<3
 Pillow>=10.0
 python-dotenv>=1.0.0
 # Real-time WebSocket + shared throttling cache
