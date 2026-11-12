@@ -8,7 +8,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
-from common.choices import PaymentStatusChoices, RegistrationStatusChoices
+from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 from events.models import Registration
 
 from .models import Payment
@@ -35,11 +35,14 @@ def _lock_registration(registration_id, **filters):
 
 
 def ensure_registration_payable(registration):
-    """Raise ValueError unless `registration` is an unpaid ticket whose hold
-    is still alive. Call it with a row-locked registration."""
+    """Raise ValueError unless `registration` is an unpaid ticket of a
+    published event whose hold is still alive. Call it with a row-locked
+    registration."""
     payment = getattr(registration, 'payment', None)
     if payment and payment.status == PaymentStatusChoices.COMPLETED:
         raise ValueError('Payment already completed')
+    if registration.event.status != EventStatusChoices.PUBLISHED:
+        raise ValueError('This event is not open for payment.')
     if registration.status != RegistrationStatusChoices.PENDING:
         raise ValueError('This registration is no longer awaiting payment. Please register again.')
     held_until = registration.seat_held_until
@@ -328,7 +331,13 @@ def refund_payment(*, payment, amount=None, reason='', notify_user=True):
     registration = payment.registration
     currency = (payment.currency or _currency_of(registration)).upper()
 
-    if not getattr(settings, 'STRIPE_MOCK_MODE', False) and payment.stripe_payment_intent_id:
+    if payment.provider == 'freedompay' and payment.provider_payment_id:
+        # Freedom Pay is called even with PAYMENTS_MOCK_MODE: it is a real
+        # (or emulated) gateway, and the money must really go back.
+        from .freedompay_flow import refund_now
+
+        refund_now(payment, refund_amount, reason)
+    elif not getattr(settings, 'STRIPE_MOCK_MODE', False) and payment.stripe_payment_intent_id:
         try:
             # The key is derived from the balance before this refund, so a
             # retry after a crash can't refund twice.

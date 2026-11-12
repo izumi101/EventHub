@@ -38,10 +38,15 @@ class AdminDashboardView(generics.GenericAPIView):
         confirmed_registrations = Registration.objects.filter(status=RegistrationStatusChoices.CONFIRMED).count()
 
         # Money is only summed within one currency, net of refunds, and
-        # includes paid group bookings (they have no Payment row).
+        # includes paid group bookings. Group bookings are still counted from
+        # the Booking row below; their ledger Payment rows (copied by
+        # payments/0005) are left out here so they are not counted twice.
         totals = defaultdict(Decimal)
         for row in (
-            Payment.objects.filter(status__in=[PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED])
+            Payment.objects.filter(
+                registration__isnull=False,
+                status__in=[PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED],
+            )
             .values('currency')
             .annotate(gross=Sum('amount'), refunded=Sum('refunded_amount'))
         ):

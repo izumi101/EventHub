@@ -1,0 +1,6 @@
+# Only requirements.lock and fpay_emulator/ go into the image.
+*
+!requirements.lock
+!fpay_emulator/
+**/__pycache__
+**/*.pyc

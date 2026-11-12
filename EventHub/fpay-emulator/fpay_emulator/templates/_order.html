@@ -1,0 +1,9 @@
+<section class="order" aria-labelledby="order-title">
+  <h1 id="order-title" class="merchant">{{ merchant_name }}</h1>
+  <p class="description">{{ payment.description }}</p>
+  <dl class="facts">
+    <div><dt>Amount</dt><dd class="amount">{{ amount }}</dd></div>
+    {% if payment.order_id %}<div><dt>Order</dt><dd>{{ payment.order_id }}</dd></div>{% endif %}
+    <div><dt>Payment</dt><dd>{{ payment.payment_id }}</dd></div>
+  </dl>
+</section>

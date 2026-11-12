@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% if payment %}{% include "_order.html" %}{% endif %}
+<section>
+  <h2>{{ title }}</h2>
+  <p>{{ text }}</p>
+  {% if payment %}<p><a class="button" href="/pay.html?customer={{ payment.customer }}">Back to the payment</a></p>{% endif %}
+</section>
+{% endblock %}

@@ -25,6 +25,7 @@ HANDLERS = {
     'send_email': 'jobs.handlers.send_email',
     'deliver_webhook': 'events.webhooks.deliver_job',
     'index_event': 'events.search.index_event_job',
+    'process_payment_refund': 'payments.freedompay_flow.process_refund_job',
 }
 
 LEASE = timedelta(minutes=5)

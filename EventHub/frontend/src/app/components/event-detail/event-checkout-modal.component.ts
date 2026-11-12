@@ -57,9 +57,17 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
             </div>
             <div class="flex justify-between">
               <span class="text-muted-foreground">Price</span>
-              <span class="font-semibold text-foreground">{{
-                event.is_free ? 'Free' : (currentGaPrice | money: event.currency)
-              }}</span>
+              <span class="font-semibold text-foreground">
+                @if (event.is_free) {
+                  Free
+                } @else if (selectedSeat?.price) {
+                  {{ selectedSeat?.price | money: event.currency }}
+                } @else if (seatMap) {
+                  <span class="font-normal text-muted-foreground">choose a seat</span>
+                } @else {
+                  {{ currentGaPrice | money: event.currency }}
+                }
+              </span>
             </div>
             @if (selectedSeat) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
@@ -241,6 +249,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                 <app-seat-selector
                   [seats]="seatMap.seats"
                   [eventId]="event.id"
+                  [currency]="event.currency"
                   (seatSelected)="selectedSeat = $event"
                 />
               }

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Payment error{% endblock %}
+{% block content %}
+<section>
+  <h1>The payment could not be started</h1>
+  <p role="alert">{{ description }}</p>
+  <p class="hint">Error code {{ code }}</p>
+</section>
+{% endblock %}

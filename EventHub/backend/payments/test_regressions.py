@@ -21,6 +21,10 @@ def _session(session_id='cs_test_1', url='https://checkout.stripe.test/x'):
     return SimpleNamespace(id=session_id, url=url)
 
 
+# These cases exercise the Stripe path on a KZT event; pin the provider list so
+# a FREEDOMPAY_* environment (e.g. running inside the demo stack) cannot route
+# the checkout to Freedom Pay instead.
+@override_settings(PAYMENT_PROVIDERS_ENABLED=['stripe'])
 class PaymentBase(APITestCase):
     def setUp(self):
         self.organizer = User.objects.create_user('org', 'org@example.com', 'Str0ng-pass!')

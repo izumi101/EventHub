@@ -64,9 +64,12 @@ Event management platform — Django REST backend + Angular frontend. Users crea
 | Run all pre-commit hooks | `pre-commit run --all-files` (install once: `pre-commit install`) |
 | Feature flags | `EventHub/docs/FEATURE_FLAGS.md` (opt-in: `COMPOSE_PROFILES=flags`) |
 | Build frontend | `cd EventHub/frontend && npm run build` |
-| Backend migrations | `docker compose exec backend python manage.py migrate` |
-| Backend shell | `docker compose exec backend python manage.py shell` |
+| Backend migrations | `docker compose exec backend python manage.py migrate` (runs as the schema owner) |
+| Backend shell | `docker compose exec backend python manage.py shell` (app role: no DDL; owner: `-e DJANGO_DB_AS_OWNER=1`) |
 | Run backend tests | `docker compose exec backend python manage.py test` |
+| DB roles: create / prove | `manage.py setup_db_roles` (runs on start) / `manage.py verify_db_roles` — `EventHub/docs/DATABASE_ROLES.md` |
+| Data checks | `docker compose exec backend python manage.py run_sql_checks` (`backend/sql/checks`) |
+| KZ demo data | `docker compose exec backend python manage.py seed_demo_kz` (DJANGO_DEBUG=1) |
 
 ## Compact Instructions
 

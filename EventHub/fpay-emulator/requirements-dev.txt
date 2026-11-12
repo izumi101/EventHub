@@ -1,0 +1,7 @@
+# Test dependencies on top of the runtime ones (run in this directory):
+#   uv pip compile requirements-dev.txt --python-version 3.12 --python-platform x86_64-manylinux_2_28 --exclude-newer 2026-10-17 -o requirements-dev.lock
+# Ruff is not pinned here: CI and pre-commit run ruff==0.17.1 (see README).
+-r requirements.txt
+pytest>=8.3
+pytest-asyncio>=0.25
+pytest-cov>=6.0
