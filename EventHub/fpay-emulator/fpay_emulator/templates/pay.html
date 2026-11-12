@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Pay {{ amount }}{% endblock %}
+{% block head %}<script src="/static/testcards.js" defer></script>{% endblock %}
 {% block content %}
 {% include "_order.html" %}
 
@@ -67,15 +68,34 @@
 </section>
 
 <details class="testcards">
-  <summary>Test cards (expiry 12/30, CVV 123)</summary>
+  <summary>Test cards (expiry {{ test_card.exp_month }}/{{ test_card.exp_year }}, CVV {{ test_card.cvv }}, cardholder {{ test_card.owner }})</summary>
+  <p class="hint">Every test card is used with the same expiry, CVV and cardholder name. “Use” fills the card form above.</p>
+  <div class="table-scroll">
   <table>
-    <caption class="sr-only">Test card numbers and their outcome</caption>
-    <thead><tr><th scope="col">Card</th><th scope="col">Outcome</th></tr></thead>
+    <caption class="sr-only">Test card numbers, the details to enter with them and their outcome</caption>
+    <thead>
+      <tr>
+        <th scope="col">Card</th><th scope="col" class="detail">Expiry</th><th scope="col" class="detail">CVV</th>
+        <th scope="col" class="detail">Cardholder</th><th scope="col">Outcome</th><th scope="col"><span class="sr-only">Fill the form</span></th>
+      </tr>
+    </thead>
     <tbody>
     {% for card in cards %}
-      <tr><td><code>{{ card.pan }}</code></td><td>{{ card.label }}{% if card.failure_code %} ({{ card.failure_code }}){% endif %}</td></tr>
+      <tr>
+        <td><code>{{ card.pan }}</code></td>
+        <td class="detail">{{ test_card.exp_month }}/{{ test_card.exp_year }}</td>
+        <td class="detail">{{ test_card.cvv }}</td>
+        <td class="detail">{{ test_card.owner }}</td>
+        <td>{{ card.label }}{% if card.failure_code %} ({{ card.failure_code }}){% endif %}</td>
+        <td>
+          <button type="button" class="use-card" data-pan="{{ card.pan }}" data-exp-month="{{ test_card.exp_month }}"
+                  data-exp-year="{{ test_card.exp_year }}" data-cvv="{{ test_card.cvv }}" data-owner="{{ test_card.owner }}"
+                  aria-label="Use card {{ card.pan }}">Use</button>
+        </td>
+      </tr>
     {% endfor %}
     </tbody>
   </table>
+  </div>
 </details>
 {% endblock %}
