@@ -23,13 +23,20 @@ import {
 
 type QrState = PaymentOutcome | 'stopped';
 
+/** What the dialog needs from a checkout answer (single ticket or group booking). */
+export type QrCheckout = Pick<
+  CheckoutSessionResponse,
+  'checkout_url' | 'provider' | 'qr_code' | 'amount' | 'currency'
+> & { payment_id: number };
+
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_MS = 10 * 60 * 1000;
 
 /**
- * Pay a ticket with a phone: shows the payment page's QR code (Freedom Pay)
- * and watches the payment until it settles, then opens the success page.
- * "Pay on this device" goes to the same payment page in this browser.
+ * Pay a ticket or a group booking with a phone: shows the payment page's QR
+ * code (Freedom Pay) and watches the payment until it settles, then opens
+ * the success page. "Pay on this device" goes to the same payment page in
+ * this browser.
  */
 @Component({
   selector: 'app-payment-qr',
@@ -46,7 +53,9 @@ const POLL_MAX_MS = 10 * 60 * 1000;
         dismissOnBackdrop
         (dismiss)="close()"
       >
-        <h2 class="text-lg font-bold text-foreground mb-1">Pay for your ticket</h2>
+        <h2 class="text-lg font-bold text-foreground mb-1">
+          {{ bookingId ? 'Pay for your group booking' : 'Pay for your ticket' }}
+        </h2>
         <p class="text-sm text-muted-foreground">Scan with your phone to pay</p>
         @if (checkout.qr_code) {
           <img
@@ -90,7 +99,9 @@ export class PaymentQrComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private document = inject(DOCUMENT);
 
-  @Input({ required: true }) checkout!: CheckoutSessionResponse;
+  @Input({ required: true }) checkout!: QrCheckout;
+  /** Set for a group booking: the success page then shows the booking. */
+  @Input() bookingId: string | null = null;
   /** The dialog was dismissed without a finished payment. */
   @Output() readonly closed = new EventEmitter<void>();
 
@@ -108,7 +119,9 @@ export class PaymentQrComponent implements OnInit, OnDestroy {
   statusText(): string {
     switch (this.state()) {
       case 'paid':
-        return 'Payment received — opening your ticket…';
+        return this.bookingId
+          ? 'Payment received — opening your tickets…'
+          : 'Payment received — opening your ticket…';
       case 'failed':
         return 'The payment did not go through. No money was taken; you can try again.';
       case 'refunded':
@@ -132,9 +145,12 @@ export class PaymentQrComponent implements OnInit, OnDestroy {
           this.state.set(outcome);
           if (outcome !== 'waiting') settled = true;
           if (outcome === 'paid') {
-            void this.router.navigate(['/payment/success'], {
-              queryParams: { provider: this.checkout.provider, payment: this.checkout.payment_id },
-            });
+            const queryParams: Record<string, string | number> = {
+              provider: this.checkout.provider,
+              payment: this.checkout.payment_id,
+            };
+            if (this.bookingId) queryParams['booking_id'] = this.bookingId;
+            void this.router.navigate(['/payment/success'], { queryParams });
           }
         },
         complete: () => {

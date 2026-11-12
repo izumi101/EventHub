@@ -12,6 +12,7 @@ import {
   paymentOutcome,
 } from '../../services/payment-polling.service';
 import { BookingStatus, PaymentStatus } from '../../models/models';
+import { MoneyPipe } from '../../pipes/money.pipe';
 import { LucideAngularModule, CircleCheckBig, CircleAlert, Smartphone } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
 
@@ -64,7 +65,7 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
 @Component({
   selector: 'app-payment-success',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, LucideAngularModule, MoneyPipe],
   template: `
     <div class="min-h-screen bg-muted flex items-center justify-center px-4 py-12 pt-20">
       <div class="card w-full max-w-sm p-8 shadow-md text-center animate-scale-in">
@@ -104,7 +105,9 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               />
             </div>
             <h1 class="text-xl font-bold text-foreground">Payment confirmed</h1>
-            <p class="text-sm text-muted-foreground">Your registration is complete</p>
+            <p class="text-sm text-muted-foreground">
+              {{ isBooking ? 'Your group booking is confirmed' : 'Your registration is complete' }}
+            </p>
           </div>
 
           <div
@@ -117,9 +120,9 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             @if (data.amount) {
               <div class="px-4 py-3 flex justify-between gap-3">
                 <span class="text-muted-foreground flex-shrink-0">Amount</span>
-                <span class="font-semibold text-foreground"
-                  >{{ data.amount }} {{ data.currency || '' }}</span
-                >
+                <span class="font-semibold text-foreground">{{
+                  data.amount | money: data.currency
+                }}</span>
               </div>
             }
             <div class="px-4 py-3 flex justify-between gap-3">
@@ -169,13 +172,14 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             } @else {
               <h1 class="text-xl font-bold text-foreground">Payment is processing</h1>
               <p class="text-sm text-muted-foreground">
-                We haven't received the confirmation yet. Your ticket will appear in your account as
-                soon as it does.
+                We haven't received the confirmation yet.
+                {{ isBooking ? 'Your tickets' : 'Your ticket' }} will appear in your account as soon
+                as it does.
               </p>
             }
           </div>
           <div class="flex flex-col gap-2">
-            @if (data.outcome === 'processing' && !isBooking) {
+            @if (data.outcome === 'processing' && canRecheck) {
               @if (polling) {
                 <p class="text-xs text-muted-foreground" role="status">
                   Checking with the payment provider…
@@ -250,16 +254,38 @@ export class PaymentSuccessComponent implements OnInit {
 
   readonly icons = { CircleCheckBig, CircleAlert, Smartphone };
 
+  /** "Check again" is offered for a ticket payment and for any Freedom Pay
+   *  payment (a group booking's included). */
+  get canRecheck(): boolean {
+    return !this.isBooking || this.paymentId !== null;
+  }
+
   ngOnInit(): void {
     this.route.queryParams.subscribe((params) => {
       const query = convertToParamMap(params);
       const sessionId = query.get('session_id');
       const bookingId = query.get('booking_id');
+      this.isBooking = Boolean(bookingId);
+
+      // Freedom Pay return (success page of the provider): our payment id,
+      // for a single ticket or (with booking_id) a group booking.
+      const paymentId = Number(query.get('payment'));
+      if (query.get('provider') === 'freedompay' && Number.isInteger(paymentId) && paymentId > 0) {
+        // The status endpoint is owner-only: a phone that scanned the QR code
+        // is not signed in, and the ticket shows up on the buyer's device.
+        if (!this.auth.getToken()) {
+          this.otherDevice = true;
+          this.loading = false;
+          return;
+        }
+        this.paymentId = paymentId;
+        this.watchPayment();
+        return;
+      }
 
       // Group booking — verify with the backend (confirms it even when the
       // Stripe webhook is not forwarded, e.g. local dev with a real key).
       if (bookingId) {
-        this.isBooking = true;
         // With a Stripe session: verify (confirms even when the webhook is
         // not forwarded). Mock flow: read the booking's real state.
         const booking$ = sessionId
@@ -286,21 +312,6 @@ export class PaymentSuccessComponent implements OnInit {
             this.loading = false;
           },
         });
-        return;
-      }
-
-      // Freedom Pay return (success page of the provider): our payment id.
-      const paymentId = Number(query.get('payment'));
-      if (query.get('provider') === 'freedompay' && Number.isInteger(paymentId) && paymentId > 0) {
-        // The status endpoint is owner-only: a phone that scanned the QR code
-        // is not signed in, and the ticket shows up on the buyer's device.
-        if (!this.auth.getToken()) {
-          this.otherDevice = true;
-          this.loading = false;
-          return;
-        }
-        this.paymentId = paymentId;
-        this.watchPayment();
         return;
       }
 

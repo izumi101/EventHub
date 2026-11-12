@@ -13,9 +13,12 @@ export function isTerminal(status: PaymentStatusResponse): boolean {
 
 export function paymentOutcome(status: PaymentStatusResponse): PaymentOutcome {
   switch (status.status) {
-    case 'completed':
-      // Money that arrived after the seat hold ended is refunded automatically.
-      return status.registration_status === 'confirmed' ? 'paid' : 'refunded';
+    case 'completed': {
+      // A payment is for a ticket or a group booking. Money that arrived
+      // after the hold ended is refunded automatically.
+      const target = status.registration_status ?? status.booking_status;
+      return target === 'confirmed' ? 'paid' : 'refunded';
+    }
     case 'refunded':
       return 'refunded';
     case 'failed':
