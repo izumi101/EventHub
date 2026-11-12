@@ -17,10 +17,12 @@ An existing `.env` must contain the Freedom Pay demo block and (optionally) the 
 
 Services: site <http://localhost:4200>, API docs <http://localhost:4200/api/v1/docs/>, Freedom Pay emulator <http://localhost:18080>. Demo logins (seed data, `DJANGO_DEBUG=1` only): `attendee` / `password123`, `organizer` / `password123`.
 
-Optional realistic data (Almaty and Astana, prices in KZT, about 4 800 registrations):
+Demo content: `seed_showcase` adds 18 hand-picked events in Almaty and Astana for `organizer` (15 in KZT, 2 in USD, free ones, seat maps, ticket tiers, one waiting for moderation) and no registrations, so the audience sees a clean catalogue and buys live. For volume (about 4 800 registrations, for the SQL checks) add `seed_demo_kz`. `index_events` builds the search embeddings. With `DJANGO_SEED_DATA=0` in `.env` a restart does not add the small default seed again.
 
 ```bash
-docker compose exec backend python manage.py seed_demo_kz
+docker compose exec backend python manage.py seed_showcase
+docker compose exec backend python manage.py index_events
+docker compose exec backend python manage.py seed_demo_kz      # optional, volume data
 ```
 
 ## 2. Full stack: backend, frontend, database

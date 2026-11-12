@@ -1,7 +1,7 @@
 # Database checks report: roles, demo data, integrity checks, query plans
 
-Date: 2026-11-12. Branch `phase-1/payment-providers` (HEAD `5af93c6` plus the
-uncommitted working tree, including the in-progress payments work).
+Date: 2026-11-12. Branch `phase-1/payment-providers`; the code is committed as
+`b5faa75` (roles) and `2121fd3` (demo data and checks).
 
 Summary:
 
