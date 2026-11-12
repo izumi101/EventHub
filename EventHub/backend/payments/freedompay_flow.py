@@ -1,9 +1,15 @@
-"""Freedom Pay for single tickets: checkout, notifications, status polling
-and refunds (ADR 0001, section 4).
+"""Freedom Pay for tickets and group bookings: checkout, notifications,
+status polling and refunds (ADR 0001, section 4).
+
+A Freedom Pay `Payment` pays for one *target*: a single-ticket
+`Registration` or a group `Booking`. The two differ only in how they are
+locked, validated, held, confirmed and told about a late payment; those
+steps live in `TicketTarget` / `BookingTarget`, and everything about the
+gateway and the money is shared.
 
 Rules kept here:
 
-- Lock order is Payment, then its Registration.
+- Lock order is Payment, then its target (registration or booking).
 - No provider network call happens inside a transaction that holds a row
   lock: checkout is lock/validate -> call the gateway -> store the session;
   a `paid` notification is confirmed with `get_status3.php` before the
@@ -12,17 +18,16 @@ Rules kept here:
 - A notification is applied once: `PaymentEvent` (provider, event_id) is
   inserted in the transaction that applies it, and a re-delivery gets the
   stored outcome back (so the reply is identical, S4).
-- Confirmation goes through `services._confirm_paid_registration`, exactly
-  like the Stripe path (ticket, seat, webhook, notification).
-
-Group bookings stay on their existing (Stripe) path.
+- Confirmation goes through the same service as the Stripe path:
+  `services._confirm_paid_registration` for a ticket,
+  `bookings.services.confirm_booking` for a group booking.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.conf import settings
@@ -81,12 +86,16 @@ def provider():
     return registry.get(PROVIDER, require_enabled=False)
 
 
-def provider_for(registration) -> str:
+def provider_for(payable) -> str:
     """`freedompay` for a KZT event when Freedom Pay is enabled and
-    configured; otherwise `stripe` (the legacy path, real or mock)."""
+    configured; otherwise `stripe` (the legacy path, real or mock).
+
+    `payable` is a registration, a booking (anything with an `event`) or an
+    event itself."""
     from events.billing import event_currency
 
-    if event_currency(registration.event) == 'KZT' and any(p.code == PROVIDER for p in registry.for_currency('KZT')):
+    event = getattr(payable, 'event', payable)
+    if event_currency(event) == 'KZT' and any(p.code == PROVIDER for p in registry.for_currency('KZT')):
         return PROVIDER
     return 'stripe'
 
@@ -99,74 +108,231 @@ def known_payment_ids(payment: Payment) -> set[str]:
     return ids
 
 
+# ───────────────────────── payable targets ─────────────────────────
+
+
+@dataclass(frozen=True)
+class OrderTerms:
+    """What one checkout attempt charges for, read under the target lock."""
+
+    amount: Decimal
+    currency: str
+    description: str
+    customer_email: str
+    # Extra query parameters of the success / failure redirects.
+    query: str = ''
+
+
+class TicketTarget:
+    """A single-ticket registration."""
+
+    field = 'registration'
+    noun = 'ticket'
+
+    def lock(self, pk):
+        return _lock_registration(pk)
+
+    def terms(self, registration) -> OrderTerms:
+        """Raise ValueError unless the ticket can be paid now."""
+        from events.billing import event_currency, registration_amount
+
+        ensure_registration_payable(registration)
+        label = registration.event.title
+        if registration.promo_code_id:
+            label += f' (promo {registration.promo_code.code})'
+        return OrderTerms(
+            amount=registration_amount(registration),
+            currency=event_currency(registration.event),
+            description=f'Ticket: {label}',
+            customer_email=registration.user.email or '',
+        )
+
+    def held_until(self, registration) -> datetime | None:
+        return registration.seat_held_until
+
+    def hold_until(self, registration, until: datetime) -> None:
+        registration.seat_held_until = until
+        registration.save(update_fields=['seat_held_until'])
+
+    def accepts_payment(self, registration) -> bool:
+        return (
+            registration.status == RegistrationStatusChoices.PENDING
+            and registration.event.status == EventStatusChoices.PUBLISHED
+        )
+
+    def describe_state(self, registration) -> str:
+        return f'status {registration.status} (event {registration.event.status})'
+
+    def confirm(self, registration, payment, amount: Decimal) -> None:
+        _confirm_paid_registration(registration, payment)
+
+    def notify_late(self, registration) -> None:
+        from events.notify import notify
+
+        notify(
+            registration.user,
+            'payment_failed',
+            f'💸 Payment refunded: {registration.event.title}',
+            'Your payment arrived after the ticket hold expired, so it is being refunded automatically. '
+            'Please book again.',
+            event=registration.event,
+        )
+
+
+class BookingTarget:
+    """A group booking: one payment for every seat it holds."""
+
+    field = 'booking'
+    noun = 'group booking'
+
+    def lock(self, pk):
+        from bookings.models import Booking
+
+        return Booking.objects.select_for_update(of=('self',)).select_related('event', 'owner').get(pk=pk)
+
+    def terms(self, booking) -> OrderTerms:
+        """Raise ValueError unless the booking can be paid now."""
+        from bookings.models import Booking
+        from bookings.payments import booking_amount
+        from events.billing import event_currency
+
+        payment = Payment.objects.filter(booking_id=booking.pk).only('status').first()
+        if payment and payment.status == PaymentStatusChoices.COMPLETED:
+            raise ValueError('Payment already completed')
+        if booking.event.status != EventStatusChoices.PUBLISHED:
+            raise ValueError('This event is not open for payment.')
+        if booking.status != Booking.Status.HOLDING:
+            raise ValueError('This booking is not awaiting payment.')
+        if booking.hold_expires_at is not None and booking.hold_expires_at < timezone.now():
+            raise ValueError('Your hold on these seats has expired. Please book again.')
+        seats = booking.seats.count()
+        if not seats:
+            raise ValueError('This booking has no seats.')
+        return OrderTerms(
+            amount=booking_amount(booking),
+            currency=event_currency(booking.event),
+            description=f'Group booking: {booking.event.title} ({seats} {"seat" if seats == 1 else "seats"})',
+            customer_email=booking.owner.email or '',
+            query=f'&booking_id={booking.pk}',
+        )
+
+    def held_until(self, booking) -> datetime | None:
+        return booking.hold_expires_at
+
+    def hold_until(self, booking, until: datetime) -> None:
+        booking.hold_expires_at = until
+        booking.save(update_fields=['hold_expires_at'])
+
+    def accepts_payment(self, booking) -> bool:
+        from bookings.models import Booking
+
+        return booking.status == Booking.Status.HOLDING and booking.event.status == EventStatusChoices.PUBLISHED
+
+    def describe_state(self, booking) -> str:
+        return f'status {booking.status} (event {booking.event.status})'
+
+    def confirm(self, booking, payment, amount: Decimal) -> None:
+        from bookings.services import confirm_booking
+
+        confirm_booking(booking, amount_paid=amount)
+
+    def notify_late(self, booking) -> None:
+        from events.notify import notify
+
+        notify(
+            booking.owner,
+            'payment_failed',
+            f'💸 Payment refunded: {booking.event.title}',
+            'Your group payment arrived after the seat hold expired, so it is being refunded automatically. '
+            'Please book again.',
+            event=booking.event,
+        )
+
+
+TICKET = TicketTarget()
+BOOKING = BookingTarget()
+
+
+def target_of(obj):
+    """The target kind of a registration or booking instance."""
+    return BOOKING if obj._meta.label_lower == 'bookings.booking' else TICKET
+
+
+def payment_target(payment: Payment):
+    """(target kind, target pk) of a payment."""
+    if payment.booking_id is not None:
+        return BOOKING, payment.booking_id
+    return TICKET, payment.registration_id
+
+
 # ───────────────────────── checkout ─────────────────────────
 
 
-def _lock_payment_and_registration(registration_id):
-    """Payment first, then the registration (ADR lock order). A payment that
-    does not exist yet is created under the registration lock."""
-    payment = Payment.objects.select_for_update().filter(registration_id=registration_id).first()
-    registration = _lock_registration(registration_id)
+def _lock_payment_and_target(target, pk):
+    """Payment first, then its target (ADR lock order). A payment that does
+    not exist yet is created under the target lock."""
+    lookup = {f'{target.field}_id': pk}
+    payment = Payment.objects.select_for_update().filter(**lookup).first()
+    obj = target.lock(pk)
     if payment is None:
-        payment = Payment.objects.select_for_update().filter(registration_id=registration_id).first()
-    return payment, registration
+        payment = Payment.objects.select_for_update().filter(**lookup).first()
+    return payment, obj
 
 
-def start_checkout(registration) -> Checkout:
-    """Open a Freedom Pay payment page for an unpaid ticket.
+def start_checkout(payable) -> Checkout:
+    """Open a Freedom Pay payment page for an unpaid ticket (a
+    `Registration`) or group booking (a `Booking`).
 
     Raises ValueError (not payable) or a PaymentProviderError (gateway).
     """
-    from events.billing import event_currency, registration_amount
     from events.services.holds import SEAT_HOLD_MINUTES
 
+    target = target_of(payable)
     gateway = provider()
     # (1) Short transaction: validate, create or reuse the pending payment,
-    # make the seat hold cover the payment page's lifetime.
+    # make the hold cover the payment page's lifetime.
     with transaction.atomic():
-        payment, registration = _lock_payment_and_registration(registration.pk)
-        ensure_registration_payable(registration)
-        amount = registration_amount(registration)
-        currency = event_currency(registration.event)
+        payment, obj = _lock_payment_and_target(target, payable.pk)
+        terms = target.terms(obj)
         if payment is None:
             payment = Payment.objects.create(
-                registration=registration, amount=amount, currency=currency.lower(), provider=PROVIDER
+                **{target.field: obj},
+                amount=terms.amount,
+                currency=terms.currency.lower(),
+                provider=PROVIDER,
             )
         elif payment.status in (PaymentStatusChoices.FAILED, PaymentStatusChoices.EXPIRED):
             transition(payment, PaymentStatusChoices.PENDING, reason='new Freedom Pay attempt')
         elif payment.status != PaymentStatusChoices.PENDING:
-            raise ValueError('This ticket can no longer be paid.')
+            raise ValueError(f'This {target.noun} can no longer be paid.')
 
         now = timezone.now()
-        hold = registration.seat_held_until or now + timedelta(minutes=SEAT_HOLD_MINUTES)
+        held = target.held_until(obj)
+        hold = held or now + timedelta(minutes=SEAT_HOLD_MINUTES)
         page_expires = now + timedelta(seconds=lifetime_seconds(hold, now))
-        if registration.seat_held_until is None or registration.seat_held_until < page_expires + timedelta(minutes=1):
-            registration.seat_held_until = page_expires + timedelta(minutes=1)
-            registration.save(update_fields=['seat_held_until'])
+        if held is None or held < page_expires + timedelta(minutes=1):
+            target.hold_until(obj, page_expires + timedelta(minutes=1))
 
         payment.provider = PROVIDER
-        payment.amount = amount
-        payment.currency = currency.lower()
+        payment.amount = terms.amount
+        payment.currency = terms.currency.lower()
         payment.method = Payment.METHOD_CARD
         payment.attempt += 1
         payment.save(update_fields=['provider', 'amount', 'currency', 'method', 'attempt', 'updated_at'])
 
-        label = registration.event.title
-        if registration.promo_code_id:
-            label += f' (promo {registration.promo_code.code})'
-        query = f'provider={PROVIDER}&payment={payment.pk}'
+        query = f'provider={PROVIDER}&payment={payment.pk}{terms.query}'
         order = PaymentOrder(
             reference=str(payment.pk),
-            amount=amount,
-            currency=currency,
-            description=f'Ticket: {label}',
+            amount=terms.amount,
+            currency=terms.currency,
+            description=terms.description,
             success_url=f'{settings.FRONTEND_URL}/payment/success?{query}',
             cancel_url=f'{settings.FRONTEND_URL}/payment/cancel?{query}',
             expires_at=page_expires,
             # Unique per merchant for good: the payment's creation time keeps
             # the key unique even if a database is reset and ids repeat.
             idempotency_key=f'payment-{payment.pk}-{int(payment.created_at.timestamp())}-attempt-{payment.attempt}',
-            customer_email=registration.user.email or '',
+            customer_email=terms.customer_email,
         )
 
     # (2) The gateway call, outside any transaction. On failure the payment
@@ -185,7 +351,7 @@ def start_checkout(registration) -> Checkout:
         payment.provider_session_id = result.session_id
         payment.provider_payload = payload
         payment.save(update_fields=['provider', 'provider_session_id', 'provider_payload', 'updated_at'])
-    logger.info('Freedom Pay payment %s opened for payment %s', result.session_id, payment.pk)
+    logger.info('Freedom Pay payment %s opened for payment %s (%s)', result.session_id, payment.pk, target.noun)
     return Checkout(payment=payment, result=result)
 
 
@@ -195,9 +361,7 @@ def start_checkout(registration) -> Checkout:
 def _find_payment(result: CallbackResult) -> Payment | None:
     payment = None
     if result.reference.isdigit():
-        payment = Payment.objects.filter(
-            pk=int(result.reference), provider=PROVIDER, registration__isnull=False
-        ).first()
+        payment = Payment.objects.filter(pk=int(result.reference), provider=PROVIDER).first()
     if payment is None and result.provider_payment_id:
         payment = Payment.objects.filter(provider=PROVIDER, provider_session_id=result.provider_payment_id).first()
     if payment is not None and result.provider_payment_id not in known_payment_ids(payment):
@@ -238,7 +402,7 @@ def _new_refund(payment, *, kind, amount: Decimal, currency: str, provider_payme
     )
 
 
-def _apply_paid(result: CallbackResult, payment: Payment | None, registration) -> tuple[str, list[Refund]]:
+def _apply_paid(result: CallbackResult, payment: Payment | None, target, obj) -> tuple[str, list[Refund]]:
     pg_id = result.provider_payment_id
     if result.amount is None or result.amount <= 0 or not result.currency:
         logger.error('Freedom Pay payment %s reported without a usable amount: not applied', pg_id)
@@ -265,7 +429,7 @@ def _apply_paid(result: CallbackResult, payment: Payment | None, registration) -
             amount=result.amount,
             currency=result.currency,
             provider_payment_id=pg_id,
-            reason='Automatic refund: the ticket was already paid.',
+            reason=f'Automatic refund: the {target.noun} was already paid.',
         )
         return Outcome.DUPLICATE_PAYMENT, [refund]
 
@@ -296,15 +460,12 @@ def _apply_paid(result: CallbackResult, payment: Payment | None, registration) -
     payment.provider_payment_id = pg_id
     payment.save(update_fields=['provider_payment_id', 'updated_at'])
 
-    if (
-        registration.status != RegistrationStatusChoices.PENDING
-        or registration.event.status != EventStatusChoices.PUBLISHED
-    ):
+    if not target.accepts_payment(obj):
         logger.warning(
-            'Freedom Pay payment for registration %s arrived in status %s (event %s): refunding automatically',
-            registration.pk,
-            registration.status,
-            registration.event.status,
+            'Freedom Pay payment for %s %s arrived in %s: refunding automatically',
+            target.noun,
+            obj.pk,
+            target.describe_state(obj),
         )
         refund = _new_refund(
             payment,
@@ -312,32 +473,24 @@ def _apply_paid(result: CallbackResult, payment: Payment | None, registration) -
             amount=payment.amount,
             currency=payment.currency,
             provider_payment_id=pg_id,
-            reason='Automatic refund: the ticket hold had ended before the payment arrived.',
+            reason=f'Automatic refund: the {target.noun} hold had ended before the payment arrived.',
         )
-        from events.notify import notify
-
-        notify(
-            registration.user,
-            'payment_failed',
-            f'💸 Payment refunded: {registration.event.title}',
-            'Your payment arrived after the ticket hold expired, so it is being refunded automatically. '
-            'Please book again.',
-            event=registration.event,
-        )
+        target.notify_late(obj)
         return Outcome.LATE_PAYMENT, [refund]
 
-    _confirm_paid_registration(registration, payment)
-    logger.info('Freedom Pay payment %s completed registration %s', pg_id, registration.pk)
+    target.confirm(obj, payment, result.amount)
+    logger.info('Freedom Pay payment %s completed %s %s', pg_id, target.noun, obj.pk)
     return Outcome.PROCESSED, []
 
 
 def _apply(result: CallbackResult, payment_pk) -> tuple[Payment | None, str, list[Refund]]:
-    payment = registration = None
+    payment = target = obj = None
     if payment_pk is not None:
         payment = Payment.objects.select_for_update().get(pk=payment_pk)
-        registration = _lock_registration(payment.registration_id)
+        target, target_pk = payment_target(payment)
+        obj = target.lock(target_pk)
     if result.kind == CallbackKind.PAID:
-        return (payment, *_apply_paid(result, payment, registration))
+        return (payment, *_apply_paid(result, payment, target, obj))
     # Only the current attempt can fail the payment; the hold expires on its own.
     if (
         result.kind in (CallbackKind.FAILED, CallbackKind.EXPIRED)
@@ -345,8 +498,8 @@ def _apply(result: CallbackResult, payment_pk) -> tuple[Payment | None, str, lis
         and payment.status == PaymentStatusChoices.PENDING
         and payment.provider_session_id == result.provider_payment_id
     ):
-        target = PaymentStatusChoices.FAILED if result.kind == CallbackKind.FAILED else PaymentStatusChoices.EXPIRED
-        transition(payment, target, reason=f'Freedom Pay payment {result.provider_payment_id} {result.kind}')
+        status = PaymentStatusChoices.FAILED if result.kind == CallbackKind.FAILED else PaymentStatusChoices.EXPIRED
+        transition(payment, status, reason=f'Freedom Pay payment {result.provider_payment_id} {result.kind}')
         return payment, Outcome.PROCESSED, []
     return payment, Outcome.IGNORED, []
 
@@ -514,9 +667,10 @@ def _finish_refund(refund_id, status: str, *, provider_refund_id: str = '', erro
 
 def refund_now(payment: Payment, amount: Decimal, reason: str, *, kind=Refund.Kind.ORGANIZER) -> Refund:
     """Synchronous refund for `services.refund_payment` (organizer refunds,
-    approved refund requests, event cancellation). Runs inside the caller's
-    transaction like the legacy Stripe refund does; WP1b moves it to the
-    ledger job. Raises ValueError when the gateway does not refund."""
+    approved refund requests, event cancellation) and for the refund of a
+    group booking. Runs inside the caller's transaction like the legacy
+    Stripe refund does; WP1b moves it to the ledger job. Raises ValueError
+    when the gateway does not refund."""
     # Derived from the gateway payment id (never reused) and the balance
     # before this refund: a retry after a lost answer reuses the key and
     # cannot refund twice.
@@ -544,3 +698,28 @@ def refund_now(payment: Payment, amount: Decimal, reason: str, *, kind=Refund.Ki
     refund.processed_at = timezone.now()
     refund.save(update_fields=['status', 'provider_refund_id', 'attempts', 'processed_at'])
     return refund
+
+
+def is_refundable_here(payment: Payment | None) -> bool:
+    """True when this payment's money was taken by Freedom Pay and some of
+    it can still be returned through the gateway."""
+    return bool(
+        payment is not None and payment.provider == PROVIDER and payment.provider_payment_id and payment.is_refundable
+    )
+
+
+def refund_remaining(payment: Payment, reason: str, *, kind=Refund.Kind.ORGANIZER) -> Decimal:
+    """Return everything not yet refunded of a locked, completed Freedom Pay
+    payment and record it on the payment (-> `refunded`). Used for group
+    bookings, which are only ever refunded in full. Returns the amount.
+    Raises ValueError when the gateway does not refund."""
+    remaining = payment.amount - payment.refunded_amount
+    if remaining <= 0:
+        return Decimal('0.00')
+    refund_now(payment, remaining, reason, kind=kind)
+    payment.refunded_amount = payment.amount
+    payment.refunded_at = timezone.now()
+    payment.refund_reason = (reason or payment.refund_reason)[:255]
+    payment.save(update_fields=['refunded_amount', 'refunded_at', 'refund_reason', 'updated_at'])
+    transition(payment, PaymentStatusChoices.REFUNDED, reason=f'{kind} refund')
+    return remaining

@@ -340,7 +340,13 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description POST /api/bookings/{id}/checkout/  — pay for the whole group. */
+        /**
+         * @description POST /api/bookings/{id}/checkout/  — pay for the whole group.
+         *
+         *     KZT events go to Freedom Pay when it is enabled (the answer carries a QR
+         *     code of the payment page, like a single ticket); other currencies keep
+         *     the Stripe path (real, or simulated with PAYMENTS_MOCK_MODE).
+         */
         post: operations["bookings_checkout_create"];
         delete?: never;
         options?: never;
@@ -1357,8 +1363,9 @@ export interface paths {
         };
         /**
          * @description The buyer's payment, provider-neutral, for the success page and the QR
-         *     dialog to poll. A Freedom Pay payment that is still pending after a
-         *     few seconds is re-checked with the gateway (rate-limited).
+         *     dialog to poll: a single ticket's or a group booking's. A Freedom Pay
+         *     payment that is still pending after a few seconds is re-checked with
+         *     the gateway (rate-limited).
          */
         get: operations["payments_status_retrieve"];
         put?: never;
@@ -1675,16 +1682,40 @@ export interface components {
             /** Format: date-time */
             readonly created_at: string;
         };
+        /**
+         * @description Same shape as the single-ticket checkout (a Freedom Pay answer carries
+         *     the QR code of the payment page); the group's payment record exists only
+         *     on the Freedom Pay path.
+         */
         BookingCheckoutResponse: {
             /**
              * Format: uri
              * @description Redirect the buyer here to pay.
              */
             checkout_url: string;
-            /** @description True when payments run in local mock mode. */
-            mock: boolean;
             /** @description Payment provider session id. */
             session_id?: string;
+            /** @description True when payments run in local mock mode. */
+            mock: boolean;
+            /**
+             * @description Who takes the money: KZT events use Freedom Pay.
+             *
+             *     * `stripe` - Stripe
+             *     * `freedompay` - Freedom Pay
+             *     * `mock` - Mock (development only)
+             *     * `offline` - Offline / manual
+             */
+            provider: components["schemas"]["ProviderEnum"];
+            /** @description Our payment reference for GET /payments/status/{payment_id}/; null on the mock and Stripe paths. */
+            payment_id: number | null;
+            /** @description `data:image/png;base64,...` QR code of the payment page (pay with a phone), or null. */
+            qr_code: string | null;
+            /**
+             * Format: decimal
+             * @description Amount charged, in `currency`.
+             */
+            amount: string;
+            currency: string;
         };
         BookingCreateRequest: {
             event: number;
@@ -2193,6 +2224,8 @@ export interface components {
          * @enum {string}
          */
         NotificationTypeEnum: "ticket_purchased" | "event_reminder" | "seat_available" | "event_updated" | "event_cancelled" | "payment_failed" | "review_reminder";
+        /** @enum {unknown} */
+        NullEnum: null;
         OfflinePaymentRequestRequest: {
             /**
              * Format: decimal
@@ -2548,12 +2581,16 @@ export interface components {
          * @enum {string}
          */
         PaymentStatusEnum: "pending" | "completed" | "failed" | "expired" | "refunded" | "disputed";
+        /**
+         * @description A payment pays for either a single ticket (`registration_*` set,
+         *     `booking_*` null) or a group booking (the other way round).
+         */
         PaymentStatusResponse: {
             payment_id: number;
             /** @description Payment provider code (`freedompay`, `stripe`, `mock`, ...). */
             provider: string;
             /**
-             * @description Provider-neutral state. `completed` with a registration that is not `confirmed` means the money arrived after the hold ended and is being refunded.
+             * @description Provider-neutral state. `completed` with a registration that is not `confirmed` (or a booking that is not `confirmed`) means the money arrived after the hold ended and is being refunded.
              *
              *     * `pending` - Pending
              *     * `completed` - Completed
@@ -2563,8 +2600,11 @@ export interface components {
              *     * `disputed` - Disputed
              */
             status: components["schemas"]["PaymentStatusEnum"];
-            registration_id: number;
-            registration_status: components["schemas"]["RegistrationStatusEnum"];
+            registration_id: number | null;
+            registration_status: (components["schemas"]["RegistrationStatusEnum"] | components["schemas"]["NullEnum"]) | null;
+            /** Format: uuid */
+            booking_id: string | null;
+            booking_status: (components["schemas"]["BookingStatusEnum"] | components["schemas"]["NullEnum"]) | null;
             event_id: number;
             event_title: string;
             /** Format: decimal */
@@ -3996,6 +4036,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };
