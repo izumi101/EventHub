@@ -163,9 +163,15 @@ def claim_seat(*, booking, seat_id, attendee_name, user=None):
             raise ValueError('You have already claimed a seat in this booking.')
 
     bs.attendee_name = (attendee_name or '').strip()[:120]
+    newly_claimed = False
     if is_auth and not is_owner:
+        newly_claimed = bs.claimed_by_id != user.id
         bs.claimed_by = user
     bs.save(update_fields=['attendee_name', 'claimed_by'])
+    if newly_claimed and booking.status == Booking.Status.CONFIRMED:
+        # A paid booking: the seat's ticket is valid now. (A claim on a
+        # holding booking is notified when the booking is paid.)
+        _notify_claimed(booking, bs)
     return bs
 
 
@@ -197,21 +203,21 @@ def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
         from payments.services import _refund_payment_intent
 
         _refund_payment_intent(payment_intent_id, key=f'booking-late-refund-{payment_intent_id}')
-        owner, event = booking.owner, booking.event
+        from events.billing import event_currency
+        from notifications import types
+        from notifications.service import notify
 
-        def notify_late():
-            from events.notify import notify
+        from .payments import booking_amount
 
-            notify(
-                owner,
-                'payment_failed',
-                f'💸 Payment refunded: {event.title}',
-                'Your group payment arrived after the seat hold expired, so it was refunded '
-                'automatically. Please book again.',
-                event,
-            )
-
-        transaction.on_commit(notify_late)
+        notify(
+            booking.owner,
+            types.PAYMENT_REFUNDED,
+            event=booking.event,
+            amount=amount_paid if amount_paid is not None else booking_amount(booking),
+            currency=event_currency(booking.event),
+            reason='Your group payment arrived after the seat hold expired, so it was refunded automatically. '
+            'Please book again.',
+        )
         return booking
 
     booking.status = Booking.Status.CONFIRMED
@@ -222,21 +228,37 @@ def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
     booking.save(update_fields=['status', 'hold_expires_at', 'stripe_payment_intent_id', 'amount_paid'])
     logger.info('Booking %s confirmed', booking.id)
 
-    owner, event, count = booking.owner, booking.event, booking.seat_count
+    from events.billing import event_currency
+    from notifications import types
+    from notifications.service import notify
 
-    def notify_confirmed():
-        from events.notify import notify
-
-        notify(
-            owner,
-            'ticket_purchased',
-            f'🎫 {count} tickets confirmed: {event.title}',
-            'Your group booking is confirmed. Tickets are in My Tickets.',
-            event,
-        )
-
-    transaction.on_commit(notify_confirmed)
+    notify(
+        booking.owner,
+        types.GROUP_BOOKING_CONFIRMED,
+        event=booking.event,
+        booking=booking,
+        amount=booking.amount_paid,
+        currency=event_currency(booking.event),
+    )
+    # Friends who claimed a seat while the booking was on hold get their
+    # ticket now that it is paid.
+    for booking_seat in booking.seats.filter(claimed_by__isnull=False).exclude(claimed_by=booking.owner_id):
+        _notify_claimed(booking, booking_seat)
     return booking
+
+
+def _notify_claimed(booking, booking_seat):
+    from notifications import types
+    from notifications.service import notify
+
+    owner = booking.owner
+    notify(
+        booking_seat.claimed_by,
+        types.GROUP_BOOKING_CLAIMED,
+        event=booking.event,
+        booking_seat=booking_seat,
+        owner_name=owner.get_full_name() or owner.username,
+    )
 
 
 @transaction.atomic
@@ -279,15 +301,21 @@ def refund_booking(booking, *, actor, reason='', event_cancelled=False):
     booking.refund_reason = (reason or '')[:255]
     booking.save(update_fields=['status', 'refunded_at', 'refund_reason', 'amount_paid'])
 
-    from events.notify import notify
+    if not event_cancelled:
+        # On a cancellation the "event cancelled" notice tells the owner
+        # about the refund (one message instead of two).
+        from events.billing import event_currency
+        from notifications import types
+        from notifications.service import notify
 
-    notify(
-        booking.owner,
-        'payment_failed',
-        f'💸 Group booking refunded: {booking.event.title}',
-        'Your group booking was refunded by the organizer.' + (f' Reason: {reason}' if reason else ''),
-        booking.event,
-    )
+        notify(
+            booking.owner,
+            types.PAYMENT_REFUNDED,
+            event=booking.event,
+            amount=booking.amount_paid,
+            currency=event_currency(booking.event),
+            reason=reason or 'Your group booking was refunded by the organizer.',
+        )
     from events.webhooks import fire
 
     fire(
