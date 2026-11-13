@@ -206,6 +206,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/profile/notifications/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The signed-in user's notification email preferences. */
+        get: operations["auth_profile_notifications_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** @description The signed-in user's notification email preferences. */
+        patch: operations["auth_profile_notifications_partial_update"];
+        trace?: never;
+    };
     "/api/v1/auth/register/": {
         parameters: {
             query?: never;
@@ -1764,7 +1782,7 @@ export interface components {
             recipients: number;
             notified: number;
             emailed: number;
-            /** @description False when SMTP is not configured. */
+            /** @description True when at least one email was queued. */
             email_enabled: boolean;
         };
         Category: {
@@ -2214,16 +2232,45 @@ export interface components {
             readonly created_at: string;
         };
         /**
-         * @description * `ticket_purchased` - 🎫 Ticket purchased
-         *     * `event_reminder` - ⏰ Event reminder
-         *     * `seat_available` - 💺 Seat available
-         *     * `event_updated` - 📝 Event updated
-         *     * `event_cancelled` - ❌ Event cancelled
-         *     * `payment_failed` - ⚠️ Payment failed
-         *     * `review_reminder` - ⭐ Leave a review
+         * @description Email preferences per notification type. In-app notifications are
+         *     always on; sign-up codes, password reset and other security emails are
+         *     not listed: they are always sent.
+         */
+        NotificationPreferences: {
+            /**
+             * Format: email
+             * @description Where emails go (empty: none are sent).
+             */
+            readonly email_address: string;
+            readonly types: components["schemas"]["NotificationTypePreference"][];
+        };
+        /**
+         * @description * `ticket_purchased` - Ticket purchased
+         *     * `registration_confirmed` - Free registration confirmed
+         *     * `payment_failed` - Payment failed
+         *     * `payment_refunded` - Payment refunded
+         *     * `refund_requested` - Refund requested
+         *     * `refund_approved` - Refund request approved
+         *     * `refund_rejected` - Refund request rejected
+         *     * `event_updated` - Event changed
+         *     * `event_cancelled` - Event cancelled
+         *     * `seat_available` - Waitlist spot available
+         *     * `group_booking_confirmed` - Group booking confirmed
+         *     * `group_booking_claimed` - Group booking seat claimed
+         *     * `event_reminder` - Event reminder
+         *     * `review_reminder` - Review reminder
+         *     * `organizer_message` - Messages from organizers
          * @enum {string}
          */
-        NotificationTypeEnum: "ticket_purchased" | "event_reminder" | "seat_available" | "event_updated" | "event_cancelled" | "payment_failed" | "review_reminder";
+        NotificationTypeEnum: "ticket_purchased" | "registration_confirmed" | "payment_failed" | "payment_refunded" | "refund_requested" | "refund_approved" | "refund_rejected" | "event_updated" | "event_cancelled" | "seat_available" | "group_booking_confirmed" | "group_booking_claimed" | "event_reminder" | "review_reminder" | "organizer_message";
+        NotificationTypePreference: {
+            readonly type: components["schemas"]["NotificationTypeEnum"];
+            readonly label: string;
+            readonly description: string;
+            readonly email_enabled: boolean;
+            /** @description False: the email is always sent and cannot be switched off. */
+            readonly email_optional: boolean;
+        };
         /** @enum {unknown} */
         NullEnum: null;
         OfflinePaymentRequestRequest: {
@@ -2520,6 +2567,12 @@ export interface components {
         PatchedEventStaffRequest: {
             role?: components["schemas"]["EventStaffRoleEnum"];
             invite_username?: string;
+        };
+        PatchedNotificationPreferencesUpdateRequest: {
+            /** @description Type key → email on/off, e.g. {"event_reminder": false}. Only the types listed with `email_optional: true` can be changed; types not mentioned keep their setting. */
+            email?: {
+                [key: string]: boolean;
+            };
         };
         PatchedPromoCodeRequest: {
             /** @description Case-insensitive code attendees type at checkout */
@@ -3702,6 +3755,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["User"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    auth_profile_notifications_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferences"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    auth_profile_notifications_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedNotificationPreferencesUpdateRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationPreferences"];
+                };
+            };
+            /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Missing or invalid access token. */

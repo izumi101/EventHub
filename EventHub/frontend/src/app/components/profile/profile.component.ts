@@ -104,6 +104,17 @@ import { apiErrorMessage } from '../../api/api-error';
             </div>
           }
 
+          <a
+            routerLink="/profile/notifications"
+            class="card p-5 mb-4 flex items-center justify-between gap-4 hover:border-primary"
+          >
+            <div>
+              <p class="text-sm font-semibold text-foreground">Notifications</p>
+              <p class="text-xs text-muted-foreground mt-0.5">Choose which emails you receive.</p>
+            </div>
+            <span class="text-muted-foreground" aria-hidden="true">→</span>
+          </a>
+
           <!-- Form -->
           <form (ngSubmit)="onSubmit()" novalidate>
             <div class="card divide-y divide-border">
