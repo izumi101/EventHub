@@ -29,6 +29,7 @@ class Command(BaseCommand):
         self.admin_password = os.environ.get('DJANGO_SEED_ADMIN_PASSWORD') or secrets.token_urlsafe(12)
 
         users = self.seed_users()
+        self.seed_test_totp(users)
         categories = self.seed_categories()
         events = self.seed_events(users, categories)
         self.seed_registrations(users, events)
@@ -97,6 +98,21 @@ class Command(BaseCommand):
             profile.save()
             users[username] = user
         return users
+
+    def seed_test_totp(self, users):
+        """Browser tests only: with DJANGO_SEED_MFA_TOTP_SECRET set, the demo
+        organizer and admin get a confirmed authenticator app with that
+        (publicly known) base32 secret, so a test can compute the codes. Left
+        empty (the default) they enroll at their first sign-in like real users.
+        This command refuses to run without DJANGO_DEBUG=1."""
+        secret = os.environ.get('DJANGO_SEED_MFA_TOTP_SECRET', '').strip().upper()
+        if not secret:
+            return
+        from mfa.testing import enroll_totp
+
+        for username in ('organizer', 'admin'):
+            enroll_totp(users[username], secret)
+        self.stdout.write('Test TOTP secret enrolled for organizer and admin (DJANGO_SEED_MFA_TOTP_SECRET).')
 
     def seed_categories(self):
         specs = [

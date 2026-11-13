@@ -29,3 +29,11 @@ drf-spectacular>=0.28
 drf-spectacular-sidecar>=2025.1
 # Feature flags from the self-hosted Unleash server (featureflags app)
 UnleashClient>=6.9,<7
+# Two-factor authentication (docs/adr/0002-two-factor-authentication.md):
+# TOTP (RFC 6238), WebAuthn / passkeys, Fernet encryption of TOTP secrets.
+pyotp>=2.9,<3
+webauthn>=3.0.1,<4
+cryptography>=49
+# cbor2 6.2.x (a webauthn dependency) is younger than our two-week minimum
+# age for new releases; lift this cap once it has settled.
+cbor2>=6.1.2,<6.2

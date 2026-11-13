@@ -30,6 +30,7 @@ from common.choices import PaymentStatusChoices
 from events.models import Category, Event, Notification, Registration
 from events.services.holds import release_expired_seat_holds
 from events.services.registration import attendee_cancel, cancel_registration
+from mfa.testing import authenticate_with_recent_mfa
 from payments.models import Payment, PaymentEvent, Refund
 from payments.providers import conf
 from payments.providers import freedompay_signature as sig
@@ -916,7 +917,7 @@ class FreedomPayFlowTests(FixturesMixin, APITestCase):
         payment, pid = self.opened()
         self.gateway.pay(pid)
         self.notify(pid, payment.pk)
-        self.client.force_authenticate(user=self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)  # refunds need step-up
         response = self.client.post(
             f'/api/v1/payments/refund/{self.registration.pk}/', {'amount': '2000'}, format='json'
         )
@@ -937,7 +938,7 @@ class FreedomPayFlowTests(FixturesMixin, APITestCase):
         self.gateway.pay(pid)
         self.notify(pid, payment.pk)
         self.gateway.fault = 'http500'
-        self.client.force_authenticate(user=self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)
         response = self.client.post(f'/api/v1/payments/refund/{self.registration.pk}/', {}, format='json')
         self.assertEqual(response.status_code, 400)
         payment.refresh_from_db()

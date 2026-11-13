@@ -19,6 +19,7 @@ from bookings.models import Booking
 from bookings.services import release_expired_bookings
 from events.models import EventSeat, Notification, SeatMap
 from events.services.lifecycle import cancel_event
+from mfa.testing import authenticate_with_recent_mfa
 from payments.models import Payment, PaymentEvent, Refund
 from payments.test_freedompay import (
     CALLBACK_PATH,
@@ -340,7 +341,7 @@ class FreedomPayBookingTests(BookingFixtures, APITestCase):
 
     def test_an_organizer_refund_goes_through_freedom_pay(self):
         payment, pid = self.paid()
-        self.client.force_authenticate(user=self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)  # refunds need step-up
         with patch('stripe.Refund.create') as stripe_refund:
             response = self.client.post(f'/api/v1/bookings/{self.booking.pk}/refund/', {'reason': 'Venue change'})
         self.assertEqual(response.status_code, 200, response.data)
@@ -353,7 +354,7 @@ class FreedomPayBookingTests(BookingFixtures, APITestCase):
     def test_a_refused_refund_leaves_the_booking_paid(self):
         payment, _ = self.paid()
         self.gateway.fault = 'http500'
-        self.client.force_authenticate(user=self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)
         response = self.client.post(f'/api/v1/bookings/{self.booking.pk}/refund/')
         self.assertEqual(response.status_code, 400)
         payment.refresh_from_db()
