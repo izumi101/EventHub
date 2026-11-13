@@ -6,6 +6,7 @@ import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
 import { AuthService } from '../../services/auth.service';
 import { PaymentStatus, PaymentStatusResponse } from '../../models/models';
+import { I18nTestingModule } from '../../i18n/testing';
 
 // The Freedom Pay return (/payment/success?provider=freedompay&payment=<id>):
 // the page polls the payment until it settles, never shows "processing" forever.
@@ -52,7 +53,7 @@ function render(
   const verifyPayment = vi.fn();
   const bookingService = { get: vi.fn(), verify: vi.fn() };
   TestBed.configureTestingModule({
-    imports: [PaymentSuccessComponent],
+    imports: [I18nTestingModule, PaymentSuccessComponent],
     providers: [
       provideRouter([]),
       {

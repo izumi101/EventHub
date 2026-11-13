@@ -4,10 +4,11 @@ import { of, throwError } from 'rxjs';
 import { PaymentSuccessComponent } from './payment-success.component';
 import { PaymentService } from '../../services/payment.service';
 import { BookingService } from '../../services/booking.service';
+import { I18nTestingModule } from '../../i18n/testing';
 
 function render(params: Record<string, string>, payment: object, booking: object) {
   TestBed.configureTestingModule({
-    imports: [PaymentSuccessComponent],
+    imports: [I18nTestingModule, PaymentSuccessComponent],
     providers: [
       provideRouter([]),
       { provide: ActivatedRoute, useValue: { queryParams: of(params) } },

@@ -6,6 +6,7 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
 import { EventService, type RegisterPayload } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import type { Event, Seat } from '../../models/models';
+import { I18nTestingModule } from '../../i18n/testing';
 
 // The real seat selector opens a WebSocket; the modal only needs its output.
 @Component({ selector: 'app-seat-selector', standalone: true, template: '' })
@@ -49,7 +50,7 @@ function setup(event: Event, opts: { seatMap?: SeatMapResult; gaPrice?: string }
     validatePromo: vi.fn(),
   };
   TestBed.configureTestingModule({
-    imports: [EventCheckoutModalComponent],
+    imports: [I18nTestingModule, EventCheckoutModalComponent],
     providers: [{ provide: EventService, useValue: eventService }],
   });
   TestBed.overrideComponent(EventCheckoutModalComponent, {

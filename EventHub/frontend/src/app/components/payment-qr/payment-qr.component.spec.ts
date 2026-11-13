@@ -4,6 +4,7 @@ import { of } from 'rxjs';
 import { PaymentQrComponent } from './payment-qr.component';
 import { PaymentService } from '../../services/payment.service';
 import { CheckoutSessionResponse, PaymentStatus, PaymentStatusResponse } from '../../models/models';
+import { I18nTestingModule } from '../../i18n/testing';
 
 const CHECKOUT: CheckoutSessionResponse = {
   checkout_url: 'http://localhost:18080/pay.html?customer=abc',
@@ -50,7 +51,7 @@ function bookingStatus(
 function render(answers: PaymentStatusResponse[], bookingId: string | null = null) {
   const getPaymentStatus = vi.fn(() => of(answers.length > 1 ? answers.shift()! : answers[0]));
   TestBed.configureTestingModule({
-    imports: [PaymentQrComponent],
+    imports: [I18nTestingModule, PaymentQrComponent],
     providers: [provideRouter([]), { provide: PaymentService, useValue: { getPaymentStatus } }],
   });
   const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
