@@ -664,3 +664,55 @@ class PreferencesApiTests(WorldMixin, APITestCase):
     def test_the_legacy_alias_serves_it_too(self):
         self.client.force_authenticate(self.alice)
         self.assertEqual(self.client.get('/api/auth/profile/notifications/').status_code, 200)
+
+
+# ───────────────────────── security emails ─────────────────────────
+
+
+class SecurityEmailTests(WorldMixin, APITestCase):
+    """Sign-up and password-reset codes are not notifications: they ignore
+    the preferences and are always emailed."""
+
+    def setUp(self):
+        self.make_world()
+        NotificationPreference.objects.create(user=self.alice, email_disabled=list(types.EMAIL_OPTIONAL_TYPES))
+
+    def test_password_reset_end_to_end_ignores_preferences(self):
+        from accounts.models import PasswordResetCode
+
+        response = self.client.post('/api/v1/auth/password-reset/request/', {'identifier': 'alice'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        run_due_jobs()
+        self.assertEqual(len(mail.outbox), 1)
+        code = PasswordResetCode.objects.get(user=self.alice).code
+        self.assertIn(code, mail.outbox[0].body)
+
+        response = self.client.post(
+            '/api/v1/auth/password-reset/verify/', {'identifier': 'alice', 'code': code}, format='json'
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        response = self.client.post(
+            '/api/v1/auth/password-reset/confirm/',
+            {
+                'reset_token': response.data['reset_token'],
+                'new_password': 'N3w-Passw0rd!x',
+                'new_password2': 'N3w-Passw0rd!x',
+            },
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.alice.refresh_from_db()
+        self.assertTrue(self.alice.check_password('N3w-Passw0rd!x'))
+
+    def test_no_reset_code_for_an_account_without_an_address(self):
+        User.objects.filter(pk=self.bob.pk).update(email='')
+        response = self.client.post('/api/v1/auth/password-reset/request/', {'identifier': 'bob'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(email_jobs().exists())
+
+    def test_sign_up_code_is_emailed(self):
+        response = self.client.post('/api/v1/auth/register/send-code/', {'email': 'new@example.com'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        run_due_jobs()
+        self.assertEqual(mail.outbox[0].to, ['new@example.com'])
+        self.assertIn('verification code', mail.outbox[0].body)
