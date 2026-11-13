@@ -104,6 +104,17 @@ import { apiErrorMessage } from '../../api/api-error';
             </div>
           }
 
+          <!-- Security (2FA) -->
+          <div class="card p-5 mb-4 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 class="text-sm font-semibold text-foreground">Security</h2>
+              <p class="text-xs text-muted-foreground mt-0.5">
+                Two-factor authentication, passkeys and recovery codes.
+              </p>
+            </div>
+            <a routerLink="/profile/security" class="btn btn-sm btn-secondary">Manage</a>
+          </div>
+
           <!-- Form -->
           <form (ngSubmit)="onSubmit()" novalidate>
             <div class="card divide-y divide-border">
