@@ -44,6 +44,20 @@ Phase 0 is complete.
 
 The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. Next per the roadmap: phase 1Б (commission, ledger, payouts, with 2FA from phase 4) and phase 2 (communications).
 
+## Phase 2 — communications: notifications (branch `phase-2/notifications`, 2026-11-13)
+
+| Step | Status |
+|---|---|
+| One notification service (`backend/notifications/`): in-app row + email job in the business transaction, per-type email preferences | done |
+| HTML + plain-text emails, e-ticket with the ticket QR inline (cid), `send_email` with HTML, attachments and a safe header allow-list | done |
+| Triggers: ticket purchased, free registration, payment failed, every refund (incl. automatic late/duplicate/mismatch Freedom Pay refunds), refund request + resolution, date/venue change, cancellation, waitlist offer, group booking confirmed/claimed, organizer messages | done |
+| 24-hour reminders, idempotent (`SentReminder`), run by the worker every minute and by `manage.py send_event_reminders` | done |
+| Preferences API `GET/PATCH /api/v1/auth/profile/notifications/` and page `/profile/notifications` | done |
+| SMTP configuration for the demo (Mailtrap / Gmail app password / Brevo) | documented in `.env.example`; needs the owner's credentials |
+| PDF ticket, web push, SMS, one-click unsubscribe, per-user email language | open (see `NOTIFICATIONS.md`) |
+
+Details: `docs/NOTIFICATIONS.md`. The seed data (`seed_data`) creates one pending registration without a hold deadline, which `run_sql_checks` reports as `stale_holds` (pre-existing, not caused by notifications).
+
 ### Owner actions still required (GitHub settings, cannot be done from code)
 
 1. **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** (release-please opens its release PR).
@@ -65,7 +79,7 @@ The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. 
 
 1. Payments: `PaymentProvider` layer (move Stripe into it), Freedom Pay provider + protocol-compatible **emulator** (CI/demo), method selection by currency, reconciliation job, missing Stripe events. Freedom Pay test credentials are pending (owner wrote to them). `freedompay.kz` is blocked by the cloud session's network policy.
 1Б. Platform commission + **double-entry ledger** + organizer payouts (agency model, IBAN profile with 2FA-protected changes, weekly payouts, bank registry export, agent reports). Note: today `Event.service_fee_percent` is set by organizers — the platform commission must be admin-controlled.
-2. Buyer emails (ticket + PDF, cancellation, refunds, reminders — `event_reminder` exists but is never sent), web push, SMS.
+2. Buyer emails — done on `phase-2/notifications` (e-ticket with QR, cancellation, refunds, reminders, preferences; see `NOTIFICATIONS.md`); still open: ticket PDF, web push, SMS.
 3. Legal & personal data (KZ law): offer, privacy policy, consents, data export/deletion, retention.
 4. Security: TOTP + passkeys, tamper-evident audit log, SAST/DAST/Trivy/SBOM/cosign.
 5. Infra: **Yandex Cloud kz1**, Terraform, Managed Kubernetes, Helm, Argo CD, canary (Argo Rollouts), preview envs, managed PostgreSQL (check pgvector), backups + restore tests, DR drills.
