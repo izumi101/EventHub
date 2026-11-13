@@ -15,6 +15,8 @@ stripe>=16.0,<17
 # HTTP client of the Freedom Pay provider (already locked as a Stripe dependency)
 requests>=2.32,<3
 Pillow>=10.0
+# Ticket QR codes in notification emails (pure Python, no dependencies)
+segno>=1.6,<2
 python-dotenv>=1.0.0
 # Real-time WebSocket + shared throttling cache
 channels>=4.1

@@ -10,6 +10,7 @@ from django.utils import timezone
 from pgvector.django import VectorField
 
 from common.choices import EventStatusChoices, RegistrationStatusChoices
+from notifications import types as notification_types
 
 INACTIVE_REGISTRATION_STATUSES = [
     RegistrationStatusChoices.CANCELLED,
@@ -734,17 +735,11 @@ class CheckInLog(models.Model):
 
 
 class Notification(models.Model):
-    """In-app notifications for users."""
+    """In-app notifications for users. Created only through
+    `notifications.service.notify`, which also queues the email."""
 
-    TYPE_CHOICES = [
-        ('ticket_purchased', '🎫 Ticket purchased'),
-        ('event_reminder', '⏰ Event reminder'),
-        ('seat_available', '💺 Seat available'),
-        ('event_updated', '📝 Event updated'),
-        ('event_cancelled', '❌ Event cancelled'),
-        ('payment_failed', '⚠️ Payment failed'),
-        ('review_reminder', '⭐ Leave a review'),
-    ]
+    # The catalogue lives in notifications.types (one place for every type).
+    TYPE_CHOICES = notification_types.CHOICES
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
     type = models.CharField(max_length=30, choices=TYPE_CHOICES)
