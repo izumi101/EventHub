@@ -516,6 +516,60 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: Missing or invalid access token.
+  /api/v1/auth/profile/notifications/:
+    get:
+      operationId: auth_profile_notifications_retrieve
+      description: The signed-in user's notification email preferences.
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferences'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+    patch:
+      operationId: auth_profile_notifications_partial_update
+      description: The signed-in user's notification email preferences.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedNotificationPreferencesUpdateRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferences'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: 'Validation failed: field name → list of messages (`non_field_errors`
+            for the request as a whole).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
   /api/v1/auth/register/:
     post:
       operationId: auth_register_create
@@ -4760,7 +4814,7 @@ components:
           type: integer
         email_enabled:
           type: boolean
-          description: False when SMTP is not configured.
+          description: True when at least one email was queued.
       required:
       - email_enabled
       - emailed
@@ -5858,20 +5912,86 @@ components:
       - is_read
       - title
       - type
+    NotificationPreferences:
+      type: object
+      description: |-
+        Email preferences per notification type. In-app notifications are
+        always on; sign-up codes, password reset and other security emails are
+        not listed: they are always sent.
+      properties:
+        email_address:
+          type: string
+          format: email
+          readOnly: true
+          description: 'Where emails go (empty: none are sent).'
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTypePreference'
+          readOnly: true
+      required:
+      - email_address
+      - types
     NotificationTypeEnum:
       enum:
       - ticket_purchased
-      - event_reminder
-      - seat_available
+      - registration_confirmed
+      - payment_failed
+      - payment_refunded
+      - refund_requested
+      - refund_approved
+      - refund_rejected
       - event_updated
       - event_cancelled
-      - payment_failed
+      - seat_available
+      - group_booking_confirmed
+      - group_booking_claimed
+      - event_reminder
       - review_reminder
+      - organizer_message
       type: string
-      description: "* `ticket_purchased` - \U0001F3AB Ticket purchased\n* `event_reminder`
-        - ⏰ Event reminder\n* `seat_available` - \U0001F4BA Seat available\n* `event_updated`
-        - \U0001F4DD Event updated\n* `event_cancelled` - ❌ Event cancelled\n* `payment_failed`
-        - ⚠️ Payment failed\n* `review_reminder` - ⭐ Leave a review"
+      description: |-
+        * `ticket_purchased` - Ticket purchased
+        * `registration_confirmed` - Free registration confirmed
+        * `payment_failed` - Payment failed
+        * `payment_refunded` - Payment refunded
+        * `refund_requested` - Refund requested
+        * `refund_approved` - Refund request approved
+        * `refund_rejected` - Refund request rejected
+        * `event_updated` - Event changed
+        * `event_cancelled` - Event cancelled
+        * `seat_available` - Waitlist spot available
+        * `group_booking_confirmed` - Group booking confirmed
+        * `group_booking_claimed` - Group booking seat claimed
+        * `event_reminder` - Event reminder
+        * `review_reminder` - Review reminder
+        * `organizer_message` - Messages from organizers
+    NotificationTypePreference:
+      type: object
+      properties:
+        type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        email_enabled:
+          type: boolean
+          readOnly: true
+        email_optional:
+          type: boolean
+          readOnly: true
+          description: 'False: the email is always sent and cannot be switched off.'
+      required:
+      - description
+      - email_enabled
+      - email_optional
+      - label
+      - type
     NullEnum:
       enum:
       - null
@@ -6409,6 +6529,16 @@ components:
           type: string
           writeOnly: true
           minLength: 1
+    PatchedNotificationPreferencesUpdateRequest:
+      type: object
+      properties:
+        email:
+          type: object
+          additionalProperties:
+            type: boolean
+          description: 'Type key → email on/off, e.g. {"event_reminder": false}. Only
+            the types listed with `email_optional: true` can be changed; types not
+            mentioned keep their setting.'
     PatchedPromoCodeRequest:
       type: object
       properties:
