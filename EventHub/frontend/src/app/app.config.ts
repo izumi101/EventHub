@@ -14,6 +14,8 @@ import { provideHttpClient, withInterceptors, withFetch } from '@angular/common/
 import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
 import { SeoService } from './services/seo.service';
+import { provideI18n } from './i18n/i18n.providers';
+import { acceptLanguageInterceptor } from './i18n/accept-language.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,7 +26,8 @@ export const appConfig: ApplicationConfig = {
       withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
       withViewTransitions(),
     ),
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+    provideHttpClient(withFetch(), withInterceptors([acceptLanguageInterceptor, authInterceptor])),
+    provideI18n(),
     // Eagerly instantiate SeoService so its router subscription starts at boot
     provideAppInitializer(() => {
       inject(SeoService);
