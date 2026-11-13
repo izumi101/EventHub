@@ -356,7 +356,7 @@ _default_email_backend = (
     if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD
     else 'django.core.mail.backends.console.EmailBackend'
 )
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', _default_email_backend)
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND') or _default_email_backend
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@eventhub.local>')
 # Time zone of the dates in notification emails (event start, reminders).
 # The app stores UTC; set the zone your events happen in, e.g. Asia/Almaty.
