@@ -11,9 +11,11 @@ KNOWN_ROLES = frozenset({'attendee', 'organizer', 'staff', 'superuser'})
 METHOD_TOTP = 'totp'
 METHOD_WEBAUTHN = 'webauthn'
 METHOD_RECOVERY = 'recovery_code'
+METHOD_EMAIL = 'email'
 
-# RFC 8176 authentication method references carried in the `amr` claim.
-AMR_BY_METHOD = {METHOD_TOTP: 'otp', METHOD_WEBAUTHN: 'hwk', METHOD_RECOVERY: 'rec'}
+# RFC 8176 authentication method references carried in the `amr` claim
+# (`rec` and `email` are ours: RFC 8176 has no value for either).
+AMR_BY_METHOD = {METHOD_TOTP: 'otp', METHOD_WEBAUTHN: 'hwk', METHOD_RECOVERY: 'rec', METHOD_EMAIL: 'email'}
 
 
 def required_roles() -> frozenset[str]:
@@ -47,6 +49,29 @@ def has_webauthn(user) -> bool:
     return WebAuthnCredential.objects.filter(user=user).exists()
 
 
+def has_email(user) -> bool:
+    """The user confirmed email codes as a factor (whether or not it counts)."""
+    from .models import EmailFactor
+
+    return EmailFactor.objects.filter(user=user).exists()
+
+
+def email_allowed_for(user) -> bool:
+    """May email codes serve as this user's second factor? Always for users
+    who are not obliged to use 2FA; for those who are, unless the deployment
+    turned it off (MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0)."""
+    return bool(settings.MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES) or not mfa_required_for(user)
+
+
+def has_usable_email(user) -> bool:
+    return has_email(user) and email_allowed_for(user)
+
+
+def has_any_factor(user) -> bool:
+    """Uncached: a factor that counts for this user exists."""
+    return has_totp(user) or has_webauthn(user) or has_usable_email(user)
+
+
 def _enabled_cache_key(user_id) -> str:
     return f'mfa:enabled:{user_id}'
 
@@ -57,7 +82,8 @@ def forget_mfa_enabled(user_id) -> None:
 
 
 def mfa_enabled(user) -> bool:
-    """A confirmed TOTP device or at least one passkey.
+    """A confirmed TOTP device, at least one passkey, or email codes where
+    they count (has_any_factor).
 
     Asked on every authenticated API request, so the answer is cached in the
     shared cache; every change of factors calls forget_mfa_enabled() (model
@@ -68,7 +94,7 @@ def mfa_enabled(user) -> bool:
     cached = cache.get(key)
     if cached is not None:
         return bool(cached)
-    enabled = has_totp(user) or has_webauthn(user)
+    enabled = has_any_factor(user)
     cache.set(key, int(enabled), ENABLED_CACHE_SECONDS)
     return enabled
 
@@ -81,6 +107,8 @@ def available_methods(user) -> list[str]:
         methods.append(METHOD_TOTP)
     if has_webauthn(user):
         methods.append(METHOD_WEBAUTHN)
+    if has_usable_email(user):
+        methods.append(METHOD_EMAIL)
     if RecoveryCode.objects.filter(user=user, used_at__isnull=True).exists():
         methods.append(METHOD_RECOVERY)
     return methods

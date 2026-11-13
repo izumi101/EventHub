@@ -16,16 +16,21 @@ from rest_framework.throttling import BaseThrottle
 
 from common.auth import revoke_all_refresh_tokens
 
-from . import passkeys, recovery, totp
+from . import email_codes, passkeys, recovery, totp
 from .exceptions import INVALID_CODE, REQUIRED_BY_POLICY, MFAError, MFALocked
-from .models import MFAState, RecoveryCode, TOTPDevice, WebAuthnCredential
+from .models import EmailCode, EmailFactor, MFAState, RecoveryCode, TOTPDevice, WebAuthnCredential
 from .policy import (
+    METHOD_EMAIL,
     METHOD_RECOVERY,
     METHOD_TOTP,
     METHOD_WEBAUTHN,
     available_methods,
+    email_allowed_for,
     forget_mfa_enabled,
+    has_any_factor,
+    has_email,
     has_totp,
+    has_usable_email,
     has_webauthn,
     mfa_required_for,
 )
@@ -33,7 +38,13 @@ from .tokens import issue_challenge_token, issue_enrollment_token, issue_jwt_pai
 
 logger = logging.getLogger('mfa')
 
-METHODS = (METHOD_TOTP, METHOD_WEBAUTHN, METHOD_RECOVERY)
+METHODS = (METHOD_TOTP, METHOD_WEBAUTHN, METHOD_RECOVERY, METHOD_EMAIL)
+
+FACTOR_LABELS = {
+    METHOD_TOTP: 'An authenticator app',
+    METHOD_WEBAUTHN: 'A passkey',
+    METHOD_EMAIL: 'Email codes',
+}
 
 
 def client_ip(request) -> str:
@@ -130,6 +141,11 @@ def verify_second_factor(
         ok = recovery.use(user, code)
     elif method == METHOD_WEBAUTHN:
         ok = webauthn_key is not None and passkeys.verify_assertion(user, credential, webauthn_key) is not None
+    elif method == METHOD_EMAIL:
+        purpose = EmailCode.PURPOSE_LOGIN if context == 'login' else EmailCode.PURPOSE_STEP_UP
+        ok = has_usable_email(user) and email_codes.verify(user, purpose, code)
+        if ok:
+            EmailFactor.objects.filter(user=user).update(last_used_at=timezone.now())
 
     if not ok:
         lock = _record_failure(user, method, context, request)
@@ -166,7 +182,7 @@ def login_response(user) -> dict:
     """What POST /auth/login/ answers once the password is right."""
     from accounts.services import build_auth_payload
 
-    if has_totp(user) or has_webauthn(user):
+    if has_any_factor(user):
         return {
             'mfa_required': True,
             'challenge_token': issue_challenge_token(user),
@@ -207,8 +223,9 @@ def _factor_added(user, *, method: str, first: bool, request) -> dict:
         )
     else:
         logger.info('mfa.factor_added user=%s method=%s ip=%s', user.pk, method, client_ip(request))
-        label = 'An authenticator app' if method == METHOD_TOTP else 'A passkey'
-        notify_security(user, 'New sign-in method added', f'{label} was added to your EventHub account.')
+        notify_security(
+            user, 'New sign-in method added', f'{FACTOR_LABELS[method]} was added to your EventHub account.'
+        )
     return result
 
 
@@ -233,7 +250,7 @@ def confirm_totp(user, code, request=None) -> dict:
             raise MFAError(
                 'The authenticator app is already active.', 'mfa_totp_exists', status_code=status.HTTP_409_CONFLICT
             )
-        first = not has_webauthn(user)
+        first = not (has_webauthn(user) or has_usable_email(user))
         if not totp.verify(device, code):
             logger.info('mfa.totp_confirm_failed user=%s ip=%s', user.pk, client_ip(request))
             raise MFAError('That code is not valid. Check the time on your phone and try again.', INVALID_CODE)
@@ -245,7 +262,7 @@ def confirm_totp(user, code, request=None) -> dict:
 
 def finish_passkey_registration(user, credential, name, request=None) -> dict:
     with transaction.atomic():
-        first = not (has_totp(user) or has_webauthn(user))
+        first = not has_any_factor(user)
         try:
             passkeys.finish_registration(user, credential, name)
         except passkeys.PasskeyError as exc:
@@ -253,8 +270,53 @@ def finish_passkey_registration(user, credential, name, request=None) -> dict:
         return _factor_added(user, method=METHOD_WEBAUTHN, first=first, request=request)
 
 
+def send_email_code(user, purpose: str, request=None) -> dict:
+    """Email a code for enrollment or step-up (sign-in codes: views)."""
+    if not user.email:
+        raise MFAError('Your account has no email address. Use another method.', 'mfa_no_email')
+    if purpose == EmailCode.PURPOSE_ENROLL:
+        if has_email(user):
+            raise MFAError('Email codes are already on.', 'mfa_email_exists', status_code=status.HTTP_409_CONFLICT)
+        if not email_allowed_for(user):
+            raise MFAError(
+                'Your account must use an authenticator app or a passkey.',
+                'mfa_email_not_allowed',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+    elif not has_usable_email(user):
+        raise MFAError('Email codes are not turned on for your account.', 'mfa_email_not_enabled')
+    return email_codes.send(user, purpose, request=request)
+
+
+def send_login_email_code(user, request=None) -> dict:
+    """Email a sign-in code. Answers the same whether or not the user has
+    email codes turned on (nothing is sent then), so the response says
+    nothing about the account beyond what the login response already did."""
+    return email_codes.send(user, EmailCode.PURPOSE_LOGIN, request=request, deliver=has_usable_email(user))
+
+
+def enable_email(user, code, request=None) -> dict:
+    with transaction.atomic():
+        # Serialise with concurrent enable attempts of the same user.
+        MFAState.objects.select_for_update().get_or_create(user=user)
+        if has_email(user):
+            raise MFAError('Email codes are already on.', 'mfa_email_exists', status_code=status.HTTP_409_CONFLICT)
+        if not email_allowed_for(user):
+            raise MFAError(
+                'Your account must use an authenticator app or a passkey.',
+                'mfa_email_not_allowed',
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        if not email_codes.verify(user, EmailCode.PURPOSE_ENROLL, code):
+            logger.info('mfa.email_confirm_failed user=%s ip=%s', user.pk, client_ip(request))
+            raise MFAError('That code is not valid or has expired. Ask for a new one.', INVALID_CODE)
+        first = not has_any_factor(user)
+        EmailFactor.objects.create(user=user, confirmed_at=timezone.now())
+        return _factor_added(user, method=METHOD_EMAIL, first=first, request=request)
+
+
 def regenerate_recovery_codes(user, request=None) -> list[str]:
-    if not (has_totp(user) or has_webauthn(user)):
+    if not has_any_factor(user):
         raise MFAError('Turn on two-factor authentication first.', 'mfa_not_enabled')
     codes = recovery.regenerate(user)
     logger.info('mfa.recovery_codes_regenerated user=%s ip=%s', user.pk, client_ip(request))
@@ -278,9 +340,22 @@ def _refuse_if_last_factor(user, remaining_factors: int) -> None:
         )
 
 
+def _other_factors(user, *, exclude: str) -> int:
+    """Factors that count for `user`, leaving out the one being removed."""
+    count = 0
+    if exclude != METHOD_TOTP and has_totp(user):
+        count += 1
+    if exclude != METHOD_EMAIL and has_usable_email(user):
+        count += 1
+    passkeys_qs = WebAuthnCredential.objects.filter(user=user)
+    if exclude.startswith('passkey:'):
+        passkeys_qs = passkeys_qs.exclude(pk=int(exclude.split(':', 1)[1]))
+    return count + passkeys_qs.count()
+
+
 def _after_removal(user, *, what: str, request) -> None:
     forget_mfa_enabled(user.pk)
-    still_enabled = has_totp(user) or has_webauthn(user)
+    still_enabled = has_any_factor(user)
     if not still_enabled:
         RecoveryCode.objects.filter(user=user).delete()
         logger.warning('mfa.disabled user=%s via=%s ip=%s', user.pk, what, client_ip(request))
@@ -300,7 +375,7 @@ def remove_totp(user, request=None) -> None:
     if device is None:
         raise MFAError('No authenticator app is set up.', 'mfa_not_found', status_code=status.HTTP_404_NOT_FOUND)
     if device.confirmed:
-        _refuse_if_last_factor(user, WebAuthnCredential.objects.filter(user=user).count())
+        _refuse_if_last_factor(user, _other_factors(user, exclude=METHOD_TOTP))
     device.delete()
     if device.confirmed:
         _after_removal(user, what='The authenticator app', request=request)
@@ -311,10 +386,30 @@ def remove_passkey(user, credential_pk, request=None) -> None:
     credential = WebAuthnCredential.objects.select_for_update().filter(user=user, pk=credential_pk).first()
     if credential is None:
         raise MFAError('No such passkey.', 'mfa_not_found', status_code=status.HTTP_404_NOT_FOUND)
-    others = WebAuthnCredential.objects.filter(user=user).exclude(pk=credential.pk).count()
-    _refuse_if_last_factor(user, others + (1 if has_totp(user) else 0))
+    _refuse_if_last_factor(user, _other_factors(user, exclude=f'passkey:{credential.pk}'))
     credential.delete()
     _after_removal(user, what=f'The passkey "{credential.name}"', request=request)
+
+
+def rename_passkey(user, credential_pk, name: str) -> WebAuthnCredential:
+    credential = WebAuthnCredential.objects.filter(user=user, pk=credential_pk).first()
+    if credential is None:
+        raise MFAError('No such passkey.', 'mfa_not_found', status_code=status.HTTP_404_NOT_FOUND)
+    credential.name = name.strip()[:64] or credential.name
+    credential.save(update_fields=['name'])
+    logger.info('mfa.passkey_renamed user=%s credential=%s', user.pk, credential.pk)
+    return credential
+
+
+@transaction.atomic
+def remove_email(user, request=None) -> None:
+    factor = EmailFactor.objects.select_for_update().filter(user=user).first()
+    if factor is None:
+        raise MFAError('Email codes are not turned on.', 'mfa_not_found', status_code=status.HTTP_404_NOT_FOUND)
+    _refuse_if_last_factor(user, _other_factors(user, exclude=METHOD_EMAIL))
+    factor.delete()
+    EmailCode.objects.filter(user=user, is_used=False).update(is_used=True)
+    _after_removal(user, what='Email codes', request=request)
 
 
 @transaction.atomic
@@ -325,10 +420,11 @@ def disable_all(user, request=None) -> None:
             REQUIRED_BY_POLICY,
             status_code=status.HTTP_409_CONFLICT,
         )
-    if not (has_totp(user) or has_webauthn(user)):
+    if not (has_totp(user) or has_webauthn(user) or has_email(user)):
         return
     TOTPDevice.objects.filter(user=user).delete()
     WebAuthnCredential.objects.filter(user=user).delete()
+    EmailFactor.objects.filter(user=user).delete()
     _after_removal(user, what='Every sign-in method', request=request)
 
 
@@ -340,8 +436,10 @@ def admin_reset(user, *, operator: str) -> dict:
     removed = {
         'totp': TOTPDevice.objects.filter(user=user).delete()[0],
         'passkeys': WebAuthnCredential.objects.filter(user=user).delete()[0],
+        'email': EmailFactor.objects.filter(user=user).delete()[0],
         'recovery_codes': RecoveryCode.objects.filter(user=user).delete()[0],
     }
+    EmailCode.objects.filter(user=user).delete()
     MFAState.objects.filter(user=user).update(failed_attempts=0, locked_until=None)
     revoke_all_refresh_tokens(user)
     forget_mfa_enabled(user.pk)

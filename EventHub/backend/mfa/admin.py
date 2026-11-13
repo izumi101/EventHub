@@ -3,7 +3,7 @@ never shown; resetting a user goes through `manage.py mfa_reset` (logged)."""
 
 from django.contrib import admin
 
-from .models import MFAState, TOTPDevice, WebAuthnCredential
+from .models import EmailFactor, MFAState, TOTPDevice, WebAuthnCredential
 
 
 class _ReadOnlyAdmin(admin.ModelAdmin):
@@ -30,6 +30,12 @@ class WebAuthnCredentialAdmin(_ReadOnlyAdmin):
     list_display = ('user', 'name', 'backed_up', 'sign_count', 'created_at', 'last_used_at')
     search_fields = ('user__username', 'user__email', 'name')
     exclude = ('public_key', 'credential_id')
+
+
+@admin.register(EmailFactor)
+class EmailFactorAdmin(_ReadOnlyAdmin):
+    list_display = ('user', 'confirmed_at', 'last_used_at')
+    search_fields = ('user__username', 'user__email')
 
 
 @admin.register(MFAState)

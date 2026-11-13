@@ -3,7 +3,7 @@
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
-from .models import TOTPDevice, WebAuthnCredential
+from .models import EmailFactor, TOTPDevice, WebAuthnCredential
 from .policy import forget_mfa_enabled
 
 
@@ -11,5 +11,7 @@ from .policy import forget_mfa_enabled
 @receiver(post_delete, sender=TOTPDevice)
 @receiver(post_save, sender=WebAuthnCredential)
 @receiver(post_delete, sender=WebAuthnCredential)
+@receiver(post_save, sender=EmailFactor)
+@receiver(post_delete, sender=EmailFactor)
 def _factors_changed(sender, instance, **kwargs):
     forget_mfa_enabled(instance.user_id)

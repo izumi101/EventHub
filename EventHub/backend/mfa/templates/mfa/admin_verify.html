@@ -11,17 +11,18 @@
     </p>
     <p>
       Sign in to the EventHub app, open <strong>Profile → Security</strong> and set up an
-      authenticator app. Then come back here.
+      authenticator app or email codes. Then come back here.
     </p>
     <p><a href="{% url 'admin:logout' %}">Log out</a></p>
   {% else %}
     <p>Confirm it is you with a second factor.</p>
-    {% if not has_totp %}
+    {% if not has_totp and not has_email %}
       <p class="help">
         Passkeys can't be used in the admin; enter one of your recovery codes, or add an
         authenticator app in the EventHub app (Profile → Security).
       </p>
     {% endif %}
+    {% if email_notice %}<p class="help" role="status">{{ email_notice }}</p>{% endif %}
     <form method="post" novalidate>
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ next }}">
@@ -39,6 +40,7 @@
       </fieldset>
       <div class="submit-row">
         <input type="submit" value="Verify" class="default">
+        {% if has_email %}<input type="submit" name="send_email_code" value="Email me a code" formnovalidate>{% endif %}
       </div>
     </form>
     <p><a href="{% url 'admin:logout' %}">Log out</a></p>

@@ -40,6 +40,7 @@ READONLY_HIDDEN_TABLES = (
     # 2FA: encrypted TOTP secrets and recovery-code hashes.
     'mfa_totpdevice',
     'mfa_recoverycode',
+    'mfa_emailcode',
 )
 # Tables it may read except for these columns (column-level grants).
 READONLY_HIDDEN_COLUMNS = {
