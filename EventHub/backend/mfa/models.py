@@ -1,7 +1,9 @@
 """Second factors of a user (docs/adr/0002-two-factor-authentication.md).
 
-A user "has 2FA" when they own a confirmed TOTP device or at least one
-WebAuthn credential. Recovery codes are a fallback, not a factor of their own.
+A user "has 2FA" when they own a confirmed TOTP device, at least one
+WebAuthn credential, or a confirmed email factor (the latter only counts for
+roles that must use 2FA while MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES is on).
+Recovery codes are a fallback, not a factor of their own.
 """
 
 from django.contrib.auth.models import User
@@ -67,6 +69,53 @@ class RecoveryCode(models.Model):
 
     def __str__(self):
         return f'Recovery code of {self.user.username} ({"used" if self.used_at else "unused"})'
+
+
+class EmailFactor(models.Model):
+    """One-time codes sent to the account's email address (ADR 0002,
+    amendment 1). Exists once the user proved the mailbox with a code."""
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='mfa_email_factor')
+    confirmed_at = models.DateTimeField()
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'email factor'
+
+    def __str__(self):
+        return f'Email codes for {self.user.username}'
+
+
+class EmailCode(models.Model):
+    """A 6-digit code emailed for one purpose. Only an HMAC of the code is
+    stored (keyed with SECRET_KEY plus a per-row salt): a database leak alone
+    does not reveal or let anyone brute-force a live code."""
+
+    PURPOSE_LOGIN = 'login'
+    PURPOSE_STEP_UP = 'step_up'
+    PURPOSE_ENROLL = 'enroll'
+    PURPOSE_CHOICES = [
+        (PURPOSE_LOGIN, 'Sign-in'),
+        (PURPOSE_STEP_UP, 'Confirm a sensitive action'),
+        (PURPOSE_ENROLL, 'Turn on email codes'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='mfa_email_codes')
+    purpose = models.CharField(max_length=16, choices=PURPOSE_CHOICES)
+    salt = models.CharField(max_length=32)
+    code_hash = models.CharField(max_length=64)
+    # Wrong guesses against this code; it is burned after the configured budget.
+    attempts = models.PositiveSmallIntegerField(default=0)
+    is_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'purpose', 'is_used'])]
+
+    def __str__(self):
+        return f'Email code for {self.user.username} ({self.purpose}, {"used" if self.is_used else "unused"})'
 
 
 class MFAState(models.Model):

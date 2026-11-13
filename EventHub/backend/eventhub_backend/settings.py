@@ -327,6 +327,16 @@ MFA_LOCKOUT_SECONDS = 60
 MFA_LOCKOUT_MAX_SECONDS = 3600
 # DRF throttles of the second-factor endpoints (per client IP / per user).
 MFA_THROTTLE_RATES = {'mfa_ip': '20/min', 'mfa_user': '10/min'}
+# Email codes as a second factor (ADR 0002, amendment 1). Weaker than TOTP or
+# passkeys (a taken-over mailbox gets both the password reset and the code):
+# set MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0 to make organizers/staff use an
+# authenticator app or a passkey instead.
+MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES = env_bool('MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES', True)
+MFA_EMAIL_CODE_TTL_SECONDS = 600
+MFA_EMAIL_CODE_MAX_ATTEMPTS = 5
+# Sending limits per user (all purposes together): one code a minute, five an hour.
+MFA_EMAIL_RESEND_SECONDS = 60
+MFA_EMAIL_MAX_PER_HOUR = 5
 # WebAuthn: the RP ID is the site's host name (no scheme or port) and every
 # origin the SPA is opened from must be listed. Passkeys need a secure
 # context: https, or http://localhost; a plain-HTTP LAN IP can't use them.

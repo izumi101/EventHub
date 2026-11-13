@@ -15,15 +15,20 @@ from common.schema import ERROR, UNAUTHENTICATED
 from . import passkeys, serializers
 from .authentication import EnrollmentTokenAuthentication, MFAJWTAuthentication, is_enrollment_auth
 from .exceptions import INVALID_TOKEN, MFAError
-from .models import TOTPDevice, WebAuthnCredential
-from .policy import METHOD_WEBAUTHN, available_methods, mfa_enabled, mfa_required_for
+from .models import EmailCode, EmailFactor, TOTPDevice, WebAuthnCredential
+from .policy import METHOD_WEBAUTHN, available_methods, email_allowed_for, mfa_enabled, mfa_required_for
 from .services import (
     confirm_totp,
     disable_all,
+    enable_email,
     finish_passkey_registration,
     regenerate_recovery_codes,
+    remove_email,
     remove_passkey,
     remove_totp,
+    rename_passkey,
+    send_email_code,
+    send_login_email_code,
     start_totp_setup,
     verify_second_factor,
 )
@@ -53,6 +58,7 @@ def status_payload(request) -> dict:
     user = request.user
     device = TOTPDevice.objects.filter(user=user, confirmed=True).first()
     keys = WebAuthnCredential.objects.filter(user=user)
+    email = EmailFactor.objects.filter(user=user).first()
     from .recovery import remaining
 
     return {
@@ -60,6 +66,9 @@ def status_payload(request) -> dict:
         'required': mfa_required_for(user),
         'totp_enabled': device is not None,
         'totp_confirmed_at': device.confirmed_at if device else None,
+        'email_enabled': email is not None,
+        'email_confirmed_at': email.confirmed_at if email else None,
+        'email_allowed': email_allowed_for(user),
         'passkeys': [
             {
                 'id': k.pk,
@@ -139,6 +148,29 @@ class MFALoginWebAuthnOptionsView(APIView):
         except passkeys.PasskeyError as exc:
             raise MFAError(str(exc), 'mfa_no_passkey') from exc
         return Response(options)
+
+
+class MFALoginEmailSendView(APIView):
+    """Email a sign-in code to the user behind a challenge token."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    throttle_classes = MFA_THROTTLES
+
+    @extend_schema(
+        request=serializers.MFAChallengeRequestSerializer,
+        responses={200: serializers.EmailCodeSentSerializer, 400: ERROR, 401: MFA_ERROR, 429: MFA_ERROR},
+        description=(
+            'Answers the same whether or not the account has email codes turned on (nothing is sent '
+            'then). Limited to one code a minute and five an hour per user (429 `mfa_email_throttled` '
+            'with `retry_after`).'
+        ),
+    )
+    def post(self, request):
+        data = serializers.MFAChallengeRequestSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        _, user = _load_challenge(data.validated_data['challenge_token'])
+        return Response(send_login_email_code(user, request=request))
 
 
 # ---- Status and management ---- #
@@ -232,8 +264,78 @@ class PasskeyRegisterVerifyView(_EnrollmentView):
         return self.finish(request, result)
 
 
+class EmailSendView(_EnrollmentView):
+    """Email a code to turn on email codes (enrollment) or for step-up."""
+
+    throttle_classes = MFA_THROTTLES
+
+    @extend_schema(
+        request=serializers.EmailSendRequestSerializer,
+        responses={
+            200: serializers.EmailCodeSentSerializer,
+            400: MFA_ERROR,
+            401: UNAUTHENTICATED,
+            403: MFA_ERROR,
+            409: ERROR,
+            429: MFA_ERROR,
+        },
+    )
+    def post(self, request):
+        data = serializers.EmailSendRequestSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        purpose = data.validated_data['purpose']
+        if purpose == EmailCode.PURPOSE_ENROLL:
+            self.guard_adding_factor(request)
+        elif is_enrollment_auth(request):
+            raise MFAError('Set up a second factor first.', 'mfa_not_enabled')
+        return Response(send_email_code(request.user, purpose, request=request))
+
+
+class EmailEnableView(_EnrollmentView):
+    throttle_classes = MFA_THROTTLES
+
+    @extend_schema(
+        request=serializers.CodeRequestSerializer,
+        responses={
+            200: serializers.FactorAddedSerializer,
+            400: MFA_ERROR,
+            401: UNAUTHENTICATED,
+            403: MFA_ERROR,
+            409: ERROR,
+        },
+    )
+    def post(self, request):
+        self.guard_adding_factor(request)
+        data = serializers.CodeRequestSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        return self.finish(request, enable_email(request.user, data.validated_data['code'], request=request))
+
+
+class EmailDisableView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=None,
+        responses={200: serializers.MFAStatusSerializer, 401: UNAUTHENTICATED, 403: MFA_ERROR, 404: ERROR, 409: ERROR},
+    )
+    def post(self, request):
+        require_recent_mfa(request)
+        remove_email(request.user, request=request)
+        return Response(status_payload(request))
+
+
 class PasskeyDetailView(APIView):
     permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=serializers.PasskeyRenameRequestSerializer,
+        responses={200: serializers.MFAStatusSerializer, 400: ERROR, 401: UNAUTHENTICATED, 404: ERROR},
+    )
+    def patch(self, request, pk):
+        data = serializers.PasskeyRenameRequestSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        rename_passkey(request.user, pk, data.validated_data['name'])
+        return Response(status_payload(request))
 
     @extend_schema(
         responses={200: serializers.MFAStatusSerializer, 401: UNAUTHENTICATED, 403: MFA_ERROR, 404: ERROR, 409: ERROR}

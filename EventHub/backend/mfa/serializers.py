@@ -5,19 +5,21 @@ from rest_framework import serializers
 from accounts.schema import TokenPairSerializer
 from accounts.serializers import UserSerializer
 
-from .policy import METHOD_RECOVERY, METHOD_TOTP, METHOD_WEBAUTHN
+from .models import EmailCode
+from .policy import METHOD_EMAIL, METHOD_RECOVERY, METHOD_TOTP, METHOD_WEBAUTHN
 
 METHOD_CHOICES = [
     (METHOD_TOTP, 'Authenticator app code'),
     (METHOD_WEBAUTHN, 'Passkey / security key'),
     (METHOD_RECOVERY, 'Recovery code'),
+    (METHOD_EMAIL, 'Code sent by email'),
 ]
 
 
 class _FactorProofSerializer(serializers.Serializer):
     method = serializers.ChoiceField(choices=METHOD_CHOICES)
     code = serializers.CharField(
-        required=False, allow_blank=True, max_length=64, help_text='TOTP code or recovery code.'
+        required=False, allow_blank=True, max_length=64, help_text='TOTP code, email code or recovery code.'
     )
     credential = serializers.DictField(
         required=False, help_text='WebAuthn assertion (PublicKeyCredential JSON) for method=webauthn.'
@@ -59,6 +61,31 @@ class CodeRequestSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=16)
 
 
+class EmailSendRequestSerializer(serializers.Serializer):
+    purpose = serializers.ChoiceField(
+        choices=[
+            (EmailCode.PURPOSE_ENROLL, 'Turn on email codes (proves the mailbox)'),
+            (EmailCode.PURPOSE_STEP_UP, 'Confirm a sensitive action'),
+        ],
+        help_text='Sign-in codes are sent by POST /auth/mfa/login/email/send/.',
+    )
+
+
+class EmailCodeSentSerializer(serializers.Serializer):
+    sent = serializers.BooleanField()
+    expires_in = serializers.IntegerField(help_text='Seconds the code stays valid.')
+    resend_in = serializers.IntegerField(help_text='Seconds before another code can be requested.')
+
+
+class PasskeyRenameRequestSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=64)
+
+    def validate_name(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Enter a name.')
+        return value.strip()
+
+
 class PasskeyOptionsRequestSerializer(serializers.Serializer):
     name = serializers.CharField(required=False, allow_blank=True, max_length=64)
 
@@ -98,6 +125,11 @@ class MFAStatusSerializer(serializers.Serializer):
     required = serializers.BooleanField(help_text='Your role must use two-factor authentication.')
     totp_enabled = serializers.BooleanField()
     totp_confirmed_at = serializers.DateTimeField(allow_null=True)
+    email_enabled = serializers.BooleanField(help_text='Codes sent to the account email are turned on.')
+    email_confirmed_at = serializers.DateTimeField(allow_null=True)
+    email_allowed = serializers.BooleanField(
+        help_text="Email codes may serve as this account's second factor (deployment policy)."
+    )
     passkeys = PasskeySerializer(many=True)
     recovery_codes_remaining = serializers.IntegerField()
     methods = serializers.ListField(child=serializers.CharField())
