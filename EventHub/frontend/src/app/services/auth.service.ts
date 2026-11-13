@@ -16,6 +16,20 @@ import type { components } from '../api/openapi';
 /** PUT /auth/profile/: the editable name fields and profile details. */
 export type ProfileUpdate = components['schemas']['PatchedUserRequest'];
 
+/** POST /auth/login/ once the password is right: a session, a second-factor
+ *  challenge, or (for roles that must use 2FA) an enrollment hand-off. */
+export type LoginResult = components['schemas']['LoginResult'];
+export type MfaChallenge = components['schemas']['MFAChallenge'];
+export type MfaEnrollmentRequired = components['schemas']['MFAEnrollmentRequired'];
+
+export function isMfaChallenge(res: LoginResult): res is MfaChallenge {
+  return 'mfa_required' in res && res.mfa_required;
+}
+
+export function isMfaEnrollmentRequired(res: LoginResult): res is MfaEnrollmentRequired {
+  return 'mfa_enrollment_required' in res && res.mfa_enrollment_required;
+}
+
 function isCachedUser(value: unknown): value is User {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -112,13 +126,29 @@ export class AuthService {
     return this.http.post<User>(`${this.apiUrl}/admin/organizers/`, payload);
   }
 
-  login(username: string, password: string): Observable<AuthResponse> {
+  /** The password step. Only a plain `{user, tokens}` answer signs in here;
+   *  a challenge or an enrollment hand-off is for the caller to continue. */
+  login(username: string, password: string): Observable<LoginResult> {
     return this.http
-      .post<AuthResponse>(`${this.apiUrl}/login/`, {
+      .post<LoginResult>(`${this.apiUrl}/login/`, {
         username,
         password,
       })
-      .pipe(tap((res) => this.handleAuth(res)));
+      .pipe(
+        tap((res) => {
+          if (!isMfaChallenge(res) && !isMfaEnrollmentRequired(res)) this.handleAuth(res);
+        }),
+      );
+  }
+
+  /** Store the session of a sign-in finished elsewhere (second factor, enrollment). */
+  completeLogin(res: AuthResponse): void {
+    this.handleAuth(res);
+  }
+
+  /** A step-up returns a new access token only; the refresh token stays. */
+  setAccessToken(access: string): void {
+    this.storeTokens(access);
   }
 
   logout(): void {
