@@ -1,19 +1,18 @@
 """Broadcast a message from an organizer to their attendees.
 
-Delivery is dual: an in-app Notification (always) plus an email (when an SMTP
-backend is configured). Audience can be narrowed to a status or a ticket tier
-so organizers can, say, email only VIPs or only confirmed buyers.
+Delivery is dual: an in-app Notification (always) plus an email (unless the
+attendee switched organizer messages off), through notifications.service.
+Audience can be narrowed to a status or a ticket tier so organizers can,
+say, email only VIPs or only confirmed buyers.
 """
 
 import logging
 
-from django.conf import settings
 from django.db import transaction
 
 from common.choices import RegistrationStatusChoices
-from jobs.handlers import enqueue_email
-
-from .models import Notification
+from notifications import types
+from notifications.service import notify
 
 logger = logging.getLogger(__name__)
 
@@ -52,41 +51,18 @@ def broadcast_to_attendees(*, event, subject: str, body: str, audience: str = 'a
         seen_users.setdefault(r.user_id, r.user)
     users = list(seen_users.values())
 
-    # 1. In-app notifications (bulk insert).
-    Notification.objects.bulk_create(
-        [
-            Notification(
-                user=u,
-                type='event_updated',
-                title=f'📣 {event.title}: {subject}',
-                body=body,
-                event=event,
-            )
-            for u in users
-        ]
-    )
-
-    # 2. Email — best-effort, and only when SMTP is genuinely configured.
-    # Without a real EMAIL_HOST the smtp backend would block on connection
-    # timeouts for every recipient, so we skip it and rely on in-app delivery.
-    emailed = 0
-    recipients = [u.email for u in users if u.email]
-    backend = getattr(settings, 'EMAIL_BACKEND', '')
-    host = getattr(settings, 'EMAIL_HOST', '') or ''
-    smtp_ready = 'smtp' in backend and host and host not in ('localhost', '127.0.0.1')
-    non_smtp_ok = backend and 'smtp' not in backend and 'dummy' not in backend
-    email_enabled = bool(recipients) and (smtp_ready or non_smtp_ok)
-
-    if email_enabled:
-        # One queued job per recipient: the worker sends them (and retries a
-        # failed address) without holding up the organizer's request.
-        for addr in recipients:
-            enqueue_email(f'{event.title}: {subject}', body, addr)
-            emailed += 1
+    # In-app notification for everyone; an email (queued, sent by the worker)
+    # to those with an address who did not switch these messages off.
+    notified = emailed = 0
+    for user in users:
+        notification = notify(user, types.ORGANIZER_MESSAGE, event=event, subject=subject, text=body)
+        if notification is not None:
+            notified += 1
+            emailed += int(notification.email_queued)
 
     return {
         'recipients': len(users),
-        'notified': len(users),
+        'notified': notified,
         'emailed': emailed,
-        'email_enabled': email_enabled,
+        'email_enabled': emailed > 0,
     }
