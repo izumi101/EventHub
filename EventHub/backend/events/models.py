@@ -744,6 +744,7 @@ class Notification(models.Model):
         ('event_cancelled', '❌ Event cancelled'),
         ('payment_failed', '⚠️ Payment failed'),
         ('review_reminder', '⭐ Leave a review'),
+        ('security_alert', '🔐 Security alert'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

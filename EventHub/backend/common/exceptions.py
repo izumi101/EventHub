@@ -30,8 +30,20 @@ def error_response(exc: ValueError, status_code=status.HTTP_400_BAD_REQUEST) -> 
 
 
 def exception_handler(exc, context):
+    from mfa.exceptions import MFAError, TokenWithoutMFA
+
+    if isinstance(exc, MFAError):
+        # Same shape as every other refusal, plus the stable code the SPA
+        # branches on (mfa_step_up_required, mfa_locked, ...).
+        body = {'error': str(exc.detail), 'code': exc.mfa_code, **exc.extra}
+        headers = {}
+        if exc.extra.get('retry_after'):
+            headers['Retry-After'] = str(exc.extra['retry_after'])
+        return Response(body, status=exc.status_code, headers=headers)
     response = drf_exception_handler(exc, context)
     if response is not None:
+        if isinstance(exc, TokenWithoutMFA) and isinstance(response.data, dict):
+            response.data['code'] = 'mfa_required'
         return response
     if isinstance(exc, DomainError):
         return error_response(exc)

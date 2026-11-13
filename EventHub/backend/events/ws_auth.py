@@ -18,11 +18,18 @@ def _user_for(token: str):
     from rest_framework_simplejwt.exceptions import TokenError
     from rest_framework_simplejwt.tokens import AccessToken
 
+    from mfa.policy import token_satisfies_policy
+
     try:
-        user_id = AccessToken(token)['user_id']
+        access = AccessToken(token)
+        user_id = access['user_id']
     except (TokenError, KeyError):
         return None
-    return User.objects.filter(pk=user_id, is_active=True).first()
+    user = User.objects.select_related('profile').filter(pk=user_id, is_active=True).first()
+    # Same 2FA rule as the REST API (mfa.authentication.MFAJWTAuthentication).
+    if user is None or not token_satisfies_policy(user, access):
+        return None
+    return user
 
 
 class JwtSubprotocolAuthMiddleware(BaseMiddleware):

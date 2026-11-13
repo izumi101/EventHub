@@ -97,8 +97,17 @@ class AccountsTests(APITestCase):
 
     def test_login_success(self):
         url = reverse('login')
-        # Test login via username
+        # Test login via username. This user is an organizer without 2FA: the
+        # password step only grants an enrollment token (mfa/test_login.py).
         data = {'username': 'testuser', 'password': self.user_password}
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['mfa_enrollment_required'])
+        self.assertNotIn('tokens', response.data)
+
+        # An attendee gets the token pair straight away.
+        self.profile.role = 'attendee'
+        self.profile.save()
         response = self.client.post(url, data)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('tokens', response.data)

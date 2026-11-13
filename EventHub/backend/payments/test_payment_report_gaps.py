@@ -24,6 +24,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from events.models import Event, Registration
+from mfa.testing import authenticate_with_recent_mfa
 from payments.models import Payment
 
 WEBHOOK_SECRET = 'whsec_report_gap_test'
@@ -131,7 +132,7 @@ class RefundBalanceTests(GapBase):
         self.reg.seat_held_until = None
         self.reg.save()
         self.payment = Payment.objects.create(registration=self.reg, amount=Decimal('100.00'), status='completed')
-        self.client.force_authenticate(self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)  # refunds need step-up
         self.url = f'/api/v1/payments/refund/{self.reg.id}/'
 
     def test_a_refund_above_the_paid_amount_is_refused_and_the_books_are_untouched(self):

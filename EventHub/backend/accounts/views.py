@@ -2,7 +2,7 @@ import contextlib
 import logging
 
 from django.conf import settings
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import PolymorphicProxySerializer, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
@@ -10,6 +10,9 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from common.schema import ERROR, FORBIDDEN, UNAUTHENTICATED, VALIDATION_ERROR, MessageSerializer
+from mfa.serializers import MFAChallengeSerializer, MFAEnrollmentRequiredSerializer
+from mfa.services import login_response
+from mfa.stepup import require_recent_mfa
 
 from . import schema
 from .serializers import LoginSerializer, OrganizerCreateSerializer, RegisterSerializer, UserSerializer
@@ -127,15 +130,34 @@ class VerifyRegistrationCodeView(APIView):
 
 class LoginView(APIView):
     """
-    Handles user login, supporting both username and email as identifiers.
-    Returns access and refresh JWT tokens on successful authentication.
+    Password step of the sign-in, with a username or an email as identifier.
+
+    Answers the JWT pair only for users who neither have nor need 2FA.
+    Otherwise: `mfa_required` + a short-lived challenge token (exchange it at
+    /auth/mfa/login/verify/), or `mfa_enrollment_required` + an
+    enrollment-scoped token for a user whose role must set up 2FA first.
     """
 
     permission_classes = [AllowAny]
+    # A stale or password-only token in the browser must not block signing in.
+    authentication_classes = []
     throttle_scope = 'login'
 
     @extend_schema(
-        request=LoginSerializer, responses={200: schema.AuthPayloadSerializer, 400: VALIDATION_ERROR, 401: ERROR}
+        request=LoginSerializer,
+        responses={
+            200: PolymorphicProxySerializer(
+                component_name='LoginResult',
+                serializers=[
+                    schema.AuthPayloadSerializer,
+                    MFAChallengeSerializer,
+                    MFAEnrollmentRequiredSerializer,
+                ],
+                resource_type_field_name=None,
+            ),
+            400: VALIDATION_ERROR,
+            401: ERROR,
+        },
     )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -143,7 +165,7 @@ class LoginView(APIView):
             identifier = serializer.validated_data['username']
             user = login_user(identifier, serializer.validated_data['password'])
             if user:
-                return Response(build_auth_payload(user))
+                return Response(login_response(user))
             return Response(
                 {'error': 'Invalid credentials'},
                 status=status.HTTP_401_UNAUTHORIZED,
@@ -326,7 +348,8 @@ class ChangePasswordView(APIView):
     """Change password for authenticated users (old password required).
 
     Every other session is signed out; the response carries a fresh token
-    pair for the current device.
+    pair for the current device. With 2FA on, a recent second factor is
+    required (403 `mfa_step_up_required`).
     """
 
     permission_classes = [IsAuthenticated]
@@ -334,7 +357,7 @@ class ChangePasswordView(APIView):
 
     @extend_schema(
         request=schema.ChangePasswordRequestSerializer,
-        responses={200: schema.ChangePasswordResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED},
+        responses={200: schema.ChangePasswordResponseSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR},
     )
     def post(self, request):
         old_password = str(request.data.get('old_password', ''))
@@ -344,8 +367,11 @@ class ChangePasswordView(APIView):
         if not old_password or not new_password:
             return Response({'error': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        require_recent_mfa(request, allow_without_mfa=True)
         try:
-            tokens = change_password(request.user, old_password, new_password, new_password2)
+            tokens = change_password(
+                request.user, old_password, new_password, new_password2, current_token=request.auth
+            )
         except ValueError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({'message': 'Password changed successfully.', 'tokens': tokens})

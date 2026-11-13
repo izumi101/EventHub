@@ -10,6 +10,8 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+from mfa.conf import DEV_ENCRYPTION_KEY as _default_mfa_key
+from mfa.conf import production_problems as mfa_production_problems
 from payments.providers.conf import parse_enabled as parse_enabled_providers
 from payments.providers.conf import production_problems as payment_production_problems
 from payments.providers.conf import unknown_codes as unknown_payment_providers
@@ -71,6 +73,7 @@ INSTALLED_APPS = [
     'bookings',
     'jobs',
     'featureflags',
+    'mfa',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +86,8 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # Staff sessions in /admin/ must pass a second factor (docs/SECURITY_2FA.md).
+    'mfa.middleware.AdminMFAMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -191,7 +196,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    # SimpleJWT access tokens plus the 2FA policy (mfa/authentication.py).
+    'DEFAULT_AUTHENTICATION_CLASSES': ('mfa.authentication.MFAJWTAuthentication',),
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticatedOrReadOnly',),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
@@ -265,6 +271,7 @@ SPECTACULAR_SETTINGS = {
         'TicketKindEnum': 'events.models.TicketType.KIND_CHOICES',
         'CheckInActionEnum': 'events.models.CheckInLog.ACTION_CHOICES',
         'WebhookTriggerEnum': 'events.models.Webhook.TRIGGER_CHOICES',
+        'MFAMethodEnum': 'mfa.serializers.METHOD_CHOICES',
     },
 }
 
@@ -293,6 +300,39 @@ SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:4200').rstrip('/')
+
+# ---- Two-factor authentication (docs/adr/0002-two-factor-authentication.md) ---- #
+# Roles that must use 2FA: organizer, staff (is_staff), superuser, attendee.
+# Empty turns enforcement off (staged rollout); users who enrolled keep
+# being asked for their factor either way.
+MFA_REQUIRED_ROLES = env_list('MFA_REQUIRED_ROLES', ['organizer', 'staff', 'superuser'])
+if _unknown_mfa_roles := sorted(set(MFA_REQUIRED_ROLES) - {'attendee', 'organizer', 'staff', 'superuser'}):
+    raise ImproperlyConfigured(
+        f'MFA_REQUIRED_ROLES lists unknown roles: {", ".join(_unknown_mfa_roles)} '
+        '(allowed: attendee, organizer, staff, superuser)'
+    )
+# Key(s) for encrypting TOTP secrets at rest; comma separated for rotation
+# (the first encrypts, all decrypt). Required when DJANGO_DEBUG=0.
+MFA_ENCRYPTION_KEYS = env_list('MFA_ENCRYPTION_KEY', []) or [_default_mfa_key]
+# How long a second-factor proof covers sensitive actions (step-up).
+MFA_STEP_UP_MAX_AGE_SECONDS = int(os.environ.get('MFA_STEP_UP_MAX_AGE_SECONDS', '600'))
+MFA_CHALLENGE_TTL_SECONDS = 300
+MFA_ENROLLMENT_TTL_SECONDS = 900
+MFA_WEBAUTHN_CHALLENGE_TTL_SECONDS = 300
+MFA_TOTP_ISSUER = os.environ.get('MFA_TOTP_ISSUER', 'EventHub')
+# Lockout: after MFA_MAX_FAILED_ATTEMPTS consecutive wrong codes the user is
+# locked for MFA_LOCKOUT_SECONDS, doubling per further failure up to the max.
+MFA_MAX_FAILED_ATTEMPTS = 5
+MFA_LOCKOUT_SECONDS = 60
+MFA_LOCKOUT_MAX_SECONDS = 3600
+# DRF throttles of the second-factor endpoints (per client IP / per user).
+MFA_THROTTLE_RATES = {'mfa_ip': '20/min', 'mfa_user': '10/min'}
+# WebAuthn: the RP ID is the site's host name (no scheme or port) and every
+# origin the SPA is opened from must be listed. Passkeys need a secure
+# context: https, or http://localhost; a plain-HTTP LAN IP can't use them.
+WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost').strip()
+WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'EventHub')
+WEBAUTHN_ORIGINS = env_list('WEBAUTHN_ORIGINS', ['http://localhost:4200', 'https://localhost'])
 
 # ---- Payments (docs/adr/0001-payment-provider-layer.md) ---- #
 # Providers that may take money, comma separated. Each enabled provider must
@@ -444,6 +484,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # 2FA audit trail: enable/disable, failures, lockouts, resets (no secrets).
+        'mfa': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         # The Unleash SDK and its scheduler log every poll at INFO.
         'UnleashClient': {
             'handlers': ['console'],
@@ -477,6 +523,9 @@ if not DEBUG and not TESTING:
             'POSTGRES_APP_USER must be its own role, not POSTGRES_USER or POSTGRES_READONLY_USER '
             '(docs/DATABASE_ROLES.md)'
         )
+    _problems += mfa_production_problems(
+        encryption_keys=env_list('MFA_ENCRYPTION_KEY', []), rp_id=WEBAUTHN_RP_ID, origins=WEBAUTHN_ORIGINS
+    )
     if _problems:
         raise ImproperlyConfigured(
             'Refusing to start with DJANGO_DEBUG=0: '
@@ -487,6 +536,8 @@ if not DEBUG and not TESTING:
 if TESTING:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {}
+    # Tests share one client IP; throttling tests turn these on explicitly.
+    MFA_THROTTLE_RATES = {}
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
     PASSWORD_HASHERS = [
         'django.contrib.auth.hashers.MD5PasswordHasher',

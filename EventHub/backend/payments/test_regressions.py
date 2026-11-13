@@ -14,6 +14,7 @@ from rest_framework.test import APITestCase
 from bookings.models import Booking, BookingSeat
 from events.billing import to_minor_units
 from events.models import Event, Registration
+from mfa.testing import authenticate_with_recent_mfa
 from payments.models import Payment
 
 
@@ -203,7 +204,7 @@ class OrganizerMoneyTests(PaymentBase):
         super().setUp()
         self.reg = self.pending(status='confirmed', seat_held_until=None)
         self.payment = Payment.objects.create(registration=self.reg, amount=Decimal('100'), status='completed')
-        self.client.force_authenticate(self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)  # refunds need step-up
 
     def test_garbage_refund_amount_is_a_400(self):
         # Important #14: Decimal('abc') raised InvalidOperation → 500.
@@ -274,7 +275,7 @@ class SharedBookingTests(PaymentBase):
 class OrganizerBookingRefundTests(PaymentBase):
     def setUp(self):
         super().setUp()
-        self.client.force_authenticate(self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)  # refunds need step-up
         self.client.post(f'/api/v1/events/{self.event.id}/seat-map/create/', {'rows': 1, 'cols': 3}, format='json')
         self.seats = list(self.event.seat_map.seats.all()[:2])
         self.booking = Booking.objects.create(

@@ -4,7 +4,7 @@ webhooks, affiliates, refund requests, waitlist overview."""
 from django.db import models
 from django.db.models import Case, IntegerField, When
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
@@ -12,6 +12,7 @@ from rest_framework.response import Response
 
 from common.permissions import can_manage_event
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
+from mfa.stepup import require_recent_mfa
 
 from .. import schema as api
 from ..models import (
@@ -234,17 +235,26 @@ class EventRefundRequestsView(generics.ListAPIView):
 
 
 class ResolveRefundRequestView(generics.GenericAPIView):
-    """Organizer approves or rejects a refund request."""
+    """Organizer approves or rejects a refund request. Approving moves money
+    and needs a recent second factor (step-up)."""
 
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         request=api.RefundResolutionRequestSerializer,
-        responses={200: api.RefundResolutionSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND},
+        responses={
+            200: api.RefundResolutionSerializer,
+            400: ERROR,
+            401: UNAUTHENTICATED,
+            403: OpenApiResponse(ERROR.response, description='Refused; `code` mfa_step_up_required asks for 2FA.'),
+            404: NOT_FOUND,
+        },
     )
     def post(self, request, pk):
         rr = get_object_or_404(RefundRequest.objects.select_related('registration__event', 'registration__user'), pk=pk)
         approve = request.data.get('approve') in (True, 'true', 'True', '1', 1)
+        if approve and can_manage_event(rr.registration.event, request.user):
+            require_recent_mfa(request)
         try:
             rr = resolve_refund_request(
                 refund_request=rr,

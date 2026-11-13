@@ -184,6 +184,8 @@ class StartupGuardTests(SimpleTestCase):
         'STRIPE_MOCK_MODE': '',
         'PAYMENTS_MOCK_MODE': '',
         'UNLEASH_ENABLED': '0',
+        # Required with DJANGO_DEBUG=0 since 2FA (mfa/conf.py).
+        'MFA_ENCRYPTION_KEY': 'test-only-mfa-encryption-key-of-enough-length',
     }
     SCRIPT = (
         'import json\n'

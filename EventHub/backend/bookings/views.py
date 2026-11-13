@@ -3,14 +3,16 @@ import logging
 import stripe
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from common.permissions import can_manage_event
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 from events.models import Event
+from mfa.stepup import require_recent_mfa
 
 from . import schema
 from .models import Booking
@@ -219,8 +221,6 @@ class EventBookingsView(APIView):
 
     @extend_schema(responses={200: BookingSerializer(many=True), 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND})
     def get(self, request, event_id):
-        from common.permissions import can_manage_event
-
         event = get_object_or_404(Event, pk=event_id)
         if not can_manage_event(event, request.user):
             return Response({'error': 'You do not manage this event.'}, status=status.HTTP_403_FORBIDDEN)
@@ -234,16 +234,26 @@ class EventBookingsView(APIView):
 
 
 class BookingRefundView(APIView):
-    """POST /api/bookings/{id}/refund/  — the event team refunds one paid group booking."""
+    """POST /api/bookings/{id}/refund/  — the event team refunds one paid group
+    booking. Needs a recent second factor (step-up)."""
 
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         request=schema.BookingRefundRequestSerializer,
-        responses={200: BookingSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: NOT_FOUND, 502: ERROR},
+        responses={
+            200: BookingSerializer,
+            400: ERROR,
+            401: UNAUTHENTICATED,
+            403: OpenApiResponse(ERROR.response, description='Refused; `code` mfa_step_up_required asks for 2FA.'),
+            404: NOT_FOUND,
+            502: ERROR,
+        },
     )
     def post(self, request, pk):
-        booking = get_object_or_404(Booking, pk=pk)
+        booking = get_object_or_404(Booking.objects.select_related('event'), pk=pk)
+        if can_manage_event(booking.event, request.user):
+            require_recent_mfa(request)
         try:
             booking = refund_booking(booking, actor=request.user, reason=str(request.data.get('reason', '') or ''))
         except PermissionError as exc:
