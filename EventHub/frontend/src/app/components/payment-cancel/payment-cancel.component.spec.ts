@@ -1,11 +1,12 @@
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { PaymentCancelComponent } from './payment-cancel.component';
+import { I18nTestingModule } from '../../i18n/testing';
 
 describe('PaymentCancelComponent', () => {
   function render(): HTMLElement {
     TestBed.configureTestingModule({
-      imports: [PaymentCancelComponent],
+      imports: [I18nTestingModule, PaymentCancelComponent],
       providers: [provideRouter([])],
     });
     const fixture = TestBed.createComponent(PaymentCancelComponent);

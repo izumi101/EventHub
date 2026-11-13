@@ -28,7 +28,8 @@ export type Role = 'public' | 'auth' | 'attendee' | 'organizer' | 'admin';
 export type LucideIcon = LucideIconData;
 
 export interface NavItem {
-  label: string;
+  /** Translation key of the item label. */
+  labelKey: string;
   icon: LucideIcon;
   route?: string;
   routeFn?: (eventId: string) => string;
@@ -38,7 +39,8 @@ export interface NavItem {
 
 export interface NavSection {
   id: string;
-  title?: string;
+  /** Translation key of the section heading. */
+  titleKey?: string;
   roles: Role[];
   collapsible?: boolean;
   defaultOpen?: boolean;
@@ -51,93 +53,93 @@ export const NAV: NavSection[] = [
     id: 'main',
     roles: ['public'],
     items: [
-      { label: 'Discover', icon: Search, route: '/', exact: true, roles: ['public'] },
+      { labelKey: 'nav.discover', icon: Search, route: '/', exact: true, roles: ['public'] },
       // Anyone signed in can buy tickets for other people's events.
-      { label: 'My Tickets', icon: Ticket, route: '/my-registrations', roles: ['auth'] },
-      { label: 'My Bookings', icon: Armchair, route: '/my-bookings', roles: ['auth'] },
-      { label: 'Favorites', icon: Heart, route: '/favorites', roles: ['auth'] },
+      { labelKey: 'nav.myTickets', icon: Ticket, route: '/my-registrations', roles: ['auth'] },
+      { labelKey: 'nav.myBookings', icon: Armchair, route: '/my-bookings', roles: ['auth'] },
+      { labelKey: 'nav.favorites', icon: Heart, route: '/favorites', roles: ['auth'] },
     ],
   },
   {
     id: 'organize',
-    title: 'Organize',
+    titleKey: 'nav.sectionOrganize',
     roles: ['organizer'],
     items: [
       {
-        label: 'Dashboard',
+        labelKey: 'nav.dashboard',
         icon: LayoutDashboard,
         route: '/organizer/dashboard',
         roles: ['organizer'],
       },
-      { label: 'My Events', icon: CalendarDays, route: '/my-events', roles: ['organizer'] },
-      { label: 'Create Event', icon: Plus, route: '/create-event', roles: ['organizer'] },
-      { label: 'Scan Tickets', icon: ScanLine, route: '/scan', roles: ['organizer'] },
+      { labelKey: 'nav.myEvents', icon: CalendarDays, route: '/my-events', roles: ['organizer'] },
+      { labelKey: 'nav.createEvent', icon: Plus, route: '/create-event', roles: ['organizer'] },
+      { labelKey: 'nav.scanTickets', icon: ScanLine, route: '/scan', roles: ['organizer'] },
     ],
   },
   {
     id: 'event-context',
-    title: '',
+    titleKey: 'nav.event',
     roles: ['organizer'],
     context: 'event',
     collapsible: true,
     defaultOpen: true,
     items: [
       {
-        label: 'Attendees',
+        labelKey: 'nav.attendees',
         icon: Users,
         routeFn: (id) => `/organizer/events/${id}/attendees`,
         roles: ['organizer'],
       },
       {
-        label: 'Analytics',
+        labelKey: 'nav.analytics',
         icon: ChartColumn,
         routeFn: (id) => `/organizer/events/${id}/analytics`,
         roles: ['organizer'],
       },
       {
-        label: 'Tickets',
+        labelKey: 'nav.tickets',
         icon: Ticket,
         routeFn: (id) => `/organizer/events/${id}/ticket-types`,
         roles: ['organizer'],
       },
       {
-        label: 'Promo Codes',
+        labelKey: 'nav.promoCodes',
         icon: Tag,
         routeFn: (id) => `/organizer/events/${id}/promo-codes`,
         roles: ['organizer'],
       },
       {
-        label: 'Questions',
+        labelKey: 'nav.questions',
         icon: MessageSquare,
         routeFn: (id) => `/organizer/events/${id}/questions`,
         roles: ['organizer'],
       },
       {
-        label: 'Check-in Lists',
+        labelKey: 'nav.checkinLists',
         icon: ClipboardList,
         routeFn: (id) => `/organizer/events/${id}/checkin-lists`,
         roles: ['organizer'],
       },
       {
-        label: 'Waitlist',
+        labelKey: 'nav.waitlist',
         icon: Clock,
         routeFn: (id) => `/organizer/events/${id}/waitlist`,
         roles: ['organizer'],
       },
       {
-        label: 'Settings',
+        labelKey: 'nav.settings',
         icon: Settings,
         routeFn: (id) => `/organizer/events/${id}/settings`,
         roles: ['organizer'],
       },
       {
-        label: 'Edit Event',
+        labelKey: 'nav.editEvent',
         icon: SquarePen,
         routeFn: (id) => `/edit-event/${id}`,
         roles: ['organizer'],
       },
       {
-        label: 'All Events',
+        labelKey: 'nav.allEvents',
         icon: ChevronLeft,
         route: '/organizer/dashboard',
         roles: ['organizer'],
@@ -146,8 +148,10 @@ export const NAV: NavSection[] = [
   },
   {
     id: 'admin',
-    title: 'Admin',
+    titleKey: 'nav.sectionAdmin',
     roles: ['admin'],
-    items: [{ label: 'Moderation', icon: Shield, route: '/admin/moderation', roles: ['admin'] }],
+    items: [
+      { labelKey: 'nav.moderation', icon: Shield, route: '/admin/moderation', roles: ['admin'] },
+    ],
   },
 ];

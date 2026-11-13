@@ -3,6 +3,7 @@ import { Subject } from 'rxjs';
 import { Seat } from '../../models/models';
 import { SeatWsService } from '../../services/seat-ws.service';
 import { SeatMapSvgComponent } from './seat-map-svg.component';
+import { I18nTestingModule } from '../../i18n/testing';
 
 const seat = (id: number, row: number, col: number, is_available = true): Seat => ({
   id,
@@ -16,6 +17,7 @@ const seat = (id: number, row: number, col: number, is_available = true): Seat =
 describe('SeatMapSvgComponent keyboard access', () => {
   function render(seats: Seat[], maxSelection = 2) {
     TestBed.configureTestingModule({
+      imports: [I18nTestingModule],
       providers: [
         {
           provide: SeatWsService,

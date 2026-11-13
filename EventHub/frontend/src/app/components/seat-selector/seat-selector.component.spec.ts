@@ -4,6 +4,7 @@ import { SeatSelectorComponent, summariseZones } from './seat-selector.component
 import { SeatWsService, WsSeatUpdate, WsSnapshot } from '../../services/seat-ws.service';
 import type { Seat } from '../../models/models';
 import { cheapestZonePrice } from '../event-detail/event-detail.component';
+import { I18nTestingModule } from '../../i18n/testing';
 
 const seat = (id: number, zone: string, price: string, available = true): Seat =>
   ({ id, row: 1, col: id, price_zone: zone, price, is_available: available }) as unknown as Seat;
@@ -12,7 +13,7 @@ function setup(seats: Seat[]) {
   const snapshots$ = new Subject<WsSnapshot>();
   const seatUpdates$ = new Subject<WsSeatUpdate>();
   TestBed.configureTestingModule({
-    imports: [SeatSelectorComponent],
+    imports: [I18nTestingModule, SeatSelectorComponent],
     providers: [
       {
         provide: SeatWsService,
