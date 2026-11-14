@@ -62,3 +62,8 @@ class Command(BaseCommand):
         Event.objects.filter(status=EventStatusChoices.PUBLISHED, end_date__isnull=True, date__lt=now).update(
             status=EventStatusChoices.COMPLETED,
         )
+
+        # Expired 2FA email codes (hashes only) are not kept around.
+        from mfa.email_codes import purge_expired
+
+        purge_expired()

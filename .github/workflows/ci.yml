@@ -153,6 +153,9 @@ jobs:
     # The whole stack as a developer runs it: docker compose up with the
     # example .env (DEBUG, mock payments, demo data), then a browser test.
     runs-on: ubuntu-latest
+    env:
+      # Publicly known test secret (base32), not a credential.
+      E2E_MFA_TOTP_SECRET: JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
     defaults:
       run:
         working-directory: EventHub
@@ -162,6 +165,8 @@ jobs:
         run: |
           cp .env.example .env
           sed -i 's/^INSTALL_SEMANTIC_SEARCH=.*/INSTALL_SEMANTIC_SEARCH=0/' .env
+          # The demo organizer must use 2FA: give it a known test TOTP secret.
+          sed -i "s/^DJANGO_SEED_MFA_TOTP_SECRET=.*/DJANGO_SEED_MFA_TOTP_SECRET=${E2E_MFA_TOTP_SECRET}/" .env
           docker compose up -d --build --wait --wait-timeout 600
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:

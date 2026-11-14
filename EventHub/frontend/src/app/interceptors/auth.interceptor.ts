@@ -7,7 +7,7 @@ import { environment } from '../../environments/environment';
 
 /** Only our own API gets the bearer token — never a third-party URL that
  *  merely contains "/api/" somewhere. */
-function isOwnApi(url: string): boolean {
+export function isOwnApi(url: string): boolean {
   return url.startsWith(`${environment.apiUrl}/`);
 }
 
@@ -18,6 +18,10 @@ function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // A request that brings its own credentials (the 2FA enrollment token) is
+  // sent as is: no stored token over it, no refresh on 401.
+  if (req.headers.has('Authorization')) return next(req);
+
   const authService = inject(AuthService);
   const router = inject(Router);
 

@@ -188,7 +188,8 @@ paths:
         Change password for authenticated users (old password required).
 
         Every other session is signed out; the response carries a fresh token
-        pair for the current device.
+        pair for the current device. With 2FA on, a recent second factor is
+        required (403 `mfa_step_up_required`).
       tags:
       - auth
       requestBody:
@@ -224,12 +225,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
   /api/v1/auth/login/:
     post:
       operationId: auth_login_create
       description: |-
-        Handles user login, supporting both username and email as identifiers.
-        Returns access and refresh JWT tokens on successful authentication.
+        Password step of the sign-in, with a username or an email as identifier.
+
+        Answers the JWT pair only for users who neither have nor need 2FA.
+        Otherwise: `mfa_required` + a short-lived challenge token (exchange it at
+        /auth/mfa/login/verify/), or `mfa_enrollment_required` + an
+        enrollment-scoped token for a user whose role must set up 2FA first.
       tags:
       - auth
       requestBody:
@@ -245,14 +256,13 @@ paths:
               $ref: '#/components/schemas/LoginRequest'
         required: true
       security:
-      - jwtAuth: []
       - {}
       responses:
         '200':
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthPayload'
+                $ref: '#/components/schemas/LoginResult'
           description: ''
         '400':
           content:
@@ -294,6 +304,770 @@ paths:
               schema:
                 $ref: '#/components/schemas/Message'
           description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+  /api/v1/auth/mfa/disable/:
+    post:
+      operationId: auth_mfa_disable_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MFAStatus'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/email/disable/:
+    post:
+      operationId: auth_mfa_email_disable_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MFAStatus'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/email/enable/:
+    post:
+      operationId: auth_mfa_email_enable_create
+      description: |-
+        Setup endpoints: a normal access token, or the enrollment token a
+        user who must enroll got at login. Adding a factor to an account that
+        already has one needs a fresh second factor (step-up).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CodeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CodeRequestRequest'
+        required: true
+      security:
+      - mfaEnrollmentToken: []
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactorAdded'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/email/send/:
+    post:
+      operationId: auth_mfa_email_send_create
+      description: Email a code to turn on email codes (enrollment) or for step-up.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EmailSendRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/EmailSendRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/EmailSendRequestRequest'
+        required: true
+      security:
+      - mfaEnrollmentToken: []
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailCodeSent'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+  /api/v1/auth/mfa/login/email/send/:
+    post:
+      operationId: auth_mfa_login_email_send_create
+      description: Answers the same whether or not the account has email codes turned
+        on (nothing is sent then). Limited to one sign-in code a minute and five an
+        hour per user (429 `mfa_email_throttled` with `retry_after`).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MFAChallengeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MFAChallengeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MFAChallengeRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailCodeSent'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+  /api/v1/auth/mfa/login/verify/:
+    post:
+      operationId: auth_mfa_login_verify_create
+      description: Exchange the login challenge token + one factor for the JWT pair.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MFALoginVerifyRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MFALoginVerifyRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MFALoginVerifyRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthPayload'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+  /api/v1/auth/mfa/login/webauthn/options/:
+    post:
+      operationId: auth_mfa_login_webauthn_options_create
+      description: Assertion options for the passkeys of the user behind a challenge
+        token.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MFAChallengeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/MFAChallengeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/MFAChallengeRequestRequest'
+        required: true
+      security:
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: WebAuthn options JSON for navigator.credentials (or @simplewebauthn/browser).
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/recovery-codes/regenerate/:
+    post:
+      operationId: auth_mfa_recovery_codes_regenerate_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecoveryCodes'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+  /api/v1/auth/mfa/status/:
+    get:
+      operationId: auth_mfa_status_retrieve
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MFAStatus'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+  /api/v1/auth/mfa/step-up/:
+    post:
+      operationId: auth_mfa_step_up_create
+      description: Prove a second factor again; returns an access token with a new
+        mfa_at.
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StepUpRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/StepUpRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/StepUpRequestRequest'
+        required: true
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StepUpResult'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '429':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+  /api/v1/auth/mfa/step-up/webauthn/options/:
+    post:
+      operationId: auth_mfa_step_up_webauthn_options_create
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: WebAuthn options JSON for navigator.credentials (or @simplewebauthn/browser).
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+  /api/v1/auth/mfa/totp/:
+    delete:
+      operationId: auth_mfa_totp_destroy
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MFAStatus'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/totp/confirm/:
+    post:
+      operationId: auth_mfa_totp_confirm_create
+      description: |-
+        Setup endpoints: a normal access token, or the enrollment token a
+        user who must enroll got at login. Adding a factor to an account that
+        already has one needs a fresh second factor (step-up).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CodeRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CodeRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CodeRequestRequest'
+        required: true
+      security:
+      - mfaEnrollmentToken: []
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactorAdded'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/totp/setup/:
+    post:
+      operationId: auth_mfa_totp_setup_create
+      description: |-
+        Setup endpoints: a normal access token, or the enrollment token a
+        user who must enroll got at login. Adding a factor to an account that
+        already has one needs a fresh second factor (step-up).
+      tags:
+      - auth
+      security:
+      - mfaEnrollmentToken: []
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TOTPSetupResult'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/webauthn/credentials/{id}/:
+    patch:
+      operationId: auth_mfa_webauthn_credentials_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPasskeyRenameRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPasskeyRenameRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPasskeyRenameRequestRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MFAStatus'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+    delete:
+      operationId: auth_mfa_webauthn_credentials_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: integer
+        required: true
+      tags:
+      - auth
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MFAStatus'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+        '404':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '409':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+  /api/v1/auth/mfa/webauthn/register/options/:
+    post:
+      operationId: auth_mfa_webauthn_register_options_create
+      description: |-
+        Setup endpoints: a normal access token, or the enrollment token a
+        user who must enroll got at login. Adding a factor to an account that
+        already has one needs a fresh second factor (step-up).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasskeyOptionsRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PasskeyOptionsRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PasskeyOptionsRequestRequest'
+      security:
+      - mfaEnrollmentToken: []
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: WebAuthn options JSON for navigator.credentials (or @simplewebauthn/browser).
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: The request was refused; see `error`.
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
+  /api/v1/auth/mfa/webauthn/register/verify/:
+    post:
+      operationId: auth_mfa_webauthn_register_verify_create
+      description: |-
+        Setup endpoints: a normal access token, or the enrollment token a
+        user who must enroll got at login. Adding a factor to an account that
+        already has one needs a fresh second factor (step-up).
+      tags:
+      - auth
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasskeyRegisterRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PasskeyRegisterRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PasskeyRegisterRequestRequest'
+        required: true
+      security:
+      - mfaEnrollmentToken: []
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FactorAdded'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with
+            retry_after), mfa_step_up_required.
         '401':
           content:
             application/json:
@@ -828,8 +1602,9 @@ paths:
   /api/v1/bookings/{id}/refund/:
     post:
       operationId: bookings_refund_create
-      description: POST /api/bookings/{id}/refund/  — the event team refunds one paid
-        group booking.
+      description: |-
+        POST /api/bookings/{id}/refund/  — the event team refunds one paid group
+        booking. Needs a recent second factor (step-up).
       parameters:
       - in: path
         name: id
@@ -876,7 +1651,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: The request was refused; see `error`.
+          description: Refused; `code` mfa_step_up_required asks for 2FA.
         '404':
           content:
             application/json:
@@ -2307,7 +3082,9 @@ paths:
   /api/v1/events/{id}/cancel-event/:
     post:
       operationId: events_cancel_event_create
-      description: 'Organizer cancels the event: refunds paid tickets, notifies attendees.'
+      description: |-
+        Organizer cancels the event: refunds paid tickets, notifies attendees.
+        Needs a recent second factor (step-up).
       parameters:
       - in: path
         name: id
@@ -2337,7 +3114,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: The request was refused; see `error`.
+          description: Refused; `code` mfa_step_up_required asks for 2FA.
         '401':
           content:
             application/json:
@@ -2393,7 +3170,9 @@ paths:
   /api/v1/events/{id}/export-attendees/:
     get:
       operationId: events_export_attendees_retrieve
-      description: CSV of all attendees for the organizer to download.
+      description: |-
+        CSV of all attendees for the organizer to download (personal data:
+        needs a recent second factor).
       parameters:
       - in: path
         name: id
@@ -2417,7 +3196,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: The request was refused; see `error`.
+          description: Refused; `code` mfa_step_up_required asks for 2FA.
         '401':
           content:
             application/json:
@@ -3428,7 +4207,9 @@ paths:
   /api/v1/payments/refund/{registration_id}/:
     post:
       operationId: payments_refund_create
-      description: Organizer refunds a registration's payment (full or partial).
+      description: |-
+        Organizer refunds a registration's payment (full or partial). Needs a
+        recent second factor (step-up).
       parameters:
       - in: path
         name: registration_id
@@ -3474,7 +4255,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: The request was refused; see `error`.
+          description: Refused; `code` mfa_step_up_required asks for 2FA.
         '404':
           content:
             application/json:
@@ -3775,7 +4556,9 @@ paths:
   /api/v1/refund-requests/{id}/resolve/:
     post:
       operationId: refund_requests_resolve_create
-      description: Organizer approves or rejects a refund request.
+      description: |-
+        Organizer approves or rejects a refund request. Approving moves money
+        and needs a recent second factor (step-up).
       parameters:
       - in: path
         name: id
@@ -3822,7 +4605,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-          description: The request was refused; see `error`.
+          description: Refused; `code` mfa_step_up_required asks for 2FA.
         '404':
           content:
             application/json:
@@ -5094,6 +5877,15 @@ components:
       required:
       - name
       - seat_id
+    CodeRequestRequest:
+      type: object
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 16
+      required:
+      - code
     DemandLevelEnum:
       enum:
       - free
@@ -5167,6 +5959,21 @@ components:
       required:
       - code
       - email
+    EmailCodeSent:
+      type: object
+      properties:
+        sent:
+          type: boolean
+        expires_in:
+          type: integer
+          description: Seconds the code stays valid.
+        resend_in:
+          type: integer
+          description: Seconds before another code can be requested.
+      required:
+      - expires_in
+      - resend_in
+      - sent
     EmailRequestRequest:
       type: object
       properties:
@@ -5176,6 +5983,19 @@ components:
           minLength: 1
       required:
       - email
+    EmailSendRequestRequest:
+      type: object
+      properties:
+        purpose:
+          allOf:
+          - $ref: '#/components/schemas/PurposeEnum'
+          description: |-
+            Sign-in codes are sent by POST /auth/mfa/login/email/send/.
+
+            * `enroll` - Turn on email codes (proves the mailbox)
+            * `step_up` - Confirm a sensitive action
+      required:
+      - purpose
     Error:
       type: object
       properties:
@@ -5725,6 +6545,33 @@ components:
       required:
       - message
       - status
+    FactorAdded:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        recovery_codes:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 'Only when this was the first factor: shown once, store them
+            safely.'
+        tokens:
+          allOf:
+          - $ref: '#/components/schemas/TokenPair'
+          nullable: true
+          description: 'Only for the first factor: a new pair (other sessions are
+            signed out).'
+        user:
+          allOf:
+          - $ref: '#/components/schemas/User'
+          nullable: true
+      required:
+      - enabled
+      - recovery_codes
+      - tokens
+      - user
     Favorite:
       type: object
       properties:
@@ -5810,6 +6657,11 @@ components:
       required:
       - password
       - username
+    LoginResult:
+      oneOf:
+      - $ref: '#/components/schemas/AuthPayload'
+      - $ref: '#/components/schemas/MFAChallenge'
+      - $ref: '#/components/schemas/MFAEnrollmentRequired'
     LogoutRequestRequest:
       type: object
       properties:
@@ -5817,6 +6669,133 @@ components:
           type: string
           minLength: 1
           description: Refresh token to revoke.
+    MFAChallenge:
+      type: object
+      properties:
+        mfa_required:
+          type: boolean
+        challenge_token:
+          type: string
+          description: Single-purpose, short-lived; not an access token.
+        methods:
+          type: array
+          items:
+            $ref: '#/components/schemas/MFAMethodEnum'
+        expires_in:
+          type: integer
+      required:
+      - challenge_token
+      - expires_in
+      - methods
+      - mfa_required
+    MFAChallengeRequestRequest:
+      type: object
+      properties:
+        challenge_token:
+          type: string
+          minLength: 1
+      required:
+      - challenge_token
+    MFAEnrollmentRequired:
+      type: object
+      properties:
+        mfa_enrollment_required:
+          type: boolean
+        enrollment_token:
+          type: string
+          description: Accepted by the 2FA setup endpoints only.
+        expires_in:
+          type: integer
+      required:
+      - enrollment_token
+      - expires_in
+      - mfa_enrollment_required
+    MFALoginVerifyRequestRequest:
+      type: object
+      properties:
+        method:
+          $ref: '#/components/schemas/MFAMethodEnum'
+        code:
+          type: string
+          description: TOTP code, email code or recovery code.
+          maxLength: 64
+        credential:
+          type: object
+          additionalProperties: {}
+          description: WebAuthn assertion (PublicKeyCredential JSON) for method=webauthn.
+        challenge_token:
+          type: string
+          minLength: 1
+      required:
+      - challenge_token
+      - method
+    MFAMethodEnum:
+      enum:
+      - totp
+      - webauthn
+      - recovery_code
+      - email
+      type: string
+      description: |-
+        * `totp` - Authenticator app code
+        * `webauthn` - Passkey / security key
+        * `recovery_code` - Recovery code
+        * `email` - Code sent by email
+    MFAStatus:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        required:
+          type: boolean
+          description: Your role must use two-factor authentication.
+        totp_enabled:
+          type: boolean
+        totp_confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+        email_enabled:
+          type: boolean
+          description: Codes sent to the account email are turned on.
+        email_confirmed_at:
+          type: string
+          format: date-time
+          nullable: true
+        email_allowed:
+          type: boolean
+          description: Email codes may serve as this account's second factor (deployment
+            policy).
+        passkeys:
+          type: array
+          items:
+            $ref: '#/components/schemas/Passkey'
+        recovery_codes_remaining:
+          type: integer
+        methods:
+          type: array
+          items:
+            type: string
+        step_up_max_age:
+          type: integer
+          description: Seconds a second-factor proof covers sensitive actions.
+        step_up_valid_until:
+          type: integer
+          nullable: true
+          description: Unix time until which the current token covers sensitive actions.
+      required:
+      - email_allowed
+      - email_confirmed_at
+      - email_enabled
+      - enabled
+      - methods
+      - passkeys
+      - recovery_codes_remaining
+      - required
+      - step_up_max_age
+      - step_up_valid_until
+      - totp_confirmed_at
+      - totp_enabled
     Message:
       type: object
       properties:
@@ -5867,11 +6846,13 @@ components:
       - event_cancelled
       - payment_failed
       - review_reminder
+      - security_alert
       type: string
       description: "* `ticket_purchased` - \U0001F3AB Ticket purchased\n* `event_reminder`
         - ⏰ Event reminder\n* `seat_available` - \U0001F4BA Seat available\n* `event_updated`
         - \U0001F4DD Event updated\n* `event_cancelled` - ❌ Event cancelled\n* `payment_failed`
-        - ⚠️ Payment failed\n* `review_reminder` - ⭐ Leave a review"
+        - ⚠️ Payment failed\n* `review_reminder` - ⭐ Leave a review\n* `security_alert`
+        - \U0001F510 Security alert"
     NullEnum:
       enum:
       - null
@@ -6257,6 +7238,47 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Webhook'
+    Passkey:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+        backed_up:
+          type: boolean
+          description: Synced passkey (e.g. iCloud Keychain, Google Password Manager).
+      required:
+      - backed_up
+      - created_at
+      - id
+      - last_used_at
+      - name
+    PasskeyOptionsRequestRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 64
+    PasskeyRegisterRequestRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 64
+        credential:
+          type: object
+          additionalProperties: {}
+          description: Attestation (PublicKeyCredential JSON).
+      required:
+      - credential
     PasswordResetConfirmRequest:
       type: object
       properties:
@@ -6409,6 +7431,13 @@ components:
           type: string
           writeOnly: true
           minLength: 1
+    PatchedPasskeyRenameRequestRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
     PatchedPromoCodeRequest:
       type: object
       properties:
@@ -6819,6 +7848,14 @@ components:
         * `freedompay` - Freedom Pay
         * `mock` - Mock (development only)
         * `offline` - Offline / manual
+    PurposeEnum:
+      enum:
+      - enroll
+      - step_up
+      type: string
+      description: |-
+        * `enroll` - Turn on email codes (proves the mailbox)
+        * `step_up` - Confirm a sensitive action
     QuestionTypeEnum:
       enum:
       - text
@@ -6883,6 +7920,15 @@ components:
         * `3` - 3
         * `4` - 4
         * `5` - 5
+    RecoveryCodes:
+      type: object
+      properties:
+        recovery_codes:
+          type: array
+          items:
+            type: string
+      required:
+      - recovery_codes
     RefundRequest:
       type: object
       properties:
@@ -7407,6 +8453,49 @@ components:
           description: Local development only (DEBUG with the console email backend).
       required:
       - message
+    StepUpRequestRequest:
+      type: object
+      properties:
+        method:
+          $ref: '#/components/schemas/MFAMethodEnum'
+        code:
+          type: string
+          description: TOTP code, email code or recovery code.
+          maxLength: 64
+        credential:
+          type: object
+          additionalProperties: {}
+          description: WebAuthn assertion (PublicKeyCredential JSON) for method=webauthn.
+      required:
+      - method
+    StepUpResult:
+      type: object
+      properties:
+        access:
+          type: string
+          description: New access token; send it from now on.
+        mfa_at:
+          type: integer
+          description: Unix time of this proof.
+        valid_until:
+          type: integer
+          description: Unix time until which sensitive actions need no new proof.
+      required:
+      - access
+      - mfa_at
+      - valid_until
+    TOTPSetupResult:
+      type: object
+      properties:
+        secret:
+          type: string
+          description: Base32 secret for manual entry; shown during setup only.
+        otpauth_uri:
+          type: string
+          description: otpauth:// URI for the QR code.
+      required:
+      - otpauth_uri
+      - secret
     TicketCheckInResult:
       type: object
       properties:
@@ -7921,3 +9010,9 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    mfaEnrollmentToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 'The `enrollment_token` from POST /auth/login/ (`mfa_enrollment_required`):
+        accepted by the 2FA setup endpoints only.'

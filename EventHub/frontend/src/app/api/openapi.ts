@@ -73,7 +73,8 @@ export interface paths {
          * @description Change password for authenticated users (old password required).
          *
          *     Every other session is signed out; the response carries a fresh token
-         *     pair for the current device.
+         *     pair for the current device. With 2FA on, a recent second factor is
+         *     required (403 `mfa_step_up_required`).
          */
         post: operations["auth_change_password_create"];
         delete?: never;
@@ -92,8 +93,12 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * @description Handles user login, supporting both username and email as identifiers.
-         *     Returns access and refresh JWT tokens on successful authentication.
+         * @description Password step of the sign-in, with a username or an email as identifier.
+         *
+         *     Answers the JWT pair only for users who neither have nor need 2FA.
+         *     Otherwise: `mfa_required` + a short-lived challenge token (exchange it at
+         *     /auth/mfa/login/verify/), or `mfa_enrollment_required` + an
+         *     enrollment-scoped token for a user whose role must set up 2FA first.
          */
         post: operations["auth_login_create"];
         delete?: never;
@@ -113,6 +118,308 @@ export interface paths {
         put?: never;
         /** @description Blacklists the user's refresh token to sign out. */
         post: operations["auth_logout_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/disable/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["auth_mfa_disable_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/email/disable/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["auth_mfa_email_disable_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/email/enable/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Setup endpoints: a normal access token, or the enrollment token a
+         *     user who must enroll got at login. Adding a factor to an account that
+         *     already has one needs a fresh second factor (step-up).
+         */
+        post: operations["auth_mfa_email_enable_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/email/send/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Email a code to turn on email codes (enrollment) or for step-up. */
+        post: operations["auth_mfa_email_send_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/login/email/send/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Answers the same whether or not the account has email codes turned on (nothing is sent then). Limited to one sign-in code a minute and five an hour per user (429 `mfa_email_throttled` with `retry_after`). */
+        post: operations["auth_mfa_login_email_send_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/login/verify/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Exchange the login challenge token + one factor for the JWT pair. */
+        post: operations["auth_mfa_login_verify_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/login/webauthn/options/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Assertion options for the passkeys of the user behind a challenge token. */
+        post: operations["auth_mfa_login_webauthn_options_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/recovery-codes/regenerate/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["auth_mfa_recovery_codes_regenerate_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["auth_mfa_status_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/step-up/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Prove a second factor again; returns an access token with a new mfa_at. */
+        post: operations["auth_mfa_step_up_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/step-up/webauthn/options/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["auth_mfa_step_up_webauthn_options_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/totp/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["auth_mfa_totp_destroy"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/totp/confirm/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Setup endpoints: a normal access token, or the enrollment token a
+         *     user who must enroll got at login. Adding a factor to an account that
+         *     already has one needs a fresh second factor (step-up).
+         */
+        post: operations["auth_mfa_totp_confirm_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/totp/setup/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Setup endpoints: a normal access token, or the enrollment token a
+         *     user who must enroll got at login. Adding a factor to an account that
+         *     already has one needs a fresh second factor (step-up).
+         */
+        post: operations["auth_mfa_totp_setup_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/webauthn/credentials/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["auth_mfa_webauthn_credentials_destroy"];
+        options?: never;
+        head?: never;
+        patch: operations["auth_mfa_webauthn_credentials_partial_update"];
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/webauthn/register/options/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Setup endpoints: a normal access token, or the enrollment token a
+         *     user who must enroll got at login. Adding a factor to an account that
+         *     already has one needs a fresh second factor (step-up).
+         */
+        post: operations["auth_mfa_webauthn_register_options_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/mfa/webauthn/register/verify/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Setup endpoints: a normal access token, or the enrollment token a
+         *     user who must enroll got at login. Adding a factor to an account that
+         *     already has one needs a fresh second factor (step-up).
+         */
+        post: operations["auth_mfa_webauthn_register_verify_create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -363,7 +670,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description POST /api/bookings/{id}/refund/  — the event team refunds one paid group booking. */
+        /**
+         * @description POST /api/bookings/{id}/refund/  — the event team refunds one paid group
+         *     booking. Needs a recent second factor (step-up).
+         */
         post: operations["bookings_refund_create"];
         delete?: never;
         options?: never;
@@ -868,7 +1178,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Organizer cancels the event: refunds paid tickets, notifies attendees. */
+        /**
+         * @description Organizer cancels the event: refunds paid tickets, notifies attendees.
+         *     Needs a recent second factor (step-up).
+         */
         post: operations["events_cancel_event_create"];
         delete?: never;
         options?: never;
@@ -900,7 +1213,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description CSV of all attendees for the organizer to download. */
+        /**
+         * @description CSV of all attendees for the organizer to download (personal data:
+         *     needs a recent second factor).
+         */
         get: operations["events_export_attendees_retrieve"];
         put?: never;
         post?: never;
@@ -1346,7 +1662,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Organizer refunds a registration's payment (full or partial). */
+        /**
+         * @description Organizer refunds a registration's payment (full or partial). Needs a
+         *     recent second factor (step-up).
+         */
         post: operations["payments_refund_create"];
         delete?: never;
         options?: never;
@@ -1450,7 +1769,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Organizer approves or rejects a refund request. */
+        /**
+         * @description Organizer approves or rejects a refund request. Approving moves money
+         *     and needs a recent second factor (step-up).
+         */
         post: operations["refund_requests_resolve_create"];
         delete?: never;
         options?: never;
@@ -1904,6 +2226,9 @@ export interface components {
             seat_id: number;
             name: string;
         };
+        CodeRequestRequest: {
+            code: string;
+        };
         /**
          * @description * `free` - free
          *     * `low` - low
@@ -1944,9 +2269,25 @@ export interface components {
             email: string;
             code: string;
         };
+        EmailCodeSent: {
+            sent: boolean;
+            /** @description Seconds the code stays valid. */
+            expires_in: number;
+            /** @description Seconds before another code can be requested. */
+            resend_in: number;
+        };
         EmailRequestRequest: {
             /** Format: email */
             email: string;
+        };
+        EmailSendRequestRequest: {
+            /**
+             * @description Sign-in codes are sent by POST /auth/mfa/login/email/send/.
+             *
+             *     * `enroll` - Turn on email codes (proves the mailbox)
+             *     * `step_up` - Confirm a sensitive action
+             */
+            purpose: components["schemas"]["PurposeEnum"];
         };
         Error: {
             /** @description Human-readable message; may change. */
@@ -2163,6 +2504,14 @@ export interface components {
             message: string;
             status: components["schemas"]["EventStatusEnum"];
         };
+        FactorAdded: {
+            enabled: boolean;
+            /** @description Only when this was the first factor: shown once, store them safely. */
+            recovery_codes: string[] | null;
+            /** @description Only for the first factor: a new pair (other sessions are signed out). */
+            tokens: components["schemas"]["TokenPair"] | null;
+            user: components["schemas"]["User"] | null;
+        };
         Favorite: {
             readonly id: number;
             readonly event: components["schemas"]["EventList"];
@@ -2196,9 +2545,65 @@ export interface components {
             username: string;
             password: string;
         };
+        LoginResult: components["schemas"]["AuthPayload"] | components["schemas"]["MFAChallenge"] | components["schemas"]["MFAEnrollmentRequired"];
         LogoutRequestRequest: {
             /** @description Refresh token to revoke. */
             refresh?: string;
+        };
+        MFAChallenge: {
+            mfa_required: boolean;
+            /** @description Single-purpose, short-lived; not an access token. */
+            challenge_token: string;
+            methods: components["schemas"]["MFAMethodEnum"][];
+            expires_in: number;
+        };
+        MFAChallengeRequestRequest: {
+            challenge_token: string;
+        };
+        MFAEnrollmentRequired: {
+            mfa_enrollment_required: boolean;
+            /** @description Accepted by the 2FA setup endpoints only. */
+            enrollment_token: string;
+            expires_in: number;
+        };
+        MFALoginVerifyRequestRequest: {
+            method: components["schemas"]["MFAMethodEnum"];
+            /** @description TOTP code, email code or recovery code. */
+            code?: string;
+            /** @description WebAuthn assertion (PublicKeyCredential JSON) for method=webauthn. */
+            credential?: {
+                [key: string]: unknown;
+            };
+            challenge_token: string;
+        };
+        /**
+         * @description * `totp` - Authenticator app code
+         *     * `webauthn` - Passkey / security key
+         *     * `recovery_code` - Recovery code
+         *     * `email` - Code sent by email
+         * @enum {string}
+         */
+        MFAMethodEnum: "totp" | "webauthn" | "recovery_code" | "email";
+        MFAStatus: {
+            enabled: boolean;
+            /** @description Your role must use two-factor authentication. */
+            required: boolean;
+            totp_enabled: boolean;
+            /** Format: date-time */
+            totp_confirmed_at: string | null;
+            /** @description Codes sent to the account email are turned on. */
+            email_enabled: boolean;
+            /** Format: date-time */
+            email_confirmed_at: string | null;
+            /** @description Email codes may serve as this account's second factor (deployment policy). */
+            email_allowed: boolean;
+            passkeys: components["schemas"]["Passkey"][];
+            recovery_codes_remaining: number;
+            methods: string[];
+            /** @description Seconds a second-factor proof covers sensitive actions. */
+            step_up_max_age: number;
+            /** @description Unix time until which the current token covers sensitive actions. */
+            step_up_valid_until: number | null;
         };
         Message: {
             message: string;
@@ -2221,9 +2626,10 @@ export interface components {
          *     * `event_cancelled` - ❌ Event cancelled
          *     * `payment_failed` - ⚠️ Payment failed
          *     * `review_reminder` - ⭐ Leave a review
+         *     * `security_alert` - 🔐 Security alert
          * @enum {string}
          */
-        NotificationTypeEnum: "ticket_purchased" | "event_reminder" | "seat_available" | "event_updated" | "event_cancelled" | "payment_failed" | "review_reminder";
+        NotificationTypeEnum: "ticket_purchased" | "event_reminder" | "seat_available" | "event_updated" | "event_cancelled" | "payment_failed" | "review_reminder" | "security_alert";
         /** @enum {unknown} */
         NullEnum: null;
         OfflinePaymentRequestRequest: {
@@ -2454,6 +2860,26 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Webhook"][];
         };
+        Passkey: {
+            id: number;
+            name: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at: string | null;
+            /** @description Synced passkey (e.g. iCloud Keychain, Google Password Manager). */
+            backed_up: boolean;
+        };
+        PasskeyOptionsRequestRequest: {
+            name?: string;
+        };
+        PasskeyRegisterRequestRequest: {
+            name?: string;
+            /** @description Attestation (PublicKeyCredential JSON). */
+            credential: {
+                [key: string]: unknown;
+            };
+        };
         PasswordResetConfirmRequest: {
             reset_token: string;
             new_password: string;
@@ -2520,6 +2946,9 @@ export interface components {
         PatchedEventStaffRequest: {
             role?: components["schemas"]["EventStaffRoleEnum"];
             invite_username?: string;
+        };
+        PatchedPasskeyRenameRequestRequest: {
+            name?: string;
         };
         PatchedPromoCodeRequest: {
             /** @description Case-insensitive code attendees type at checkout */
@@ -2707,6 +3136,12 @@ export interface components {
          */
         ProviderEnum: "stripe" | "freedompay" | "mock" | "offline";
         /**
+         * @description * `enroll` - Turn on email codes (proves the mailbox)
+         *     * `step_up` - Confirm a sensitive action
+         * @enum {string}
+         */
+        PurposeEnum: "enroll" | "step_up";
+        /**
          * @description * `text` - Short text
          *     * `textarea` - Long text
          *     * `dropdown` - Dropdown
@@ -2745,6 +3180,9 @@ export interface components {
          * @enum {integer}
          */
         RatingEnum: 1 | 2 | 3 | 4 | 5;
+        RecoveryCodes: {
+            recovery_codes: string[];
+        };
         RefundRequest: {
             readonly id: number;
             readonly username: string;
@@ -2944,6 +3382,29 @@ export interface components {
             message: string;
             /** @description Local development only (DEBUG with the console email backend). */
             dev_code?: string;
+        };
+        StepUpRequestRequest: {
+            method: components["schemas"]["MFAMethodEnum"];
+            /** @description TOTP code, email code or recovery code. */
+            code?: string;
+            /** @description WebAuthn assertion (PublicKeyCredential JSON) for method=webauthn. */
+            credential?: {
+                [key: string]: unknown;
+            };
+        };
+        StepUpResult: {
+            /** @description New access token; send it from now on. */
+            access: string;
+            /** @description Unix time of this proof. */
+            mfa_at: number;
+            /** @description Unix time until which sensitive actions need no new proof. */
+            valid_until: number;
+        };
+        TOTPSetupResult: {
+            /** @description Base32 secret for manual entry; shown during setup only. */
+            secret: string;
+            /** @description otpauth:// URI for the QR code. */
+            otpauth_uri: string;
         };
         TicketCheckInResult: {
             message: string;
@@ -3390,6 +3851,15 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
+            /** @description The request was refused; see `error`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     auth_login_create: {
@@ -3412,7 +3882,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AuthPayload"];
+                    "application/json": components["schemas"]["LoginResult"];
                 };
             };
             /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */
@@ -3458,6 +3928,907 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Message"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    auth_mfa_disable_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_email_disable_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_email_enable_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CodeRequestRequest"];
+                "multipart/form-data": components["schemas"]["CodeRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorAdded"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_email_send_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmailSendRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["EmailSendRequestRequest"];
+                "multipart/form-data": components["schemas"]["EmailSendRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailCodeSent"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_login_email_send_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MFAChallengeRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["MFAChallengeRequestRequest"];
+                "multipart/form-data": components["schemas"]["MFAChallengeRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmailCodeSent"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_login_verify_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MFALoginVerifyRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["MFALoginVerifyRequestRequest"];
+                "multipart/form-data": components["schemas"]["MFALoginVerifyRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthPayload"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_login_webauthn_options_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MFAChallengeRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["MFAChallengeRequestRequest"];
+                "multipart/form-data": components["schemas"]["MFAChallengeRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description WebAuthn options JSON for navigator.credentials (or @simplewebauthn/browser). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_recovery_codes_regenerate_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecoveryCodes"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_status_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    auth_mfa_step_up_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StepUpRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["StepUpRequestRequest"];
+                "multipart/form-data": components["schemas"]["StepUpRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepUpResult"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_step_up_webauthn_options_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description WebAuthn options JSON for navigator.credentials (or @simplewebauthn/browser). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    auth_mfa_totp_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_totp_confirm_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CodeRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CodeRequestRequest"];
+                "multipart/form-data": components["schemas"]["CodeRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorAdded"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_totp_setup_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TOTPSetupResult"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_webauthn_credentials_destroy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_webauthn_credentials_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PatchedPasskeyRenameRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PatchedPasskeyRenameRequestRequest"];
+                "multipart/form-data": components["schemas"]["PatchedPasskeyRenameRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MFAStatus"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_webauthn_register_options_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["PasskeyOptionsRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PasskeyOptionsRequestRequest"];
+                "multipart/form-data": components["schemas"]["PasskeyOptionsRequestRequest"];
+            };
+        };
+        responses: {
+            /** @description WebAuthn options JSON for navigator.credentials (or @simplewebauthn/browser). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description The request was refused; see `error`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    auth_mfa_webauthn_register_verify_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PasskeyRegisterRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["PasskeyRegisterRequestRequest"];
+                "multipart/form-data": components["schemas"]["PasskeyRegisterRequestRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FactorAdded"];
+                };
+            };
+            /** @description Refused; `code` is e.g. mfa_invalid, mfa_locked (429, with retry_after), mfa_step_up_required. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Missing or invalid access token. */
@@ -4092,7 +5463,7 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
-            /** @description The request was refused; see `error`. */
+            /** @description Refused; `code` mfa_step_up_required asks for 2FA. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5527,7 +6898,7 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
-            /** @description The request was refused; see `error`. */
+            /** @description Refused; `code` mfa_step_up_required asks for 2FA. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5626,7 +6997,7 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
-            /** @description The request was refused; see `error`. */
+            /** @description Refused; `code` mfa_step_up_required asks for 2FA. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6827,7 +8198,7 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
-            /** @description The request was refused; see `error`. */
+            /** @description Refused; `code` mfa_step_up_required asks for 2FA. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7190,7 +8561,7 @@ export interface operations {
                     "application/json": components["schemas"]["Detail"];
                 };
             };
-            /** @description The request was refused; see `error`. */
+            /** @description Refused; `code` mfa_step_up_required asks for 2FA. */
             403: {
                 headers: {
                     [name: string]: unknown;
