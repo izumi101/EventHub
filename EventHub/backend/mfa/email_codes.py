@@ -3,8 +3,10 @@
 A 6-digit code is emailed for one purpose (sign-in, step-up, enrollment),
 lives MFA_EMAIL_CODE_TTL_SECONDS, allows MFA_EMAIL_CODE_MAX_ATTEMPTS guesses
 and works once. Only an HMAC of the code is stored. Sending a new code for a
-purpose retires the previous one; sending is limited per user (one a minute,
-a few an hour) so the endpoint can't be used to flood a mailbox. The email
+purpose retires the previous one; sending is limited per user and purpose
+(one a minute, a few an hour) so the endpoint can't be used to flood a
+mailbox, while finishing one flow (e.g. enrollment) never blocks the next
+(the sign-in right after it). The email
 leaves through the outbox (jobs.handlers.enqueue_email), never from the
 request.
 """
@@ -57,9 +59,11 @@ def ttl_seconds() -> int:
     return int(settings.MFA_EMAIL_CODE_TTL_SECONDS)
 
 
-def _retry_after(user, now) -> int:
-    """Seconds until the user may get another code (0 = now)."""
-    recent = EmailCode.objects.filter(user=user, created_at__gt=now - timedelta(hours=1)).order_by('-created_at')
+def _retry_after(user, purpose: str, now) -> int:
+    """Seconds until the user may get another code for `purpose` (0 = now)."""
+    recent = EmailCode.objects.filter(user=user, purpose=purpose, created_at__gt=now - timedelta(hours=1)).order_by(
+        '-created_at'
+    )
     times = list(recent.values_list('created_at', flat=True)[: int(settings.MFA_EMAIL_MAX_PER_HOUR)])
     wait = 0
     if times:
@@ -84,7 +88,7 @@ def send(user, purpose: str, *, request=None, deliver: bool = True) -> dict:
         # One row lock per user serialises concurrent sends, so the limits hold.
         MFAState.objects.select_for_update().get_or_create(user=user)
         now = timezone.now()
-        wait = _retry_after(user, now)
+        wait = _retry_after(user, purpose, now)
         if wait:
             raise MFAError(
                 f'A code was sent recently. You can ask for a new one in {wait} seconds.',

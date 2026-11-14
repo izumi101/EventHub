@@ -49,7 +49,8 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f'2FA reset for {user.username}: removed {removed["totp"]} authenticator app(s), '
-                f'{removed["passkeys"]} passkey(s), {removed["recovery_codes"]} recovery code(s); '
+                f'{removed["passkeys"]} passkey(s), {removed["email"]} email factor(s), '
+                f'{removed["recovery_codes"]} recovery code(s); '
                 'all sessions signed out.'
             )
         )
