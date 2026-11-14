@@ -6,25 +6,37 @@ import { ToastService } from '../../services/toast.service';
 import { LucideAngularModule, Users, Copy, Check, Clock, Armchair, Ticket } from 'lucide-angular';
 import * as QRCode from 'qrcode';
 import { DialogDirective } from '../../directives/dialog.directive';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-my-bookings',
   standalone: true,
-  imports: [DialogDirective, CommonModule, RouterModule, LucideAngularModule],
+  imports: [
+    DialogDirective,
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
         <div class="mb-7">
-          <h1 class="text-2xl font-bold text-foreground">My Bookings</h1>
+          <h1 class="text-2xl font-bold text-foreground">
+            {{ 'myBookings.myBookings' | transloco }}
+          </h1>
           <p class="text-sm text-muted-foreground mt-1">
-            Group seat reservations you own — each seat is its own ticket
+            {{ 'myBookings.groupSeatReservationsYou' | transloco }}
           </p>
         </div>
 
         @if (loading) {
           <div class="flex items-center justify-center py-20 gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading bookings…</span>
+            <span class="text-sm">{{ 'myBookings.loadingBookings' | transloco }}</span>
           </div>
         } @else if (bookings.length === 0) {
           <div class="flex flex-col items-center justify-center py-20 text-center">
@@ -33,11 +45,15 @@ import { DialogDirective } from '../../directives/dialog.directive';
             >
               <lucide-icon [img]="icons.Users" class="w-8 h-8 text-primary/50" aria-hidden="true" />
             </div>
-            <h3 class="text-base font-semibold text-foreground mb-1">No group bookings</h3>
+            <h3 class="text-base font-semibold text-foreground mb-1">
+              {{ 'myBookings.noGroupBookings' | transloco }}
+            </h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
-              Book several seats at once from an event page and they'll appear here.
+              {{ 'myBookings.bookSeveralSeatsAt' | transloco }}
             </p>
-            <a routerLink="/" class="btn btn-primary btn-sm">Discover events</a>
+            <a routerLink="/" class="btn btn-primary btn-sm">{{
+              'favorites.discoverEvents' | transloco
+            }}</a>
           </div>
         } @else {
           <div class="space-y-5">
@@ -52,10 +68,19 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       {{ b.event_title }}
                     </a>
                     <p class="text-xs text-muted-foreground mt-0.5">
-                      {{ b.event_date | date: 'EEE, MMM d, y · h:mm a' }} · {{ b.event_location }}
+                      {{ b.event_date | localDate: 'EEE, MMM d, y · h:mm a' }} ·
+                      {{ b.event_location }}
                     </p>
                     <p class="text-xs text-muted-foreground mt-1">
-                      {{ b.seat_count }} seats · {{ b.total_due }} {{ b.currency }}
+                      {{
+                        'myBookings.seatcountSeatsTotaldueCurrency'
+                          | transloco
+                            : {
+                                seatCount: b.seat_count,
+                                totalDue: b.total_due,
+                                currency: b.currency,
+                              }
+                      }}
                     </p>
                   </div>
                   <span
@@ -77,13 +102,15 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] text-warning text-xs mb-3"
                     >
                       <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
-                      Seats are held until {{ b.hold_expires_at | date: 'h:mm a' }} — complete the
-                      payment from the event page.
+                      {{
+                        'myBookings.seatsAreHeldUntil'
+                          | transloco: { holdExpiresAt: (b.hold_expires_at | localDate: 'h:mm a') }
+                      }}
                     </div>
                     <label
                       [attr.for]="'share-' + b.id"
                       class="block text-xs font-medium text-muted-foreground mb-1.5"
-                      >Invite friends to claim their seats</label
+                      >{{ 'myBookings.inviteFriendsToClaim' | transloco }}</label
                     >
                     <div class="flex gap-2">
                       <input
@@ -113,7 +140,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                       </div>
                       <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-foreground">
-                          Row {{ s.row }}, Seat {{ s.col }}
+                          {{ 'bookingClaim.rowRowSeatCol' | transloco: { row: s.row, col: s.col } }}
                           <span class="text-xs font-normal text-muted-foreground capitalize"
                             >· {{ s.zone }} · {{ s.price }} {{ b.currency }}</span
                           >
@@ -126,11 +153,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
                               : 'text-muted-foreground'
                           "
                         >
-                          {{ s.attendee_name || 'Unclaimed' }}
+                          {{ s.attendee_name || ('bookingClaim.unclaimed' | transloco) }}
                           @if (s.is_checked_in) {
-                            <span class="text-[color:var(--pine-600)] font-medium"
-                              >· checked in</span
-                            >
+                            <span class="text-[color:var(--pine-600)] font-medium">{{
+                              'myBookings.checkedIn' | transloco
+                            }}</span>
                           }
                         </p>
                       </div>
@@ -139,7 +166,7 @@ import { DialogDirective } from '../../directives/dialog.directive';
                           <button
                             class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in"
                             (click)="zoomSeat = s"
-                            title="Tap to enlarge"
+                            [title]="'myBookings.tapToEnlarge' | transloco"
                           >
                             <img [src]="qrCodes[s.ticket_uuid]" alt="QR" class="w-14 h-14 block" />
                           </button>
@@ -155,12 +182,11 @@ import { DialogDirective } from '../../directives/dialog.directive';
                   <div class="px-5 py-3 border-t border-border bg-muted/30">
                     <p class="text-xs text-muted-foreground flex items-center gap-1.5">
                       <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5" />
-                      Each seat has its own QR ticket — share the invite link and friends see theirs
-                      too.
+                      {{ 'myBookings.eachSeatHasIts' | transloco }}
                     </p>
                     <div class="flex gap-2 mt-2">
                       <input
-                        aria-label="Invite link"
+                        [attr.aria-label]="'myBookings.inviteLink' | transloco"
                         readonly
                         [value]="shareUrl(b)"
                         class="input flex-1 text-xs"
@@ -193,26 +219,36 @@ import { DialogDirective } from '../../directives/dialog.directive';
           (dismiss)="zoomSeat = null"
         >
           <h3 class="text-base font-bold text-foreground leading-tight">
-            Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}
+            {{ 'bookingClaim.rowRowSeatCol' | transloco: { row: zoomSeat.row, col: zoomSeat.col } }}
           </h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">
-            {{ zoomSeat.attendee_name || 'Unclaimed seat' }} — show at the entrance
+            {{
+              'bookingClaim.attendeenameShowAtThe'
+                | transloco: { attendeeName: zoomSeat.attendee_name || 'Unclaimed seat' }
+            }}
           </p>
           @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
             <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
-              <img [src]="qrCodes[zoomSeat.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
+              <img
+                [src]="qrCodes[zoomSeat.ticket_uuid]"
+                [alt]="'bookingClaim.ticketQrCode' | transloco"
+                class="w-56 h-56"
+              />
             </div>
           }
           <p class="text-sm font-mono font-semibold text-foreground tracking-wider mt-4">
             #{{ (zoomSeat.ticket_uuid || '').substring(0, 8).toUpperCase() }}
           </p>
-          <button (click)="zoomSeat = null" class="btn btn-secondary btn-full mt-5">Close</button>
+          <button (click)="zoomSeat = null" class="btn btn-secondary btn-full mt-5">
+            {{ 'common.close' | transloco }}
+          </button>
         </div>
       </div>
     }
   `,
 })
 export class MyBookingsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private bookingService = inject(BookingService);
   private toast = inject(ToastService);
 
@@ -234,7 +270,7 @@ export class MyBookingsComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
-        this.toast.error('Failed to load bookings.');
+        this.toast.error(this.i18n.t('myBookings.failedToLoadBookings'));
       },
     });
   }

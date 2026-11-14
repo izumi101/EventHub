@@ -6,27 +6,30 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { Event, Registration } from '../../models/models';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe, LocalNumberPipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 /** Reviews block on the event page: list, average rating and the
  *  "write a review" form (confirmed attendees, after the event starts). */
 @Component({
   selector: 'app-event-reviews',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslocoPipe, LocalDatePipe, LocalNumberPipe],
   template: `
     <div>
       <div class="flex items-center justify-between mb-4">
         <h2 class="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          Reviews
+          {{ 'reviews.reviews' | transloco }}
           @if (reviews.length > 0) {
             <span class="ml-2 text-foreground normal-case font-bold">
-              {{ avgRating | number: '1.1-1' }} ★ ({{ reviews.length }})
+              {{ avgRating | localNumber: '1.1-1' }} ★ ({{ reviews.length }})
             </span>
           }
         </h2>
         @if (canReview) {
           <button (click)="showReviewForm = !showReviewForm" class="btn btn-sm btn-secondary">
-            Write a review
+            {{ 'reviews.writeAReview' | transloco }}
           </button>
         }
       </div>
@@ -47,7 +50,7 @@ import { apiErrorMessage } from '../../api/api-error';
           </div>
           <textarea
             [(ngModel)]="reviewComment"
-            placeholder="Share your experience..."
+            [placeholder]="'reviews.shareYourExperience' | transloco"
             rows="3"
             class="input resize-none mb-3"
           ></textarea>
@@ -57,10 +60,10 @@ import { apiErrorMessage } from '../../api/api-error';
               [disabled]="!reviewRating || submittingReview"
               class="btn btn-sm btn-primary"
             >
-              {{ submittingReview ? 'Posting...' : 'Post review' }}
+              {{ (submittingReview ? 'reviews.posting' : 'reviews.postReview') | transloco }}
             </button>
             <button (click)="showReviewForm = false" class="btn btn-sm btn-secondary">
-              Cancel
+              {{ 'common.cancel' | transloco }}
             </button>
           </div>
         </div>
@@ -68,7 +71,7 @@ import { apiErrorMessage } from '../../api/api-error';
 
       <!-- Reviews list -->
       @if (reviews.length === 0) {
-        <p class="text-sm text-muted-foreground py-4">No reviews yet. Be the first!</p>
+        <p class="text-sm text-muted-foreground py-4">{{ 'reviews.noReviewsYetBe' | transloco }}</p>
       } @else {
         <div class="space-y-4">
           @for (review of reviews; track review.id) {
@@ -85,7 +88,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     >{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span
                   >
                   <span class="text-xs text-muted-foreground">{{
-                    review.created_at | date: 'MMM d, y'
+                    review.created_at | localDate: 'MMM d, y'
                   }}</span>
                 </div>
                 @if (review.comment) {
@@ -100,6 +103,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class EventReviewsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private authService = inject(AuthService);
   private toastService = inject(ToastService);
@@ -161,10 +165,12 @@ export class EventReviewsComponent implements OnInit {
         this.reviewRating = 0;
         this.reviewComment = '';
         this.submittingReview = false;
-        this.toastService.success('Review posted!');
+        this.toastService.success(this.i18n.t('reviews.reviewPosted'));
       },
       error: (err) => {
-        this.toastService.error(apiErrorMessage(err, 'Failed to post review', 'non_field_errors'));
+        this.toastService.error(
+          apiErrorMessage(err, this.i18n.t('reviews.failedToPostReview'), 'non_field_errors'),
+        );
         this.submittingReview = false;
       },
     });
