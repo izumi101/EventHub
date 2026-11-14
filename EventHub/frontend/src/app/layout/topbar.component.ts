@@ -8,16 +8,28 @@ import { AuthService } from '../services/auth.service';
 import { NotificationService } from '../services/notification.service';
 import { User } from '../models/models';
 import { LucideAngularModule, Menu, Bell, ChevronRight } from 'lucide-angular';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
+import { LocalDatePipe } from '../i18n/locale.pipes';
 
 interface Crumb {
-  label: string;
+  /** Event titles are data, everything else is a translation key. */
+  label?: string;
+  labelKey?: string;
   route?: string;
 }
 
 @Component({
   selector: 'app-topbar',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LanguageSwitcherComponent,
+    LocalDatePipe,
+  ],
   template: `
     <header class="topbar">
       <div class="topbar-inner">
@@ -26,7 +38,7 @@ interface Crumb {
           <button
             (click)="layout.toggleMobile()"
             class="topbar-icon-btn focus-ring"
-            aria-label="Open navigation"
+            [attr.aria-label]="'nav.openNavigation' | transloco"
           >
             <lucide-icon [img]="icons.Menu" class="w-5 h-5" aria-hidden="true" />
           </button>
@@ -37,7 +49,10 @@ interface Crumb {
         </div>
 
         <!-- Desktop: breadcrumbs -->
-        <nav class="hidden md:flex items-center gap-1 text-sm min-w-0" aria-label="Breadcrumb">
+        <nav
+          class="hidden md:flex items-center gap-1 text-sm min-w-0"
+          [attr.aria-label]="'nav.breadcrumb' | transloco"
+        >
           @for (crumb of breadcrumbs; track $index) {
             @if (!$last) {
               @if (crumb.route) {
@@ -45,10 +60,12 @@ interface Crumb {
                   [routerLink]="crumb.route"
                   class="text-muted-foreground hover:text-foreground transition-colors truncate max-w-[180px] focus-ring rounded"
                 >
-                  {{ crumb.label }}
+                  {{ crumb.labelKey ? (crumb.labelKey | transloco) : crumb.label }}
                 </a>
               } @else {
-                <span class="text-muted-foreground truncate max-w-[180px]">{{ crumb.label }}</span>
+                <span class="text-muted-foreground truncate max-w-[180px]">{{
+                  crumb.labelKey ? (crumb.labelKey | transloco) : crumb.label
+                }}</span>
               }
               <lucide-icon
                 [img]="icons.ChevronRight"
@@ -57,7 +74,7 @@ interface Crumb {
               />
             } @else {
               <span class="font-medium text-foreground truncate max-w-[220px]">{{
-                crumb.label
+                crumb.labelKey ? (crumb.labelKey | transloco) : crumb.label
               }}</span>
             }
           }
@@ -67,13 +84,15 @@ interface Crumb {
 
         <!-- Right side: ⌘K stub + bell -->
         <div class="topbar-actions">
+          <app-language-switcher />
+
           <!-- ⌘K search stub (desktop only) -->
           <button
             class="hidden md:flex items-center gap-2 text-xs text-muted-foreground border border-border rounded-md px-2.5 py-1.5 hover:bg-muted transition-colors focus-ring"
-            title="Quick search (coming soon)"
-            aria-label="Quick search"
+            [title]="'nav.quickSearchSoon' | transloco"
+            [attr.aria-label]="'nav.quickSearch' | transloco"
           >
-            <span>Search</span>
+            <span>{{ 'nav.search' | transloco }}</span>
             <kbd class="text-[10px] bg-muted px-1 rounded">⌘K</kbd>
           </button>
 
@@ -84,10 +103,9 @@ interface Crumb {
                 (click)="toggleNotif($event)"
                 class="topbar-icon-btn focus-ring relative"
                 [attr.aria-label]="
-                  'Notifications' +
-                  (notifService.unreadCount() > 0
-                    ? ' (' + notifService.unreadCount() + ' unread)'
-                    : '')
+                  notifService.unreadCount() > 0
+                    ? ('nav.notificationsUnread' | transloco: { count: notifService.unreadCount() })
+                    : ('nav.notifications' | transloco)
                 "
               >
                 <lucide-icon [img]="icons.Bell" class="w-5 h-5" aria-hidden="true" />
@@ -108,20 +126,22 @@ interface Crumb {
                   (click)="$event.stopPropagation()"
                 >
                   <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-                    <span class="font-semibold text-foreground text-sm">Notifications</span>
+                    <span class="font-semibold text-foreground text-sm">{{
+                      'nav.notifications' | transloco
+                    }}</span>
                     @if (notifService.unreadCount() > 0) {
                       <button
                         (click)="notifService.markRead(); notifOpen = false"
                         class="text-xs text-primary hover:underline"
                       >
-                        Mark all read
+                        {{ 'nav.markAllRead' | transloco }}
                       </button>
                     }
                   </div>
                   <div class="max-h-80 overflow-y-auto divide-y divide-border">
                     @if (notifService.notifications().length === 0) {
                       <div class="px-4 py-8 text-center text-sm text-muted-foreground">
-                        No notifications
+                        {{ 'nav.noNotifications' | transloco }}
                       </div>
                     }
                     @for (n of notifService.notifications(); track n.id) {
@@ -144,7 +164,7 @@ interface Crumb {
                           </span>
                         }
                         <span class="block text-muted-foreground text-[10px] mt-1">
-                          {{ n.created_at | date: 'MMM d, HH:mm' }}
+                          {{ n.created_at | localDate: 'MMM d, HH:mm' }}
                         </span>
                       </button>
                     }
@@ -213,44 +233,44 @@ export class TopbarComponent implements OnInit, OnDestroy {
     if (ctx) {
       const section = this.eventSection(path);
       this.breadcrumbs = [
-        { label: 'Dashboard', route: '/organizer/dashboard' },
+        { labelKey: 'nav.dashboard', route: '/organizer/dashboard' },
         { label: ctx.title, route: `/organizer/events/${ctx.id}/attendees` },
-        ...(section ? [{ label: section }] : []),
+        ...(section ? [{ labelKey: section }] : []),
       ];
       return;
     }
 
-    this.breadcrumbs = [{ label: this.pageLabel(path) }];
+    this.breadcrumbs = [{ labelKey: this.pageLabel(path) }];
   }
 
   private pageLabel(path: string): string {
-    if (path === '/' || path === '') return 'Discover';
-    if (path.startsWith('/organizer/dashboard')) return 'Dashboard';
-    if (path.startsWith('/my-events')) return 'My Events';
-    if (path.startsWith('/my-registrations')) return 'My Tickets';
-    if (path.startsWith('/my-bookings')) return 'My Bookings';
-    if (path.startsWith('/admin/moderation')) return 'Moderation';
-    if (path.startsWith('/create-event')) return 'Create Event';
-    if (path.startsWith('/scan')) return 'Scan Tickets';
-    if (path.startsWith('/profile')) return 'Profile';
-    if (path.startsWith('/favorites')) return 'Favorites';
-    if (path.startsWith('/validate')) return 'Validate Ticket';
-    if (path.startsWith('/payment/success')) return 'Payment Success';
-    if (path.startsWith('/payment/cancel')) return 'Payment Cancelled';
-    if (path.startsWith('/events/')) return 'Event';
-    return 'EventHub';
+    if (path === '/' || path === '') return 'nav.discover';
+    if (path.startsWith('/organizer/dashboard')) return 'nav.dashboard';
+    if (path.startsWith('/my-events')) return 'nav.myEvents';
+    if (path.startsWith('/my-registrations')) return 'nav.myTickets';
+    if (path.startsWith('/my-bookings')) return 'nav.myBookings';
+    if (path.startsWith('/admin/moderation')) return 'nav.moderation';
+    if (path.startsWith('/create-event')) return 'nav.createEvent';
+    if (path.startsWith('/scan')) return 'nav.scanTickets';
+    if (path.startsWith('/profile')) return 'nav.profile';
+    if (path.startsWith('/favorites')) return 'nav.favorites';
+    if (path.startsWith('/validate')) return 'nav.validateTicket';
+    if (path.startsWith('/payment/success')) return 'nav.paymentSuccess';
+    if (path.startsWith('/payment/cancel')) return 'nav.paymentCancelled';
+    if (path.startsWith('/events/')) return 'nav.event';
+    return 'nav.brand';
   }
 
   private eventSection(path: string): string | null {
-    if (path.includes('/attendees')) return 'Attendees';
-    if (path.includes('/analytics')) return 'Analytics';
-    if (path.includes('/ticket-types')) return 'Tickets';
-    if (path.includes('/promo-codes')) return 'Promo Codes';
-    if (path.includes('/questions')) return 'Questions';
-    if (path.includes('/checkin-lists')) return 'Check-in Lists';
-    if (path.includes('/waitlist')) return 'Waitlist';
-    if (path.includes('/settings')) return 'Settings';
-    if (path.includes('/edit-event/')) return 'Edit Event';
+    if (path.includes('/attendees')) return 'nav.attendees';
+    if (path.includes('/analytics')) return 'nav.analytics';
+    if (path.includes('/ticket-types')) return 'nav.tickets';
+    if (path.includes('/promo-codes')) return 'nav.promoCodes';
+    if (path.includes('/questions')) return 'nav.questions';
+    if (path.includes('/checkin-lists')) return 'nav.checkinLists';
+    if (path.includes('/waitlist')) return 'nav.waitlist';
+    if (path.includes('/settings')) return 'nav.settings';
+    if (path.includes('/edit-event/')) return 'nav.editEvent';
     return null;
   }
 }

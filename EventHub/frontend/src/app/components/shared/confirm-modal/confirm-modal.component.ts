@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ModalService } from '../../../services/modal.service';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-confirm-modal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslocoPipe],
   template: `
     @if (modalService.isOpen()) {
       <div
@@ -34,7 +35,7 @@ import { ModalService } from '../../../services/modal.service';
 
           <div class="flex gap-2 justify-end">
             <button (click)="modalService.cancel()" class="btn btn-secondary btn-sm">
-              {{ modalService.config()?.cancelText || 'Cancel' }}
+              {{ modalService.config()?.cancelText || ('common.cancel' | transloco) }}
             </button>
             <button
               (click)="modalService.confirm()"
@@ -45,7 +46,7 @@ import { ModalService } from '../../../services/modal.service';
                   : 'btn-primary'
               "
             >
-              {{ modalService.config()?.confirmText || 'Confirm' }}
+              {{ modalService.config()?.confirmText || ('common.confirm' | transloco) }}
             </button>
           </div>
         </div>

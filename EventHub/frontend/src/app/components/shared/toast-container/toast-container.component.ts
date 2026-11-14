@@ -10,11 +10,12 @@ import {
   X,
   type LucideIconData,
 } from 'lucide-angular';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-toast-container',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule],
+  imports: [CommonModule, LucideAngularModule, TranslocoPipe],
   template: `
     <div
       class="fixed bottom-5 right-4 z-[9999] flex flex-col gap-2.5 max-w-sm w-full pointer-events-none"
@@ -36,7 +37,7 @@ import {
           <button
             (click)="toastService.dismiss(toast.id)"
             class="flex-shrink-0 opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded"
-            aria-label="Dismiss"
+            [attr.aria-label]="'common.dismiss' | transloco"
           >
             <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true" />
           </button>

@@ -37,6 +37,9 @@ import {
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
 import { supportsWebShare } from '../../utils/browser-support';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 /** The cheapest zone of a seat map, or null without zones (the price a seated event starts "from"). */
 export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined): string | null {
@@ -62,6 +65,8 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
     EventCheckoutModalComponent,
     RefundRequestModalComponent,
     PaymentQrComponent,
+    TranslocoPipe,
+    LocalDatePipe,
   ],
   template: `
     <!-- Loading -->
@@ -69,7 +74,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
       <div class="page-root-white flex items-center justify-center">
         <div class="flex flex-col items-center gap-3 text-muted-foreground">
           <span class="spinner spinner-lg"></span>
-          <p class="text-sm">Loading event...</p>
+          <p class="text-sm">{{ 'eventDetail.loadingEvent' | transloco }}</p>
         </div>
       </div>
     }
@@ -77,8 +82,12 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
     @if (!loading && !event) {
       <div class="page-root-white flex items-center justify-center">
         <div class="text-center">
-          <p class="text-foreground font-semibold mb-2">Event not found</p>
-          <a routerLink="/" class="btn btn-secondary btn-sm">Back to events</a>
+          <p class="text-foreground font-semibold mb-2">
+            {{ 'eventDetail.eventNotFound' | transloco }}
+          </p>
+          <a routerLink="/" class="btn btn-secondary btn-sm">{{
+            'eventDetail.backToEvents' | transloco
+          }}</a>
         </div>
       </div>
     }
@@ -95,7 +104,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                 aria-hidden="true"
               />
               <p class="text-sm text-warning font-medium">
-                This event is pending approval and is not yet visible to the public.
+                {{ 'eventDetail.thisEventIsPending' | transloco }}
               </p>
               @if (isAdmin) {
                 <div class="ml-auto flex gap-2">
@@ -104,13 +113,13 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     class="btn btn-sm"
                     style="background:#15803d;color:#fff;border-color:#15803d"
                   >
-                    Approve
+                    {{ 'common.approve' | transloco }}
                   </button>
                   <button
                     (click)="reject()"
                     class="btn btn-sm btn-danger border border-transparent"
                   >
-                    Reject
+                    {{ 'common.reject' | transloco }}
                   </button>
                 </div>
               }
@@ -128,14 +137,17 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                 aria-hidden="true"
               />
               <p class="text-sm text-foreground font-medium">
-                This is a draft — only you can see it. Submit it for review to get it published.
+                {{ 'eventDetail.thisIsADraft' | transloco }}
               </p>
               <button
                 (click)="submitForReview()"
                 [disabled]="submittingForReview"
                 class="btn btn-sm btn-primary ml-auto"
               >
-                {{ submittingForReview ? 'Submitting…' : 'Submit for review' }}
+                {{
+                  (submittingForReview ? 'eventDetail.submitting' : 'eventDetail.submitForReview')
+                    | transloco
+                }}
               </button>
             </div>
           </div>
@@ -151,7 +163,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                 aria-hidden="true"
               />
               <p class="text-sm text-[color:var(--destructive)] font-medium">
-                This event has been cancelled by the organizer. Paid tickets were refunded.
+                {{ 'eventDetail.thisEventHasBeen' | transloco }}
               </p>
             </div>
           </div>
@@ -162,14 +174,14 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
           <!-- Breadcrumb -->
           <nav
             class="flex items-center gap-1.5 text-sm text-muted-foreground mb-4"
-            aria-label="Breadcrumb"
+            [attr.aria-label]="'attendees.breadcrumb' | transloco"
           >
             <a
               routerLink="/"
               class="hover:text-foreground transition-colors flex items-center gap-1"
             >
               <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true" />
-              Events
+              {{ 'dashboard.events' | transloco }}
             </a>
             <span>/</span>
             <span class="text-foreground font-medium truncate max-w-xs">{{ event.title }}</span>
@@ -204,7 +216,8 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
             <!-- overlay -->
             <div class="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
               <p class="kicker mb-2" style="color:rgba(255,255,255,0.82)">
-                {{ event.category.name || 'Event' }} · {{ event.date | date: 'EEE, MMM d' }}
+                {{ event.category.name || ('nav.event' | transloco) }} ·
+                {{ event.date | localDate: 'EEE, MMM d' }}
               </p>
               <h1
                 class="font-display font-semibold text-white leading-[1.04] max-w-3xl"
@@ -229,20 +242,20 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     class="btn btn-sm btn-outline flex items-center gap-1.5"
                   >
                     <lucide-icon [img]="icons.SquarePen" class="w-3.5 h-3.5" aria-hidden="true" />
-                    Edit
+                    {{ 'common.edit' | transloco }}
                   </a>
                   <a
                     [routerLink]="['/organizer/events', event.id, 'ticket-types']"
                     class="btn btn-sm btn-outline flex items-center gap-1.5"
                   >
                     <lucide-icon [img]="icons.Tag" class="w-3.5 h-3.5" aria-hidden="true" />
-                    Tickets
+                    {{ 'nav.tickets' | transloco }}
                   </a>
                   <a
                     [routerLink]="['/organizer/events', event.id, 'attendees']"
                     class="btn btn-sm btn-secondary"
                   >
-                    Attendees
+                    {{ 'nav.attendees' | transloco }}
                   </a>
                 </div>
               }
@@ -253,10 +266,10 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                   {{ event.status | titlecase }}
                 </span>
                 @if (event.is_free) {
-                  <span class="badge badge-free">Free</span>
+                  <span class="badge badge-free">{{ 'common.free' | transloco }}</span>
                 }
                 @if (event.is_online) {
-                  <span class="badge badge-online">Online</span>
+                  <span class="badge badge-online">{{ 'home.online' | transloco }}</span>
                 }
               </div>
 
@@ -269,14 +282,16 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     aria-hidden="true"
                   />
                   <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">Date & Time</p>
+                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
+                      {{ 'eventDetail.dateTime' | transloco }}
+                    </p>
                     <p class="text-sm font-semibold text-foreground">
-                      {{ event.date | date: 'EEEE, MMM d, y' }}
+                      {{ event.date | localDate: 'EEEE, MMM d, y' }}
                     </p>
                     <p class="text-xs text-muted-foreground">
-                      {{ event.date | date: 'h:mm a' }}
+                      {{ event.date | localDate: 'h:mm a' }}
                       @if (event.end_date) {
-                        – {{ event.end_date | date: 'h:mm a' }}
+                        – {{ event.end_date | localDate: 'h:mm a' }}
                       }
                     </p>
                   </div>
@@ -289,7 +304,9 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     aria-hidden="true"
                   />
                   <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">Location</p>
+                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
+                      {{ 'home.location' | transloco }}
+                    </p>
                     <p class="text-sm font-semibold text-foreground">{{ event.location }}</p>
                     @if (event.address) {
                       <p class="text-xs text-muted-foreground">{{ event.address }}</p>
@@ -304,12 +321,24 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     aria-hidden="true"
                   />
                   <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">Capacity</p>
+                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
+                      {{ 'dashboard.capacity' | transloco }}
+                    </p>
                     <p class="text-sm font-semibold text-foreground">
-                      {{ event.available_spots }} spots left
+                      {{
+                        'eventDetail.availablespotsSpotsLeft'
+                          | transloco: { availableSpots: event.available_spots }
+                      }}
                     </p>
                     <p class="text-xs text-muted-foreground">
-                      {{ event.registered_count }} / {{ event.max_participants }} registered
+                      {{
+                        'eventDetail.registeredcountMaxparticipantsRegistered'
+                          | transloco
+                            : {
+                                registeredCount: event.registered_count,
+                                maxParticipants: event.max_participants,
+                              }
+                      }}
                     </p>
                   </div>
                 </div>
@@ -321,7 +350,9 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     aria-hidden="true"
                   />
                   <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">Category</p>
+                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
+                      {{ 'common.category' | transloco }}
+                    </p>
                     <p class="text-sm font-semibold text-foreground">
                       {{ event.category.name || '—' }}
                     </p>
@@ -354,7 +385,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                 <h2
                   class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3"
                 >
-                  Organizer
+                  {{ 'footer.organizer' | transloco }}
                 </h2>
                 <div class="flex items-center gap-3">
                   <div
@@ -377,7 +408,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                 <h2
                   class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3"
                 >
-                  About this event
+                  {{ 'eventDetail.aboutThisEvent' | transloco }}
                 </h2>
                 <div class="prose-sm text-foreground leading-relaxed whitespace-pre-wrap text-sm">
                   {{ event.description }}
@@ -402,18 +433,23 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                       <p
                         class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2"
                       >
-                        {{ event.has_ticket_types ? 'Tickets from' : 'Price' }}
+                        {{
+                          (event.has_ticket_types ? 'eventDetail.ticketsFrom' : 'common.price')
+                            | transloco
+                        }}
                       </p>
                       <div class="flex items-center gap-3 flex-wrap">
                         <span
                           class="text-3xl font-extrabold text-foreground tracking-tight leading-none"
                         >
                           @if (event.is_free) {
-                            Free
+                            {{ 'common.free' | transloco }}
                           } @else if (event.has_ticket_types) {
                             {{ event.price_from | money: event.currency }}
                           } @else if (seatPriceFrom) {
-                            <span class="text-base font-semibold text-muted-foreground">from</span>
+                            <span class="text-base font-semibold text-muted-foreground">{{
+                              'eventDetail.from' | transloco
+                            }}</span>
                             {{ seatPriceFrom | money: event.currency }}
                           } @else if (pricingData && pricingData.multiplier !== 1.0) {
                             {{ pricingData.current_price | money: event.currency }}
@@ -427,26 +463,38 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           <span
                             class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
                             [class]="demandBadgeClass(pricingData.demand_level)"
-                            >{{ pricingData.demand_level }} demand</span
+                            >{{
+                              'eventDetail.demandlevelDemand'
+                                | transloco: { demandLevel: pricingData.demand_level }
+                            }}</span
                           >
                         }
                       </div>
                       @if (event.has_ticket_types) {
                         <p class="text-xs text-muted-foreground mt-1">
-                          {{ event.ticket_types.length }} ticket types available
+                          {{
+                            'eventDetail.ticketTypeslengthTicketTypes'
+                              | transloco: { ticket_typesLength: event.ticket_types.length }
+                          }}
                         </p>
                       } @else if (seatPriceFrom) {
                         <p class="text-xs text-muted-foreground mt-1">
-                          per seat; the price depends on the seat zone
+                          {{ 'eventDetail.perSeatThePrice' | transloco }}
                         </p>
                       } @else if (!event.is_free) {
                         <p class="text-xs text-muted-foreground mt-1">
-                          per ticket
+                          {{ 'eventDetail.perTicket' | transloco }}
                           @if (
                             pricingData && pricingData.base_price !== pricingData.current_price
                           ) {
-                            · base price {{ pricingData.base_price | money: event.currency }},
-                            demand ×{{ pricingData.multiplier }}
+                            {{
+                              'eventDetail.basePriceBasepriceDemand'
+                                | transloco
+                                  : {
+                                      basePrice: (pricingData.base_price | money: event.currency),
+                                      multiplier: pricingData.multiplier,
+                                    }
+                            }}
                           }
                         </p>
                       }
@@ -459,9 +507,10 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                     @if (event.max_participants > 0) {
                       <div class="mb-5">
                         <div class="flex justify-between text-xs mb-1.5">
-                          <span class="font-semibold text-foreground"
-                            >{{ event.available_spots }} spots left</span
-                          >
+                          <span class="font-semibold text-foreground">{{
+                            'eventDetail.availablespotsSpotsLeft'
+                              | transloco: { availableSpots: event.available_spots }
+                          }}</span>
                           <span class="text-muted-foreground"
                             >{{ event.registered_count }} / {{ event.max_participants }}</span
                           >
@@ -487,20 +536,21 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                       <div class="text-center py-3 px-3 rounded-xl bg-muted">
                         <p class="text-sm text-muted-foreground">
                           {{
-                            event.status === 'cancelled'
-                              ? 'This event was cancelled — sales are closed.'
-                              : 'This event has ended.'
+                            (event.status === 'cancelled'
+                              ? 'eventDetail.thisEventWasCancelled'
+                              : 'eventDetail.thisEventHasEnded'
+                            ) | transloco
                           }}
                         </p>
                       </div>
                     } @else if (!authService.isLoggedIn) {
                       <a routerLink="/login" class="btn btn-primary btn-full btn-lg">
-                        Sign in to register
+                        {{ 'eventDetail.signInToRegister' | transloco }}
                       </a>
                     } @else if (isOwner) {
                       <div class="text-center py-3 px-3 rounded-xl bg-muted">
                         <p class="text-sm text-muted-foreground">
-                          You're the organizer of this event
+                          {{ 'eventDetail.youReTheOrganizer' | transloco }}
                         </p>
                       </div>
                     } @else if (registrationStatus === 'confirmed') {
@@ -515,15 +565,15 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         />
                         <div>
                           <p class="text-sm font-semibold text-[color:var(--pine-600)]">
-                            You're registered!
+                            {{ 'eventDetail.youReRegistered' | transloco }}
                           </p>
                           <p class="text-xs text-[color:var(--pine-600)]">
-                            Ticket is in My Tickets
+                            {{ 'eventDetail.ticketIsInMy' | transloco }}
                           </p>
                         </div>
                       </div>
                       <a routerLink="/my-registrations" class="btn btn-primary btn-full mb-2">
-                        View my ticket →
+                        {{ 'eventDetail.viewMyTicket' | transloco }}
                       </a>
 
                       <!-- Refund logic: confirmed tickets can't be cancelled by
@@ -534,19 +584,19 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] border border-transparent text-warning text-xs"
                         >
                           <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
-                          Refund requested — awaiting organizer review.
+                          {{ 'eventDetail.refundRequestedAwaitingOrganizer' | transloco }}
                         </div>
                       } @else if (myRegistration?.is_checked_in) {
                         <!-- Scanned at the door → service delivered, no refund -->
                         <p class="text-xs text-muted-foreground text-center px-2">
-                          Ticket was used for entry — refunds are unavailable.
+                          {{ 'eventDetail.ticketWasUsedFor' | transloco }}
                         </p>
                       } @else if (!isPaidTicket()) {
                         <!-- Free ticket → no cancel / refund actions -->
                       } @else if (event.refundable === false) {
                         <!-- Paid, non-refundable -->
                         <p class="text-xs text-muted-foreground text-center px-2">
-                          Tickets for this event are non-refundable.
+                          {{ 'eventDetail.ticketsForThisEvent' | transloco }}
                         </p>
                       } @else {
                         <!-- Paid, refundable → request refund -->
@@ -554,7 +604,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           (click)="showRefundModal = true"
                           class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
                         >
-                          Request a refund
+                          {{ 'eventDetail.requestARefund' | transloco }}
                         </button>
                       }
                     } @else if (registrationStatus === 'pending') {
@@ -567,9 +617,11 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           aria-hidden="true"
                         />
                         <div>
-                          <p class="text-sm font-semibold text-warning">Payment incomplete</p>
+                          <p class="text-sm font-semibold text-warning">
+                            {{ 'eventDetail.paymentIncomplete' | transloco }}
+                          </p>
                           <p class="text-xs text-warning">
-                            Seat held — complete payment to confirm
+                            {{ 'eventDetail.seatHeldCompletePayment' | transloco }}
                           </p>
                         </div>
                       </div>
@@ -578,14 +630,20 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         [disabled]="registering"
                         class="btn btn-primary btn-full mb-2"
                       >
-                        {{ registering ? 'Processing...' : 'Complete payment' }}
+                        {{
+                          (registering ? 'checkout.processing' : 'eventDetail.completePayment')
+                            | transloco
+                        }}
                       </button>
                       <button
                         (click)="cancelRegistration()"
                         [disabled]="cancelling"
                         class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
                       >
-                        {{ cancelling ? 'Cancelling...' : 'Release seat' }}
+                        {{
+                          (cancelling ? 'eventDetail.cancelling' : 'eventDetail.releaseSeat2')
+                            | transloco
+                        }}
                       </button>
                     } @else if (registrationStatus === 'rejected') {
                       <div
@@ -599,20 +657,20 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         <div>
                           @if (myRegistration?.refund_request?.status === 'rejected') {
                             <p class="text-sm font-bold text-[color:var(--destructive)]">
-                              Refund request declined
+                              {{ 'eventDetail.refundRequestDeclined' | transloco }}
                             </p>
                             <p class="text-xs text-[color:var(--destructive)]">
                               {{
                                 myRegistration?.refund_request?.organizer_note ||
-                                  'The organizer declined your refund.'
+                                  ('eventDetail.theOrganizerDeclinedYour' | transloco)
                               }}
                             </p>
                           } @else {
                             <p class="text-sm font-bold text-[color:var(--destructive)]">
-                              Registration declined
+                              {{ 'eventDetail.registrationDeclined' | transloco }}
                             </p>
                             <p class="text-xs text-[color:var(--destructive)]">
-                              Contact the organizer for more info
+                              {{ 'eventDetail.contactTheOrganizerFor' | transloco }}
                             </p>
                           }
                         </div>
@@ -621,8 +679,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                       <!-- Organizers/admins manage events, they don't buy tickets -->
                       <div class="text-center py-3 px-3 rounded-xl bg-muted">
                         <p class="text-sm text-muted-foreground">
-                          Only attendee accounts can buy tickets — organizer and admin accounts
-                          can't register.
+                          {{ 'eventDetail.onlyAttendeeAccountsCan' | transloco }}
                         </p>
                       </div>
                     } @else if (waitlist?.status === 'offered') {
@@ -636,10 +693,10 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         />
                         <div>
                           <p class="text-sm font-bold text-[color:var(--pine-600)]">
-                            A spot opened up for you!
+                            {{ 'eventDetail.aSpotOpenedUp' | transloco }}
                           </p>
                           <p class="text-xs text-[color:var(--pine-600)]">
-                            It's reserved for a limited time — grab it before it passes on.
+                            {{ 'eventDetail.itSReservedFor' | transloco }}
                           </p>
                         </div>
                       </div>
@@ -647,7 +704,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         (click)="showCheckout = true"
                         class="btn btn-primary btn-full btn-lg font-bold"
                       >
-                        Claim my spot
+                        {{ 'eventDetail.claimMySpot' | transloco }}
                       </button>
                     } @else if (queueInfo && queueInfo.status === 'queued') {
                       <!-- Virtual waiting room -->
@@ -656,12 +713,19 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                       >
                         <span class="spinner spinner-sm flex-shrink-0"></span>
                         <div>
-                          <p class="text-sm font-bold text-foreground">You're in the queue</p>
+                          <p class="text-sm font-bold text-foreground">
+                            {{ 'eventDetail.youReInThe' | transloco }}
+                          </p>
                           <p class="text-xs text-ember">
-                            Position #{{ queueInfo.position }} of {{ queueInfo.total }} · ~{{
-                              queueInfo.wait_minutes
+                            {{
+                              'eventDetail.positionPositionOfTotal'
+                                | transloco
+                                  : {
+                                      position: queueInfo.position,
+                                      total: queueInfo.total,
+                                      waitMinutes: queueInfo.wait_minutes,
+                                    }
                             }}
-                            min. We'll start your checkout automatically.
                           </p>
                         </div>
                       </div>
@@ -669,7 +733,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         (click)="leaveQueue()"
                         class="btn btn-ghost btn-full btn-sm text-muted-foreground"
                       >
-                        Leave queue
+                        {{ 'eventDetail.leaveQueue' | transloco }}
                       </button>
                     } @else if (event.available_spots === 0) {
                       <!-- Sold out → waitlist -->
@@ -682,10 +746,14 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                             class="w-5 h-5 text-ember flex-shrink-0"
                           />
                           <div>
-                            <p class="text-sm font-bold text-foreground">You're on the waitlist</p>
+                            <p class="text-sm font-bold text-foreground">
+                              {{ 'eventDetail.youReOnThe' | transloco }}
+                            </p>
                             <p class="text-xs text-ember">
-                              Position #{{ waitlist?.position }} · we'll notify you when a spot
-                              frees up.
+                              {{
+                                'eventDetail.positionPositionWeLl'
+                                  | transloco: { position: waitlist?.position }
+                              }}
                             </p>
                           </div>
                         </div>
@@ -694,14 +762,14 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           [disabled]="waitlisting"
                           class="btn btn-ghost btn-full btn-sm text-muted-foreground"
                         >
-                          Leave waitlist
+                          {{ 'eventDetail.leaveWaitlist' | transloco }}
                         </button>
                       } @else {
                         <button
                           disabled
                           class="btn btn-full btn-lg opacity-50 cursor-not-allowed bg-muted text-muted-foreground mb-2"
                         >
-                          Sold out
+                          {{ 'event.soldOut' | transloco }}
                         </button>
                         @if (authService.isLoggedIn) {
                           <button
@@ -709,12 +777,15 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                             [disabled]="waitlisting"
                             class="btn btn-secondary btn-full"
                           >
-                            {{ waitlisting ? 'Joining…' : '🔔 Join the waitlist' }}
+                            {{
+                              (waitlisting ? 'eventDetail.joining' : 'eventDetail.joinTheWaitlist')
+                                | transloco
+                            }}
                           </button>
                         } @else {
-                          <a routerLink="/login" class="btn btn-secondary btn-full"
-                            >Sign in to join waitlist</a
-                          >
+                          <a routerLink="/login" class="btn btn-secondary btn-full">{{
+                            'eventDetail.signInToJoin' | transloco
+                          }}</a>
                         }
                       }
                     } @else {
@@ -724,16 +795,21 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         class="btn btn-primary btn-full btn-lg font-bold shadow-md hover:shadow-primary/30 transition-all"
                       >
                         @if (registering) {
-                          <span class="spinner spinner-sm"></span> Processing...
+                          <span class="spinner spinner-sm"></span>
+                          {{ 'checkout.processing' | transloco }}
                         } @else if (event.has_ticket_types) {
-                          Choose tickets
+                          {{ 'eventDetail.chooseTickets' | transloco }}
                         } @else if (seatPriceFrom) {
-                          {{ 'Choose a seat — from ' + (seatPriceFrom | money: event.currency) }}
+                          {{
+                            'eventDetail.chooseSeatFrom'
+                              | transloco: { price: (seatPriceFrom | money: event.currency) }
+                          }}
                         } @else {
                           {{
                             event.is_free
-                              ? 'Register for free'
-                              : 'Get tickets — ' + (currentGaPrice | money: event.currency)
+                              ? ('eventDetail.registerFree' | transloco)
+                              : ('eventDetail.getTicketsPrice'
+                                | transloco: { price: (currentGaPrice | money: event.currency) })
                           }}
                         }
                       </button>
@@ -743,7 +819,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           class="btn btn-secondary btn-full mt-2 flex items-center justify-center gap-2 text-sm"
                         >
                           <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
-                          Book seats for a group
+                          {{ 'eventDetail.bookSeatsForA' | transloco }}
                         </a>
                       }
                     }
@@ -761,7 +837,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                           "
                         >
                           <lucide-icon [img]="icons.Heart" class="w-4 h-4" aria-hidden="true" />
-                          {{ favorited ? 'Saved' : 'Save' }}
+                          {{ (favorited ? 'eventDetail.saved' : 'common.save') | transloco }}
                         </button>
                       }
                       <button
@@ -769,7 +845,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                         class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted border border-border transition-colors"
                       >
                         <lucide-icon [img]="icons.Share2" class="w-4 h-4" aria-hidden="true" />
-                        Share
+                        {{ 'eventDetail.share' | transloco }}
                       </button>
                     </div>
                   </div>
@@ -808,6 +884,7 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
   `,
 })
 export class EventDetailComponent implements OnInit, OnDestroy {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private paymentService = inject(PaymentService);
   authService = inject(AuthService);
@@ -1028,10 +1105,12 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.favorited = res.favorited;
         this.toastService.success(
-          res.favorited ? '❤ Added to favorites' : 'Removed from favorites',
+          res.favorited
+            ? this.i18n.t('eventDetail.addedToFavorites')
+            : this.i18n.t('eventDetail.removedFromFavorites'),
         );
       },
-      error: () => this.toastService.error('Failed to update favorites'),
+      error: () => this.toastService.error(this.i18n.t('eventDetail.failedToUpdateFavorites')),
     });
   }
 
@@ -1073,17 +1152,19 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         this.waitlist = s;
         this.waitlisting = false;
         if (s.status === 'spots_available') {
-          this.toastService.success('A spot is available — you can register now!');
+          this.toastService.success(this.i18n.t('eventDetail.aSpotIsAvailable'));
           this.loadEvent(true);
         } else if (s.status === 'offered') {
-          this.toastService.success('A spot is ready for you! Claim it now.');
+          this.toastService.success(this.i18n.t('eventDetail.aSpotIsReady'));
         } else {
-          this.toastService.success(`You're on the waitlist (position #${s.position}).`);
+          this.toastService.success(
+            this.i18n.t('eventDetail.youReOnThe2', { position: s.position }),
+          );
         }
       },
       error: () => {
         this.waitlisting = false;
-        this.toastService.error('Could not join waitlist.');
+        this.toastService.error(this.i18n.t('eventDetail.couldNotJoinWaitlist'));
       },
     });
   }
@@ -1095,11 +1176,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       next: () => {
         this.waitlist = { status: 'not_joined' };
         this.waitlisting = false;
-        this.toastService.success('Left the waitlist.');
+        this.toastService.success(this.i18n.t('eventDetail.leftTheWaitlist'));
       },
       error: () => {
         this.waitlisting = false;
-        this.toastService.error('Could not leave waitlist.');
+        this.toastService.error(this.i18n.t('eventDetail.couldNotLeaveWaitlist'));
       },
     });
   }
@@ -1126,9 +1207,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
             error: () => {
               this.registering = false;
               this.showCheckout = false;
-              this.toastService.error(
-                'Payment setup failed. Your spot is held for 10 minutes — try again.',
-              );
+              this.toastService.error(this.i18n.t('eventDetail.paymentSetupFailedYour'));
               this.loadEvent(true);
             },
           });
@@ -1136,7 +1215,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         } else {
           this.registering = false;
           this.showCheckout = false;
-          this.toastService.success("You're registered!");
+          this.toastService.success(this.i18n.t('eventDetail.youReRegistered'));
           if (this.event)
             this.event = { ...this.event, available_spots: this.event.available_spots - 1 };
           this.loadEvent(true);
@@ -1152,7 +1231,12 @@ export class EventDetailComponent implements OnInit, OnDestroy {
           return;
         }
         this.toastService.error(
-          apiErrorMessage(err, 'Registration failed. Please try again.', 'detail', 'error'),
+          apiErrorMessage(
+            err,
+            this.i18n.t('eventDetail.registrationFailedPleaseTry'),
+            'detail',
+            'error',
+          ),
         );
       },
     });
@@ -1167,14 +1251,16 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       next: (s) => {
         this.queueInfo = s;
         if (s.status === 'queued') {
-          this.toastService.info(`High demand — you're #${s.position} in the queue.`);
+          this.toastService.info(
+            this.i18n.t('eventDetail.highDemandYouRe', { position: s.position }),
+          );
           this.startQueuePolling();
         } else {
           // not_needed / already admitted → just retry.
           this.retryAfterQueue();
         }
       },
-      error: () => this.toastService.error('Could not join the queue. Please try again.'),
+      error: () => this.toastService.error(this.i18n.t('eventDetail.couldNotJoinThe')),
     });
   }
 
@@ -1188,7 +1274,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
           if (s.status === 'admitted' || s.status === 'not_needed') {
             this.stopQueuePolling();
             this.queueInfo = null;
-            this.toastService.success("You're in! Completing your registration…");
+            this.toastService.success(this.i18n.t('eventDetail.youReInCompleting'));
             this.retryAfterQueue();
           }
         },
@@ -1222,22 +1308,20 @@ export class EventDetailComponent implements OnInit, OnDestroy {
             },
             error: () => {
               this.registering = false;
-              this.toastService.error(
-                'Payment setup failed. Your spot is held for 10 minutes — try again.',
-              );
+              this.toastService.error(this.i18n.t('eventDetail.paymentSetupFailedYour'));
               this.loadEvent(true);
             },
           });
         } else {
           this.registering = false;
-          this.toastService.success("You're registered!");
+          this.toastService.success(this.i18n.t('eventDetail.youReRegistered'));
           this.loadEvent(true);
         }
       },
       error: (err) => {
         this.registering = false;
         this.toastService.error(
-          apiErrorMessage(err, 'Registration failed — please try again.', 'error'),
+          apiErrorMessage(err, this.i18n.t('eventDetail.registrationFailedPleaseTry2'), 'error'),
         );
         this.loadEvent(true);
       },
@@ -1257,12 +1341,14 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     this.eventService.submitEvent(this.event.id).subscribe({
       next: () => {
         this.submittingForReview = false;
-        this.toastService.success('Submitted for review — an admin will approve it.');
+        this.toastService.success(this.i18n.t('eventDetail.submittedForReviewAn'));
         this.loadEvent(true);
       },
       error: (err) => {
         this.submittingForReview = false;
-        this.toastService.error(apiErrorMessage(err, 'Could not submit for review.', 'error'));
+        this.toastService.error(
+          apiErrorMessage(err, this.i18n.t('eventDetail.couldNotSubmitFor'), 'error'),
+        );
       },
     });
   }
@@ -1280,9 +1366,9 @@ export class EventDetailComponent implements OnInit, OnDestroy {
         // Payment already went through but the registration was stuck as
         // pending — the backend now reconciles it, so refresh to show it.
         if (apiErrorBody(err)?.['error'] === 'Payment already completed') {
-          this.toastService.success('Payment already completed — your ticket is confirmed.');
+          this.toastService.success(this.i18n.t('eventDetail.paymentAlreadyCompletedYour'));
         } else {
-          this.toastService.error('Could not start payment. Your seat hold may have expired.');
+          this.toastService.error(this.i18n.t('eventDetail.couldNotStartPayment'));
         }
         this.loadEvent(true);
       },
@@ -1298,10 +1384,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   async cancelRegistration(): Promise<void> {
     if (!this.event) return;
     const confirmed = await this.modalService.open({
-      title: 'Release Seat',
-      message: `Release your held seat for "${this.event.title}"? You can register again later.`,
-      confirmText: 'Yes, release',
-      cancelText: 'Keep it',
+      title: this.i18n.t('eventDetail.releaseSeat'),
+      message: this.i18n.t('eventDetail.releaseYourHeldSeat', { title: this.event.title }),
+      confirmText: this.i18n.t('eventDetail.yesRelease'),
+      cancelText: this.i18n.t('eventDetail.keepIt'),
       isDestructive: true,
     });
     if (!confirmed) return;
@@ -1313,12 +1399,14 @@ export class EventDetailComponent implements OnInit, OnDestroy {
           this.event = { ...this.event, available_spots: this.event.available_spots + 1 };
         this.registrationStatus = null;
         this.cancelling = false;
-        this.toastService.success('Seat released.');
+        this.toastService.success(this.i18n.t('eventDetail.seatReleased'));
         this.loadEvent(true);
       },
       error: (err) => {
         this.cancelling = false;
-        this.toastService.error(apiErrorMessage(err, 'Failed to release the seat.', 'error'));
+        this.toastService.error(
+          apiErrorMessage(err, this.i18n.t('eventDetail.failedToReleaseThe'), 'error'),
+        );
       },
     });
   }
@@ -1331,37 +1419,37 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   async approve(): Promise<void> {
     if (!this.event) return;
     const confirmed = await this.modalService.open({
-      title: 'Approve Event',
-      message: `Approve and publish "${this.event.title}"?`,
-      confirmText: 'Approve',
-      cancelText: 'Cancel',
+      title: this.i18n.t('eventDetail.approveEvent'),
+      message: this.i18n.t('eventDetail.approveAndPublishTitle', { title: this.event.title }),
+      confirmText: this.i18n.t('common.approve'),
+      cancelText: this.i18n.t('common.cancel'),
     });
     if (!confirmed) return;
     this.eventService.approveEvent(this.event.id).subscribe({
       next: () => {
-        this.toastService.success('Event approved and published.');
+        this.toastService.success(this.i18n.t('eventDetail.eventApprovedAndPublished'));
         this.loadEvent(true);
       },
-      error: () => this.toastService.error('Failed to approve event.'),
+      error: () => this.toastService.error(this.i18n.t('eventDetail.failedToApproveEvent')),
     });
   }
 
   async reject(): Promise<void> {
     if (!this.event) return;
     const confirmed = await this.modalService.open({
-      title: 'Reject Event',
-      message: `Reject "${this.event.title}"? The organizer will see it as declined.`,
-      confirmText: 'Reject',
-      cancelText: 'Cancel',
+      title: this.i18n.t('eventDetail.rejectEvent'),
+      message: this.i18n.t('eventDetail.rejectTitleTheOrganizer', { title: this.event.title }),
+      confirmText: this.i18n.t('common.reject'),
+      cancelText: this.i18n.t('common.cancel'),
       isDestructive: true,
     });
     if (!confirmed) return;
     this.eventService.rejectEvent(this.event.id).subscribe({
       next: () => {
-        this.toastService.success('Event rejected.');
+        this.toastService.success(this.i18n.t('eventDetail.eventRejected'));
         this.loadEvent(true);
       },
-      error: () => this.toastService.error('Failed to reject event.'),
+      error: () => this.toastService.error(this.i18n.t('eventDetail.failedToRejectEvent')),
     });
   }
 
@@ -1377,9 +1465,9 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     } else {
       try {
         await navigator.clipboard.writeText(url);
-        this.toastService.success('Link copied!');
+        this.toastService.success(this.i18n.t('eventDetail.linkCopied'));
       } catch {
-        this.toastService.error('Failed to copy link.');
+        this.toastService.error(this.i18n.t('eventDetail.failedToCopyLink'));
       }
     }
   }

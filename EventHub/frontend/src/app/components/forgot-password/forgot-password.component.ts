@@ -5,11 +5,13 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-forgot-password',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule, TranslocoPipe],
   template: `
     <!-- Each step of this multi-step form shows the one field to fill next, which
          takes focus on purpose: a deliberate exception to no-autofocus. -->
@@ -24,22 +26,26 @@ import { apiErrorMessage } from '../../api/api-error';
           <span class="font-display font-semibold text-lg text-white">EventHub</span>
         </a>
         <div class="relative z-10 max-w-md">
-          <p class="kicker mb-4" style="color:var(--ember-500)">Account recovery</p>
+          <p class="kicker mb-4" style="color:var(--ember-500)">
+            {{ 'forgotPassword.accountRecovery' | transloco }}
+          </p>
           <h2
             class="font-display font-semibold leading-[1.05] text-white"
             style="font-size:clamp(2rem,3vw,2.75rem)"
           >
-            Let's get you back to the night.
+            {{ 'forgotPassword.letSGetYou' | transloco }}
           </h2>
           <p class="mt-5 text-[0.95rem] leading-relaxed" style="color:rgba(245,239,230,0.72)">
-            Reset your password in a couple of steps and pick up right where you left off.
+            {{ 'forgotPassword.resetYourPasswordIn' | transloco }}
           </p>
         </div>
         <div
           class="relative z-10 flex items-center gap-3 text-xs"
           style="color:rgba(245,239,230,0.55)"
         >
-          <span>Secure reset</span><span aria-hidden="true">·</span><span>Takes a minute</span>
+          <span>{{ 'forgotPassword.secureReset' | transloco }}</span
+          ><span aria-hidden="true">·</span
+          ><span>{{ 'forgotPassword.takesAMinute' | transloco }}</span>
         </div>
         <span class="auth-ring" style="right:-120px;bottom:-120px;width:340px;height:340px"></span>
         <span
@@ -72,22 +78,24 @@ import { apiErrorMessage } from '../../api/api-error';
 
           <!-- Step 1: Enter identifier -->
           @if (step === 1) {
-            <h1 class="text-lg font-bold text-foreground mb-1">Reset your password</h1>
+            <h1 class="text-lg font-bold text-foreground mb-1">
+              {{ 'forgotPassword.resetYourPassword' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground mb-6">
-              Enter your username or email and we'll send you a reset code.
+              {{ 'forgotPassword.enterYourUsernameOr' | transloco }}
             </p>
 
             <form (ngSubmit)="requestReset()" novalidate class="space-y-4">
               <div>
                 <label for="identifier" class="block text-sm font-medium text-foreground mb-1.5">
-                  Username or email
+                  {{ 'forgotPassword.usernameOrEmail' | transloco }}
                 </label>
                 <input
                   id="identifier"
                   type="text"
                   [(ngModel)]="identifier"
                   name="identifier"
-                  placeholder="@username or email"
+                  [placeholder]="'forgotPassword.usernameOrEmail2' | transloco"
                   class="input"
                   autocapitalize="none"
                   autofocus
@@ -102,9 +110,10 @@ import { apiErrorMessage } from '../../api/api-error';
 
               <button type="submit" [disabled]="loading" class="btn btn-primary btn-full btn-lg">
                 @if (loading) {
-                  <span class="spinner spinner-sm"></span> Sending...
+                  <span class="spinner spinner-sm"></span>
+                  {{ 'forgotPassword.sending' | transloco }}
                 } @else {
-                  Send reset code
+                  {{ 'forgotPassword.sendResetCode' | transloco }}
                 }
               </button>
             </form>
@@ -112,18 +121,20 @@ import { apiErrorMessage } from '../../api/api-error';
 
           <!-- Step 2: Enter code -->
           @if (step === 2) {
-            <h1 class="text-lg font-bold text-foreground mb-1">Enter the code</h1>
+            <h1 class="text-lg font-bold text-foreground mb-1">
+              {{ 'forgotPassword.enterTheCode' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground mb-6">
-              We sent a 6-digit code to
+              {{ 'forgotPassword.weSentADigit' | transloco }}
               <span class="font-semibold text-foreground">{{ identifier }}</span
               >.
             </p>
 
             <form (ngSubmit)="verifyCode()" novalidate class="space-y-4">
               <div>
-                <label for="code" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Reset code</label
-                >
+                <label for="code" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'forgotPassword.resetCode' | transloco
+                }}</label>
                 <input
                   id="code"
                   type="text"
@@ -145,13 +156,14 @@ import { apiErrorMessage } from '../../api/api-error';
 
               <div class="flex gap-2">
                 <button type="button" (click)="step = 1" class="btn btn-secondary flex-1">
-                  Back
+                  {{ 'common.back' | transloco }}
                 </button>
                 <button type="submit" [disabled]="loading" class="btn btn-primary flex-1">
                   @if (loading) {
-                    <span class="spinner spinner-sm"></span> Verifying...
+                    <span class="spinner spinner-sm"></span>
+                    {{ 'forgotPassword.verifying' | transloco }}
                   } @else {
-                    Verify
+                    {{ 'forgotPassword.verify' | transloco }}
                   }
                 </button>
               </div>
@@ -160,16 +172,18 @@ import { apiErrorMessage } from '../../api/api-error';
 
           <!-- Step 3: New password -->
           @if (step === 3) {
-            <h1 class="text-lg font-bold text-foreground mb-1">Set new password</h1>
+            <h1 class="text-lg font-bold text-foreground mb-1">
+              {{ 'forgotPassword.setNewPassword' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground mb-6">
-              Choose a strong password for your account.
+              {{ 'forgotPassword.chooseAStrongPassword' | transloco }}
             </p>
 
             <form (ngSubmit)="confirmReset()" novalidate class="space-y-4">
               <div>
-                <label for="newpw" class="block text-sm font-medium text-foreground mb-1.5"
-                  >New password</label
-                >
+                <label for="newpw" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'forgotPassword.newPassword' | transloco
+                }}</label>
                 <div
                   class="flex items-center gap-2 border border-border rounded-md px-3 h-10 bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-shadow"
                 >
@@ -187,7 +201,9 @@ import { apiErrorMessage } from '../../api/api-error';
                     type="button"
                     (click)="showPw = !showPw"
                     class="text-muted-foreground hover:text-foreground flex-shrink-0"
-                    [attr.aria-label]="showPw ? 'Hide' : 'Show'"
+                    [attr.aria-label]="
+                      (showPw ? 'forgotPassword.hide' : 'forgotPassword.show') | transloco
+                    "
                   >
                     <lucide-icon
                       [img]="showPw ? icons.EyeOff : icons.Eye"
@@ -199,9 +215,9 @@ import { apiErrorMessage } from '../../api/api-error';
               </div>
 
               <div>
-                <label for="newpw2" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Confirm password</label
-                >
+                <label for="newpw2" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'forgotPassword.confirmPassword' | transloco
+                }}</label>
                 <input
                   id="newpw2"
                   type="password"
@@ -228,17 +244,19 @@ import { apiErrorMessage } from '../../api/api-error';
 
               <button type="submit" [disabled]="loading" class="btn btn-primary btn-full btn-lg">
                 @if (loading) {
-                  <span class="spinner spinner-sm"></span> Saving...
+                  <span class="spinner spinner-sm"></span> {{ 'common.saving' | transloco }}
                 } @else {
-                  Save new password
+                  {{ 'forgotPassword.saveNewPassword' | transloco }}
                 }
               </button>
             </form>
           }
 
           <p class="text-sm text-muted-foreground text-center mt-6">
-            Remembered it?
-            <a routerLink="/login" class="text-ember font-semibold hover:underline ml-1">Sign in</a>
+            {{ 'forgotPassword.rememberedIt' | transloco }}
+            <a routerLink="/login" class="text-ember font-semibold hover:underline ml-1">{{
+              'bookingClaim.signIn' | transloco
+            }}</a>
           </p>
         </div>
       </main>
@@ -246,6 +264,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class ForgotPasswordComponent {
+  private i18n = inject(LanguageService);
   private authService = inject(AuthService);
   private router = inject(Router);
 
@@ -266,7 +285,7 @@ export class ForgotPasswordComponent {
 
   requestReset(): void {
     if (!this.identifier.trim()) {
-      this.error = 'Please enter your username or email.';
+      this.error = this.i18n.t('forgotPassword.pleaseEnterYourUsername');
       return;
     }
     this.error = '';
@@ -278,14 +297,18 @@ export class ForgotPasswordComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = apiErrorMessage(err, 'Request failed. Please try again.', 'detail');
+        this.error = apiErrorMessage(
+          err,
+          this.i18n.t('forgotPassword.requestFailedPleaseTry'),
+          'detail',
+        );
       },
     });
   }
 
   verifyCode(): void {
     if (this.code.length !== 6) {
-      this.error = 'Enter the 6-digit code.';
+      this.error = this.i18n.t('forgotPassword.enterTheDigitCode');
       return;
     }
     this.error = '';
@@ -298,18 +321,22 @@ export class ForgotPasswordComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = apiErrorMessage(err, 'Invalid or expired code.', 'detail');
+        this.error = apiErrorMessage(
+          err,
+          this.i18n.t('forgotPassword.invalidOrExpiredCode'),
+          'detail',
+        );
       },
     });
   }
 
   confirmReset(): void {
     if (!this.newPassword || this.newPassword.length < 8) {
-      this.error = 'Password must be at least 8 characters.';
+      this.error = this.i18n.t('forgotPassword.passwordMustBeAt');
       return;
     }
     if (this.newPassword !== this.newPassword2) {
-      this.error = 'Passwords do not match.';
+      this.error = this.i18n.t('forgotPassword.passwordsDoNotMatch');
       return;
     }
     this.error = '';
@@ -319,14 +346,14 @@ export class ForgotPasswordComponent {
       .subscribe({
         next: () => {
           this.loading = false;
-          this.success = 'Password updated! Redirecting to sign in...';
+          this.success = this.i18n.t('forgotPassword.passwordUpdatedRedirectingTo');
           setTimeout(() => {
             void this.router.navigate(['/login']);
           }, 1800);
         },
         error: (err) => {
           this.loading = false;
-          this.error = apiErrorMessage(err, 'Failed to set new password.', 'detail');
+          this.error = apiErrorMessage(err, this.i18n.t('forgotPassword.failedToSetNew'), 'detail');
         },
       });
   }

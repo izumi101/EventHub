@@ -18,17 +18,26 @@ import {
   ChevronDown,
   ChevronRight,
 } from 'lucide-angular';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../i18n/language.service';
+import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
 
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LanguageSwitcherComponent,
+  ],
   template: `
     <aside
       class="sidebar"
       [class.sidebar-collapsed]="layout.collapsed()"
       [class.sidebar-mobile-open]="layout.mobileOpen()"
-      aria-label="Main navigation"
+      [attr.aria-label]="'nav.mainNavigation' | transloco"
     >
       <!-- Header: logo + collapse toggle -->
       <div class="sidebar-header">
@@ -51,9 +60,9 @@ import {
         <button
           (click)="layout.toggleCollapsed()"
           class="sidebar-collapse-btn focus-ring"
-          [title]="layout.collapsed() ? 'Expand sidebar' : 'Collapse sidebar'"
+          [title]="(layout.collapsed() ? 'nav.expandSidebar' : 'nav.collapseSidebar') | transloco"
           [attr.aria-expanded]="!layout.collapsed()"
-          aria-label="Toggle sidebar"
+          [attr.aria-label]="'nav.toggleSidebar' | transloco"
         >
           <lucide-icon
             [img]="layout.collapsed() ? icons.PanelLeftOpen : icons.PanelLeftClose"
@@ -67,7 +76,7 @@ import {
       <nav class="sidebar-nav" role="navigation">
         @for (section of visibleSections(); track section.id) {
           <!-- Section header -->
-          @if (section.title && !layout.collapsed()) {
+          @if (section.titleKey && !layout.collapsed()) {
             @if (section.collapsible) {
               <button
                 class="sidebar-section-header"
@@ -76,8 +85,8 @@ import {
               >
                 <span>{{
                   section.id === 'event-context'
-                    ? layout.eventContext()?.title || 'Event'
-                    : section.title
+                    ? layout.eventContext()?.title || ('nav.event' | transloco)
+                    : (section.titleKey | transloco)
                 }}</span>
                 <lucide-icon
                   [img]="layout.isGroupOpen(section.id) ? icons.ChevronDown : icons.ChevronRight"
@@ -87,7 +96,7 @@ import {
               </button>
             } @else {
               <div class="sidebar-section-label">
-                {{ section.title }}
+                {{ section.titleKey | transloco }}
               </div>
             }
           }
@@ -99,10 +108,10 @@ import {
 
           <!-- Items (hidden if group collapsed) -->
           @if (!section.collapsible || layout.isGroupOpen(section.id, section.defaultOpen)) {
-            @for (item of visibleItems(section); track item.label) {
+            @for (item of visibleItems(section); track item.labelKey) {
               <a
                 [routerLink]="getRoute(item)"
-                [title]="layout.collapsed() ? item.label : ''"
+                [title]="layout.collapsed() ? (item.labelKey | transloco) : ''"
                 class="sidebar-item focus-ring"
                 [class.sidebar-item-active]="isActive(item)"
                 (click)="layout.closeMobile()"
@@ -114,7 +123,7 @@ import {
                   aria-hidden="true"
                 />
                 @if (!layout.collapsed()) {
-                  <span class="sidebar-item-label">{{ item.label }}</span>
+                  <span class="sidebar-item-label">{{ item.labelKey | transloco }}</span>
                 }
               </a>
             }
@@ -129,12 +138,21 @@ import {
 
       <!-- Footer -->
       <div class="sidebar-footer">
+        <!-- Language switcher: also the way to switch language on mobile -->
+        @if (!layout.collapsed()) {
+          <div class="px-2 py-1 md:hidden">
+            <app-language-switcher />
+          </div>
+        }
+
         <!-- Theme toggle -->
         <button
           (click)="theme.toggle()"
           class="sidebar-item focus-ring"
-          [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
-          [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+          [title]="(theme.isDark() ? 'nav.switchToLight' : 'nav.switchToDark') | transloco"
+          [attr.aria-label]="
+            (theme.isDark() ? 'nav.switchToLight' : 'nav.switchToDark') | transloco
+          "
         >
           <lucide-icon
             [img]="theme.isDark() ? icons.Sun : icons.Moon"
@@ -143,7 +161,7 @@ import {
           />
           @if (!layout.collapsed()) {
             <span class="sidebar-item-label">{{
-              theme.isDark() ? 'Light mode' : 'Dark mode'
+              (theme.isDark() ? 'nav.lightMode' : 'nav.darkMode') | transloco
             }}</span>
           }
         </button>
@@ -178,14 +196,14 @@ import {
                   class="profile-dropdown-item focus-ring"
                 >
                   <lucide-icon [img]="icons.UserIcon" class="w-4 h-4" aria-hidden="true" />
-                  Profile
+                  {{ 'nav.profile' | transloco }}
                 </a>
                 <button
                   (click)="logout()"
                   class="profile-dropdown-item profile-dropdown-item-danger focus-ring w-full text-left"
                 >
                   <lucide-icon [img]="icons.LogOut" class="w-4 h-4" aria-hidden="true" />
-                  Sign Out
+                  {{ 'nav.signOut' | transloco }}
                 </button>
               </div>
             }
@@ -198,7 +216,7 @@ import {
               class="sidebar-item focus-ring text-primary"
             >
               <lucide-icon [img]="icons.UserIcon" class="sidebar-item-icon" aria-hidden="true" />
-              <span class="sidebar-item-label">Sign In</span>
+              <span class="sidebar-item-label">{{ 'nav.signIn' | transloco }}</span>
             </a>
           }
         }
@@ -219,6 +237,7 @@ export class SidebarComponent {
   private authService = inject(AuthService);
   private modalService = inject(ModalService);
   private router = inject(Router);
+  private i18n = inject(LanguageService);
 
   user: User | null = null;
   isOrganizer = false;
@@ -325,10 +344,10 @@ export class SidebarComponent {
   async logout(): Promise<void> {
     this.profileOpen = false;
     const confirmed = await this.modalService.open({
-      title: 'Sign Out',
-      message: 'Are you sure you want to sign out of EventHub?',
-      confirmText: 'Sign Out',
-      cancelText: 'Cancel',
+      title: this.i18n.t('nav.signOutTitle'),
+      message: this.i18n.t('nav.signOutMessage'),
+      confirmText: this.i18n.t('nav.signOut'),
+      cancelText: this.i18n.t('common.cancel'),
       isDestructive: true,
     });
     if (confirmed) {

@@ -1,11 +1,12 @@
 import { Component } from '@angular/core';
 import { RouterModule } from '@angular/router';
 import { LucideAngularModule, House, ArrowLeft } from 'lucide-angular';
+import { TranslocoPipe } from '@jsverse/transloco';
 
 @Component({
   selector: 'app-not-found',
   standalone: true,
-  imports: [RouterModule, LucideAngularModule],
+  imports: [RouterModule, LucideAngularModule, TranslocoPipe],
   template: `
     <div class="min-h-dvh bg-background flex items-center justify-center px-4 py-12">
       <div class="text-center animate-fade-in max-w-md">
@@ -15,21 +16,21 @@ import { LucideAngularModule, House, ArrowLeft } from 'lucide-angular';
         >
           404
         </p>
-        <p class="kicker mb-3">Lost the trail</p>
+        <p class="kicker mb-3">{{ 'notFound.lostTheTrail' | transloco }}</p>
         <h1 class="font-display text-2xl font-semibold text-foreground mb-2">
-          This page has left the venue.
+          {{ 'notFound.thisPageHasLeft' | transloco }}
         </h1>
         <p class="text-sm text-muted-foreground mb-8 max-w-xs mx-auto">
-          The page you're looking for doesn't exist or has been moved.
+          {{ 'notFound.thePageYouRe' | transloco }}
         </p>
         <div class="flex flex-wrap items-center justify-center gap-3">
           <a routerLink="/" class="btn btn-primary flex items-center gap-1.5">
             <lucide-icon [img]="icons.House" class="w-4 h-4" aria-hidden="true" />
-            Back to home
+            {{ 'notFound.backToHome' | transloco }}
           </a>
           <button (click)="goBack()" class="btn btn-secondary flex items-center gap-1.5">
             <lucide-icon [img]="icons.ArrowLeft" class="w-4 h-4" aria-hidden="true" />
-            Go back
+            {{ 'notFound.goBack' | transloco }}
           </button>
         </div>
       </div>

@@ -18,11 +18,22 @@ import {
   ChevronRight,
   X,
 } from 'lucide-angular';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
+import { PluralPipe } from '../../i18n/locale.pipes';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, EventCardComponent, LucideAngularModule],
+  imports: [
+    CommonModule,
+    RouterModule,
+    FormsModule,
+    EventCardComponent,
+    LucideAngularModule,
+    TranslocoPipe,
+    PluralPipe,
+  ],
   template: `
     <div class="page-root-white">
       <!-- ─── Discovery header ─── -->
@@ -30,16 +41,17 @@ import {
         <div class="container py-7">
           <!-- Editorial hero -->
           <div class="mb-6 max-w-2xl">
-            <p class="kicker mb-3">What's on · This week</p>
+            <p class="kicker mb-3">{{ 'home.kicker' | transloco }}</p>
             <h1
               class="font-display font-semibold tracking-tight leading-[1.02] text-foreground"
               style="font-size:clamp(2.25rem,4.6vw,3.4rem)"
             >
-              Find your next<br /><span class="text-ember">night out.</span>
+              {{ 'home.titleLine1' | transloco }}<br /><span class="text-ember">{{
+                'home.titleLine2' | transloco
+              }}</span>
             </h1>
             <p class="text-muted-foreground mt-4 text-[0.975rem] leading-relaxed max-w-xl">
-              From sold-out gigs to quiet gallery openings — every event worth your evening, in one
-              place.
+              {{ 'home.subtitle' | transloco }}
             </p>
           </div>
 
@@ -65,10 +77,10 @@ import {
                 [(ngModel)]="searchQuery"
                 (keyup.enter)="applyFilters()"
                 [placeholder]="
-                  semanticMode ? 'Describe what you are looking for...' : 'Search events...'
+                  (semanticMode ? 'home.searchPlaceholderAi' : 'home.searchPlaceholder') | transloco
                 "
                 class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-                aria-label="Search events"
+                [attr.aria-label]="'home.searchEvents' | transloco"
               />
               <!-- AI toggle button -->
               <button
@@ -79,7 +91,7 @@ import {
                     ? 'flex-shrink-0 font-mono-ui text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded bg-ember text-white'
                     : 'flex-shrink-0 font-mono-ui text-[10px] font-medium tracking-wide px-1.5 py-0.5 rounded bg-muted text-muted-foreground hover:bg-ember/10 hover:text-ember transition-colors'
                 "
-                title="Toggle AI semantic search"
+                [title]="'home.toggleAi' | transloco"
               >
                 AI
               </button>
@@ -98,22 +110,24 @@ import {
                 type="text"
                 [(ngModel)]="searchLocation"
                 (keyup.enter)="applyFilters()"
-                placeholder="Location"
+                [placeholder]="'home.location' | transloco"
                 class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground w-full"
-                aria-label="Filter by location"
+                [attr.aria-label]="'home.filterLocation' | transloco"
               />
             </label>
 
-            <button (click)="applyFilters()" class="btn btn-primary h-10 px-5">Search</button>
+            <button (click)="applyFilters()" class="btn btn-primary h-10 px-5">
+              {{ 'home.search' | transloco }}
+            </button>
 
             @if (hasActiveFilters) {
               <button
                 (click)="resetFilters()"
                 class="btn btn-ghost btn-sm h-10 flex items-center gap-1.5 text-muted-foreground"
-                aria-label="Clear all filters"
+                [attr.aria-label]="'home.clearAll' | transloco"
               >
                 <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" aria-hidden="true" />
-                Clear
+                {{ 'home.clear' | transloco }}
               </button>
             }
           </div>
@@ -133,13 +147,13 @@ import {
                 [(ngModel)]="ordering"
                 (change)="applyFilters()"
                 class="bg-transparent text-sm text-foreground outline-none cursor-pointer h-full"
-                aria-label="Sort events"
+                [attr.aria-label]="'home.sortEvents' | transloco"
               >
-                <option value="date">Date: soonest first</option>
-                <option value="-date">Date: latest first</option>
-                <option value="-created_at">Newest added</option>
-                <option value="price">Price: low to high</option>
-                <option value="-price">Price: high to low</option>
+                <option value="date">{{ 'home.sort.dateAsc' | transloco }}</option>
+                <option value="-date">{{ 'home.sort.dateDesc' | transloco }}</option>
+                <option value="-created_at">{{ 'home.sort.newest' | transloco }}</option>
+                <option value="price">{{ 'home.sort.priceAsc' | transloco }}</option>
+                <option value="-price">{{ 'home.sort.priceDesc' | transloco }}</option>
               </select>
             </div>
 
@@ -148,10 +162,10 @@ import {
               (click)="toggleFree()"
               class="chip"
               [class.chip-active]="isFree"
-              aria-label="Show free events only"
+              [attr.aria-label]="'home.freeOnlyLabel' | transloco"
               [attr.aria-pressed]="isFree"
             >
-              Free only
+              {{ 'home.freeOnly' | transloco }}
             </button>
 
             <!-- Online toggle -->
@@ -159,10 +173,10 @@ import {
               (click)="toggleOnline()"
               class="chip"
               [class.chip-active]="isOnline"
-              aria-label="Show online events only"
+              [attr.aria-label]="'home.onlineOnlyLabel' | transloco"
               [attr.aria-pressed]="isOnline"
             >
-              Online
+              {{ 'home.online' | transloco }}
             </button>
           </div>
         </div>
@@ -179,7 +193,7 @@ import {
               class="chip flex-shrink-0"
               [class.chip-active]="selectedCategory === null"
             >
-              All
+              {{ 'home.all' | transloco }}
             </button>
             @for (cat of categories; track cat.id) {
               <button
@@ -199,7 +213,7 @@ import {
         <!-- Recommended for you (personalised, signed-in only) -->
         @if (recommended.length > 0 && !hasActiveFilters) {
           <section class="mb-10">
-            <p class="kicker mb-3">Recommended for you</p>
+            <p class="kicker mb-3">{{ 'home.recommended' | transloco }}</p>
             <div class="flex gap-5 overflow-x-auto pb-2 no-scrollbar">
               @for (event of recommended; track event.id) {
                 <div class="w-72 flex-shrink-0">
@@ -213,7 +227,7 @@ import {
         <!-- Results meta -->
         @if (!loading && events.length > 0) {
           <p class="text-sm text-muted-foreground mb-5">
-            {{ totalCount }} event{{ totalCount !== 1 ? 's' : '' }} found
+            {{ 'home.eventsFound' | tPlural: totalCount }}
           </p>
         }
 
@@ -247,11 +261,15 @@ import {
                 aria-hidden="true"
               />
             </div>
-            <h3 class="text-base font-semibold text-foreground mb-1">No events found</h3>
+            <h3 class="text-base font-semibold text-foreground mb-1">
+              {{ 'home.noEvents' | transloco }}
+            </h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
-              Try adjusting your search or filters to find what you're looking for.
+              {{ 'home.noEventsHint' | transloco }}
             </p>
-            <button (click)="resetFilters()" class="btn btn-secondary btn-sm">Clear filters</button>
+            <button (click)="resetFilters()" class="btn btn-secondary btn-sm">
+              {{ 'home.clearFilters' | transloco }}
+            </button>
           </div>
 
           <!-- Grid -->
@@ -273,9 +291,9 @@ import {
               <button (click)="loadMore()" [disabled]="loadingMore" class="btn btn-secondary">
                 @if (loadingMore) {
                   <span class="spinner spinner-sm"></span>
-                  Loading...
+                  {{ 'common.loading' | transloco }}
                 } @else {
-                  Load more events
+                  {{ 'home.loadMore' | transloco }}
                   <lucide-icon [img]="icons.ChevronRight" class="w-4 h-4" aria-hidden="true" />
                 }
               </button>
@@ -291,6 +309,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   private searchService = inject(SearchService);
   private toastService = inject(ToastService);
   private authService = inject(AuthService);
+  private i18n = inject(LanguageService);
 
   events: Event[] = [];
   categories: Category[] = [];
@@ -395,7 +414,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       error: (err) => {
         // Status 0 = offline / aborted request: no toast for that.
         if (apiErrorStatus(err) !== 0) {
-          this.toastService.error('Failed to load events. Please try again.');
+          this.toastService.error(this.i18n.t('home.loadError'));
         }
         this.loading = false;
       },
@@ -415,7 +434,7 @@ export class HomeComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.currentPage--;
-        this.toastService.error('Failed to load more events.');
+        this.toastService.error(this.i18n.t('home.loadMoreError'));
         this.loadingMore = false;
       },
     });

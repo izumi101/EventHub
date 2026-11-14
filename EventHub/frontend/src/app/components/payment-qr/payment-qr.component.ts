@@ -20,6 +20,8 @@ import {
   PaymentPollingService,
   paymentOutcome,
 } from '../../services/payment-polling.service';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 type QrState = PaymentOutcome | 'stopped';
 
@@ -41,7 +43,7 @@ const POLL_MAX_MS = 10 * 60 * 1000;
 @Component({
   selector: 'app-payment-qr',
   standalone: true,
-  imports: [DialogDirective, MoneyPipe],
+  imports: [DialogDirective, MoneyPipe, TranslocoPipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div
@@ -54,15 +56,15 @@ const POLL_MAX_MS = 10 * 60 * 1000;
         (dismiss)="close()"
       >
         <h2 class="text-lg font-bold text-foreground mb-1">
-          {{ bookingId ? 'Pay for your group booking' : 'Pay for your ticket' }}
+          {{ (bookingId ? 'paymentQr.payForYourGroup' : 'paymentQr.payForYourTicket') | transloco }}
         </h2>
-        <p class="text-sm text-muted-foreground">Scan with your phone to pay</p>
+        <p class="text-sm text-muted-foreground">{{ 'paymentQr.scanWithYourPhone' | transloco }}</p>
         @if (checkout.qr_code) {
           <img
             [src]="checkout.qr_code"
             [alt]="
-              'QR code that opens the payment page for ' +
-              (checkout.amount | money: checkout.currency)
+              'paymentQr.qrAlt'
+                | transloco: { amount: (checkout.amount | money: checkout.currency) }
             "
             width="240"
             height="240"
@@ -77,24 +79,25 @@ const POLL_MAX_MS = 10 * 60 * 1000;
         </p>
         @if (state() === 'stopped') {
           <button type="button" class="btn btn-secondary btn-full mb-2" (click)="startPolling()">
-            Check payment status
+            {{ 'paymentQr.checkPaymentStatus' | transloco }}
           </button>
         }
         <button type="button" class="btn btn-primary btn-full mb-2" (click)="payHere()">
-          Pay on this device
+          {{ 'paymentQr.payOnThisDevice' | transloco }}
         </button>
         <button
           type="button"
           class="btn btn-ghost btn-full text-muted-foreground"
           (click)="close()"
         >
-          Close
+          {{ 'common.close' | transloco }}
         </button>
       </div>
     </div>
   `,
 })
 export class PaymentQrComponent implements OnInit, OnDestroy {
+  private i18n = inject(LanguageService);
   private poller = inject(PaymentPollingService);
   private router = inject(Router);
   private document = inject(DOCUMENT);
@@ -120,16 +123,16 @@ export class PaymentQrComponent implements OnInit, OnDestroy {
     switch (this.state()) {
       case 'paid':
         return this.bookingId
-          ? 'Payment received — opening your tickets…'
-          : 'Payment received — opening your ticket…';
+          ? this.i18n.t('paymentQr.paymentReceivedOpeningYour')
+          : this.i18n.t('paymentQr.paymentReceivedOpeningYour2');
       case 'failed':
-        return 'The payment did not go through. No money was taken; you can try again.';
+        return this.i18n.t('paymentQr.thePaymentDidNot');
       case 'refunded':
-        return 'The payment arrived after your seat hold ended and is being refunded.';
+        return this.i18n.t('paymentQr.thePaymentArrivedAfter');
       case 'stopped':
-        return 'We stopped checking. If you paid, check the status again.';
+        return this.i18n.t('paymentQr.weStoppedCheckingIf');
       default:
-        return 'Waiting for the payment…';
+        return this.i18n.t('paymentQr.waitingForThePayment');
     }
   }
 

@@ -14,6 +14,8 @@ import { SeatSelectorComponent } from '../seat-selector/seat-selector.component'
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 /** The "Confirm registration" checkout dialog.
  *
@@ -24,7 +26,14 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
 @Component({
   selector: 'app-event-checkout-modal',
   standalone: true,
-  imports: [DialogDirective, MoneyPipe, CommonModule, FormsModule, SeatSelectorComponent],
+  imports: [
+    DialogDirective,
+    MoneyPipe,
+    CommonModule,
+    FormsModule,
+    SeatSelectorComponent,
+    TranslocoPipe,
+  ],
   template: `
     <div
       class="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-4 animate-fade-in"
@@ -36,11 +45,13 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
         (dismiss)="closed.emit()"
       >
         <div class="flex items-center justify-between p-5 border-b border-border">
-          <h2 class="text-base font-semibold text-foreground">Confirm registration</h2>
+          <h2 class="text-base font-semibold text-foreground">
+            {{ 'checkout.confirmRegistration' | transloco }}
+          </h2>
           <button
             (click)="closed.emit()"
             class="btn btn-ghost btn-sm w-8 h-8 p-0 text-muted-foreground"
-            aria-label="Close"
+            [attr.aria-label]="'common.close' | transloco"
           >
             ✕
           </button>
@@ -50,20 +61,22 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           <!-- Summary -->
           <div class="p-3 rounded-lg bg-muted border border-border text-sm">
             <div class="flex justify-between mb-1.5">
-              <span class="text-muted-foreground">Event</span>
+              <span class="text-muted-foreground">{{ 'nav.event' | transloco }}</span>
               <span class="font-medium text-foreground text-right max-w-[200px] truncate">{{
                 event.title
               }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-muted-foreground">Price</span>
+              <span class="text-muted-foreground">{{ 'common.price' | transloco }}</span>
               <span class="font-semibold text-foreground">
                 @if (event.is_free) {
-                  Free
+                  {{ 'common.free' | transloco }}
                 } @else if (selectedSeat?.price) {
                   {{ selectedSeat?.price | money: event.currency }}
                 } @else if (seatMap) {
-                  <span class="font-normal text-muted-foreground">choose a seat</span>
+                  <span class="font-normal text-muted-foreground">{{
+                    'checkout.chooseASeat' | transloco
+                  }}</span>
                 } @else {
                   {{ currentGaPrice | money: event.currency }}
                 }
@@ -71,45 +84,51 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
             </div>
             @if (selectedSeat) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
-                <span class="text-muted-foreground">Seat</span>
-                <span class="font-medium text-foreground"
-                  >Row {{ selectedSeat.row }}, Seat {{ selectedSeat.col }}</span
-                >
+                <span class="text-muted-foreground">{{ 'checkout.seat' | transloco }}</span>
+                <span class="font-medium text-foreground">{{
+                  'bookingClaim.rowRowSeatCol'
+                    | transloco: { row: selectedSeat.row, col: selectedSeat.col }
+                }}</span>
               </div>
             }
             @if (selectedTicketType) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
-                <span class="text-muted-foreground">Ticket</span>
+                <span class="text-muted-foreground">{{ 'checkout.ticket' | transloco }}</span>
                 <span class="font-medium text-foreground">{{ selectedTicketType.name }}</span>
               </div>
             }
             @if (promoQuote) {
               <div class="flex justify-between text-[color:var(--pine-600)] mt-1.5">
-                <span>Promo {{ promoQuote.code }}</span>
+                <span>{{ 'checkout.promoCode' | transloco: { code: promoQuote.code } }}</span>
                 <span class="font-medium">−{{ promoQuote.savings | money: event.currency }}</span>
               </div>
             }
             @if (showFeeLines()) {
               <div class="flex justify-between text-muted-foreground mt-1.5">
-                <span>Subtotal</span>
+                <span>{{ 'checkout.subtotal' | transloco }}</span>
                 <span>{{ checkoutSubtotal | money: event.currency }}</span>
               </div>
               @if (taxAmount > 0) {
                 <div class="flex justify-between text-muted-foreground">
-                  <span>Tax ({{ event.tax_percent }}%)</span>
+                  <span>{{
+                    'checkout.taxTaxpercent' | transloco: { taxPercent: event.tax_percent }
+                  }}</span>
                   <span>{{ taxAmount | money: event.currency }}</span>
                 </div>
               }
               @if (feeAmount > 0) {
                 <div class="flex justify-between text-muted-foreground">
-                  <span>Service fee ({{ event.service_fee_percent }}%)</span>
+                  <span>{{
+                    'checkout.serviceFeeServicefeepercent'
+                      | transloco: { serviceFeePercent: event.service_fee_percent }
+                  }}</span>
                   <span>{{ feeAmount | money: event.currency }}</span>
                 </div>
               }
             }
             @if (selectedTicketType || promoQuote || showFeeLines()) {
               <div class="flex justify-between border-t border-border pt-1.5 mt-1.5">
-                <span class="text-foreground font-semibold">Total</span>
+                <span class="text-foreground font-semibold">{{ 'common.total' | transloco }}</span>
                 <span class="text-foreground font-bold">{{
                   checkoutTotal | money: event.currency
                 }}</span>
@@ -120,7 +139,9 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           <!-- Ticket tier selection -->
           @if (event.has_ticket_types) {
             <div class="space-y-2">
-              <p class="text-sm font-semibold text-foreground">Choose your ticket</p>
+              <p class="text-sm font-semibold text-foreground">
+                {{ 'checkout.chooseYourTicket' | transloco }}
+              </p>
               @for (tt of event.ticket_types; track tt.id) {
                 <!-- The donation input sits beside the tier button, not inside it:
                      interactive content inside a <button> is invalid HTML. -->
@@ -147,7 +168,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                           @if (tt.kind === 'donation') {
                             <span
                               class="text-[10px] font-bold uppercase text-ember bg-ember/10 px-1.5 py-0.5 rounded"
-                              >Donation</span
+                              >{{ 'checkout.donation' | transloco }}</span
                             >
                           }
                         </div>
@@ -161,7 +182,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                       <div class="text-right flex-shrink-0">
                         <span class="font-bold text-foreground">
                           @if (tt.kind === 'free') {
-                            Free
+                            {{ 'common.free' | transloco }}
                           } @else if (tt.kind === 'donation') {
                             {{ tt.price | money: event.currency }}+
                           } @else {
@@ -182,7 +203,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                         [min]="tt.price"
                         step="1"
                         class="input flex-1"
-                        placeholder="Amount"
+                        [placeholder]="'checkout.amount' | transloco"
                       />
                     </div>
                   }
@@ -194,8 +215,10 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           <!-- Promo code (paid events) -->
           @if (showPromoField()) {
             <div>
-              <label for="checkout-promo" class="block text-sm font-medium text-foreground mb-1.5"
-                >Promo code</label
+              <label
+                for="checkout-promo"
+                class="block text-sm font-medium text-foreground mb-1.5"
+                >{{ 'checkout.promoCode2' | transloco }}</label
               >
               @if (!promoQuote) {
                 <div class="flex gap-2">
@@ -203,7 +226,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                     id="checkout-promo"
                     [(ngModel)]="promoInput"
                     (keyup.enter)="applyPromo()"
-                    placeholder="Enter code"
+                    [placeholder]="'checkout.enterCode' | transloco"
                     class="input flex-1 uppercase"
                     [class.input-error]="promoError"
                   />
@@ -212,7 +235,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                     [disabled]="!promoInput.trim() || checkingPromo"
                     class="btn btn-secondary"
                   >
-                    {{ checkingPromo ? '…' : 'Apply' }}
+                    {{ checkingPromo ? '…' : ('common.apply' | transloco) }}
                   </button>
                 </div>
                 @if (promoError) {
@@ -223,14 +246,20 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                   class="flex items-center justify-between p-2.5 rounded-lg bg-[color:var(--pine-50)] border border-transparent"
                 >
                   <span class="text-sm font-medium text-[color:var(--pine-600)]">
-                    ✓ {{ promoQuote.code }} applied — you save
-                    {{ promoQuote.savings | money: event.currency }}
+                    {{
+                      'checkout.codeAppliedYouSave'
+                        | transloco
+                          : {
+                              code: promoQuote.code,
+                              savings: (promoQuote.savings | money: event.currency),
+                            }
+                    }}
                   </span>
                   <button
                     (click)="removePromo()"
                     class="text-xs text-[color:var(--pine-600)] hover:underline"
                   >
-                    Remove
+                    {{ 'common.remove' | transloco }}
                   </button>
                 </div>
               }
@@ -243,7 +272,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
               @if (loadingSeatMap || !seatMap) {
                 <div class="flex flex-col items-center gap-2 py-6 text-muted-foreground">
                   <span class="spinner spinner-sm"></span>
-                  <span class="text-sm">Loading seats…</span>
+                  <span class="text-sm">{{ 'checkout.loadingSeats' | transloco }}</span>
                 </div>
               } @else {
                 <app-seat-selector
@@ -257,7 +286,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           }
           @if (!event.is_free && !event.has_ticket_types && seatMapMissing) {
             <p class="text-xs text-muted-foreground border-t border-border pt-4">
-              General admission — no assigned seating for this event.
+              {{ 'checkout.generalAdmissionNoAssigned' | transloco }}
             </p>
           }
 
@@ -265,7 +294,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           @if (questions.length) {
             <div class="border-t border-border pt-4 space-y-3">
               <p class="text-sm font-semibold text-foreground">
-                A few questions from the organizer
+                {{ 'checkout.aFewQuestionsFrom' | transloco }}
               </p>
               @for (q of questions; track q.id) {
                 <div>
@@ -294,7 +323,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                         [(ngModel)]="answers[q.id]"
                         class="input w-full"
                       >
-                        <option value="">Select…</option>
+                        <option value="">{{ 'checkout.select' | transloco }}</option>
                         @for (opt of q.options; track opt) {
                           <option [value]="opt">{{ opt }}</option>
                         }
@@ -308,7 +337,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
                           [(ngModel)]="answers[q.id]"
                           class="w-4 h-4 rounded"
                         />
-                        Yes
+                        {{ 'common.yes' | transloco }}
                       </label>
                     }
                     @case ('date') {
@@ -345,12 +374,15 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           <!-- Notes -->
           <div>
             <label for="reg-notes" class="block text-sm font-medium text-foreground mb-1.5">
-              Additional notes <span class="text-muted-foreground font-normal">(optional)</span>
+              {{ 'checkout.additionalNotes' | transloco }}
+              <span class="text-muted-foreground font-normal">{{
+                'checkout.optional' | transloco
+              }}</span>
             </label>
             <textarea
               id="reg-notes"
               [(ngModel)]="registrationNotes"
-              placeholder="Dietary requirements, questions for the organizer..."
+              [placeholder]="'checkout.dietaryRequirementsQuestionsFor' | transloco"
               rows="3"
               class="input resize-none"
             ></textarea>
@@ -358,7 +390,9 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
         </div>
 
         <div class="flex items-center gap-3 p-5 border-t border-border">
-          <button (click)="closed.emit()" class="btn btn-secondary flex-1">Cancel</button>
+          <button (click)="closed.emit()" class="btn btn-secondary flex-1">
+            {{ 'common.cancel' | transloco }}
+          </button>
           <button
             (click)="submit()"
             [disabled]="registering || !canConfirm()"
@@ -366,24 +400,27 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
           >
             @if (registering) {
               <span class="spinner spinner-sm"></span>
-              Processing...
+              {{ 'checkout.processing' | transloco }}
             } @else if (event.has_ticket_types && !selectedTicketType) {
-              Choose a ticket
+              {{ 'checkout.chooseATicket' | transloco }}
             } @else if (
               !event.is_free &&
               !event.has_ticket_types &&
               !seatMapMissing &&
               (loadingSeatMap || !seatMap)
             ) {
-              Loading seats…
+              {{ 'checkout.loadingSeats' | transloco }}
             } @else if (
               !event.is_free && !event.has_ticket_types && !seatMapMissing && !selectedSeat
             ) {
-              Select a seat to continue
+              {{ 'checkout.selectASeatTo' | transloco }}
             } @else if (confirmIsPaid()) {
-              Proceed to payment — {{ checkoutTotal | money: event.currency }}
+              {{
+                'checkout.proceedToPaymentCheckouttotal'
+                  | transloco: { checkoutTotal: (checkoutTotal | money: event.currency) }
+              }}
             } @else {
-              Confirm registration
+              {{ 'checkout.confirmRegistration' | transloco }}
             }
           </button>
         </div>
@@ -392,6 +429,7 @@ import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
   `,
 })
 export class EventCheckoutModalComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private toastService = inject(ToastService);
 
@@ -454,7 +492,7 @@ export class EventCheckoutModalComponent implements OnInit {
           if (apiErrorStatus(err) === 404) {
             this.seatMapMissing = true;
           } else {
-            this.toastService.error('Failed to load seat map');
+            this.toastService.error(this.i18n.t('checkout.failedToLoadSeat'));
           }
         },
       });
@@ -477,16 +515,17 @@ export class EventCheckoutModalComponent implements OnInit {
   tierAvailabilityLabel(tt: TicketType): string {
     switch (tt.sale_state) {
       case 'sold_out':
-        return 'Sold out';
+        return this.i18n.t('event.soldOut');
       case 'scheduled':
-        return 'Sales not started yet';
+        return this.i18n.t('checkout.salesNotStartedYet');
       case 'ended':
-        return 'Sales ended';
+        return this.i18n.t('checkout.salesEnded');
       case 'inactive':
-        return 'Unavailable';
+        return this.i18n.t('checkout.unavailable');
       default:
-        if (tt.available !== null && tt.available <= 10) return `Only ${tt.available} left`;
-        return 'Available';
+        if (tt.available !== null && tt.available <= 10)
+          return this.i18n.t('checkout.onlyAvailableLeft', { available: tt.available });
+        return this.i18n.t('checkout.available');
     }
   }
 
@@ -519,7 +558,7 @@ export class EventCheckoutModalComponent implements OnInit {
         this.checkingPromo = false;
       },
       error: (err) => {
-        this.promoError = apiErrorMessage(err, 'Invalid promo code', 'error');
+        this.promoError = apiErrorMessage(err, this.i18n.t('checkout.invalidPromoCode'), 'error');
         this.promoQuote = null;
         this.checkingPromo = false;
       },
@@ -610,18 +649,18 @@ export class EventCheckoutModalComponent implements OnInit {
     // Ticket-typed events require a tier; seat-map events require a seat.
     if (this.event.has_ticket_types) {
       if (!this.selectedTicketType) {
-        this.toastService.error('Please choose a ticket');
+        this.toastService.error(this.i18n.t('checkout.pleaseChooseATicket'));
         return;
       }
       if (this.selectedTicketType.kind === 'donation') {
         const min = Number(this.selectedTicketType.price);
         if (Number(this.donationAmount) < min) {
-          this.toastService.error(`Minimum contribution is $${min}`);
+          this.toastService.error(this.i18n.t('checkout.minimumContributionIsMin', { min: min }));
           return;
         }
       }
     } else if (!this.event.is_free && !this.seatMapMissing && !this.selectedSeat) {
-      this.toastService.error('Please select a seat');
+      this.toastService.error(this.i18n.t('checkout.pleaseSelectASeat'));
       return;
     }
 
@@ -630,7 +669,7 @@ export class EventCheckoutModalComponent implements OnInit {
       (q) => q.is_required && !this.answers[q.id] && this.answers[q.id] !== false,
     );
     if (missing) {
-      this.toastService.error(`Please answer: ${missing.label}`);
+      this.toastService.error(this.i18n.t('checkout.pleaseAnswerLabel', { label: missing.label }));
       return;
     }
 

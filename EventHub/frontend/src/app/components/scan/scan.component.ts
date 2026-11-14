@@ -24,6 +24,9 @@ import {
   ChevronLeft,
 } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 type ScanState =
   | 'requesting' // asking for camera access
@@ -37,7 +40,7 @@ type ScanState =
 @Component({
   selector: 'app-scan',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, LucideAngularModule, TranslocoPipe, LocalDatePipe],
   template: `
     <div class="page-root">
       <div class="container max-w-md py-8">
@@ -47,12 +50,14 @@ type ScanState =
           class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-5"
         >
           <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true" />
-          Dashboard
+          {{ 'nav.dashboard' | transloco }}
         </a>
 
-        <h1 class="text-2xl font-bold text-foreground mb-1">Scan tickets</h1>
+        <h1 class="text-2xl font-bold text-foreground mb-1">
+          {{ 'attendees.scanTickets' | transloco }}
+        </h1>
         <p class="text-sm text-muted-foreground mb-6">
-          Point the camera at an attendee's QR code to check them in.
+          {{ 'scan.pointTheCameraAt' | transloco }}
         </p>
 
         <div class="card overflow-hidden shadow-card">
@@ -76,7 +81,7 @@ type ScanState =
                 ></div>
               </div>
               <p class="absolute bottom-4 inset-x-0 text-center text-white/90 text-sm font-medium">
-                Searching for QR code...
+                {{ 'scan.searchingForQrCode' | transloco }}
               </p>
             }
 
@@ -86,7 +91,9 @@ type ScanState =
                   class="spinner spinner-lg"
                   style="border-top-color:#fff;border-color:rgba(255,255,255,0.3)"
                 ></span>
-                <p class="text-white text-sm font-medium">Verifying ticket...</p>
+                <p class="text-white text-sm font-medium">
+                  {{ 'scan.verifyingTicket' | transloco }}
+                </p>
               </div>
             }
 
@@ -95,7 +102,7 @@ type ScanState =
                 class="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/90"
               >
                 <lucide-icon [img]="icons.Camera" class="w-8 h-8" aria-hidden="true" />
-                <p class="text-sm font-medium">Requesting camera access...</p>
+                <p class="text-sm font-medium">{{ 'scan.requestingCameraAccess' | transloco }}</p>
               </div>
             }
           </div>
@@ -115,32 +122,32 @@ type ScanState =
               <h2 class="text-base font-semibold text-foreground mb-1">
                 @switch (state) {
                   @case ('denied') {
-                    Camera access denied
+                    {{ 'scan.cameraAccessDenied' | transloco }}
                   }
                   @case ('nocamera') {
-                    No camera found
+                    {{ 'scan.noCameraFound' | transloco }}
                   }
                   @case ('insecure') {
-                    Camera unavailable
+                    {{ 'scan.cameraUnavailable' | transloco }}
                   }
                 }
               </h2>
               <p class="text-sm text-muted-foreground mb-5">
                 @switch (state) {
                   @case ('denied') {
-                    Allow camera access in your browser settings and try again.
+                    {{ 'scan.allowCameraAccessIn' | transloco }}
                   }
                   @case ('nocamera') {
-                    This device doesn't have an available camera.
+                    {{ 'scan.thisDeviceDoesnT' | transloco }}
                   }
                   @case ('insecure') {
-                    The camera requires a secure connection (HTTPS or localhost).
+                    {{ 'scan.theCameraRequiresA' | transloco }}
                   }
                 }
               </p>
               <button (click)="startCamera()" class="btn btn-secondary btn-sm">
                 <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
-                Try again
+                {{ 'scan.tryAgain' | transloco }}
               </button>
             </div>
           }
@@ -158,8 +165,12 @@ type ScanState =
                     aria-hidden="true"
                   />
                 </div>
-                <h2 class="text-xl font-bold text-foreground mb-1">Access granted</h2>
-                <p class="text-sm text-muted-foreground mb-5">Ticket valid · checked in</p>
+                <h2 class="text-xl font-bold text-foreground mb-1">
+                  {{ 'scan.accessGranted' | transloco }}
+                </h2>
+                <p class="text-sm text-muted-foreground mb-5">
+                  {{ 'scan.ticketValidCheckedIn' | transloco }}
+                </p>
               } @else if (resultStatus === 'used') {
                 <div
                   class="w-16 h-16 rounded-full bg-[color:var(--warning-50)] flex items-center justify-center mx-auto mb-4"
@@ -170,8 +181,12 @@ type ScanState =
                     aria-hidden="true"
                   />
                 </div>
-                <h2 class="text-xl font-bold text-foreground mb-1">Already scanned</h2>
-                <p class="text-sm text-muted-foreground mb-5">This ticket has been used</p>
+                <h2 class="text-xl font-bold text-foreground mb-1">
+                  {{ 'scan.alreadyScanned' | transloco }}
+                </h2>
+                <p class="text-sm text-muted-foreground mb-5">
+                  {{ 'scan.thisTicketHasBeen' | transloco }}
+                </p>
               } @else {
                 <div
                   class="w-16 h-16 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center mx-auto mb-4"
@@ -182,7 +197,9 @@ type ScanState =
                     aria-hidden="true"
                   />
                 </div>
-                <h2 class="text-xl font-bold text-foreground mb-1">Invalid ticket</h2>
+                <h2 class="text-xl font-bold text-foreground mb-1">
+                  {{ 'scan.invalidTicket' | transloco }}
+                </h2>
                 <p class="text-sm text-muted-foreground mb-5">{{ errorMessage }}</p>
               }
 
@@ -192,22 +209,28 @@ type ScanState =
                   class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-5 text-left"
                 >
                   <div class="px-4 py-3 flex justify-between gap-3">
-                    <span class="text-muted-foreground flex-shrink-0">Attendee</span>
+                    <span class="text-muted-foreground flex-shrink-0">{{
+                      'attendees.attendee' | transloco
+                    }}</span>
                     <span class="font-medium text-foreground text-right">{{
                       result.attendee
                     }}</span>
                   </div>
                   @if (result.event) {
                     <div class="px-4 py-3 flex justify-between gap-3">
-                      <span class="text-muted-foreground flex-shrink-0">Event</span>
+                      <span class="text-muted-foreground flex-shrink-0">{{
+                        'nav.event' | transloco
+                      }}</span>
                       <span class="font-medium text-foreground text-right">{{ result.event }}</span>
                     </div>
                   }
                   @if (resultStatus === 'used' && result.checked_in_at) {
                     <div class="px-4 py-3 flex justify-between gap-3">
-                      <span class="text-muted-foreground flex-shrink-0">First scan</span>
+                      <span class="text-muted-foreground flex-shrink-0">{{
+                        'scan.firstScan' | transloco
+                      }}</span>
                       <span class="font-medium text-foreground">{{
-                        result.checked_in_at | date: 'HH:mm, MMM d'
+                        result.checked_in_at | localDate: 'HH:mm, MMM d'
                       }}</span>
                     </div>
                   }
@@ -216,20 +239,21 @@ type ScanState =
 
               <button (click)="scanNext()" class="btn btn-primary btn-full btn-lg">
                 <lucide-icon [img]="icons.Camera" class="w-4 h-4" aria-hidden="true" />
-                Scan next ticket
+                {{ 'scan.scanNextTicket' | transloco }}
               </button>
             </div>
           }
         </div>
 
         <p class="text-xs text-muted-foreground text-center mt-4">
-          Only event organizers can check in tickets.
+          {{ 'scan.onlyEventOrganizersCan' | transloco }}
         </p>
       </div>
     </div>
   `,
 })
 export class ScanComponent implements AfterViewInit, OnDestroy {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private zone = inject(NgZone);
 
@@ -363,7 +387,7 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
         this.resultStatus = 'error';
         this.errorMessage = apiErrorMessage(
           err,
-          'Invalid ticket or insufficient permissions.',
+          this.i18n.t('scan.invalidTicketOrInsufficient'),
           'error',
         );
         this.vibrate([200]);

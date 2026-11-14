@@ -9,11 +9,22 @@ import { LucideAngularModule, Users, Check, Armchair } from 'lucide-angular';
 import * as QRCode from 'qrcode';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-booking-claim',
   standalone: true,
-  imports: [DialogDirective, CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [
+    DialogDirective,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-lg py-10">
@@ -21,11 +32,15 @@ import { apiErrorMessage } from '../../api/api-error';
           <div class="flex justify-center py-24"><span class="spinner spinner-lg"></span></div>
         } @else if (!booking) {
           <div class="text-center py-20">
-            <h1 class="text-xl font-bold text-foreground mb-2">Invite not found</h1>
+            <h1 class="text-xl font-bold text-foreground mb-2">
+              {{ 'bookingClaim.inviteNotFound' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground">
-              This booking link is invalid or has expired.
+              {{ 'bookingClaim.thisBookingLinkIs' | transloco }}
             </p>
-            <a routerLink="/" class="btn btn-primary btn-sm mt-5">Browse events</a>
+            <a routerLink="/" class="btn btn-primary btn-sm mt-5">{{
+              'bookingClaim.browseEvents' | transloco
+            }}</a>
           </div>
         } @else {
           <div class="text-center mb-6">
@@ -35,11 +50,14 @@ import { apiErrorMessage } from '../../api/api-error';
               <lucide-icon [img]="icons.Users" class="w-6 h-6 text-primary" />
             </div>
             <h1 class="text-xl font-bold text-foreground">
-              {{ booking.owner_username }} invited you
+              {{
+                'bookingClaim.ownerusernameInvitedYou'
+                  | transloco: { ownerUsername: booking.owner_username }
+              }}
             </h1>
             <p class="text-sm text-muted-foreground mt-1">{{ booking.event_title }}</p>
             <p class="text-xs text-muted-foreground">
-              {{ booking.event_date | date: 'EEE, MMM d, y · h:mm a' }} ·
+              {{ booking.event_date | localDate: 'EEE, MMM d, y · h:mm a' }} ·
               {{ booking.event_location }}
             </p>
           </div>
@@ -47,7 +65,7 @@ import { apiErrorMessage } from '../../api/api-error';
           @if (booking.status === 'confirmed') {
             <!-- Paid: every seat is a live ticket — claim yours and grab the QR -->
             <div class="note note-success mb-4 text-center">
-              Booking confirmed & paid. Claim your seat to put your name on the ticket.
+              {{ 'bookingClaim.bookingConfirmedPaidClaim' | transloco }}
             </div>
             @if (!isLoggedIn) {
               <p class="text-xs text-center text-muted-foreground mb-4">
@@ -55,9 +73,9 @@ import { apiErrorMessage } from '../../api/api-error';
                   routerLink="/login"
                   [queryParams]="{ returnUrl: '/booking/' + token }"
                   class="underline"
-                  >Sign in</a
+                  >{{ 'bookingClaim.signIn' | transloco }}</a
                 >
-                before claiming to get your own QR ticket.
+                {{ 'bookingClaim.beforeClaimingToGet' | transloco }}
               </p>
             }
             <div class="space-y-2">
@@ -72,7 +90,7 @@ import { apiErrorMessage } from '../../api/api-error';
                       </div>
                       <div class="min-w-0">
                         <p class="text-sm font-semibold text-foreground">
-                          Row {{ s.row }}, Seat {{ s.col }}
+                          {{ 'bookingClaim.rowRowSeatCol' | transloco: { row: s.row, col: s.col } }}
                         </p>
                         <p
                           class="text-xs"
@@ -82,7 +100,7 @@ import { apiErrorMessage } from '../../api/api-error';
                               : 'text-muted-foreground'
                           "
                         >
-                          {{ s.attendee_name || 'Unclaimed' }}
+                          {{ s.attendee_name || ('bookingClaim.unclaimed' | transloco) }}
                         </p>
                       </div>
                     </div>
@@ -93,18 +111,20 @@ import { apiErrorMessage } from '../../api/api-error';
                         <button
                           class="bg-white rounded-lg p-1.5 ring-1 ring-border shadow-sm cursor-zoom-in flex-shrink-0"
                           (click)="zoomSeat = s"
-                          title="Show ticket QR"
+                          [title]="'bookingClaim.showTicketQr' | transloco"
                         >
                           <img [src]="qrCodes[s.ticket_uuid]" alt="QR" class="w-14 h-14 block" />
                         </button>
                       } @else {
-                        <span class="text-xs text-muted-foreground flex-shrink-0">Claimed</span>
+                        <span class="text-xs text-muted-foreground flex-shrink-0">{{
+                          'bookingClaim.claimed' | transloco
+                        }}</span>
                       }
                     } @else if (claimingId === s.seat_id) {
                       <div class="flex gap-2">
                         <input
                           [(ngModel)]="claimName"
-                          placeholder="Your name"
+                          [placeholder]="'bookingClaim.yourName' | transloco"
                           class="input h-9 text-sm w-28"
                           (keyup.enter)="confirmClaim(s)"
                         />
@@ -113,7 +133,7 @@ import { apiErrorMessage } from '../../api/api-error';
                           [disabled]="!claimName.trim()"
                           class="btn btn-primary btn-sm"
                         >
-                          Claim
+                          {{ 'bookingClaim.claim' | transloco }}
                         </button>
                       </div>
                     } @else {
@@ -121,7 +141,7 @@ import { apiErrorMessage } from '../../api/api-error';
                         (click)="startClaim(s)"
                         class="btn btn-secondary btn-sm flex-shrink-0"
                       >
-                        Claim seat
+                        {{ 'bookingClaim.claimSeat' | transloco }}
                       </button>
                     }
                   </div>
@@ -129,15 +149,17 @@ import { apiErrorMessage } from '../../api/api-error';
               }
             </div>
             <p class="text-xs text-center text-muted-foreground mt-5">
-              Show your QR at the entrance — each seat has its own ticket.
+              {{ 'bookingClaim.showYourQrAt' | transloco }}
             </p>
           } @else if (booking.status !== 'holding') {
             <div class="card p-5 text-center">
-              <p class="text-sm text-muted-foreground">This booking is no longer active.</p>
+              <p class="text-sm text-muted-foreground">
+                {{ 'bookingClaim.thisBookingIsNo' | transloco }}
+              </p>
             </div>
           } @else {
             <p class="text-sm text-center text-muted-foreground mb-4">
-              Tap a seat to claim it with your name
+              {{ 'bookingClaim.tapASeatTo' | transloco }}
             </p>
             <div class="space-y-2">
               @for (s of booking.seats; track s.id) {
@@ -152,7 +174,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     </div>
                     <div>
                       <p class="text-sm font-semibold text-foreground">
-                        Row {{ s.row }}, Seat {{ s.col }}
+                        {{ 'bookingClaim.rowRowSeatCol' | transloco: { row: s.row, col: s.col } }}
                       </p>
                       <p class="text-xs text-muted-foreground capitalize">
                         {{ s.zone }} · {{ s.price }} {{ booking.currency }}
@@ -171,7 +193,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     <div class="flex gap-2">
                       <input
                         [(ngModel)]="claimName"
-                        placeholder="Your name"
+                        [placeholder]="'bookingClaim.yourName' | transloco"
                         class="input h-9 text-sm w-28"
                         (keyup.enter)="confirmClaim(s)"
                       />
@@ -180,12 +202,12 @@ import { apiErrorMessage } from '../../api/api-error';
                         [disabled]="!claimName.trim()"
                         class="btn btn-primary btn-sm"
                       >
-                        Claim
+                        {{ 'bookingClaim.claim' | transloco }}
                       </button>
                     </div>
                   } @else {
                     <button (click)="startClaim(s)" class="btn btn-secondary btn-sm">
-                      Claim seat
+                      {{ 'bookingClaim.claimSeat' | transloco }}
                     </button>
                   }
                 </div>
@@ -193,7 +215,7 @@ import { apiErrorMessage } from '../../api/api-error';
             </div>
 
             <p class="text-xs text-center text-muted-foreground mt-5">
-              The organizer pays for the whole group. You just pick your seat.
+              {{ 'bookingClaim.theOrganizerPaysFor' | transloco }}
             </p>
           }
         }
@@ -212,23 +234,33 @@ import { apiErrorMessage } from '../../api/api-error';
           (dismiss)="zoomSeat = null"
         >
           <h3 class="text-base font-bold text-foreground leading-tight">
-            Row {{ zoomSeat.row }}, Seat {{ zoomSeat.col }}
+            {{ 'bookingClaim.rowRowSeatCol' | transloco: { row: zoomSeat.row, col: zoomSeat.col } }}
           </h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">
-            {{ zoomSeat.attendee_name }} — show at the entrance
+            {{
+              'bookingClaim.attendeenameShowAtThe'
+                | transloco: { attendeeName: zoomSeat.attendee_name }
+            }}
           </p>
           @if (zoomSeat.ticket_uuid && qrCodes[zoomSeat.ticket_uuid]) {
             <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
-              <img [src]="qrCodes[zoomSeat.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
+              <img
+                [src]="qrCodes[zoomSeat.ticket_uuid]"
+                [alt]="'bookingClaim.ticketQrCode' | transloco"
+                class="w-56 h-56"
+              />
             </div>
           }
-          <button (click)="zoomSeat = null" class="btn btn-secondary btn-full mt-5">Close</button>
+          <button (click)="zoomSeat = null" class="btn btn-secondary btn-full mt-5">
+            {{ 'common.close' | transloco }}
+          </button>
         </div>
       </div>
     }
   `,
 })
 export class BookingClaimComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private bookingService = inject(BookingService);
   private toast = inject(ToastService);
@@ -294,10 +326,13 @@ export class BookingClaimComponent implements OnInit {
         this.booking = b;
         this.claimingId = null;
         this.claimName = '';
-        this.toast.success('Seat claimed!');
+        this.toast.success(this.i18n.t('bookingClaim.seatClaimed'));
         this.generateQrs();
       },
-      error: (err) => this.toast.error(apiErrorMessage(err, 'Could not claim seat', 'error')),
+      error: (err) =>
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('bookingClaim.couldNotClaimSeat'), 'error'),
+        ),
     });
   }
 }

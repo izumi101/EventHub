@@ -5,24 +5,25 @@ import { FormsModule } from '@angular/forms';
 import { EventService } from '../../services/event.service';
 import { Category, EventFormPayload } from '../../models/models';
 import { apiErrorBody } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-event-form',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, TranslocoPipe],
   template: `
     <div class="page-root">
       <div class="container max-w-2xl py-8">
         <!-- Header -->
         <div class="mb-7">
           <h1 class="text-2xl font-bold text-foreground">
-            {{ editMode ? 'Edit event' : 'Create event' }}
+            {{ (editMode ? 'dashboard.editEvent' : 'dashboard.createEvent') | transloco }}
           </h1>
           <p class="text-sm text-muted-foreground mt-1">
             {{
-              editMode
-                ? 'Update your event details'
-                : 'Fill in the details below — your event will be reviewed before publishing'
+              (editMode ? 'eventForm.updateYourEventDetails' : 'eventForm.fillInTheDetails')
+                | transloco
             }}
           </p>
         </div>
@@ -31,18 +32,20 @@ import { apiErrorBody } from '../../api/api-error';
           <div class="card divide-y divide-border">
             <!-- Core details -->
             <div class="p-5 space-y-4">
-              <h2 class="text-sm font-semibold text-foreground">Event details</h2>
+              <h2 class="text-sm font-semibold text-foreground">
+                {{ 'eventForm.eventDetails' | transloco }}
+              </h2>
 
               <div>
                 <label for="title" class="block text-sm font-medium text-foreground mb-1.5">
-                  Title <span class="text-destructive">*</span>
+                  {{ 'common.title' | transloco }} <span class="text-destructive">*</span>
                 </label>
                 <input
                   id="title"
                   type="text"
                   [(ngModel)]="formData.title"
                   name="title"
-                  placeholder="e.g. Jazz Night at Almaty Arena"
+                  [placeholder]="'eventForm.eGJazzNight' | transloco"
                   class="input"
                   required
                 />
@@ -50,13 +53,13 @@ import { apiErrorBody } from '../../api/api-error';
 
               <div>
                 <label for="description" class="block text-sm font-medium text-foreground mb-1.5">
-                  Description <span class="text-destructive">*</span>
+                  {{ 'common.description' | transloco }} <span class="text-destructive">*</span>
                 </label>
                 <textarea
                   id="description"
                   [(ngModel)]="formData.description"
                   name="description"
-                  placeholder="Describe what attendees can expect..."
+                  [placeholder]="'eventForm.describeWhatAttendeesCan' | transloco"
                   rows="4"
                   class="input resize-none"
                   required
@@ -66,8 +69,10 @@ import { apiErrorBody } from '../../api/api-error';
               <!-- Cover image -->
               <div>
                 <label for="cover-image" class="block text-sm font-medium text-foreground mb-1.5">
-                  Cover image
-                  <span class="text-muted-foreground font-normal">(optional, up to 5 MB)</span>
+                  {{ 'eventForm.coverImage' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'eventForm.optionalUpToMb' | transloco
+                  }}</span>
                 </label>
                 @if (imagePreview) {
                   <div
@@ -76,7 +81,7 @@ import { apiErrorBody } from '../../api/api-error';
                   >
                     <img
                       [src]="imagePreview"
-                      alt="Event cover preview"
+                      [alt]="'eventForm.eventCoverPreview' | transloco"
                       class="w-full h-full object-cover"
                     />
                     <button
@@ -84,7 +89,7 @@ import { apiErrorBody } from '../../api/api-error';
                       (click)="clearImage()"
                       class="absolute top-2 right-2 btn btn-sm bg-black/60 text-white border-transparent hover:bg-black/80"
                     >
-                      Remove
+                      {{ 'common.remove' | transloco }}
                     </button>
                   </div>
                 }
@@ -100,7 +105,7 @@ import { apiErrorBody } from '../../api/api-error';
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label for="category" class="block text-sm font-medium text-foreground mb-1.5">
-                    Category <span class="text-destructive">*</span>
+                    {{ 'common.category' | transloco }} <span class="text-destructive">*</span>
                   </label>
                   <select
                     id="category"
@@ -109,7 +114,7 @@ import { apiErrorBody } from '../../api/api-error';
                     class="input"
                     required
                   >
-                    <option value="" disabled>Select a category</option>
+                    <option value="" disabled>{{ 'eventForm.selectACategory' | transloco }}</option>
                     @for (cat of categories; track cat.id) {
                       <option [value]="cat.id">{{ cat.name }}</option>
                     }
@@ -121,7 +126,8 @@ import { apiErrorBody } from '../../api/api-error';
                     for="max_participants"
                     class="block text-sm font-medium text-foreground mb-1.5"
                   >
-                    Max participants <span class="text-destructive">*</span>
+                    {{ 'eventForm.maxParticipants' | transloco }}
+                    <span class="text-destructive">*</span>
                   </label>
                   <input
                     id="max_participants"
@@ -138,12 +144,15 @@ import { apiErrorBody } from '../../api/api-error';
 
             <!-- Date & price -->
             <div class="p-5 space-y-4">
-              <h2 class="text-sm font-semibold text-foreground">Schedule & pricing</h2>
+              <h2 class="text-sm font-semibold text-foreground">
+                {{ 'eventForm.schedulePricing' | transloco }}
+              </h2>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label for="date" class="block text-sm font-medium text-foreground mb-1.5">
-                    Start date & time <span class="text-destructive">*</span>
+                    {{ 'eventForm.startDateTime' | transloco }}
+                    <span class="text-destructive">*</span>
                   </label>
                   <input
                     id="date"
@@ -157,8 +166,10 @@ import { apiErrorBody } from '../../api/api-error';
 
                 <div>
                   <label for="end_date" class="block text-sm font-medium text-foreground mb-1.5">
-                    End date & time
-                    <span class="text-muted-foreground font-normal">(optional)</span>
+                    {{ 'eventForm.endDateTime' | transloco }}
+                    <span class="text-muted-foreground font-normal">{{
+                      'checkout.optional' | transloco
+                    }}</span>
                   </label>
                   <input
                     id="end_date"
@@ -171,7 +182,7 @@ import { apiErrorBody } from '../../api/api-error';
 
                 <div>
                   <label for="price" class="block text-sm font-medium text-foreground mb-1.5">
-                    Price — 0 for free
+                    {{ 'eventForm.priceForFree' | transloco }}
                   </label>
                   <input
                     id="price"
@@ -185,20 +196,20 @@ import { apiErrorBody } from '../../api/api-error';
                 </div>
 
                 <div>
-                  <label for="currency" class="block text-sm font-medium text-foreground mb-1.5"
-                    >Currency</label
-                  >
+                  <label for="currency" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'eventForm.currency' | transloco
+                  }}</label>
                   <select
                     id="currency"
                     [(ngModel)]="formData.currency"
                     name="currency"
                     class="input"
                   >
-                    <option value="USD">USD — US Dollar</option>
-                    <option value="EUR">EUR — Euro</option>
-                    <option value="GBP">GBP — British Pound</option>
-                    <option value="KZT">KZT — Kazakhstani Tenge</option>
-                    <option value="RUB">RUB — Russian Ruble</option>
+                    <option value="USD">{{ 'eventForm.usdUsDollar' | transloco }}</option>
+                    <option value="EUR">{{ 'eventForm.eurEuro' | transloco }}</option>
+                    <option value="GBP">{{ 'eventForm.gbpBritishPound' | transloco }}</option>
+                    <option value="KZT">{{ 'eventForm.kztKazakhstaniTenge' | transloco }}</option>
+                    <option value="RUB">{{ 'eventForm.rubRussianRuble' | transloco }}</option>
                   </select>
                 </div>
               </div>
@@ -208,18 +219,20 @@ import { apiErrorBody } from '../../api/api-error';
                 class="flex items-start gap-2.5 p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm"
               >
                 <p class="text-foreground/80">
-                  This sets a single price. Want <strong>multiple tiers</strong> (VIP, Early Bird,
-                  Student, Donation)?
+                  {{ 'eventForm.thisSetsASingle' | transloco }}
+                  <strong>{{ 'eventForm.multipleTiers' | transloco }}</strong>
+                  {{ 'eventForm.vipEarlyBirdStudent' | transloco }}
                   @if (editMode && eventId) {
                     <a
                       [routerLink]="['/organizer/events', eventId, 'ticket-types']"
                       class="text-primary font-medium hover:underline"
-                      >Add ticket types →</a
+                      >{{ 'eventForm.addTicketTypes' | transloco }}</a
                     >
                   } @else {
                     <span class="text-muted-foreground"
-                      >Create the event first, then open <strong>Tickets</strong> on the event to
-                      add tiers.</span
+                      >{{ 'eventForm.createTheEventFirst' | transloco }}
+                      <strong>{{ 'nav.tickets' | transloco }}</strong>
+                      {{ 'eventForm.onTheEventTo' | transloco }}</span
                     >
                   }
                 </p>
@@ -228,9 +241,9 @@ import { apiErrorBody } from '../../api/api-error';
               <!-- Tax & fees -->
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <div>
-                  <label for="tax" class="block text-sm font-medium text-foreground mb-1.5"
-                    >Tax / VAT (%)</label
-                  >
+                  <label for="tax" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'eventForm.taxVat' | transloco
+                  }}</label>
                   <input
                     id="tax"
                     type="number"
@@ -244,9 +257,9 @@ import { apiErrorBody } from '../../api/api-error';
                   />
                 </div>
                 <div>
-                  <label for="fee" class="block text-sm font-medium text-foreground mb-1.5"
-                    >Service fee (%)</label
-                  >
+                  <label for="fee" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'eventForm.serviceFee' | transloco
+                  }}</label>
                   <input
                     id="fee"
                     type="number"
@@ -267,8 +280,10 @@ import { apiErrorBody } from '../../api/api-error';
                   name="fees_passed_to_buyer"
                   class="w-4 h-4 rounded"
                 />
-                Pass tax &amp; fees on to the buyer
-                <span class="text-xs text-muted-foreground">(unchecked = you absorb them)</span>
+                {{ 'eventForm.passTaxAmpFees' | transloco }}
+                <span class="text-xs text-muted-foreground">{{
+                  'eventForm.uncheckedYouAbsorbThem' | transloco
+                }}</span>
               </label>
 
               <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer">
@@ -278,27 +293,29 @@ import { apiErrorBody } from '../../api/api-error';
                   name="refundable"
                   class="w-4 h-4 rounded"
                 />
-                Allow refund requests
-                <span class="text-xs text-muted-foreground"
-                  >(unchecked = tickets are non-refundable)</span
-                >
+                {{ 'eventForm.allowRefundRequests' | transloco }}
+                <span class="text-xs text-muted-foreground">{{
+                  'eventForm.uncheckedTicketsAreNon' | transloco
+                }}</span>
               </label>
             </div>
 
             <!-- Venue -->
             <div class="p-5 space-y-4">
-              <h2 class="text-sm font-semibold text-foreground">Venue</h2>
+              <h2 class="text-sm font-semibold text-foreground">
+                {{ 'eventForm.venue' | transloco }}
+              </h2>
 
               <div>
                 <label for="location" class="block text-sm font-medium text-foreground mb-1.5">
-                  Venue name <span class="text-destructive">*</span>
+                  {{ 'eventForm.venueName' | transloco }} <span class="text-destructive">*</span>
                 </label>
                 <input
                   id="location"
                   type="text"
                   [(ngModel)]="formData.location"
                   name="location"
-                  placeholder="e.g. Congress Hall, Almaty"
+                  [placeholder]="'eventForm.eGCongressHall' | transloco"
                   class="input"
                   required
                 />
@@ -306,14 +323,17 @@ import { apiErrorBody } from '../../api/api-error';
 
               <div>
                 <label for="address" class="block text-sm font-medium text-foreground mb-1.5">
-                  Address <span class="text-muted-foreground font-normal">(optional)</span>
+                  {{ 'eventForm.address' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span>
                 </label>
                 <input
                   id="address"
                   type="text"
                   [(ngModel)]="formData.address"
                   name="address"
-                  placeholder="Street address"
+                  [placeholder]="'eventForm.streetAddress' | transloco"
                   class="input"
                 />
               </div>
@@ -323,9 +343,11 @@ import { apiErrorBody } from '../../api/api-error';
                 class="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30"
               >
                 <div>
-                  <p class="text-sm font-medium text-foreground">Online event</p>
+                  <p class="text-sm font-medium text-foreground">
+                    {{ 'eventForm.onlineEvent' | transloco }}
+                  </p>
                   <p class="text-xs text-muted-foreground">
-                    Provide a meeting link for remote attendees
+                    {{ 'eventForm.provideAMeetingLink' | transloco }}
                   </p>
                 </div>
                 <input
@@ -334,21 +356,22 @@ import { apiErrorBody } from '../../api/api-error';
                   name="is_online"
                   class="toggle"
                   [id]="'is-online'"
-                  [attr.aria-label]="'Online event'"
+                  [attr.aria-label]="'eventForm.onlineEvent' | transloco"
                 />
               </div>
 
               @if (formData.is_online) {
                 <div class="animate-fade-in">
                   <label for="online_link" class="block text-sm font-medium text-foreground mb-1.5">
-                    Meeting link <span class="text-destructive">*</span>
+                    {{ 'eventForm.meetingLink' | transloco }}
+                    <span class="text-destructive">*</span>
                   </label>
                   <input
                     id="online_link"
                     type="url"
                     [(ngModel)]="formData.online_link"
                     name="online_link"
-                    placeholder="https://zoom.us/j/..."
+                    [placeholder]="'eventForm.httpsZoomUsJ' | transloco"
                     class="input"
                   />
                 </div>
@@ -358,20 +381,22 @@ import { apiErrorBody } from '../../api/api-error';
             <!-- SEO (optional) -->
             <div class="p-5 space-y-4">
               <h2 class="text-sm font-semibold text-foreground">
-                Search & social preview
-                <span class="text-muted-foreground font-normal">(optional)</span>
+                {{ 'eventForm.searchSocialPreview' | transloco }}
+                <span class="text-muted-foreground font-normal">{{
+                  'checkout.optional' | transloco
+                }}</span>
               </h2>
               <div>
-                <label for="seo_title" class="block text-sm font-medium text-foreground mb-1.5"
-                  >SEO title</label
-                >
+                <label for="seo_title" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'eventForm.seoTitle' | transloco
+                }}</label>
                 <input
                   id="seo_title"
                   type="text"
                   [(ngModel)]="formData.seo_title"
                   name="seo_title"
                   maxlength="200"
-                  placeholder="Defaults to the event title"
+                  [placeholder]="'eventForm.defaultsToTheEvent' | transloco"
                   class="input"
                 />
               </div>
@@ -379,7 +404,7 @@ import { apiErrorBody } from '../../api/api-error';
                 <label
                   for="seo_description"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >SEO description</label
+                  >{{ 'eventForm.seoDescription' | transloco }}</label
                 >
                 <textarea
                   id="seo_description"
@@ -387,7 +412,7 @@ import { apiErrorBody } from '../../api/api-error';
                   name="seo_description"
                   maxlength="500"
                   rows="2"
-                  placeholder="Shown in search results and link previews"
+                  [placeholder]="'eventForm.shownInSearchResults' | transloco"
                   class="input resize-none"
                 ></textarea>
               </div>
@@ -416,12 +441,14 @@ import { apiErrorBody } from '../../api/api-error';
                 <button type="submit" [disabled]="submitting" class="btn btn-primary">
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
-                    Saving...
+                    {{ 'common.saving' | transloco }}
                   } @else {
-                    {{ editMode ? 'Save changes' : 'Create event' }}
+                    {{ (editMode ? 'eventForm.saveChanges' : 'dashboard.createEvent') | transloco }}
                   }
                 </button>
-                <a routerLink="/" class="btn btn-ghost text-muted-foreground">Cancel</a>
+                <a routerLink="/" class="btn btn-ghost text-muted-foreground">{{
+                  'common.cancel' | transloco
+                }}</a>
               </div>
             </div>
           </div>
@@ -431,6 +458,7 @@ import { apiErrorBody } from '../../api/api-error';
   `,
 })
 export class EventFormComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
@@ -473,7 +501,7 @@ export class EventFormComponent implements OnInit {
         this.categories = cats;
       },
       error: () => {
-        this.error = 'Failed to load categories.';
+        this.error = this.i18n.t('eventForm.failedToLoadCategories');
       },
     });
 
@@ -506,7 +534,7 @@ export class EventFormComponent implements OnInit {
           this.imagePreview = ev.image;
         },
         error: () => {
-          this.error = 'Failed to load event.';
+          this.error = this.i18n.t('eventForm.failedToLoadEvent');
         },
       });
     }
@@ -517,7 +545,7 @@ export class EventFormComponent implements OnInit {
     const file = input.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      this.error = 'Image must be under 5 MB.';
+      this.error = this.i18n.t('eventForm.imageMustBeUnder');
       input.value = '';
       return;
     }
@@ -542,42 +570,42 @@ export class EventFormComponent implements OnInit {
     this.success = '';
 
     if (!this.formData.title.trim()) {
-      this.error = 'Title is required.';
+      this.error = this.i18n.t('eventForm.titleIsRequired');
       return;
     }
     if (!this.formData.description.trim()) {
-      this.error = 'Description is required.';
+      this.error = this.i18n.t('eventForm.descriptionIsRequired');
       return;
     }
     if (!this.formData.category) {
-      this.error = 'Please select a category.';
+      this.error = this.i18n.t('eventForm.pleaseSelectACategory');
       return;
     }
     if (!this.formData.date) {
-      this.error = 'Start date is required.';
+      this.error = this.i18n.t('eventForm.startDateIsRequired');
       return;
     }
     if (!this.editMode && new Date(this.formData.date).getTime() < Date.now()) {
-      this.error = 'The start date is in the past.';
+      this.error = this.i18n.t('eventForm.theStartDateIs');
       return;
     }
     if (
       this.formData.end_date &&
       new Date(this.formData.end_date) <= new Date(this.formData.date)
     ) {
-      this.error = 'The end date must be after the start date.';
+      this.error = this.i18n.t('eventForm.theEndDateMust');
       return;
     }
     if (!this.formData.location.trim()) {
-      this.error = 'Venue name is required.';
+      this.error = this.i18n.t('eventForm.venueNameIsRequired');
       return;
     }
     if (this.formData.max_participants < 1) {
-      this.error = 'Max participants must be at least 1.';
+      this.error = this.i18n.t('eventForm.maxParticipantsMustBe');
       return;
     }
     if (this.formData.is_online && !this.formData.online_link.trim()) {
-      this.error = 'Meeting link is required for online events.';
+      this.error = this.i18n.t('eventForm.meetingLinkIsRequired');
       return;
     }
 
@@ -623,7 +651,9 @@ export class EventFormComponent implements OnInit {
 
     req.subscribe({
       next: (ev) => {
-        this.success = this.editMode ? 'Event updated!' : 'Event created and submitted for review.';
+        this.success = this.editMode
+          ? this.i18n.t('eventForm.eventUpdated')
+          : this.i18n.t('eventForm.eventCreatedAndSubmitted');
         this.submitting = false;
         setTimeout(() => {
           void this.router.navigate(['/events', ev.id]);
@@ -632,7 +662,9 @@ export class EventFormComponent implements OnInit {
       error: (err) => {
         const body = apiErrorBody(err);
         // DRF validation errors: { field: ["message", …], … }
-        this.error = body ? Object.values(body).flat().join(' ') : 'Failed to save event.';
+        this.error = body
+          ? Object.values(body).flat().join(' ')
+          : this.i18n.t('eventForm.failedToSaveEvent');
         this.submitting = false;
       },
     });

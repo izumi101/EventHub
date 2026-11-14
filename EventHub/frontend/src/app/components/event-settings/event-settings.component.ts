@@ -29,31 +29,46 @@ import {
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
+import { PluralPipe } from '../../i18n/locale.pipes';
 
 @Component({
   selector: 'app-event-settings',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+    PluralPipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
-            >Dashboard</a
-          >
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">{{
+            'nav.dashboard' | transloco
+          }}</a>
           <span>/</span>
           @if (eventId) {
             <a
               [routerLink]="['/organizer/events', eventId, 'attendees']"
               class="hover:text-foreground transition-colors truncate max-w-[180px]"
-              >{{ event?.title || 'Event' }}</a
+              >{{ event?.title || ('nav.event' | transloco) }}</a
             >
           }
           <span>/</span>
-          <span class="text-foreground font-medium">Settings</span>
+          <span class="text-foreground font-medium">{{ 'nav.settings' | transloco }}</span>
         </nav>
 
-        <h1 class="text-2xl font-bold text-foreground mb-1">Event settings</h1>
+        <h1 class="text-2xl font-bold text-foreground mb-1">
+          {{ 'eventSettings.eventSettings' | transloco }}
+        </h1>
         <p class="text-sm text-muted-foreground mb-6">{{ event?.title }}</p>
 
         <!-- Tabs -->
@@ -67,7 +82,8 @@ import { apiErrorMessage } from '../../api/api-error';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.Users" class="w-4 h-4" /> Team
+            <lucide-icon [img]="icons.Users" class="w-4 h-4" />
+            {{ 'eventSettings.team' | transloco }}
           </button>
           <button
             (click)="tab = 'affiliates'"
@@ -78,7 +94,8 @@ import { apiErrorMessage } from '../../api/api-error';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.Share2" class="w-4 h-4" /> Affiliates
+            <lucide-icon [img]="icons.Share2" class="w-4 h-4" />
+            {{ 'eventSettings.affiliates' | transloco }}
           </button>
           <button
             (click)="tab = 'webhooks'"
@@ -89,7 +106,8 @@ import { apiErrorMessage } from '../../api/api-error';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.WebhookIcon" class="w-4 h-4" /> Webhooks
+            <lucide-icon [img]="icons.WebhookIcon" class="w-4 h-4" />
+            {{ 'eventSettings.webhooks' | transloco }}
           </button>
           <button
             (click)="tab = 'refunds'"
@@ -100,7 +118,8 @@ import { apiErrorMessage } from '../../api/api-error';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.RotateCcw" class="w-4 h-4" /> Refunds
+            <lucide-icon [img]="icons.RotateCcw" class="w-4 h-4" />
+            {{ 'eventSettings.refunds' | transloco }}
             @if (pendingRefunds > 0) {
               <span
                 class="bg-[color:var(--destructive)] text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center"
@@ -117,7 +136,8 @@ import { apiErrorMessage } from '../../api/api-error';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.Armchair" class="w-4 h-4" /> Seat map
+            <lucide-icon [img]="icons.Armchair" class="w-4 h-4" />
+            {{ 'eventSettings.seatMap' | transloco }}
           </button>
           <button
             (click)="tab = 'danger'"
@@ -128,33 +148,42 @@ import { apiErrorMessage } from '../../api/api-error';
                 : 'border-transparent text-muted-foreground hover:text-foreground'
             "
           >
-            <lucide-icon [img]="icons.TriangleAlert" class="w-4 h-4" /> Danger
+            <lucide-icon [img]="icons.TriangleAlert" class="w-4 h-4" />
+            {{ 'eventSettings.danger' | transloco }}
           </button>
         </div>
 
         <!-- ───────── TEAM ───────── -->
         @if (tab === 'team') {
           <div class="card p-5 mb-5">
-            <h2 class="font-semibold text-foreground mb-3">Invite a team member</h2>
+            <h2 class="font-semibold text-foreground mb-3">
+              {{ 'eventSettings.inviteATeamMember' | transloco }}
+            </h2>
             <div class="flex flex-col sm:flex-row gap-2">
-              <input [(ngModel)]="staffUsername" placeholder="Username" class="input flex-1" />
+              <input
+                [(ngModel)]="staffUsername"
+                [placeholder]="'eventSettings.username' | transloco"
+                class="input flex-1"
+              />
               <select [(ngModel)]="staffRole" class="input sm:w-56">
-                <option value="co_organizer">Co-organizer (full access)</option>
-                <option value="check_in">Check-in staff (scan only)</option>
+                <option value="co_organizer">
+                  {{ 'eventSettings.coOrganizerFullAccess' | transloco }}
+                </option>
+                <option value="check_in">{{ 'eventSettings.checkInStaffScan' | transloco }}</option>
               </select>
               <button
                 (click)="addStaff()"
                 [disabled]="!staffUsername.trim() || savingStaff"
                 class="btn btn-primary"
               >
-                {{ savingStaff ? '…' : 'Invite' }}
+                {{ savingStaff ? '…' : ('common.invite' | transloco) }}
               </button>
             </div>
           </div>
 
           @if (staff.length === 0) {
             <p class="text-sm text-muted-foreground text-center py-8">
-              No team members yet. You have full access as the organizer.
+              {{ 'eventSettings.noTeamMembersYet' | transloco }}
             </p>
           } @else {
             <div class="space-y-2">
@@ -177,7 +206,12 @@ import { apiErrorMessage } from '../../api/api-error';
                         : 'text-warning bg-[color:var(--warning-50)]'
                     "
                   >
-                    {{ s.role === 'co_organizer' ? 'Co-organizer' : 'Check-in' }}
+                    {{
+                      (s.role === 'co_organizer'
+                        ? 'eventSettings.coOrganizer'
+                        : 'attendees.checkIn'
+                      ) | transloco
+                    }}
                   </span>
                   <button
                     (click)="removeStaff(s)"
@@ -194,27 +228,33 @@ import { apiErrorMessage } from '../../api/api-error';
         <!-- ───────── AFFILIATES ───────── -->
         @if (tab === 'affiliates') {
           <div class="card p-5 mb-5">
-            <h2 class="font-semibold text-foreground mb-3">New promoter link</h2>
+            <h2 class="font-semibold text-foreground mb-3">
+              {{ 'eventSettings.newPromoterLink' | transloco }}
+            </h2>
             <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2">
               <input
                 [(ngModel)]="affName"
-                placeholder="Promoter name (e.g. Instagram)"
+                [placeholder]="'eventSettings.promoterNameEG' | transloco"
                 class="input"
               />
-              <input [(ngModel)]="affCode" placeholder="CODE" class="input uppercase sm:w-32" />
+              <input
+                [(ngModel)]="affCode"
+                [placeholder]="'eventSettings.code' | transloco"
+                class="input uppercase sm:w-32"
+              />
               <button
                 (click)="addAffiliate()"
                 [disabled]="!affName.trim() || !affCode.trim() || savingAff"
                 class="btn btn-primary"
               >
-                {{ savingAff ? '…' : 'Create' }}
+                {{ savingAff ? '…' : ('common.create' | transloco) }}
               </button>
             </div>
           </div>
 
           @if (affiliates.length === 0) {
             <p class="text-sm text-muted-foreground text-center py-8">
-              No promoters yet. Create a tracked link to attribute sales.
+              {{ 'eventSettings.noPromotersYetCreate' | transloco }}
             </p>
           } @else {
             <div class="space-y-3">
@@ -227,17 +267,23 @@ import { apiErrorMessage } from '../../api/api-error';
                     </div>
                     <div class="text-center px-3">
                       <p class="font-bold text-foreground">{{ a.clicks }}</p>
-                      <p class="text-[10px] uppercase text-muted-foreground">clicks</p>
+                      <p class="text-[10px] uppercase text-muted-foreground">
+                        {{ 'eventSettings.clicks' | transloco }}
+                      </p>
                     </div>
                     <div class="text-center px-3">
                       <p class="font-bold text-foreground">{{ a.sales }}</p>
-                      <p class="text-[10px] uppercase text-muted-foreground">sales</p>
+                      <p class="text-[10px] uppercase text-muted-foreground">
+                        {{ 'eventSettings.sales' | transloco }}
+                      </p>
                     </div>
                     <div class="text-center px-3">
                       <p class="font-bold text-[color:var(--pine-600)]">
                         {{ a.revenue | money: event?.currency }}
                       </p>
-                      <p class="text-[10px] uppercase text-muted-foreground">revenue</p>
+                      <p class="text-[10px] uppercase text-muted-foreground">
+                        {{ 'eventSettings.revenue' | transloco }}
+                      </p>
                     </div>
                     <button
                       (click)="removeAffiliate(a)"
@@ -270,34 +316,36 @@ import { apiErrorMessage } from '../../api/api-error';
         <!-- ───────── WEBHOOKS ───────── -->
         @if (tab === 'webhooks') {
           <div class="card p-5 mb-5">
-            <h2 class="font-semibold text-foreground mb-3">New webhook</h2>
+            <h2 class="font-semibold text-foreground mb-3">
+              {{ 'eventSettings.newWebhook' | transloco }}
+            </h2>
             <label
               for="event-settings-hook-url"
               class="block text-sm font-medium text-foreground mb-1.5"
-              >Endpoint URL</label
+              >{{ 'eventSettings.endpointUrl' | transloco }}</label
             >
             <input
               id="event-settings-hook-url"
               [(ngModel)]="hookUrl"
-              placeholder="https://your-server.com/webhook"
+              [placeholder]="'eventSettings.httpsYourServerCom' | transloco"
               class="input w-full mb-3"
             />
             <label
               for="event-settings-hook-secret"
               class="block text-sm font-medium text-foreground mb-1.5"
-              >Secret
-              <span class="text-muted-foreground font-normal"
-                >(optional, signs payloads)</span
-              ></label
+              >{{ 'eventSettings.secret' | transloco }}
+              <span class="text-muted-foreground font-normal">{{
+                'eventSettings.optionalSignsPayloads' | transloco
+              }}</span></label
             >
             <input
               id="event-settings-hook-secret"
               [(ngModel)]="hookSecret"
-              placeholder="A shared secret"
+              [placeholder]="'eventSettings.aSharedSecret' | transloco"
               class="input w-full mb-3"
             />
             <p id="hook-triggers-caption" class="block text-sm font-medium text-foreground mb-2">
-              Trigger on
+              {{ 'eventSettings.triggerOn' | transloco }}
             </p>
             <div
               class="grid grid-cols-2 gap-2 mb-4"
@@ -314,7 +362,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     (change)="toggleTrigger(t.key)"
                     class="w-4 h-4 rounded"
                   />
-                  {{ t.label }}
+                  {{ t.labelKey | transloco }}
                 </label>
               }
             </div>
@@ -323,13 +371,13 @@ import { apiErrorMessage } from '../../api/api-error';
               [disabled]="!hookUrl.trim() || hookTriggers.length === 0 || savingHook"
               class="btn btn-primary btn-full"
             >
-              {{ savingHook ? 'Creating…' : 'Create webhook' }}
+              {{ (savingHook ? 'checkin.creating' : 'eventSettings.createWebhook') | transloco }}
             </button>
           </div>
 
           @if (webhooks.length === 0) {
             <p class="text-sm text-muted-foreground text-center py-8">
-              No webhooks. Add one to push events to Zapier, Make, or your own server.
+              {{ 'eventSettings.noWebhooksAddOne' | transloco }}
             </p>
           } @else {
             <div class="space-y-2">
@@ -347,22 +395,32 @@ import { apiErrorMessage } from '../../api/api-error';
                         }
                       </div>
                       <p class="text-xs text-muted-foreground mt-1.5">
-                        {{ w.deliveries_count }} deliveries
+                        {{
+                          'eventSettings.deliveriescountDeliveries'
+                            | transloco: { deliveriesCount: w.deliveries_count }
+                        }}
                         @if (w.last_status) {
-                          · last status {{ w.last_status }}
+                          {{
+                            'eventSettings.lastStatusLaststatus'
+                              | transloco: { lastStatus: w.last_status }
+                          }}
                         }
                       </p>
                     </div>
                     <button
                       (click)="toggleWebhook(w)"
                       class="btn btn-ghost btn-sm text-xs"
-                      [title]="w.is_active ? 'Disable' : 'Enable'"
+                      [title]="
+                        (w.is_active ? 'eventSettings.disable' : 'eventSettings.enable') | transloco
+                      "
                     >
                       <span
                         [class]="
                           w.is_active ? 'text-[color:var(--pine-600)]' : 'text-muted-foreground'
                         "
-                        >{{ w.is_active ? 'Active' : 'Off' }}</span
+                        >{{
+                          (w.is_active ? 'common.active' : 'eventSettings.off') | transloco
+                        }}</span
                       >
                     </button>
                     <button
@@ -384,27 +442,36 @@ import { apiErrorMessage } from '../../api/api-error';
             <div class="flex justify-center py-12"><span class="spinner"></span></div>
           } @else if (seatMapInfo) {
             <div class="card p-5">
-              <h2 class="font-semibold text-foreground mb-2">Seat map exists</h2>
+              <h2 class="font-semibold text-foreground mb-2">
+                {{ 'eventSettings.seatMapExists' | transloco }}
+              </h2>
               <p class="text-sm text-muted-foreground">
-                {{ seatMapInfo.rows }} rows × {{ seatMapInfo.cols }} columns —
-                {{ seatMapInfo.seats.length || seatMapInfo.rows * seatMapInfo.cols }} seats total.
-                Attendees pick a seat at checkout; zone prices multiply the base price (VIP ×2,
-                Premium ×3 by default).
+                {{
+                  'eventSettings.rowsRowsColsColumns'
+                    | transloco
+                      : {
+                          rows: seatMapInfo.rows,
+                          cols: seatMapInfo.cols,
+                          seatsLength:
+                            seatMapInfo.seats.length || seatMapInfo.rows * seatMapInfo.cols,
+                        }
+                }}
               </p>
             </div>
           } @else {
             <div class="card p-5">
-              <h2 class="font-semibold text-foreground mb-1">Create a seat map</h2>
+              <h2 class="font-semibold text-foreground mb-1">
+                {{ 'eventSettings.createASeatMap' | transloco }}
+              </h2>
               <p class="text-sm text-muted-foreground mb-4">
-                Without a seat map this event sells general-admission tickets. Generate assigned
-                seating below — front rows can be Premium/VIP priced.
+                {{ 'eventSettings.withoutASeatMap' | transloco }}
               </p>
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                 <div>
                   <label
                     for="event-settings-sm-rows"
                     class="block text-sm font-medium text-foreground mb-1.5"
-                    >Rows</label
+                    >{{ 'eventSettings.rows' | transloco }}</label
                   >
                   <input
                     id="event-settings-sm-rows"
@@ -419,7 +486,7 @@ import { apiErrorMessage } from '../../api/api-error';
                   <label
                     for="event-settings-sm-cols"
                     class="block text-sm font-medium text-foreground mb-1.5"
-                    >Seats per row</label
+                    >{{ 'eventSettings.seatsPerRow' | transloco }}</label
                   >
                   <input
                     id="event-settings-sm-cols"
@@ -434,7 +501,7 @@ import { apiErrorMessage } from '../../api/api-error';
                   <label
                     for="event-settings-sm-premium"
                     class="block text-sm font-medium text-foreground mb-1.5"
-                    >Premium rows</label
+                    >{{ 'eventSettings.premiumRows' | transloco }}</label
                   >
                   <input
                     id="event-settings-sm-premium"
@@ -448,7 +515,7 @@ import { apiErrorMessage } from '../../api/api-error';
                   <label
                     for="event-settings-sm-vip"
                     class="block text-sm font-medium text-foreground mb-1.5"
-                    >VIP rows</label
+                    >{{ 'eventSettings.vipRows' | transloco }}</label
                   >
                   <input
                     id="event-settings-sm-vip"
@@ -461,14 +528,18 @@ import { apiErrorMessage } from '../../api/api-error';
               </div>
               <label class="flex items-center gap-2 text-sm text-foreground cursor-pointer mb-4">
                 <input type="checkbox" [(ngModel)]="smSyncCapacity" class="w-4 h-4 rounded" />
-                Set event capacity to {{ smRows * smCols }} (rows × seats)
+                {{ 'eventSettings.setEventCapacityTo' | transloco: { smCols: smRows * smCols } }}
               </label>
               <button
                 (click)="createSeatMap()"
                 [disabled]="creatingSeatMap || smRows < 1 || smCols < 1"
                 class="btn btn-primary"
               >
-                {{ creatingSeatMap ? 'Generating…' : 'Generate ' + smRows * smCols + ' seats' }}
+                {{
+                  creatingSeatMap
+                    ? ('eventSettings.generating' | transloco)
+                    : ('eventSettings.generateSeats' | tPlural: smRows * smCols)
+                }}
               </button>
             </div>
           }
@@ -477,18 +548,24 @@ import { apiErrorMessage } from '../../api/api-error';
         <!-- ───────── DANGER ───────── -->
         @if (tab === 'danger') {
           <div class="card p-5 border-[color:var(--destructive-50)]">
-            <h2 class="font-semibold text-[color:var(--destructive)] mb-1">Cancel this event</h2>
+            <h2 class="font-semibold text-[color:var(--destructive)] mb-1">
+              {{ 'eventSettings.cancelThisEvent' | transloco }}
+            </h2>
             <p class="text-sm text-muted-foreground mb-4">
-              The event is taken off sale, every attendee gets an in-app notification, and all paid
-              tickets are automatically refunded. This cannot be undone.
+              {{ 'eventSettings.theEventIsTaken' | transloco }}
             </p>
             @if (event?.status === 'cancelled') {
               <p class="text-sm font-medium text-[color:var(--destructive)]">
-                This event is already cancelled.
+                {{ 'eventSettings.thisEventIsAlready' | transloco }}
               </p>
             } @else {
               <button (click)="cancelEvent()" [disabled]="cancellingEvent" class="btn btn-danger">
-                {{ cancellingEvent ? 'Cancelling…' : 'Cancel event & refund attendees' }}
+                {{
+                  (cancellingEvent
+                    ? 'eventSettings.cancelling'
+                    : 'eventSettings.cancelEventRefundAttendees'
+                  ) | transloco
+                }}
               </button>
             }
           </div>
@@ -498,7 +575,7 @@ import { apiErrorMessage } from '../../api/api-error';
         @if (tab === 'refunds') {
           @if (refunds.length === 0) {
             <p class="text-sm text-muted-foreground text-center py-12">
-              No refund requests for this event.
+              {{ 'eventSettings.noRefundRequestsFor' | transloco }}
             </p>
           } @else {
             <div class="space-y-3">
@@ -516,7 +593,10 @@ import { apiErrorMessage } from '../../api/api-error';
                         </span>
                       </p>
                       <p class="text-xs text-muted-foreground">
-                        Requested {{ r.created_at | date: 'MMM d, HH:mm' }}
+                        {{
+                          'eventSettings.requestedCreatedat'
+                            | transloco: { createdAt: (r.created_at | localDate: 'MMM d, HH:mm') }
+                        }}
                       </p>
                     </div>
                     <span
@@ -538,7 +618,7 @@ import { apiErrorMessage } from '../../api/api-error';
                         [disabled]="resolvingId === r.id"
                         class="btn btn-secondary flex-1 text-sm"
                       >
-                        Decline
+                        {{ 'eventSettings.decline' | transloco }}
                       </button>
                       <button
                         (click)="resolveRefund(r, true)"
@@ -548,12 +628,18 @@ import { apiErrorMessage } from '../../api/api-error';
                         {{
                           resolvingId === r.id
                             ? '…'
-                            : 'Approve & refund ' + (r.amount | money: event?.currency)
+                            : ('eventSettings.approveRefund'
+                              | transloco: { amount: (r.amount | money: event?.currency) })
                         }}
                       </button>
                     </div>
                   } @else if (r.organizer_note) {
-                    <p class="text-xs text-muted-foreground">Note: {{ r.organizer_note }}</p>
+                    <p class="text-xs text-muted-foreground">
+                      {{
+                        'eventSettings.noteOrganizernote'
+                          | transloco: { organizerNote: r.organizer_note }
+                      }}
+                    </p>
                   }
                 </div>
               }
@@ -565,6 +651,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class EventSettingsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private eventService = inject(EventService);
   private toast = inject(ToastService);
@@ -613,11 +700,11 @@ export class EventSettingsComponent implements OnInit {
   hookSecret = '';
   hookTriggers: WebhookTrigger[] = [];
   savingHook = false;
-  allTriggers: { key: WebhookTrigger; label: string }[] = [
-    { key: 'ticket_sold', label: 'Ticket sold' },
-    { key: 'registration_created', label: 'Registration' },
-    { key: 'refund_issued', label: 'Refund issued' },
-    { key: 'attendee_checked_in', label: 'Checked in' },
+  allTriggers: { key: WebhookTrigger; labelKey: string }[] = [
+    { key: 'ticket_sold', labelKey: 'eventSettings.trigger.ticketSold' },
+    { key: 'registration_created', labelKey: 'eventSettings.trigger.registration' },
+    { key: 'refund_issued', labelKey: 'eventSettings.trigger.refundIssued' },
+    { key: 'attendee_checked_in', labelKey: 'eventSettings.trigger.checkedIn' },
   ];
 
   readonly icons = {
@@ -673,11 +760,17 @@ export class EventSettingsComponent implements OnInit {
         next: (sm) => {
           this.creatingSeatMap = false;
           this.seatMapInfo = sm;
-          this.toast.success(`Seat map created — ${this.smRows * this.smCols} seats.`);
+          this.toast.success(
+            this.i18n.t('eventSettings.seatMapCreatedSmcols', {
+              smCols: this.smRows * this.smCols,
+            }),
+          );
         },
         error: (err) => {
           this.creatingSeatMap = false;
-          this.toast.error(apiErrorMessage(err, 'Could not create the seat map.', 'error'));
+          this.toast.error(
+            apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCreateThe'), 'error'),
+          );
         },
       });
   }
@@ -686,10 +779,10 @@ export class EventSettingsComponent implements OnInit {
   async cancelEvent(): Promise<void> {
     if (!this.event) return;
     const confirmed = await this.modal.open({
-      title: 'Cancel Event',
-      message: `Cancel "${this.event.title}"? Every attendee will be notified and paid tickets will be refunded. This cannot be undone.`,
-      confirmText: 'Cancel event',
-      cancelText: 'Keep event',
+      title: this.i18n.t('eventSettings.cancelEvent'),
+      message: this.i18n.t('eventSettings.cancelTitleEveryAttendee', { title: this.event.title }),
+      confirmText: this.i18n.t('eventSettings.cancelEvent2'),
+      cancelText: this.i18n.t('eventSettings.keepEvent'),
       isDestructive: true,
     });
     if (!confirmed) return;
@@ -699,12 +792,17 @@ export class EventSettingsComponent implements OnInit {
         this.cancellingEvent = false;
         if (this.event) this.event.status = 'cancelled';
         this.toast.success(
-          `Event cancelled — ${res.notified ?? 0} attendees notified, ${res.refunded ?? 0} refunds issued.`,
+          this.i18n.t('eventSettings.eventCancelledNotifiedAttendees', {
+            notified: res.notified ?? 0,
+            refunded: res.refunded ?? 0,
+          }),
         );
       },
       error: (err) => {
         this.cancellingEvent = false;
-        this.toast.error(apiErrorMessage(err, 'Could not cancel the event.', 'error'));
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCancelThe'), 'error'),
+        );
       },
     });
   }
@@ -717,12 +815,18 @@ export class EventSettingsComponent implements OnInit {
     this.eventService.resolveRefundRequest(r.id, approve).subscribe({
       next: () => {
         this.resolvingId = null;
-        this.toast.success(approve ? 'Refund approved & processed.' : 'Refund declined.');
+        this.toast.success(
+          approve
+            ? this.i18n.t('eventSettings.refundApprovedProcessed')
+            : this.i18n.t('eventSettings.refundDeclined'),
+        );
         this.loadRefunds();
       },
       error: (err) => {
         this.resolvingId = null;
-        this.toast.error(apiErrorMessage(err, 'Could not resolve.', 'error'));
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('eventSettings.couldNotResolve'), 'error'),
+        );
       },
     });
   }
@@ -744,7 +848,7 @@ export class EventSettingsComponent implements OnInit {
     this.savingStaff = true;
     this.eventService.addStaff(this.eventId, this.staffUsername.trim(), this.staffRole).subscribe({
       next: () => {
-        this.toast.success('Team member added.');
+        this.toast.success(this.i18n.t('eventSettings.teamMemberAdded'));
         this.staffUsername = '';
         this.savingStaff = false;
         this.loadStaff();
@@ -752,7 +856,12 @@ export class EventSettingsComponent implements OnInit {
       error: (err) => {
         this.savingStaff = false;
         this.toast.error(
-          apiErrorMessage(err, 'Could not add member.', 'invite_username', 'detail'),
+          apiErrorMessage(
+            err,
+            this.i18n.t('eventSettings.couldNotAddMember'),
+            'invite_username',
+            'detail',
+          ),
         );
       },
     });
@@ -761,9 +870,9 @@ export class EventSettingsComponent implements OnInit {
     this.eventService.removeStaff(s.id).subscribe({
       next: () => {
         this.staff = this.staff.filter((x) => x.id !== s.id);
-        this.toast.success('Removed.');
+        this.toast.success(this.i18n.t('eventSettings.removed'));
       },
-      error: () => this.toast.error('Remove failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.removeFailed')),
     });
   }
 
@@ -780,7 +889,7 @@ export class EventSettingsComponent implements OnInit {
       })
       .subscribe({
         next: () => {
-          this.toast.success('Promoter created.');
+          this.toast.success(this.i18n.t('eventSettings.promoterCreated'));
           this.affName = '';
           this.affCode = '';
           this.savingAff = false;
@@ -788,7 +897,9 @@ export class EventSettingsComponent implements OnInit {
         },
         error: (err) => {
           this.savingAff = false;
-          this.toast.error(apiErrorMessage(err, 'Could not create (duplicate code?).', 'code'));
+          this.toast.error(
+            apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCreateDuplicate'), 'code'),
+          );
         },
       });
   }
@@ -796,9 +907,9 @@ export class EventSettingsComponent implements OnInit {
     this.eventService.deleteAffiliate(a.id).subscribe({
       next: () => {
         this.affiliates = this.affiliates.filter((x) => x.id !== a.id);
-        this.toast.success('Deleted.');
+        this.toast.success(this.i18n.t('eventSettings.deleted'));
       },
-      error: () => this.toast.error('Delete failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.deleteFailed')),
     });
   }
   affLink(a: Affiliate): string {
@@ -831,7 +942,7 @@ export class EventSettingsComponent implements OnInit {
       })
       .subscribe({
         next: () => {
-          this.toast.success('Webhook created.');
+          this.toast.success(this.i18n.t('eventSettings.webhookCreated'));
           this.hookUrl = '';
           this.hookSecret = '';
           this.hookTriggers = [];
@@ -840,23 +951,25 @@ export class EventSettingsComponent implements OnInit {
         },
         error: (err) => {
           this.savingHook = false;
-          this.toast.error(apiErrorMessage(err, 'Could not create webhook.', 'url'));
+          this.toast.error(
+            apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCreateWebhook'), 'url'),
+          );
         },
       });
   }
   toggleWebhook(w: Webhook) {
     this.eventService.updateWebhook(w.id, { is_active: !w.is_active }).subscribe({
       next: (u) => Object.assign(w, u),
-      error: () => this.toast.error('Update failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.updateFailed')),
     });
   }
   removeWebhook(w: Webhook) {
     this.eventService.deleteWebhook(w.id).subscribe({
       next: () => {
         this.webhooks = this.webhooks.filter((x) => x.id !== w.id);
-        this.toast.success('Deleted.');
+        this.toast.success(this.i18n.t('eventSettings.deleted'));
       },
-      error: () => this.toast.error('Delete failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.deleteFailed')),
     });
   }
 }
