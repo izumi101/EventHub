@@ -60,17 +60,11 @@ def client_ip(request) -> str:
 
 
 def notify_security(user, title: str, body: str) -> None:
-    """In-app notification + email for a security-relevant change."""
-    from events.notify import notify
-    from jobs.handlers import enqueue_email
+    """In-app notification + email (always sent) for a security-relevant
+    change."""
+    from notifications.service import notify
 
-    notify(user, 'security_alert', title, body)
-    if user.email:
-        enqueue_email(
-            f'EventHub — {title}',
-            f'{body}\n\nIf this was not you, reset your password and contact support right away.\n\nEventHub Team',
-            user.email,
-        )
+    notify(user, 'security_alert', title=title, body=body)
 
 
 # ---- Lockout ---- #

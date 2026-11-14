@@ -210,12 +210,15 @@ class LayoutTests(TestCase):
             # Default privileges reference the schema (setup_db_roles sets them).
             cursor.execute('ALTER DEFAULT PRIVILEGES IN SCHEMA events GRANT SELECT ON TABLES TO PUBLIC')
         total = len(expected_tables())
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT nspname FROM pg_namespace WHERE nspname = ANY(%s)', [list(DOMAIN_SCHEMAS)])
+            existing = sorted(row[0] for row in cursor.fetchall())
         category = Category.objects.create(name='Rollback', description='', icon='')
 
         result = restore_public()
 
         self.assertEqual(len(result.moved), total)
-        self.assertEqual(sorted(result.dropped_schemas), sorted(s for s in DOMAIN_SCHEMAS if s != 'notifications'))
+        self.assertEqual(sorted(result.dropped_schemas), existing)
         self.assertEqual({tuple(s) for s in self.locations().values()}, {(PUBLIC,)})
         self.assertEqual(
             self.scalar('SELECT count(*) FROM pg_namespace WHERE nspname = ANY(%s)', [list(DOMAIN_SCHEMAS)]), 0

@@ -14,9 +14,10 @@ from django.db import transaction
 from django.utils import timezone
 
 from common.choices import EventStatusChoices
+from notifications import types
+from notifications.service import notify
 
 from .models import Event, WaitlistEntry
-from .notify import notify
 
 # How long an offered spot is reserved for one person before passing on.
 OFFER_TTL_MINUTES = 30
@@ -104,13 +105,7 @@ def promote_waitlist(event: Event):
         entry.offered_at = now
         entry.offer_expires_at = now + timedelta(minutes=OFFER_TTL_MINUTES)
         entry.save(update_fields=['status', 'offered_at', 'offer_expires_at'])
-        notify(
-            entry.user,
-            'seat_available',
-            f'🎉 A spot opened up: {event.title}',
-            f'You have {OFFER_TTL_MINUTES} minutes to grab your ticket before it passes to the next person.',
-            event=event,
-        )
+        notify(entry.user, types.SEAT_AVAILABLE, event=event, minutes=OFFER_TTL_MINUTES)
     return len(next_up)
 
 

@@ -89,10 +89,17 @@ services:
       FREEDOMPAY_RESULT_URL: ${FREEDOMPAY_RESULT_URL:-http://backend:8000/api/v1/payments/callback/freedompay/}
       FREEDOMPAY_TESTING_MODE: ${FREEDOMPAY_TESTING_MODE:-0}
       FREEDOMPAY_DEMO_MODE: ${FREEDOMPAY_DEMO_MODE:-0}
+      # SMTP (docs/NOTIFICATIONS.md). Empty user/password: emails are only
+      # printed in the worker log (console backend).
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-}
       EMAIL_HOST: ${EMAIL_HOST:-smtp.gmail.com}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_USE_TLS: ${EMAIL_USE_TLS:-1}
       EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-EventHub <no-reply@eventhub.local>}
+      # Time zone of the dates in notification emails.
+      NOTIFICATION_TIME_ZONE: ${NOTIFICATION_TIME_ZONE:-}
       JOBS_RUN_INLINE: ${JOBS_RUN_INLINE:-0}
       # gunicorn worker processes per backend container (default: CPU count,
       # which inside a container is the host's — so set it explicitly).

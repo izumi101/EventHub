@@ -166,16 +166,15 @@ class TicketTarget:
     def confirm(self, registration, payment, amount: Decimal) -> None:
         _confirm_paid_registration(registration, payment)
 
-    def notify_late(self, registration) -> None:
-        from events.notify import notify
+    def buyer(self, registration):
+        return registration.user
 
-        notify(
+    def notify_late(self, registration) -> None:
+        _notify_payment_failed(
             registration.user,
-            'payment_failed',
-            f'💸 Payment refunded: {registration.event.title}',
+            registration.event,
             'Your payment arrived after the ticket hold expired, so it is being refunded automatically. '
             'Please book again.',
-            event=registration.event,
         )
 
 
@@ -236,17 +235,23 @@ class BookingTarget:
 
         confirm_booking(booking, amount_paid=amount)
 
-    def notify_late(self, booking) -> None:
-        from events.notify import notify
+    def buyer(self, booking):
+        return booking.owner
 
-        notify(
+    def notify_late(self, booking) -> None:
+        _notify_payment_failed(
             booking.owner,
-            'payment_failed',
-            f'💸 Payment refunded: {booking.event.title}',
+            booking.event,
             'Your group payment arrived after the seat hold expired, so it is being refunded automatically. '
             'Please book again.',
-            event=booking.event,
         )
+
+
+def _notify_payment_failed(user, event, reason: str = '') -> None:
+    from notifications import types
+    from notifications.service import notify
+
+    notify(user, types.PAYMENT_FAILED, event=event, reason=reason)
 
 
 TICKET = TicketTarget()
@@ -500,6 +505,9 @@ def _apply(result: CallbackResult, payment_pk) -> tuple[Payment | None, str, lis
     ):
         status = PaymentStatusChoices.FAILED if result.kind == CallbackKind.FAILED else PaymentStatusChoices.EXPIRED
         transition(payment, status, reason=f'Freedom Pay payment {result.provider_payment_id} {result.kind}')
+        if status == PaymentStatusChoices.FAILED:
+            # A declined card; an expired payment page is just abandoned.
+            _notify_payment_failed(target.buyer(obj), obj.event)
         return payment, Outcome.PROCESSED, []
     return payment, Outcome.IGNORED, []
 
@@ -662,7 +670,27 @@ def _finish_refund(refund_id, status: str, *, provider_refund_id: str = '', erro
             payment.save(update_fields=['refunded_amount', 'refunded_at', 'refund_reason', 'updated_at'])
             if payment.refunded_amount >= payment.amount and payment.status == PaymentStatusChoices.COMPLETED:
                 transition(payment, PaymentStatusChoices.REFUNDED, reason=f'refund {refund.pk}')
+        if payment is not None:
+            # Late, duplicate and mismatched payments: tell the buyer the
+            # money is back (an orphan refund has no buyer we know of).
+            _notify_refunded(payment, refund)
         logger.info('Refund %s (%s) of %s %s succeeded', refund.pk, refund.kind, refund.amount, refund.currency)
+
+
+def _notify_refunded(payment: Payment, refund: Refund) -> None:
+    from notifications import types
+    from notifications.service import notify
+
+    target, _ = payment_target(payment)
+    obj = payment.booking if target is BOOKING else payment.registration
+    notify(
+        target.buyer(obj),
+        types.PAYMENT_REFUNDED,
+        event=obj.event,
+        amount=refund.amount,
+        currency=refund.currency,
+        reason=refund.reason,
+    )
 
 
 def refund_now(payment: Payment, amount: Decimal, reason: str, *, kind=Refund.Kind.ORGANIZER) -> Refund:
