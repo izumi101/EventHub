@@ -10,6 +10,7 @@ import { ToastService } from '../../services/toast.service';
 import { StepUpService } from '../../services/step-up.service';
 import { MfaStatus } from '../../services/mfa.service';
 import { PasskeyClient } from '../../utils/passkey-client';
+import { I18nTestingModule } from '../../i18n/testing';
 import { environment } from '../../../environments/environment';
 
 const API = `${environment.apiUrl}/auth/mfa`;
@@ -46,7 +47,7 @@ async function setup(initial: MfaStatus = status(), confirmAnswer = true) {
   const modal = { open: vi.fn().mockResolvedValue(confirmAnswer) };
   const toast = { success: vi.fn(), error: vi.fn() };
   TestBed.configureTestingModule({
-    imports: [SecuritySettingsComponent],
+    imports: [SecuritySettingsComponent, I18nTestingModule],
     providers: [
       provideRouter([]),
       provideHttpClient(withInterceptors([stepUpInterceptor, authInterceptor])),

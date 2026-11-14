@@ -6,25 +6,27 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { User } from '../../models/models';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule],
+  imports: [CommonModule, RouterModule, FormsModule, TranslocoPipe],
   template: `
     <div class="page-root">
       <div class="container max-w-2xl py-8">
         <!-- Header -->
         <div class="mb-7">
-          <p class="kicker mb-2">Account</p>
-          <h1 class="text-3xl font-semibold text-foreground">Profile</h1>
-          <p class="text-sm text-muted-foreground mt-1.5">Manage your account information</p>
+          <p class="kicker mb-2">{{ 'profile.account' | transloco }}</p>
+          <h1 class="text-3xl font-semibold text-foreground">{{ 'profile.title' | transloco }}</h1>
+          <p class="text-sm text-muted-foreground mt-1.5">{{ 'profile.intro' | transloco }}</p>
         </div>
 
         @if (loading) {
           <div class="card p-8 flex items-center justify-center gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading profile...</span>
+            <span class="text-sm">{{ 'profile.loading' | transloco }}</span>
           </div>
         }
 
@@ -34,7 +36,7 @@ import { apiErrorMessage } from '../../api/api-error';
             @if (user.profile.avatar) {
               <img
                 [src]="user.profile.avatar"
-                alt="Avatar"
+                [alt]="'profile.avatarAlt' | transloco"
                 class="w-14 h-14 rounded-full object-cover ring-1 ring-border flex-shrink-0"
               />
             } @else {
@@ -48,23 +50,29 @@ import { apiErrorMessage } from '../../api/api-error';
               <p class="font-semibold text-foreground">{{ user.username }}</p>
               <p class="text-sm text-muted-foreground">{{ user.email }}</p>
               @if (user.is_superuser) {
-                <span class="badge badge-completed mt-1">Admin</span>
+                <span class="badge badge-completed mt-1">{{
+                  'profile.roleAdmin' | transloco
+                }}</span>
               } @else if (user.is_staff) {
-                <span class="badge badge-pending mt-1">Staff</span>
+                <span class="badge badge-pending mt-1">{{ 'profile.roleStaff' | transloco }}</span>
               } @else if (user.profile.role === 'organizer') {
-                <span class="badge badge-published mt-1">Organizer</span>
+                <span class="badge badge-published mt-1">{{
+                  'profile.roleOrganizer' | transloco
+                }}</span>
               } @else {
-                <span class="badge badge-pending mt-1">Attendee</span>
+                <span class="badge badge-pending mt-1">{{
+                  'profile.roleAttendee' | transloco
+                }}</span>
               }
             </div>
             <div class="flex items-center gap-2">
               <label class="btn btn-sm btn-secondary cursor-pointer">
                 {{
                   uploadingAvatar
-                    ? 'Uploading…'
+                    ? ('profile.uploading' | transloco)
                     : user.profile.avatar
-                      ? 'Change photo'
-                      : 'Upload photo'
+                      ? ('profile.changePhoto' | transloco)
+                      : ('profile.uploadPhoto' | transloco)
                 }}
                 <input
                   type="file"
@@ -80,7 +88,7 @@ import { apiErrorMessage } from '../../api/api-error';
                   (click)="removeAvatar()"
                   class="btn btn-sm btn-ghost text-muted-foreground"
                 >
-                  Remove
+                  {{ 'common.remove' | transloco }}
                 </button>
               }
             </div>
@@ -91,13 +99,18 @@ import { apiErrorMessage } from '../../api/api-error';
             <div class="card p-5 mb-4 flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p class="text-sm font-semibold text-foreground">
-                  {{ user.profile.role === 'organizer' ? 'Organizer account' : 'Attendee account' }}
+                  {{
+                    (user.profile.role === 'organizer'
+                      ? 'profile.organizerAccount'
+                      : 'profile.attendeeAccount'
+                    ) | transloco
+                  }}
                 </p>
                 <p class="text-xs text-muted-foreground mt-0.5">
                   {{
                     user.profile.role === 'organizer'
-                      ? 'You can create and manage events.'
-                      : 'Organizer accounts are created by administrators. Contact support if you need one.'
+                      ? ('profile.organizerHint' | transloco)
+                      : ('profile.attendeeHint' | transloco)
                   }}
                 </p>
               </div>
@@ -107,21 +120,31 @@ import { apiErrorMessage } from '../../api/api-error';
           <!-- Security (2FA) -->
           <div class="card p-5 mb-4 flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2 class="text-sm font-semibold text-foreground">Security</h2>
+              <h2 class="text-sm font-semibold text-foreground">
+                {{ 'profile.securityTitle' | transloco }}
+              </h2>
               <p class="text-xs text-muted-foreground mt-0.5">
-                Two-factor authentication, passkeys and recovery codes.
+                {{ 'profile.securityHint' | transloco }}
               </p>
             </div>
-            <a routerLink="/profile/security" class="btn btn-sm btn-secondary">Manage</a>
+            <a routerLink="/profile/security" class="btn btn-sm btn-secondary">{{
+              'profile.manage' | transloco
+            }}</a>
           </div>
 
           <!-- Notifications -->
           <div class="card p-5 mb-4 flex items-center justify-between gap-4 flex-wrap">
             <div>
-              <h2 class="text-sm font-semibold text-foreground">Notifications</h2>
-              <p class="text-xs text-muted-foreground mt-0.5">Choose which emails you receive.</p>
+              <h2 class="text-sm font-semibold text-foreground">
+                {{ 'profile.notificationsTitle' | transloco }}
+              </h2>
+              <p class="text-xs text-muted-foreground mt-0.5">
+                {{ 'profile.notificationsHint' | transloco }}
+              </p>
             </div>
-            <a routerLink="/profile/notifications" class="btn btn-sm btn-secondary">Manage</a>
+            <a routerLink="/profile/notifications" class="btn btn-sm btn-secondary">{{
+              'profile.manage' | transloco
+            }}</a>
           </div>
 
           <!-- Form -->
@@ -129,45 +152,51 @@ import { apiErrorMessage } from '../../api/api-error';
             <div class="card divide-y divide-border">
               <!-- Personal details -->
               <div class="p-5">
-                <h2 class="text-sm font-semibold text-foreground mb-4">Personal details</h2>
+                <h2 class="text-sm font-semibold text-foreground mb-4">
+                  {{ 'profile.personalDetails' | transloco }}
+                </h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label for="first_name" class="block text-sm font-medium text-foreground mb-1.5"
-                      >First name</label
+                    <label
+                      for="first_name"
+                      class="block text-sm font-medium text-foreground mb-1.5"
+                      >{{ 'profile.firstName' | transloco }}</label
                     >
                     <input
                       id="first_name"
                       type="text"
                       [(ngModel)]="formData.first_name"
                       name="first_name"
-                      placeholder="First name"
+                      [placeholder]="'profile.firstName' | transloco"
                       class="input"
                       autocomplete="given-name"
                     />
                   </div>
                   <div>
-                    <label for="last_name" class="block text-sm font-medium text-foreground mb-1.5"
-                      >Last name</label
+                    <label
+                      for="last_name"
+                      class="block text-sm font-medium text-foreground mb-1.5"
+                      >{{ 'profile.lastName' | transloco }}</label
                     >
                     <input
                       id="last_name"
                       type="text"
                       [(ngModel)]="formData.last_name"
                       name="last_name"
-                      placeholder="Last name"
+                      [placeholder]="'profile.lastName' | transloco"
                       class="input"
                       autocomplete="family-name"
                     />
                   </div>
                   <div class="sm:col-span-2">
-                    <label for="bio" class="block text-sm font-medium text-foreground mb-1.5"
-                      >Bio</label
-                    >
+                    <label for="bio" class="block text-sm font-medium text-foreground mb-1.5">{{
+                      'profile.bio' | transloco
+                    }}</label>
                     <textarea
                       id="bio"
                       [(ngModel)]="formData.profile.bio"
                       name="bio"
-                      placeholder="Tell us a bit about yourself..."
+                      [placeholder]="'profile.bioPlaceholder' | transloco"
                       rows="3"
                       class="input resize-none"
                     ></textarea>
@@ -177,12 +206,14 @@ import { apiErrorMessage } from '../../api/api-error';
 
               <!-- Contact -->
               <div class="p-5">
-                <h2 class="text-sm font-semibold text-foreground mb-4">Contact & location</h2>
+                <h2 class="text-sm font-semibold text-foreground mb-4">
+                  {{ 'profile.contact' | transloco }}
+                </h2>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label for="phone" class="block text-sm font-medium text-foreground mb-1.5"
-                      >Phone</label
-                    >
+                    <label for="phone" class="block text-sm font-medium text-foreground mb-1.5">{{
+                      'common.phone' | transloco
+                    }}</label>
                     <input
                       id="phone"
                       type="tel"
@@ -194,22 +225,24 @@ import { apiErrorMessage } from '../../api/api-error';
                     />
                   </div>
                   <div>
-                    <label for="location" class="block text-sm font-medium text-foreground mb-1.5"
-                      >Location</label
+                    <label
+                      for="location"
+                      class="block text-sm font-medium text-foreground mb-1.5"
+                      >{{ 'profile.location' | transloco }}</label
                     >
                     <input
                       id="location"
                       type="text"
                       [(ngModel)]="formData.profile.location"
                       name="location"
-                      placeholder="City, Country"
+                      [placeholder]="'profile.locationPlaceholder' | transloco"
                       class="input"
                     />
                   </div>
                   <div class="sm:col-span-2">
-                    <label for="website" class="block text-sm font-medium text-foreground mb-1.5"
-                      >Website</label
-                    >
+                    <label for="website" class="block text-sm font-medium text-foreground mb-1.5">{{
+                      'profile.website' | transloco
+                    }}</label>
                     <input
                       id="website"
                       type="url"
@@ -236,9 +269,9 @@ import { apiErrorMessage } from '../../api/api-error';
                 <button type="submit" [disabled]="submitting" class="btn btn-primary">
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
-                    Saving...
+                    {{ 'common.saving' | transloco }}
                   } @else {
-                    Save changes
+                    {{ 'profile.saveChanges' | transloco }}
                   }
                 </button>
               </div>
@@ -248,12 +281,14 @@ import { apiErrorMessage } from '../../api/api-error';
           <!-- Change password -->
           <div class="card divide-y divide-border mt-4">
             <div class="p-5">
-              <h2 class="text-sm font-semibold text-foreground mb-4">Change password</h2>
+              <h2 class="text-sm font-semibold text-foreground mb-4">
+                {{ 'profile.changePassword' | transloco }}
+              </h2>
               <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
-                  <label for="old_pw" class="block text-sm font-medium text-foreground mb-1.5"
-                    >Current password</label
-                  >
+                  <label for="old_pw" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'profile.currentPassword' | transloco
+                  }}</label>
                   <input
                     id="old_pw"
                     type="password"
@@ -264,9 +299,9 @@ import { apiErrorMessage } from '../../api/api-error';
                   />
                 </div>
                 <div>
-                  <label for="new_pw" class="block text-sm font-medium text-foreground mb-1.5"
-                    >New password</label
-                  >
+                  <label for="new_pw" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'profile.newPassword' | transloco
+                  }}</label>
                   <input
                     id="new_pw"
                     type="password"
@@ -277,9 +312,9 @@ import { apiErrorMessage } from '../../api/api-error';
                   />
                 </div>
                 <div>
-                  <label for="new_pw2" class="block text-sm font-medium text-foreground mb-1.5"
-                    >Repeat new password</label
-                  >
+                  <label for="new_pw2" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'profile.repeatNewPassword' | transloco
+                  }}</label>
                   <input
                     id="new_pw2"
                     type="password"
@@ -306,7 +341,7 @@ import { apiErrorMessage } from '../../api/api-error';
                 [disabled]="changingPw || !pw.old || !pw.new1 || !pw.new2"
                 class="btn btn-secondary"
               >
-                {{ changingPw ? 'Updating…' : 'Update password' }}
+                {{ (changingPw ? 'profile.updating' : 'profile.updatePassword') | transloco }}
               </button>
             </div>
           </div>
@@ -318,6 +353,7 @@ import { apiErrorMessage } from '../../api/api-error';
 export class ProfileComponent implements OnInit {
   private authService = inject(AuthService);
   private toastService = inject(ToastService);
+  private lang = inject(LanguageService);
 
   user: User | null = null;
   loading = false;
@@ -358,7 +394,7 @@ export class ProfileComponent implements OnInit {
         this.loading = false;
       },
       error: () => {
-        this.error = 'Failed to load profile.';
+        this.error = this.lang.t('profile.loadFailed');
         this.loading = false;
       },
     });
@@ -371,14 +407,14 @@ export class ProfileComponent implements OnInit {
     this.authService.updateProfile(this.formData).subscribe({
       next: (user) => {
         this.user = user;
-        this.success = 'Profile updated.';
+        this.success = this.lang.t('profile.updated');
         this.submitting = false;
         setTimeout(() => {
           this.success = '';
         }, 3000);
       },
       error: (err) => {
-        this.error = apiErrorMessage(err, 'Failed to update profile.', 'detail');
+        this.error = apiErrorMessage(err, this.lang.t('profile.updateFailed'), 'detail');
         this.submitting = false;
       },
     });
@@ -389,7 +425,7 @@ export class ProfileComponent implements OnInit {
     const file = input.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      this.toastService.error('Avatar must be under 5 MB.');
+      this.toastService.error(this.lang.t('profile.avatarTooBig'));
       input.value = '';
       return;
     }
@@ -398,11 +434,13 @@ export class ProfileComponent implements OnInit {
       next: (user) => {
         this.user = user;
         this.uploadingAvatar = false;
-        this.toastService.success('Avatar updated.');
+        this.toastService.success(this.lang.t('profile.avatarUpdated'));
       },
       error: (err) => {
         this.uploadingAvatar = false;
-        this.toastService.error(apiErrorMessage(err, 'Could not upload the avatar.', 'error'));
+        this.toastService.error(
+          apiErrorMessage(err, this.lang.t('profile.avatarUploadFailed'), 'error'),
+        );
       },
     });
     input.value = '';
@@ -412,9 +450,9 @@ export class ProfileComponent implements OnInit {
     this.authService.deleteAvatar().subscribe({
       next: (user) => {
         this.user = user;
-        this.toastService.success('Avatar removed.');
+        this.toastService.success(this.lang.t('profile.avatarRemoved'));
       },
-      error: () => this.toastService.error('Could not remove the avatar.'),
+      error: () => this.toastService.error(this.lang.t('profile.avatarRemoveFailed')),
     });
   }
 
@@ -422,11 +460,11 @@ export class ProfileComponent implements OnInit {
     this.pwError = '';
     this.pwSuccess = '';
     if (this.pw.new1 !== this.pw.new2) {
-      this.pwError = 'Passwords do not match.';
+      this.pwError = this.lang.t('profile.passwordsMismatch');
       return;
     }
     if (this.pw.new1.length < 8) {
-      this.pwError = 'Password must be at least 8 characters.';
+      this.pwError = this.lang.t('profile.passwordTooShort');
       return;
     }
     this.changingPw = true;
@@ -434,14 +472,14 @@ export class ProfileComponent implements OnInit {
       next: () => {
         this.changingPw = false;
         this.pw = { old: '', new1: '', new2: '' };
-        this.pwSuccess = 'Password changed.';
+        this.pwSuccess = this.lang.t('profile.passwordChanged');
         setTimeout(() => {
           this.pwSuccess = '';
         }, 3000);
       },
       error: (err) => {
         this.changingPw = false;
-        this.pwError = apiErrorMessage(err, 'Could not change the password.', 'error');
+        this.pwError = apiErrorMessage(err, this.lang.t('profile.passwordChangeFailed'), 'error');
       },
     });
   }

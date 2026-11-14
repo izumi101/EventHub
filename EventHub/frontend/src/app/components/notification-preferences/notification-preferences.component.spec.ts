@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { NotificationPreferencesComponent } from './notification-preferences.component';
 import type { NotificationPreferences } from '../../services/notification-preferences.service';
 import { ToastService } from '../../services/toast.service';
+import { I18nTestingModule } from '../../i18n/testing';
 import { environment } from '../../../environments/environment';
 
 const URL = `${environment.apiUrl}/auth/profile/notifications/`;
@@ -42,7 +43,7 @@ describe('NotificationPreferencesComponent', () => {
   beforeEach(() => {
     toast = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
-      imports: [NotificationPreferencesComponent],
+      imports: [NotificationPreferencesComponent, I18nTestingModule],
       providers: [
         provideHttpClient(),
         provideHttpClientTesting(),

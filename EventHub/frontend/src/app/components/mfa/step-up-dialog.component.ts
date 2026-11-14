@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { TranslocoPipe } from '@jsverse/transloco';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { MfaService } from '../../services/mfa.service';
 import { StepUpService } from '../../services/step-up.service';
@@ -13,7 +14,7 @@ import { MfaVerifier, MfaVerifyComponent } from './mfa-verify.component';
 @Component({
   selector: 'app-step-up-dialog',
   standalone: true,
-  imports: [DialogDirective, MfaVerifyComponent],
+  imports: [DialogDirective, MfaVerifyComponent, TranslocoPipe],
   template: `
     @if (stepUp.request(); as req) {
       <div class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/40">
@@ -22,18 +23,22 @@ import { MfaVerifier, MfaVerifyComponent } from './mfa-verify.component';
           appDialog
           (dismiss)="cancel()"
         >
-          <h2 class="text-base font-semibold text-foreground mb-1">Confirm it's you</h2>
+          <h2 class="text-base font-semibold text-foreground mb-1">
+            {{ 'mfa.confirmTitle' | transloco }}
+          </h2>
           <p class="text-sm text-muted-foreground mb-5">
-            This action is protected. Verify with a second factor to continue.
+            {{ 'mfa.stepUp.intro' | transloco }}
           </p>
           <app-mfa-verify
             [methods]="req.methods"
             [verifier]="verifier"
-            submitLabel="Confirm"
+            [submitLabel]="'common.confirm' | transloco"
             (verified)="stepUp.resolve(true)"
           />
           <div class="mt-4 flex justify-end">
-            <button type="button" class="btn btn-ghost btn-sm" (click)="cancel()">Cancel</button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="cancel()">
+              {{ 'common.cancel' | transloco }}
+            </button>
           </div>
         </div>
       </div>

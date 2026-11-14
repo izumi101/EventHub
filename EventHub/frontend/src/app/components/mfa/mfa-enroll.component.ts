@@ -14,6 +14,8 @@ import {
 } from '../../services/mfa.service';
 import { Countdown } from '../../utils/countdown';
 import { PasskeyClient } from '../../utils/passkey-client';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 export type EnrollMethod = 'email' | 'totp' | 'webauthn';
 type Step = 'choose' | EnrollMethod;
@@ -27,33 +29,40 @@ type Step = 'choose' | EnrollMethod;
 @Component({
   selector: 'app-mfa-enroll',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet],
+  imports: [FormsModule, NgTemplateOutlet, TranslocoPipe],
   template: `
     @switch (step()) {
       @case ('choose') {
-        <div class="space-y-3" role="group" aria-label="Choose a second factor">
+        <div
+          class="space-y-3"
+          role="group"
+          [attr.aria-label]="'mfa.enroll.chooseGroup' | transloco"
+        >
           @if (offer().includes('totp')) {
             <button type="button" class="enroll-option" (click)="go('totp')">
-              <span class="font-semibold text-foreground">Authenticator app</span>
+              <span class="font-semibold text-foreground">{{ 'mfa.method.totp' | transloco }}</span>
               <span class="text-xs text-muted-foreground">
-                Google Authenticator, 1Password, Authy… Works offline. Recommended.
+                {{ 'mfa.enroll.totpDesc' | transloco }}
               </span>
             </button>
           }
           @if (offer().includes('webauthn') && passkeys.supported) {
             <button type="button" class="enroll-option" (click)="go('webauthn')">
-              <span class="font-semibold text-foreground">Passkey</span>
+              <span class="font-semibold text-foreground">{{
+                'mfa.method.webauthn' | transloco
+              }}</span>
               <span class="text-xs text-muted-foreground">
-                Face ID, Touch ID, Windows Hello or a security key. Phishing-resistant.
+                {{ 'mfa.enroll.passkeyDesc' | transloco }}
               </span>
             </button>
           }
           @if (offer().includes('email')) {
             <button type="button" class="enroll-option" (click)="go('email')">
-              <span class="font-semibold text-foreground">Email code</span>
+              <span class="font-semibold text-foreground">{{
+                'mfa.method.email' | transloco
+              }}</span>
               <span class="text-xs text-muted-foreground">
-                A code sent to your account email at each sign-in. Simplest, but only as safe as
-                your mailbox.
+                {{ 'mfa.enroll.emailDesc' | transloco }}
               </span>
             </button>
           }
@@ -63,8 +72,7 @@ type Step = 'choose' | EnrollMethod;
       @case ('email') {
         <form class="space-y-4" (ngSubmit)="confirmEmail()" novalidate>
           <p class="text-sm text-muted-foreground">
-            We'll send a 6-digit code to the email address on your account. Enter it here to turn on
-            email codes.
+            {{ 'mfa.enroll.emailIntro' | transloco }}
           </p>
           <div class="flex items-center gap-3 flex-wrap">
             <button
@@ -73,13 +81,13 @@ type Step = 'choose' | EnrollMethod;
               (click)="sendEmail()"
               [disabled]="busy() || countdown.seconds() > 0"
             >
-              {{ emailSent() ? 'Resend code' : 'Send code' }}
+              {{ (emailSent() ? 'mfa.resendCode' : 'mfa.sendCode') | transloco }}
             </button>
             <span class="text-xs text-muted-foreground" aria-live="polite">
               @if (countdown.seconds() > 0) {
-                You can ask for a new code in {{ countdown.seconds() }} s.
+                {{ 'mfa.resendIn' | transloco: { seconds: countdown.seconds() } }}
               } @else if (emailSent()) {
-                Code sent. Check your inbox (and spam).
+                {{ 'mfa.codeSent' | transloco }}
               }
             </span>
           </div>
@@ -90,7 +98,7 @@ type Step = 'choose' | EnrollMethod;
             class="btn btn-primary btn-full"
             [disabled]="busy() || !emailSent() || !code.trim()"
           >
-            Turn on email codes
+            {{ 'mfa.enroll.turnOnEmail' | transloco }}
           </button>
           <ng-container *ngTemplateOutlet="back" />
         </form>
@@ -100,9 +108,9 @@ type Step = 'choose' | EnrollMethod;
         <form class="space-y-4" (ngSubmit)="confirmTotp()" novalidate>
           @if (totp(); as setup) {
             <ol class="text-sm text-muted-foreground space-y-1 list-decimal pl-5">
-              <li>Open your authenticator app and add an account.</li>
-              <li>Scan the QR code, or type the key below.</li>
-              <li>Enter the 6-digit code the app shows.</li>
+              <li>{{ 'mfa.enroll.totpStep1' | transloco }}</li>
+              <li>{{ 'mfa.enroll.totpStep2' | transloco }}</li>
+              <li>{{ 'mfa.enroll.totpStep3' | transloco }}</li>
             </ol>
             <div class="flex flex-col items-center gap-3">
               @if (qr()) {
@@ -111,11 +119,13 @@ type Step = 'choose' | EnrollMethod;
                   width="192"
                   height="192"
                   class="rounded-md border border-border bg-white p-2"
-                  alt="QR code for your authenticator app"
+                  [alt]="'mfa.enroll.qrAlt' | transloco"
                 />
               }
               <div class="text-center">
-                <p class="text-xs text-muted-foreground mb-1" id="totp-secret-label">Setup key</p>
+                <p class="text-xs text-muted-foreground mb-1" id="totp-secret-label">
+                  {{ 'mfa.enroll.setupKey' | transloco }}
+                </p>
                 <code
                   class="font-mono text-sm text-foreground break-all select-all"
                   aria-labelledby="totp-secret-label"
@@ -130,13 +140,14 @@ type Step = 'choose' | EnrollMethod;
               class="btn btn-primary btn-full"
               [disabled]="busy() || !code.trim()"
             >
-              Turn on authenticator app
+              {{ 'mfa.enroll.turnOnTotp' | transloco }}
             </button>
           } @else {
             <ng-container *ngTemplateOutlet="feedback" />
             @if (busy()) {
               <p class="text-sm text-muted-foreground flex items-center gap-2">
-                <span class="spinner spinner-sm" aria-hidden="true"></span> Preparing...
+                <span class="spinner spinner-sm" aria-hidden="true"></span>
+                {{ 'mfa.enroll.preparing' | transloco }}
               </p>
             }
           }
@@ -147,18 +158,18 @@ type Step = 'choose' | EnrollMethod;
       @case ('webauthn') {
         <form class="space-y-4" (ngSubmit)="createPasskey()" novalidate>
           <p class="text-sm text-muted-foreground">
-            Your browser will ask you to create a passkey with this device or a security key.
+            {{ 'mfa.enroll.passkeyIntro' | transloco }}
           </p>
           <div>
             <label for="passkey-name" class="block text-sm font-medium text-foreground mb-1.5">
-              Name (optional)
+              {{ 'mfa.enroll.nameOptional' | transloco }}
             </label>
             <input
               id="passkey-name"
               name="passkeyName"
               class="input"
               maxlength="64"
-              placeholder="e.g. Work laptop"
+              [placeholder]="'mfa.enroll.namePlaceholder' | transloco"
               [(ngModel)]="passkeyName"
             />
           </div>
@@ -166,9 +177,9 @@ type Step = 'choose' | EnrollMethod;
           <button type="submit" class="btn btn-primary btn-full" [disabled]="busy()">
             @if (busy()) {
               <span class="spinner spinner-sm" aria-hidden="true"></span>
-              Waiting for the passkey...
+              {{ 'mfa.verifyForm.waitingForPasskey' | transloco }}
             } @else {
-              Create passkey
+              {{ 'mfa.enroll.createPasskey' | transloco }}
             }
           </button>
           <ng-container *ngTemplateOutlet="back" />
@@ -178,9 +189,9 @@ type Step = 'choose' | EnrollMethod;
 
     <ng-template #codeField>
       <div>
-        <label for="enroll-code" class="block text-sm font-medium text-foreground mb-1.5"
-          >Code</label
-        >
+        <label for="enroll-code" class="block text-sm font-medium text-foreground mb-1.5">{{
+          'mfa.code' | transloco
+        }}</label>
         <input
           id="enroll-code"
           name="code"
@@ -205,11 +216,11 @@ type Step = 'choose' | EnrollMethod;
     <ng-template #back>
       @if (canGoBack()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="backToChoice()">
-          Choose another method
+          {{ 'mfa.enroll.chooseAnother' | transloco }}
         </button>
       } @else {
         <button type="button" class="btn btn-ghost btn-sm" (click)="cancelled.emit()">
-          Cancel
+          {{ 'common.cancel' | transloco }}
         </button>
       }
     </ng-template>
@@ -252,6 +263,7 @@ export class MfaEnrollComponent implements OnInit {
   readonly cancelled = output();
 
   private readonly mfa = inject(MfaService);
+  private readonly lang = inject(LanguageService);
   protected readonly passkeys = inject(PasskeyClient);
   protected readonly countdown = new Countdown();
 
@@ -299,7 +311,7 @@ export class MfaEnrollComponent implements OnInit {
         this.emailSent.set(true);
         this.countdown.start(res.resend_in);
       },
-      error: (err: unknown) => this.fail(err, 'Could not send the code.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('mfa.enroll.sendFailed')),
     });
   }
 
@@ -309,7 +321,7 @@ export class MfaEnrollComponent implements OnInit {
     this.error.set('');
     this.mfa.emailEnable(this.code.trim(), this.enrollmentToken()).subscribe({
       next: (res) => this.finish(res),
-      error: (err: unknown) => this.fail(err, 'That code is not valid.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('mfa.enroll.invalidCode')),
     });
   }
 
@@ -319,7 +331,7 @@ export class MfaEnrollComponent implements OnInit {
     this.error.set('');
     this.mfa.totpConfirm(this.code.trim(), this.enrollmentToken()).subscribe({
       next: (res) => this.finish(res),
-      error: (err: unknown) => this.fail(err, 'That code is not valid.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('mfa.enroll.invalidCode')),
     });
   }
 
@@ -338,14 +350,14 @@ export class MfaEnrollComponent implements OnInit {
       this.busy.set(false);
       this.error.set(
         isApiError(err)
-          ? apiErrorMessage(err, 'Could not start the passkey set-up.', 'error')
+          ? apiErrorMessage(err, this.lang.t('mfa.enroll.passkeyStartFailed'), 'error')
           : this.passkeys.errorMessage(err),
       );
       return;
     }
     this.mfa.passkeyRegisterVerify(credential, name, this.enrollmentToken()).subscribe({
       next: (res) => this.finish(res),
-      error: (err: unknown) => this.fail(err, 'The passkey could not be registered.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('mfa.enroll.passkeyRegisterFailed')),
     });
   }
 
@@ -362,7 +374,7 @@ export class MfaEnrollComponent implements OnInit {
           () => this.qr.set(''),
         );
       },
-      error: (err: unknown) => this.fail(err, 'Could not start the authenticator set-up.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('mfa.enroll.totpStartFailed')),
     });
   }
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import {
   WebAuthnAbortService,
   browserSupportsWebAuthn,
@@ -8,6 +8,7 @@ import {
   type PublicKeyCredentialRequestOptionsJSON,
 } from '@simplewebauthn/browser';
 import type { WebAuthnJson } from '../services/mfa.service';
+import { LanguageService } from '../i18n/language.service';
 
 /**
  * The browser side of passkeys (@simplewebauthn/browser), behind a service so
@@ -15,6 +16,8 @@ import type { WebAuthnJson } from '../services/mfa.service';
  */
 @Injectable({ providedIn: 'root' })
 export class PasskeyClient {
+  private readonly lang = inject(LanguageService);
+
   /** Passkeys need WebAuthn and a secure context (https or http://localhost). */
   get supported(): boolean {
     return typeof window !== 'undefined' && window.isSecureContext && browserSupportsWebAuthn();
@@ -45,14 +48,14 @@ export class PasskeyClient {
   errorMessage(err: unknown): string {
     const name = err instanceof Error ? err.name : '';
     if (name === 'NotAllowedError' || name === 'AbortError') {
-      return 'The passkey prompt was closed or timed out. Try again.';
+      return this.lang.t('mfa.passkeyError.closed');
     }
     if (name === 'InvalidStateError') {
-      return 'This passkey is already registered on your account.';
+      return this.lang.t('mfa.passkeyError.alreadyRegistered');
     }
     if (name === 'SecurityError') {
-      return 'Passkeys need a secure connection (https or localhost).';
+      return this.lang.t('mfa.passkeyError.insecure');
     }
-    return 'The passkey could not be used. Try again or choose another method.';
+    return this.lang.t('mfa.passkeyError.generic');
   }
 }
