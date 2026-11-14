@@ -49,6 +49,16 @@ services:
       DJANGO_SEED_ADMIN_PASSWORD: ${DJANGO_SEED_ADMIN_PASSWORD:-}
       # Browser tests only: a known TOTP secret for the demo organizer and admin.
       DJANGO_SEED_MFA_TOTP_SECRET: ${DJANGO_SEED_MFA_TOTP_SECRET:-}
+      # Two-factor authentication (docs/SECURITY_2FA.md). MFA_ENCRYPTION_KEY
+      # is required with DJANGO_DEBUG=0. An empty MFA_REQUIRED_ROLES turns
+      # enforcement off, so only an unset one falls back to the default.
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES-organizer,staff,superuser}
+      MFA_STEP_UP_MAX_AGE_SECONDS: ${MFA_STEP_UP_MAX_AGE_SECONDS:-600}
+      MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES: ${MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES:-1}
+      MFA_TOTP_ISSUER: ${MFA_TOTP_ISSUER:-EventHub}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-http://localhost:4200,https://localhost}
       DJANGO_COLLECTSTATIC: ${DJANGO_COLLECTSTATIC:-0}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
       POSTGRES_DB: ${POSTGRES_DB:-eventhub}
@@ -68,6 +78,9 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      # Rate limits per scope, e.g. login=60/min,mfa_ip=120/min (settings
+      # REST_FRAMEWORK / MFA_THROTTLE_RATES); empty keeps the defaults.
+      DJANGO_THROTTLE_RATES: ${DJANGO_THROTTLE_RATES:-}
       # Payments (docs/adr/0001-payment-provider-layer.md): every enabled
       # provider must be configured when DJANGO_DEBUG=0.
       # .env.example enables freedompay for the demo (KZT events).
