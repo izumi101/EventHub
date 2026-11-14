@@ -6,7 +6,7 @@ schema. Three roles, each with only what its job needs:
 | Role | Env (user / password) | Used by | May | May not |
 |------|-----------------------|---------|-----|---------|
 | `eventhub_user` (owner) | `POSTGRES_USER` / `POSTGRES_PASSWORD` | `migrate`, `setup_db_roles`, `verify_db_roles`, the test runner, anything started with `DJANGO_DB_AS_OWNER=1` | everything: owns every table, runs DDL, creates roles | — |
-| `eventhub_app` | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | gunicorn (backend), `run_worker` (worker), every other `manage.py` command (`shell`, `seed_data`, `run_maintenance`, ...) | `CONNECT`; `USAGE` on schema `public`; `SELECT, INSERT, UPDATE, DELETE` on every table; `USAGE, SELECT, UPDATE` on sequences; `EXECUTE` on functions | `CREATE` / `ALTER` / `DROP` anything, `TRUNCATE`, `REFERENCES`, `TRIGGER`, temporary tables, `CREATE SCHEMA`, writing `django_migrations`; not superuser, no `CREATEDB` / `CREATEROLE` / `REPLICATION` / `BYPASSRLS`, inherits no role |
+| `eventhub_app` | `POSTGRES_APP_USER` / `POSTGRES_APP_PASSWORD` | gunicorn (backend), `run_worker` (worker), every other `manage.py` command (`shell`, `seed_data`, `run_maintenance`, ...) | `CONNECT`; `USAGE` on `public` and every domain schema (`DATABASE_SCHEMAS.md`); `SELECT, INSERT, UPDATE, DELETE` on every table; `USAGE, SELECT, UPDATE` on sequences; `EXECUTE` on functions | `CREATE` / `ALTER` / `DROP` anything, `TRUNCATE`, `REFERENCES`, `TRIGGER`, temporary tables, `CREATE SCHEMA`, `CREATE` in any schema, writing `django_migrations`; not superuser, no `CREATEDB` / `CREATEROLE` / `REPLICATION` / `BYPASSRLS`, inherits no role |
 | `eventhub_readonly` | `POSTGRES_READONLY_USER` / `POSTGRES_READONLY_PASSWORD` | `run_sql_checks`, the SQL in `backend/sql/reports` and `backend/sql/explain/hot_queries.sql`, analysts | `CONNECT`; `SELECT` on business tables | any write; reading credentials: `auth_user.password`, `events_webhook.secret`, `django_session`, `token_blacklist_*` (refresh tokens), `accounts_passwordresetcode`, `accounts_emailverificationcode`. Sessions default to read-only transactions, `statement_timeout = 60s`, at most 10 connections |
 
 Code: `backend/common/db_roles.py`; commands `setup_db_roles` and
@@ -36,12 +36,17 @@ still receives the owner password because its entrypoint runs `migrate`
 
 ```text
 container start (entrypoint.sh)
-  python manage.py migrate          -> connects as POSTGRES_USER (owner)
+  python manage.py migrate          -> connects as POSTGRES_USER (owner); moves new
+                                       tables into their domain schema and
+                                       persists the database search_path
+                                       (DATABASE_SCHEMAS.md)
   python manage.py setup_db_roles   -> connects as owner; creates / updates
                                        eventhub_app + eventhub_readonly,
                                        resets their passwords from env,
-                                       re-grants on all tables, sets
-                                       ALTER DEFAULT PRIVILEGES
+                                       re-grants on all tables in public and
+                                       every domain schema, sets ALTER DEFAULT
+                                       PRIVILEGES per schema, persists their
+                                       search_path (ALTER ROLE ... IN DATABASE)
   [seed_data if DJANGO_SEED_DATA=1] -> eventhub_app
   exec gunicorn                     -> eventhub_app
 worker container: run_worker        -> eventhub_app (starts after the backend is healthy)
@@ -74,13 +79,20 @@ it is not used). Per run, in one transaction:
 2. `CREATE ROLE` or `ALTER ROLE ... LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE
    NOREPLICATION NOBYPASSRLS NOINHERIT PASSWORD '<SCRAM verifier>'` and revokes
    every role membership;
-3. `REVOKE CREATE ON SCHEMA public FROM PUBLIC`, `REVOKE CONNECT, TEMPORARY ON
-   DATABASE ... FROM PUBLIC`, then `GRANT CONNECT` to the two roles only;
-4. grants on all existing tables / sequences / functions, revokes what is not
-   listed above (so manual drift is repaired on the next start);
-5. `ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA public GRANT ... TO
-   eventhub_app / eventhub_readonly`, so tables created by later migrations
-   are usable immediately, even before the next `setup_db_roles`;
+3. `REVOKE CREATE ON SCHEMA <s> FROM PUBLIC` for `public` and every domain
+   schema that exists, `REVOKE CONNECT, TEMPORARY ON DATABASE ... FROM
+   PUBLIC`, then `GRANT CONNECT` to the two roles only, `USAGE` (never
+   `CREATE`) on each of those schemas, and `ALTER ROLE <role> IN DATABASE
+   <db> SET search_path` to the application search path, so psql and
+   DataGrip sessions of the two roles resolve unqualified names too;
+4. grants on all existing tables / sequences / functions in each schema,
+   revokes what is not listed above (so manual drift is repaired on the next
+   start);
+5. `ALTER DEFAULT PRIVILEGES FOR ROLE <owner> IN SCHEMA <s> GRANT ... TO
+   eventhub_app / eventhub_readonly` per schema, so tables created by later
+   migrations (in `public`, then moved with their privileges) or directly in
+   a domain schema are usable immediately, even before the next
+   `setup_db_roles`;
 6. hides the credential tables and columns from the read-only role
    (column-level grant on `auth_user` and `events_webhook`);
 7. verifies the role attributes afterwards and fails the start if a role
@@ -115,13 +127,19 @@ old `.env` keeps starting (as the owner, with the warning).
 docker compose exec backend python manage.py verify_db_roles
 ```
 
-prints PASS/FAIL per probe: the app role can SELECT/INSERT/UPDATE/DELETE but
+prints PASS/FAIL per probe (74 on the demo database). Both roles connect
+without a search path of their own, so the probes first prove the persisted
+search path (`search_path persisted`) and that unqualified names resolve
+across the schemas. Then: the app role can SELECT/INSERT/UPDATE/DELETE but
 gets `permission denied` for CREATE TABLE, ALTER TABLE (`must be owner`),
 DROP TABLE, TRUNCATE, CREATE SCHEMA, temporary tables and writes to
 `django_migrations`; the read-only role can SELECT but cannot INSERT, UPDATE,
-DELETE, CREATE or read `auth_user.password` / sessions / refresh tokens; and a
-table the owner creates afterwards (as a new migration would) is immediately
-writable by the app role and readable, not writable, by the read-only role.
+DELETE, CREATE or read `auth_user.password` / sessions / refresh tokens; per
+domain schema both roles can read one of its tables but get `permission
+denied for schema <s>` for `CREATE TABLE <s>.…`; and a table the owner
+creates afterwards in `public` and in every domain schema (as a new
+migration would) is immediately writable by the app role and readable, not
+writable, by the read-only role.
 
 Interactive, with `psql` inside the db container (use `-h db`: the image
 trusts connections from `localhost` inside the container without a password):
