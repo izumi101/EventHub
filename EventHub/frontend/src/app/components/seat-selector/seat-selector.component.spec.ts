@@ -90,10 +90,10 @@ describe('summariseZones', () => {
       at(3, 'vip', '16000.00'),
       at(5, 'standard', '8000.00'),
     ]);
-    expect(zones.map((z) => `${z.rows}: ${z.label} ${z.price}`)).toEqual([
-      'Row 1: Premium 24000.00',
-      'Rows 2–3: VIP 16000.00',
-      'Rows 4–5: Standard 8000.00',
+    expect(zones.map((z) => [z.zone, z.rowsKey, z.rowsParams, z.price])).toEqual([
+      ['premium', 'seatSelector.row', { first: 1 }, '24000.00'],
+      ['vip', 'seatSelector.rowRange', { first: 2, last: 3 }, '16000.00'],
+      ['standard', 'seatSelector.rowRange', { first: 4, last: 5 }, '8000.00'],
     ]);
   });
 });
