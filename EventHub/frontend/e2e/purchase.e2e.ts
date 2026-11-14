@@ -1,8 +1,6 @@
-import { createHmac } from 'node:crypto';
-import { APIRequestContext, APIResponse, expect, Page, test } from '@playwright/test';
-import type { components } from '../src/app/api/openapi';
-
-type Schemas = components['schemas'];
+import { APIResponse, expect, test } from '@playwright/test';
+import { createAttendee, Schemas, SEEDED_TOTP_SECRET, signIn } from './support/api';
+import { collectErrors, signInWithPassword } from './support/ui';
 
 /** The JSON body of an API response, typed by the OpenAPI contract. */
 async function body<T>(response: APIResponse): Promise<T> {
@@ -11,71 +9,6 @@ async function body<T>(response: APIResponse): Promise<T> {
 
 // Demo data from `seed_data` (DJANGO_SEED_DATA=1 in .env.example).
 const PAID_ONLINE_EVENT = 'Online Django REST Workshop';
-
-async function login(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await page.fill('input[name="username"]', username);
-  await page.fill('input[name="password"]', password);
-  const [response] = await Promise.all([
-    page.waitForResponse((r) => r.url().includes('/api/v1/auth/login/')),
-    page.click('button[type="submit"]'),
-  ]);
-  expect(response.status()).toBe(200);
-}
-
-/** RFC 6238 code (SHA-1, 6 digits, 30 s) for a base32 secret. */
-function totp(secret: string, now = Date.now()): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const ch of secret.replace(/=+$/, '').toUpperCase()) {
-    bits += alphabet.indexOf(ch).toString(2).padStart(5, '0');
-  }
-  const key = Buffer.from(bits.match(/.{8}/g)?.map((b) => parseInt(b, 2)) ?? []);
-  const counter = Buffer.alloc(8);
-  counter.writeBigUInt64BE(BigInt(Math.floor(now / 30_000)));
-  const mac = createHmac('sha1', key).update(counter).digest();
-  const offset = mac[mac.length - 1] & 0xf;
-  return ((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).toString().padStart(6, '0');
-}
-
-/**
- * API sign-in that completes the second step for accounts with 2FA (the demo
- * organizer must use it): the stack is seeded with the TOTP secret in
- * E2E_MFA_TOTP_SECRET (DJANGO_SEED_MFA_TOTP_SECRET on the backend).
- */
-async function apiLogin(
-  request: APIRequestContext,
-  username: string,
-  password: string,
-): Promise<Schemas['AuthPayload']> {
-  const first = await body<Schemas['LoginResult']>(
-    await request.post('/api/v1/auth/login/', { data: { username, password } }),
-  );
-  if ('tokens' in first) return first;
-  const secret = process.env['E2E_MFA_TOTP_SECRET'];
-  if (!('challenge_token' in first) || !secret) {
-    throw new Error(`${username} needs 2FA: set E2E_MFA_TOTP_SECRET and seed it`);
-  }
-  const verified = await request.post('/api/v1/auth/mfa/login/verify/', {
-    data: { challenge_token: first.challenge_token, method: 'totp', code: totp(secret) },
-  });
-  expect(verified.status()).toBe(200);
-  return body<Schemas['AuthPayload']>(verified);
-}
-
-function collectErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => {
-    // CSP violations and runtime errors show up as console errors.
-    if (m.type() !== 'error') return;
-    // "No seat map for this event" is an expected 404 the checkout handles.
-    if (m.text().startsWith('Failed to load resource') && m.location().url.endsWith('/seat_map/'))
-      return;
-    errors.push(`console: ${m.text()} (${m.location().url})`);
-  });
-  return errors;
-}
 
 test('home page renders, styled, under the CSP', async ({ page }) => {
   const errors = collectErrors(page);
@@ -88,16 +21,18 @@ test('home page renders, styled, under the CSP', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('attendee buys a paid ticket and gets the online link', async ({ page }) => {
+test('attendee buys a paid ticket and gets the online link', async ({ page, request }) => {
   const errors = collectErrors(page);
-  await login(page, 'attendee', 'password123');
+  // A new attendee each run, so the spec can run again on the same stack.
+  const { account } = await createAttendee(request);
+  await signInWithPassword(page, account.username, account.password);
 
   await page.goto('/');
   await page.getByText(PAID_ONLINE_EVENT).first().click();
   await page.getByRole('button', { name: /Get tickets/ }).click();
   await page.getByRole('button', { name: /Proceed to payment/ }).click();
 
-  // Mock payments (DEBUG + STRIPE_MOCK_MODE=1) confirm on the server first.
+  // Mock payments (DEBUG + PAYMENTS_MOCK_MODE=1) confirm on the server first.
   await expect(page.getByText('Payment confirmed')).toBeVisible();
 
   await page.goto('/my-registrations');
@@ -127,14 +62,21 @@ test('seat map updates arrive over the WebSocket through nginx', async ({ page }
   );
   const id = events.results[0].id;
 
-  // The demo data has no seat maps: the organizer creates one (400 if it exists).
-  const org = await apiLogin(page.request, 'organizer', 'password123');
+  // The demo data has no seat maps: the organizer creates one (400 if it
+  // exists). The seeded organizer must use 2FA: the stack is seeded with the
+  // TOTP secret in E2E_MFA_TOTP_SECRET (DJANGO_SEED_MFA_TOTP_SECRET).
+  const org = await signIn(page.request, {
+    username: 'organizer',
+    email: '',
+    password: 'password123',
+    totpSecret: SEEDED_TOTP_SECRET,
+  });
   await page.request.post(`/api/v1/events/${id}/seat-map/create/`, {
     data: { rows: 2, cols: 4, sync_capacity: false },
-    headers: { Authorization: `Bearer ${org.tokens.access}` },
+    headers: { Authorization: `Bearer ${org.access}` },
   });
 
-  await login(page, 'attendee', 'password123');
+  await signInWithPassword(page, 'attendee', 'password123');
 
   const snapshot = page
     .waitForEvent('websocket', (ws) => ws.url().includes(`/ws/seats/${id}/`))
