@@ -49,6 +49,16 @@ services:
       DJANGO_SEED_ADMIN_PASSWORD: ${DJANGO_SEED_ADMIN_PASSWORD:-}
       # Browser tests only: a known TOTP secret for the demo organizer and admin.
       DJANGO_SEED_MFA_TOTP_SECRET: ${DJANGO_SEED_MFA_TOTP_SECRET:-}
+      # Two-factor authentication (docs/SECURITY_2FA.md). MFA_ENCRYPTION_KEY
+      # is required with DJANGO_DEBUG=0. An empty MFA_REQUIRED_ROLES turns
+      # enforcement off, so only an unset one falls back to the default.
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
+      MFA_REQUIRED_ROLES: ${MFA_REQUIRED_ROLES-organizer,staff,superuser}
+      MFA_STEP_UP_MAX_AGE_SECONDS: ${MFA_STEP_UP_MAX_AGE_SECONDS:-600}
+      MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES: ${MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES:-1}
+      MFA_TOTP_ISSUER: ${MFA_TOTP_ISSUER:-EventHub}
+      WEBAUTHN_RP_ID: ${WEBAUTHN_RP_ID:-localhost}
+      WEBAUTHN_ORIGINS: ${WEBAUTHN_ORIGINS:-http://localhost:4200,https://localhost}
       DJANGO_COLLECTSTATIC: ${DJANGO_COLLECTSTATIC:-0}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
       POSTGRES_DB: ${POSTGRES_DB:-eventhub}
