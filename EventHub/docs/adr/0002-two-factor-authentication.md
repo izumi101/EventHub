@@ -1,6 +1,6 @@
 # ADR 0002: Two-factor authentication
 
-- Status: accepted (2026-11-12)
+- Status: accepted (2026-11-12); amended 2026-11-13 (Amendment 1: email codes)
 - Scope: roadmap phase 4.1 (`PLAN.md` 4.1, "2FA: TOTP + WebAuthn / passkeys")
 - Operator guide: [`docs/SECURITY_2FA.md`](../SECURITY_2FA.md)
 
@@ -40,7 +40,8 @@ Constraints:
   ten codes stays cheap). Regenerating them needs a fresh second factor.
 
 SMS and email OTP were rejected: SIM swap and mailbox takeover are the
-attacks 2FA is meant to stop, and both cost money or depend on delivery.
+attacks 2FA is meant to stop, and both cost money or depend on delivery. Email codes
+were later added as an opt-in factor with a policy switch (Amendment 1).
 
 ### 2. Login is two requests; the first never returns a session
 
@@ -185,3 +186,73 @@ verification is a human process and is documented in `SECURITY_2FA.md`.
 - Hardware-attestation allow-lists (FIDO MDS).
 - An email-change endpoint: the API has none today (email is read-only in
   `UserSerializer`); when one is added it must call `require_recent_mfa`.
+
+## Amendment 1 (2026-11-13): email codes as a second factor
+
+### Context
+
+The team specification requires "two-factor authentication by mail". The
+original decision rejected email OTP (section 1). This amendment adds it as
+an opt-in factor next to TOTP and passkeys, with the trade-off stated and a
+switch to keep it away from the accounts that matter most.
+
+### Decision
+
+- **Method `email`.** A 6-digit code sent to the account's email address,
+  per purpose (`login`, `step_up`, `enroll`). Stored as an HMAC-SHA256 keyed
+  with `SECRET_KEY` plus a per-row salt (a database leak alone does not
+  allow enumerating the 10^6 codes), valid `MFA_EMAIL_CODE_TTL_SECONDS`
+  (600 s), `MFA_EMAIL_CODE_MAX_ATTEMPTS` (5) guesses — counted before the
+  comparison, the code is burned when the budget is spent — and single use
+  (conditional `UPDATE ... WHERE is_used = false`). A new code for a purpose
+  retires the previous one. The per-user lockout of section 6 applies on top.
+- **Sending** goes through the outbox (`jobs.handlers.enqueue_email`), never
+  from the request, and is limited per user and purpose:
+  `MFA_EMAIL_RESEND_SECONDS` (one a minute) and `MFA_EMAIL_MAX_PER_HOUR`
+  (five an hour), answered with 429 `mfa_email_throttled` + `retry_after`.
+  Limits are per purpose so that finishing enrollment never blocks the
+  sign-in right after it.
+- **Enrollment** proves the mailbox: `POST /auth/mfa/email/send/`
+  (`purpose=enroll`) then `POST /auth/mfa/email/enable/` with the code.
+  Both accept the enrollment token; with a session they need step-up when a
+  factor already exists (same rule as TOTP and passkeys). The first factor
+  returns recovery codes and a new JWT pair as before.
+- **Sign-in**: `POST /auth/mfa/login/email/send/` with the challenge token,
+  then `login/verify/` with `method=email`. The send endpoint answers the
+  same whether or not the account has email codes turned on (nothing is
+  sent then); wrong, expired, used and missing codes all get the same
+  `mfa_invalid` answer.
+- **Step-up**: `email/send/` with `purpose=step_up`, then
+  `POST /auth/mfa/step-up/` with `method=email`. The Django admin second
+  step offers "Email me a code" to staff who use email codes.
+- **Removal**: `POST /auth/mfa/email/disable/` (step-up; refused when it is
+  the last factor of an account that must use 2FA). `disable/` and
+  `mfa_reset` remove it too.
+- `amr` gets the value `email` (not in RFC 8176, like `rec`), so a later
+  policy can tell an email proof from a TOTP or passkey proof.
+- `PATCH /auth/mfa/webauthn/credentials/<id>/` renames a passkey (no
+  step-up: harmless) — added for the SPA's security page.
+
+### Security trade-off
+
+Email is the weakest factor here. Whoever controls the mailbox can reset the
+password *and* read the code, so against a mailbox takeover email "2FA" adds
+nothing; it still stops password reuse and phishing of the password alone,
+the common case. It is not phishing-resistant (a real-time proxy can relay
+the code) and depends on mail delivery.
+
+Users who are **not** obliged to use 2FA may always choose it. For the roles
+in `MFA_REQUIRED_ROLES` it counts as their factor while
+`MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=1` (default, so the demo organizer can
+enroll with nothing but a mailbox). Set it to `0` in production to require
+an authenticator app or a passkey from organizers, staff and superusers:
+email codes then neither satisfy the role rule at login (the user is asked
+to enroll another factor) nor can be turned on by those users.
+
+### Consequences
+
+- New tables `mfa_emailfactor` and `mfa_emailcode` (the latter hidden from
+  the read-only DB role); expired codes are deleted by `run_maintenance`.
+- Rotating `SECRET_KEY` invalidates codes in flight (at most 10 minutes).
+- In DEBUG the console email backend prints the code in the worker log,
+  which is how the demo reads it.

@@ -61,6 +61,20 @@ The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. 
 - ESLint runs typed linting (`strictTypeChecked`); `.git-blame-ignore-revs` lists the bulk-format commits.
 - Feature flags are opt-in locally (`COMPOSE_PROFILES=flags`, `UNLEASH_ENABLED=1`); the default stack and the e2e job do not start Unleash. Every flag has a safe default in `featureflags/registry.py` and an owner and removal date.
 
+## Phase 4.1 — two-factor authentication (branch `phase-4/2fa-frontend`, on top of `phase-4/two-factor-auth`; not merged)
+
+Design: `docs/adr/0002-two-factor-authentication.md` (with Amendment 1, email codes).
+
+| Step | Status |
+|---|---|
+| Backend: TOTP, passkeys (WebAuthn), recovery codes, challenge/enrollment tokens, step-up (`mfa_at` in the JWT), role enforcement, admin second step, `mfa_reset` | done (`8102315`) |
+| Backend: email codes as a factor (login, enrollment, step-up), `MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES` switch, passkey rename | done |
+| SPA: sign-in second step (authenticator, email code with resend countdown, passkey via `@simplewebauthn/browser`, recovery code), guided enrollment with recovery codes shown once | done |
+| SPA: step-up interceptor + "Confirm it's you" dialog (retry once), Profile → Security page (`/profile/security`) | done |
+| E2E browser test signs the organizer in with a seeded TOTP secret (`DJANGO_SEED_MFA_TOTP_SECRET` / `E2E_MFA_TOTP_SECRET`) | done |
+
+Open: production should set `MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0` and a real `MFA_ENCRYPTION_KEY`; session/device management and new-device alerts (PLAN 4.1 next item); passkeys were tested by unit tests only (no WebAuthn authenticator in the automated runs). Demo steps: `docs/DEMO.md` section 6.
+
 ## Next phases (summary of PLAN.md)
 
 1. Payments: `PaymentProvider` layer (move Stripe into it), Freedom Pay provider + protocol-compatible **emulator** (CI/demo), method selection by currency, reconciliation job, missing Stripe events. Freedom Pay test credentials are pending (owner wrote to them). `freedompay.kz` is blocked by the cloud session's network policy.
