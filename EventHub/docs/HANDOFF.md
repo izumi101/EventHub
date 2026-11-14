@@ -55,6 +55,7 @@ The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. 
 
 ### Notes for later phases
 
+- Database tables live in one PostgreSQL schema per domain (`identity`, `events`, `bookings`, `payments`, `jobs`, `notifications`, `platform`; `public` keeps only extensions), moved automatically on `migrate`. A new Django app must be added to `APP_SCHEMAS` in `backend/common/db_schemas.py` (a test fails otherwise); layout, rollback and the DataGrip refresh tip are in `DATABASE_SCHEMAS.md`.
 - `requirements*.lock` are updated by Renovate as plain pins (its `pip-compile` manager cannot read `uv pip compile --python-platform` headers); regenerate with the command in the lock header after changing `requirements.txt` by hand.
 - The `GITLEAKS_VERSION` and SHA-256 in `.github/workflows/gitleaks.yml` are not tracked by Renovate; bump them together with the pre-commit hook revision.
 - `.gitleaks.toml` allowlists exactly one false positive (`LinkedinIcon` in `footer/brand-icons.ts`); never allowlist a real secret, rotate it.
