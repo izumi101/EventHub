@@ -11,18 +11,23 @@ import {
   RefreshCw,
 } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-validate-ticket',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, LucideAngularModule, TranslocoPipe, LocalDatePipe],
   template: `
     <div class="min-h-screen bg-muted flex items-center justify-center px-4 py-12 pt-20">
       <div class="card w-full max-w-sm p-8 shadow-md text-center animate-scale-in">
         @if (loading) {
           <div class="flex flex-col items-center gap-4 py-8">
             <span class="spinner spinner-lg"></span>
-            <p class="text-sm text-muted-foreground">Verifying ticket...</p>
+            <p class="text-sm text-muted-foreground">
+              {{ 'scan.verifyingTicket' | transloco }}
+            </p>
           </div>
         } @else if (status === 'success') {
           <div class="flex flex-col items-center gap-3 mb-6">
@@ -35,8 +40,10 @@ import { apiErrorMessage } from '../../api/api-error';
                 aria-hidden="true"
               />
             </div>
-            <h1 class="text-xl font-bold text-foreground">Access granted</h1>
-            <p class="text-sm text-muted-foreground">Ticket is valid</p>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ 'scan.accessGranted' | transloco }}
+            </h1>
+            <p class="text-sm text-muted-foreground">{{ 'validate.ticketIsValid' | transloco }}</p>
           </div>
 
           @if (result) {
@@ -44,12 +51,16 @@ import { apiErrorMessage } from '../../api/api-error';
               class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-6 text-left"
             >
               <div class="px-4 py-3 flex justify-between gap-3">
-                <span class="text-muted-foreground flex-shrink-0">Attendee</span>
+                <span class="text-muted-foreground flex-shrink-0">{{
+                  'attendees.attendee' | transloco
+                }}</span>
                 <span class="font-medium text-foreground text-right">{{ result.attendee }}</span>
               </div>
               @if (result.event) {
                 <div class="px-4 py-3 flex justify-between gap-3">
-                  <span class="text-muted-foreground flex-shrink-0">Event</span>
+                  <span class="text-muted-foreground flex-shrink-0">{{
+                    'nav.event' | transloco
+                  }}</span>
                   <span class="font-medium text-foreground text-right">{{ result.event }}</span>
                 </div>
               }
@@ -58,7 +69,7 @@ import { apiErrorMessage } from '../../api/api-error';
 
           <button (click)="recheck()" class="btn btn-primary btn-full">
             <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
-            Next ticket
+            {{ 'validate.nextTicket' | transloco }}
           </button>
         } @else if (status === 'used') {
           <div class="flex flex-col items-center gap-3 mb-6">
@@ -71,8 +82,12 @@ import { apiErrorMessage } from '../../api/api-error';
                 aria-hidden="true"
               />
             </div>
-            <h1 class="text-xl font-bold text-foreground">Already scanned</h1>
-            <p class="text-sm text-muted-foreground">This ticket has been used</p>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ 'scan.alreadyScanned' | transloco }}
+            </h1>
+            <p class="text-sm text-muted-foreground">
+              {{ 'scan.thisTicketHasBeen' | transloco }}
+            </p>
           </div>
 
           @if (result) {
@@ -80,14 +95,16 @@ import { apiErrorMessage } from '../../api/api-error';
               class="rounded-lg border border-transparent bg-[color:var(--warning-50)] divide-y divide-border text-sm mb-6 text-left"
             >
               <div class="px-4 py-3 flex justify-between gap-3">
-                <span class="text-warning flex-shrink-0">Attendee</span>
+                <span class="text-warning flex-shrink-0">{{
+                  'attendees.attendee' | transloco
+                }}</span>
                 <span class="font-medium text-warning text-right">{{ result.attendee }}</span>
               </div>
               @if (result.checked_in_at) {
                 <div class="px-4 py-3 flex justify-between gap-3">
-                  <span class="text-warning flex-shrink-0">First scan</span>
+                  <span class="text-warning flex-shrink-0">{{ 'scan.firstScan' | transloco }}</span>
                   <span class="font-medium text-warning">{{
-                    result.checked_in_at | date: 'HH:mm, MMM d'
+                    result.checked_in_at | localDate: 'HH:mm, MMM d'
                   }}</span>
                 </div>
               }
@@ -96,7 +113,7 @@ import { apiErrorMessage } from '../../api/api-error';
 
           <button (click)="recheck()" class="btn btn-secondary btn-full">
             <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
-            Next ticket
+            {{ 'validate.nextTicket' | transloco }}
           </button>
         } @else {
           <!-- Error -->
@@ -110,19 +127,21 @@ import { apiErrorMessage } from '../../api/api-error';
                 aria-hidden="true"
               />
             </div>
-            <h1 class="text-xl font-bold text-foreground">Validation failed</h1>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ 'validate.validationFailed' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground max-w-xs">
-              {{ errorMessage || 'Invalid ticket or insufficient permissions.' }}
+              {{ errorMessage || ('scan.invalidTicketOrInsufficient' | transloco) }}
             </p>
           </div>
 
           <div class="flex flex-col gap-2">
             <button (click)="recheck()" class="btn btn-primary btn-full">
               <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" aria-hidden="true" />
-              Retry
+              {{ 'common.retry' | transloco }}
             </button>
             <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">
-              Back to home
+              {{ 'notFound.backToHome' | transloco }}
             </a>
           </div>
         }
@@ -131,6 +150,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class ValidateTicketComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private eventService = inject(EventService);
 
@@ -162,7 +182,11 @@ export class ValidateTicketComponent implements OnInit {
       },
       error: (err) => {
         this.status = 'error';
-        this.errorMessage = apiErrorMessage(err, 'Validation failed.', 'error');
+        this.errorMessage = apiErrorMessage(
+          err,
+          this.i18n.t('validate.validationFailed2'),
+          'error',
+        );
         this.loading = false;
       },
     });

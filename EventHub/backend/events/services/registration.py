@@ -272,6 +272,13 @@ def register_for_event(
     }
     fire(event, 'registration_created', payload)  # queued in this transaction
 
+    if registration.status == RegistrationStatusChoices.CONFIRMED:
+        # A free ticket is final now; paid ones are notified on payment.
+        from notifications import types
+        from notifications.service import notify
+
+        notify(user, types.REGISTRATION_CONFIRMED, event=event, registration=registration)
+
     return registration
 
 

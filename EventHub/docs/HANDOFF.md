@@ -5,6 +5,8 @@ Read this first when continuing the production-readiness work in a new session.
 - **Branch:** work is merged into `main` (phase 0: PR #3, phase 1: PR #4 and the group-booking follow-up); a new branch per phase from `main`.
 - **Full roadmap:** the owner keeps `PLAN.md` (private, Russian, 11 phases + 1Б). Ask for it if you need task-level detail.
 - **Principle agreed with the owner:** everything at production level — no "minimal" variants.
+- **Cross-team tests (2026-11-14):** 23 Playwright browser tests over every feature, an isolated test stack (`docker-compose.qa.yml`), database checks (`scripts/qa-db-checks.sh`) and the report with results, bugs and gaps: [`TEST_REPORT.md`](TEST_REPORT.md).
+- **i18n (phase 2):** the UI is translated into kk / ru / en with Transloco; see [`I18N.md`](I18N.md). Login, profile, auth service and 2FA files are still English-only (follow-up).
 
 ## Working rules
 
@@ -44,6 +46,20 @@ Phase 0 is complete.
 
 The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. Next per the roadmap: phase 1Б (commission, ledger, payouts, with 2FA from phase 4) and phase 2 (communications).
 
+## Phase 2 — communications: notifications (branch `phase-2/notifications`, 2026-11-13)
+
+| Step | Status |
+|---|---|
+| One notification service (`backend/notifications/`): in-app row + email job in the business transaction, per-type email preferences | done |
+| HTML + plain-text emails, e-ticket with the ticket QR inline (cid), `send_email` with HTML, attachments and a safe header allow-list | done |
+| Triggers: ticket purchased, free registration, payment failed, every refund (incl. automatic late/duplicate/mismatch Freedom Pay refunds), refund request + resolution, date/venue change, cancellation, waitlist offer, group booking confirmed/claimed, organizer messages | done |
+| 24-hour reminders, idempotent (`SentReminder`), run by the worker every minute and by `manage.py send_event_reminders` | done |
+| Preferences API `GET/PATCH /api/v1/auth/profile/notifications/` and page `/profile/notifications` | done |
+| SMTP configuration for the demo (Mailtrap / Gmail app password / Brevo) | documented in `.env.example`; needs the owner's credentials |
+| PDF ticket, web push, SMS, one-click unsubscribe, per-user email language | open (see `NOTIFICATIONS.md`) |
+
+Details: `docs/NOTIFICATIONS.md`. The seed data (`seed_data`) creates one pending registration without a hold deadline, which `run_sql_checks` reports as `stale_holds` (pre-existing, not caused by notifications).
+
 ### Owner actions still required (GitHub settings, cannot be done from code)
 
 1. **Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests"** (release-please opens its release PR).
@@ -55,17 +71,32 @@ The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. 
 
 ### Notes for later phases
 
+- Database tables live in one PostgreSQL schema per domain (`identity`, `events`, `bookings`, `payments`, `jobs`, `notifications`, `platform`; `public` keeps only extensions), moved automatically on `migrate`. A new Django app must be added to `APP_SCHEMAS` in `backend/common/db_schemas.py` (a test fails otherwise); layout, rollback and the DataGrip refresh tip are in `DATABASE_SCHEMAS.md`.
 - `requirements*.lock` are updated by Renovate as plain pins (its `pip-compile` manager cannot read `uv pip compile --python-platform` headers); regenerate with the command in the lock header after changing `requirements.txt` by hand.
 - The `GITLEAKS_VERSION` and SHA-256 in `.github/workflows/gitleaks.yml` are not tracked by Renovate; bump them together with the pre-commit hook revision.
 - `.gitleaks.toml` allowlists exactly one false positive (`LinkedinIcon` in `footer/brand-icons.ts`); never allowlist a real secret, rotate it.
 - ESLint runs typed linting (`strictTypeChecked`); `.git-blame-ignore-revs` lists the bulk-format commits.
 - Feature flags are opt-in locally (`COMPOSE_PROFILES=flags`, `UNLEASH_ENABLED=1`); the default stack and the e2e job do not start Unleash. Every flag has a safe default in `featureflags/registry.py` and an owner and removal date.
 
+## Phase 4.1 — two-factor authentication (branch `phase-4/2fa-frontend`, on top of `phase-4/two-factor-auth`; not merged)
+
+Design: `docs/adr/0002-two-factor-authentication.md` (with Amendment 1, email codes).
+
+| Step | Status |
+|---|---|
+| Backend: TOTP, passkeys (WebAuthn), recovery codes, challenge/enrollment tokens, step-up (`mfa_at` in the JWT), role enforcement, admin second step, `mfa_reset` | done (`8102315`) |
+| Backend: email codes as a factor (login, enrollment, step-up), `MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES` switch, passkey rename | done |
+| SPA: sign-in second step (authenticator, email code with resend countdown, passkey via `@simplewebauthn/browser`, recovery code), guided enrollment with recovery codes shown once | done |
+| SPA: step-up interceptor + "Confirm it's you" dialog (retry once), Profile → Security page (`/profile/security`) | done |
+| E2E browser test signs the organizer in with a seeded TOTP secret (`DJANGO_SEED_MFA_TOTP_SECRET` / `E2E_MFA_TOTP_SECRET`) | done |
+
+Open: production should set `MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0` and a real `MFA_ENCRYPTION_KEY`; session/device management and new-device alerts (PLAN 4.1 next item); passkeys were tested by unit tests only (no WebAuthn authenticator in the automated runs). Demo steps: `docs/DEMO.md` section 6.
+
 ## Next phases (summary of PLAN.md)
 
 1. Payments: `PaymentProvider` layer (move Stripe into it), Freedom Pay provider + protocol-compatible **emulator** (CI/demo), method selection by currency, reconciliation job, missing Stripe events. Freedom Pay test credentials are pending (owner wrote to them). `freedompay.kz` is blocked by the cloud session's network policy.
 1Б. Platform commission + **double-entry ledger** + organizer payouts (agency model, IBAN profile with 2FA-protected changes, weekly payouts, bank registry export, agent reports). Note: today `Event.service_fee_percent` is set by organizers — the platform commission must be admin-controlled.
-2. Buyer emails (ticket + PDF, cancellation, refunds, reminders — `event_reminder` exists but is never sent), web push, SMS.
+2. Buyer emails — done on `phase-2/notifications` (e-ticket with QR, cancellation, refunds, reminders, preferences; see `NOTIFICATIONS.md`); still open: ticket PDF, web push, SMS.
 3. Legal & personal data (KZ law): offer, privacy policy, consents, data export/deletion, retention.
 4. Security: TOTP + passkeys, tamper-evident audit log, SAST/DAST/Trivy/SBOM/cosign.
 5. Infra: **Yandex Cloud kz1**, Terraform, Managed Kubernetes, Helm, Argo CD, canary (Argo Rollouts), preview envs, managed PostgreSQL (check pgvector), backups + restore tests, DR drills.

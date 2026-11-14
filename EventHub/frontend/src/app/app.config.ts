@@ -6,6 +6,7 @@ import {
 } from '@angular/core';
 import {
   provideRouter,
+  TitleStrategy,
   withComponentInputBinding,
   withInMemoryScrolling,
   withViewTransitions,
@@ -13,7 +14,11 @@ import {
 import { provideHttpClient, withInterceptors, withFetch } from '@angular/common/http';
 import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
+import { stepUpInterceptor } from './interceptors/step-up.interceptor';
 import { SeoService } from './services/seo.service';
+import { provideI18n } from './i18n/i18n.providers';
+import { TranslatedTitleStrategy } from './i18n/title.strategy';
+import { acceptLanguageInterceptor } from './i18n/accept-language.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -24,7 +29,14 @@ export const appConfig: ApplicationConfig = {
       withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
       withViewTransitions(),
     ),
-    provideHttpClient(withFetch(), withInterceptors([authInterceptor])),
+    // stepUpInterceptor first: its retry goes through the interceptors after it
+    // (Accept-Language, then authInterceptor with the fresh token).
+    provideHttpClient(
+      withFetch(),
+      withInterceptors([stepUpInterceptor, acceptLanguageInterceptor, authInterceptor]),
+    ),
+    provideI18n(),
+    { provide: TitleStrategy, useExisting: TranslatedTitleStrategy },
     // Eagerly instantiate SeoService so its router subscription starts at boot
     provideAppInitializer(() => {
       inject(SeoService);

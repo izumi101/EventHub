@@ -26,13 +26,17 @@ import {
   DollarSign,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe, LocalNumberPipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 type EventTab = 'upcoming' | 'past' | 'drafts';
 type SortKey = 'date' | 'registrations' | 'checkin' | 'capacity';
 
 interface ActivityItem {
   id: string;
-  message: string;
+  messageKey: string;
+  params: Record<string, unknown>;
   timestamp: Date;
   type: 'registration' | 'approval' | 'change';
 }
@@ -46,7 +50,16 @@ interface EventWithStats extends Event {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule, MoneyPipe],
+  imports: [
+    CommonModule,
+    RouterModule,
+    FormsModule,
+    LucideAngularModule,
+    MoneyPipe,
+    TranslocoPipe,
+    LocalDatePipe,
+    LocalNumberPipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-6xl py-8">
@@ -54,13 +67,18 @@ interface EventWithStats extends Event {
         <div class="mb-8">
           <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
-              <p class="kicker mb-2">{{ isAdmin ? 'Admin' : 'Workspace' }}</p>
+              <p class="kicker mb-2">
+                {{ (isAdmin ? 'dashboard.admin' : 'dashboard.workspace') | transloco }}
+              </p>
               <h1 class="text-3xl font-semibold text-foreground">
-                {{ isAdmin ? 'Admin Panel' : 'Organizer Dashboard' }}
+                {{
+                  (isAdmin ? 'dashboard.adminPanel' : 'dashboard.organizerDashboard') | transloco
+                }}
               </h1>
               <p class="text-sm text-muted-foreground mt-1.5">
                 {{
-                  isAdmin ? 'Review and approve events' : 'Manage your events and track performance'
+                  (isAdmin ? 'dashboard.reviewAndApproveEvents' : 'dashboard.manageYourEventsAnd')
+                    | transloco
                 }}
               </p>
             </div>
@@ -68,11 +86,11 @@ interface EventWithStats extends Event {
               <div class="flex items-center gap-2 flex-shrink-0">
                 <a routerLink="/scan" class="btn btn-secondary flex items-center gap-1.5">
                   <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true" />
-                  Scan
+                  {{ 'dashboard.scan' | transloco }}
                 </a>
                 <a routerLink="/create-event" class="btn btn-primary flex items-center gap-1.5">
                   <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true" />
-                  New event
+                  {{ 'dashboard.newEvent' | transloco }}
                 </a>
               </div>
             }
@@ -82,7 +100,9 @@ interface EventWithStats extends Event {
           @if (!isAdmin && events.length > 0) {
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
               <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">Events</p>
+                <p class="text-xs text-muted-foreground font-medium mb-1">
+                  {{ 'dashboard.events' | transloco }}
+                </p>
                 <div class="flex items-baseline gap-2">
                   <p class="text-2xl font-bold text-foreground num">{{ filteredEvents.length }}</p>
                   @if (eventsTrend) {
@@ -94,7 +114,9 @@ interface EventWithStats extends Event {
                 </div>
               </div>
               <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">Registrations</p>
+                <p class="text-xs text-muted-foreground font-medium mb-1">
+                  {{ 'dashboard.registrations' | transloco }}
+                </p>
                 <div class="flex items-baseline gap-2">
                   <p class="text-2xl font-bold text-foreground num">{{ totalRegistrations }}</p>
                   @if (regTrend) {
@@ -106,11 +128,15 @@ interface EventWithStats extends Event {
                 </div>
               </div>
               <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">Check-in Rate</p>
+                <p class="text-xs text-muted-foreground font-medium mb-1">
+                  {{ 'dashboard.checkInRate' | transloco }}
+                </p>
                 <p class="text-2xl font-bold text-foreground num">{{ totalCheckinRate }}%</p>
               </div>
               <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">Revenue</p>
+                <p class="text-xs text-muted-foreground font-medium mb-1">
+                  {{ 'dashboard.revenue' | transloco }}
+                </p>
                 @for (r of revenueByCurrency; track r.currency) {
                   <p class="text-2xl font-bold text-foreground num">
                     {{ r.amount | money: r.currency }}
@@ -140,21 +166,23 @@ interface EventWithStats extends Event {
                   type="search"
                   [(ngModel)]="searchQuery"
                   (input)="applyFilters()"
-                  placeholder="Search events..."
+                  [placeholder]="'dashboard.searchEvents' | transloco"
                   class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-                  aria-label="Search events"
+                  [attr.aria-label]="'home.searchEvents' | transloco"
                 />
               </label>
               <select
                 [(ngModel)]="sortBy"
                 (change)="applyFilters()"
                 class="input h-10 sm:w-40"
-                aria-label="Sort events"
+                [attr.aria-label]="'dashboard.sortEvents' | transloco"
               >
-                <option value="date">Date (newest)</option>
-                <option value="registrations">Most registrations</option>
-                <option value="checkin">Check-in rate</option>
-                <option value="capacity">Capacity filled</option>
+                <option value="date">{{ 'dashboard.dateNewest' | transloco }}</option>
+                <option value="registrations">
+                  {{ 'dashboard.mostRegistrations' | transloco }}
+                </option>
+                <option value="checkin">{{ 'dashboard.checkInRate2' | transloco }}</option>
+                <option value="capacity">{{ 'dashboard.capacityFilled' | transloco }}</option>
               </select>
             </div>
 
@@ -168,7 +196,9 @@ interface EventWithStats extends Event {
                     : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground'
                 "
               >
-                Upcoming ({{ upcomingCount }})
+                {{
+                  'dashboard.upcomingUpcomingcount' | transloco: { upcomingCount: upcomingCount }
+                }}
               </button>
               <button
                 (click)="setTab('past')"
@@ -178,7 +208,7 @@ interface EventWithStats extends Event {
                     : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground'
                 "
               >
-                Past ({{ pastCount }})
+                {{ 'dashboard.pastPastcount' | transloco: { pastCount: pastCount } }}
               </button>
               <button
                 (click)="setTab('drafts')"
@@ -188,7 +218,7 @@ interface EventWithStats extends Event {
                     : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground'
                 "
               >
-                Drafts ({{ draftCount }})
+                {{ 'dashboard.draftsDraftcount' | transloco: { draftCount: draftCount } }}
               </button>
               <div class="flex-1"></div>
               <!-- View toggle: List / Calendar -->
@@ -200,8 +230,8 @@ interface EventWithStats extends Event {
                       ? 'px-2 py-2 text-primary'
                       : 'px-2 py-2 text-muted-foreground hover:text-foreground'
                   "
-                  title="List view"
-                  aria-label="List view"
+                  [title]="'dashboard.listView' | transloco"
+                  [attr.aria-label]="'dashboard.listView' | transloco"
                 >
                   ≡
                 </button>
@@ -212,8 +242,8 @@ interface EventWithStats extends Event {
                       ? 'px-2 py-2 text-primary'
                       : 'px-2 py-2 text-muted-foreground hover:text-foreground'
                   "
-                  title="Calendar view"
-                  aria-label="Calendar view"
+                  [title]="'dashboard.calendarView' | transloco"
+                  [attr.aria-label]="'dashboard.calendarView' | transloco"
                 >
                   <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true" />
                 </button>
@@ -226,7 +256,7 @@ interface EventWithStats extends Event {
         @if (loading) {
           <div class="flex items-center justify-center py-20 gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading dashboard...</span>
+            <span class="text-sm">{{ 'dashboard.loadingDashboard' | transloco }}</span>
           </div>
         } @else if (filteredEvents.length === 0) {
           <div class="card p-12 flex flex-col items-center text-center">
@@ -238,7 +268,7 @@ interface EventWithStats extends Event {
               />
             </div>
             <h3 class="text-base font-semibold text-foreground mb-1">
-              {{ isAdmin ? 'No pending events' : tabEmptyLabel }}
+              {{ isAdmin ? ('dashboard.noPendingEvents' | transloco) : tabEmptyLabel }}
             </h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
               {{ tabEmptyMessage }}
@@ -249,7 +279,7 @@ interface EventWithStats extends Event {
                 class="btn btn-primary btn-sm flex items-center gap-1.5"
               >
                 <lucide-icon [img]="icons.Plus" class="w-3.5 h-3.5" aria-hidden="true" />
-                Create event
+                {{ 'dashboard.createEvent' | transloco }}
               </a>
             }
           </div>
@@ -284,7 +314,7 @@ interface EventWithStats extends Event {
                             class="w-3.5 h-3.5"
                             aria-hidden="true"
                           />
-                          {{ event.date | date: 'MMM d, y · HH:mm' }}
+                          {{ event.date | localDate: 'MMM d, y · HH:mm' }}
                         </span>
                         <span class="flex items-center gap-1 truncate">
                           <lucide-icon
@@ -305,14 +335,16 @@ interface EventWithStats extends Event {
                           class="btn btn-sm btn-secondary flex items-center gap-1"
                         >
                           <lucide-icon [img]="icons.Users" class="w-3.5 h-3.5" aria-hidden="true" />
-                          Attendees
+                          {{ 'nav.attendees' | transloco }}
                         </a>
                         <!-- Quick actions menu (·××) -->
                         <div class="relative" [@.disabled]="true">
                           <button
                             (click)="toggleMenu(event.id)"
                             class="btn btn-sm btn-ghost p-2"
-                            [attr.aria-label]="'Menu for ' + event.title"
+                            [attr.aria-label]="
+                              'dashboard.menuFor' | transloco: { title: event.title }
+                            "
                           >
                             <lucide-icon
                               [img]="icons.Ellipsis"
@@ -334,7 +366,7 @@ interface EventWithStats extends Event {
                                   class="w-4 h-4"
                                   aria-hidden="true"
                                 />
-                                Edit event
+                                {{ 'dashboard.editEvent' | transloco }}
                               </a>
                               <button
                                 (click)="duplicateEvent(event.id)"
@@ -345,7 +377,7 @@ interface EventWithStats extends Event {
                                   class="w-4 h-4"
                                   aria-hidden="true"
                                 />
-                                Duplicate
+                                {{ 'dashboard.duplicate' | transloco }}
                               </button>
                               <button
                                 (click)="deleteEvent(event.id)"
@@ -356,7 +388,7 @@ interface EventWithStats extends Event {
                                   class="w-4 h-4"
                                   aria-hidden="true"
                                 />
-                                Delete
+                                {{ 'common.delete' | transloco }}
                               </button>
                             </div>
                           }
@@ -370,7 +402,7 @@ interface EventWithStats extends Event {
                     <!-- Capacity -->
                     <div>
                       <div class="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>Capacity</span>
+                        <span>{{ 'dashboard.capacity' | transloco }}</span>
                         <span class="font-semibold text-foreground"
                           >{{ event.stats?.total_registrations }}/{{ event.max_participants }}</span
                         >
@@ -382,35 +414,50 @@ interface EventWithStats extends Event {
                         ></div>
                       </div>
                       <p class="text-xs text-muted-foreground mt-1">
-                        {{ event.capacityPercent || 0 }}% filled
+                        {{
+                          'dashboard.capacitypercentFilled'
+                            | transloco: { capacityPercent: event.capacityPercent || 0 }
+                        }}
                       </p>
                     </div>
 
                     <!-- Registrations -->
                     <div>
-                      <p class="text-xs text-muted-foreground mb-1">Registrations</p>
+                      <p class="text-xs text-muted-foreground mb-1">
+                        {{ 'dashboard.registrations' | transloco }}
+                      </p>
                       <p class="text-lg font-bold text-foreground">
                         {{ event.stats?.total_registrations || 0 }}
                       </p>
                       <p class="text-xs text-muted-foreground mt-1">
                         {{
                           (event.stats?.total_registrations || 0) > 0
-                            ? (((event.stats?.checked_in || 0) /
-                                (event.stats?.total_registrations || 1)) *
-                                100 | number: '1.0-0') + '% checked in'
-                            : 'No registrations'
+                            ? ('dashboard.percentCheckedIn'
+                              | transloco
+                                : {
+                                    percent:
+                                      (((event.stats?.checked_in || 0) /
+                                        (event.stats?.total_registrations || 1)) *
+                                        100 | localNumber: '1.0-0'),
+                                  })
+                            : ('dashboard.noRegistrations' | transloco)
                         }}
                       </p>
                     </div>
 
                     <!-- Check-in -->
                     <div>
-                      <p class="text-xs text-muted-foreground mb-1">Check-in Rate</p>
+                      <p class="text-xs text-muted-foreground mb-1">
+                        {{ 'dashboard.checkInRate' | transloco }}
+                      </p>
                       <p class="text-lg font-bold text-foreground">
                         {{ event.stats?.check_in_rate || 0 }}%
                       </p>
                       <p class="text-xs text-muted-foreground mt-1">
-                        {{ event.stats?.checked_in || 0 }} checked in
+                        {{
+                          'dashboard.checkedinCheckedIn'
+                            | transloco: { checkedIn: event.stats?.checked_in || 0 }
+                        }}
                       </p>
                     </div>
 
@@ -423,12 +470,14 @@ interface EventWithStats extends Event {
                             class="w-3 h-3"
                             aria-hidden="true"
                           />
-                          <span>Revenue</span>
+                          <span>{{ 'dashboard.revenue' | transloco }}</span>
                         </div>
                         <p class="text-lg font-bold text-foreground">
                           {{ event.revenue | money: event.currency }}
                         </p>
-                        <p class="text-xs text-muted-foreground mt-1">net of refunds</p>
+                        <p class="text-xs text-muted-foreground mt-1">
+                          {{ 'dashboard.netOfRefunds' | transloco }}
+                        </p>
                       </div>
                     }
                   </div>
@@ -438,7 +487,7 @@ interface EventWithStats extends Event {
                     [routerLink]="['/events', event.id]"
                     class="text-xs text-primary hover:underline flex items-center gap-1"
                   >
-                    View event →
+                    {{ 'dashboard.viewEvent' | transloco }}
                   </a>
                 </div>
               }
@@ -447,14 +496,16 @@ interface EventWithStats extends Event {
             <!-- Activity feed (bottom) -->
             @if (activityFeed.length > 0) {
               <div class="mt-8">
-                <h2 class="text-sm font-semibold text-foreground mb-4">Recent activity</h2>
+                <h2 class="text-sm font-semibold text-foreground mb-4">
+                  {{ 'dashboard.recentActivity' | transloco }}
+                </h2>
                 <div class="space-y-2">
                   @for (item of activityFeed.slice(0, 5); track item.id) {
                     <div class="flex gap-3 text-sm text-muted-foreground">
                       <span class="text-xs text-muted-foreground flex-shrink-0">
-                        {{ item.timestamp | date: 'short' }}
+                        {{ item.timestamp | localDate: 'short' }}
                       </span>
-                      <p>{{ item.message }}</p>
+                      <p>{{ item.messageKey | transloco: item.params }}</p>
                     </div>
                   }
                 </div>
@@ -465,7 +516,7 @@ interface EventWithStats extends Event {
           <!-- CALENDAR VIEW (placeholder) -->
           @if (viewMode === 'calendar') {
             <div class="card p-8 text-center text-muted-foreground">
-              <p class="text-sm">Calendar view coming soon. Use list view for now.</p>
+              <p class="text-sm">{{ 'dashboard.calendarViewComingSoon' | transloco }}</p>
             </div>
           }
         }
@@ -474,6 +525,7 @@ interface EventWithStats extends Event {
   `,
 })
 export class DashboardComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private authService = inject(AuthService);
   private modalService = inject(ModalService);
@@ -668,7 +720,8 @@ export class DashboardComponent implements OnInit {
       if (e.stats?.total_registrations) {
         feed.push({
           id: `reg-${e.id}`,
-          message: `${e.stats.total_registrations} attendees registered for "${e.title}"`,
+          messageKey: 'dashboard.activityRegistered',
+          params: { count: e.stats.total_registrations, title: e.title },
           timestamp: new Date(e.created_at),
           type: 'registration',
         });
@@ -676,7 +729,8 @@ export class DashboardComponent implements OnInit {
       if (e.status === 'published') {
         feed.push({
           id: `pub-${e.id}`,
-          message: `"${e.title}" published and is live`,
+          messageKey: 'dashboard.activityPublished',
+          params: { title: e.title },
           timestamp: new Date(e.created_at),
           type: 'approval',
         });
@@ -699,26 +753,30 @@ export class DashboardComponent implements OnInit {
 
   statusTimeline(event: Event): string {
     const statusMap: Record<string, string> = {
-      draft: 'Draft',
-      pending: 'Pending approval',
-      published: 'Published',
-      completed: 'Completed',
-      rejected: 'Rejected',
-      cancelled: 'Cancelled',
+      draft: this.i18n.t('dashboard.draft'),
+      pending: this.i18n.t('dashboard.pendingApproval'),
+      published: this.i18n.t('dashboard.published'),
+      completed: this.i18n.t('dashboard.completed'),
+      rejected: this.i18n.t('common.rejected'),
+      cancelled: this.i18n.t('common.cancelled'),
     };
     return statusMap[event.status] ?? event.status;
   }
 
   get tabEmptyLabel(): string {
-    const map = { upcoming: 'No upcoming events', past: 'No past events', drafts: 'No drafts' };
+    const map = {
+      upcoming: this.i18n.t('dashboard.noUpcomingEvents'),
+      past: this.i18n.t('dashboard.noPastEvents'),
+      drafts: this.i18n.t('dashboard.noDrafts'),
+    };
     return map[this.currentTab];
   }
 
   get tabEmptyMessage(): string {
     const map = {
-      upcoming: 'Create your first event to get started.',
-      past: 'Your completed events will appear here.',
-      drafts: 'Save event drafts before publishing.',
+      upcoming: this.i18n.t('dashboard.createYourFirstEvent'),
+      past: this.i18n.t('dashboard.yourCompletedEventsWill'),
+      drafts: this.i18n.t('dashboard.saveEventDraftsBefore'),
     };
     return map[this.currentTab];
   }
@@ -730,7 +788,9 @@ export class DashboardComponent implements OnInit {
   duplicateEvent(id: number): void {
     const event = this.events.find((e) => e.id === id);
     if (!event) return;
-    this.toastService.success(`Event "${event.title}" duplicated (feature coming soon)`);
+    this.toastService.success(
+      this.i18n.t('dashboard.eventTitleDuplicatedFeature', { title: event.title }),
+    );
     this.openMenuId = null;
   }
 
@@ -738,10 +798,10 @@ export class DashboardComponent implements OnInit {
     const event = this.events.find((e) => e.id === id);
     if (!event) return;
     const ok = await this.modalService.open({
-      title: 'Delete Event',
-      message: `Delete "${event.title}"? This cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
+      title: this.i18n.t('dashboard.deleteEvent'),
+      message: this.i18n.t('dashboard.deleteTitleThisCannot', { title: event.title }),
+      confirmText: this.i18n.t('common.delete'),
+      cancelText: this.i18n.t('common.cancel'),
       isDestructive: true,
     });
     if (!ok) return;
@@ -749,9 +809,9 @@ export class DashboardComponent implements OnInit {
       next: () => {
         this.events = this.events.filter((e) => e.id !== id);
         this.applyFilters();
-        this.toastService.success('Event deleted.');
+        this.toastService.success(this.i18n.t('dashboard.eventDeleted'));
       },
-      error: () => this.toastService.error('Failed to delete event.'),
+      error: () => this.toastService.error(this.i18n.t('dashboard.failedToDeleteEvent')),
     });
     this.openMenuId = null;
   }

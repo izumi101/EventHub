@@ -5,6 +5,8 @@ import { EventService } from '../../services/event.service';
 import { PaymentService } from '../../services/payment.service';
 import { ToastService } from '../../services/toast.service';
 import type { Registration } from '../../models/models';
+import { I18nTestingModule } from '../../i18n/testing';
+import { LanguageService } from '../../i18n/language.service';
 
 const reg = (over: Record<string, unknown> = {}): Registration =>
   ({
@@ -24,7 +26,7 @@ function setup() {
   };
   const paymentService = { createCheckoutSession: vi.fn() };
   TestBed.configureTestingModule({
-    imports: [MyRegistrationsComponent],
+    imports: [I18nTestingModule, MyRegistrationsComponent],
     providers: [
       { provide: EventService, useValue: eventService },
       { provide: PaymentService, useValue: paymentService },
@@ -151,5 +153,17 @@ describe('MyRegistrationsComponent payment actions', () => {
       'Could not start payment. Your seat hold may have expired.',
     );
     expect(s.eventService.getMyRegistrations).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('MyRegistrationsComponent seat zone', () => {
+  it('shows the zone code from the API in the active language', async () => {
+    const s = setup();
+    expect(s.cmp.zoneLabel('standard')).toBe('Standard');
+    await TestBed.inject(LanguageService).setLang('ru');
+    expect(s.cmp.zoneLabel('standard')).toBe('Стандарт');
+    expect(s.cmp.zoneLabel('premium')).toBe('Премиум');
+    // An unknown code is shown as it came.
+    expect(s.cmp.zoneLabel('balcony')).toBe('balcony');
   });
 });

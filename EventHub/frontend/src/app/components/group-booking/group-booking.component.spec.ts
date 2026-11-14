@@ -8,6 +8,7 @@ import { ToastService } from '../../services/toast.service';
 import { AuthService } from '../../services/auth.service';
 import { PaymentService } from '../../services/payment.service';
 import type { Seat } from '../../models/models';
+import { I18nTestingModule } from '../../i18n/testing';
 
 const NOW = new Date('2026-11-12T10:00:00Z');
 
@@ -40,7 +41,7 @@ function setup() {
     get: vi.fn(),
   };
   TestBed.configureTestingModule({
-    imports: [GroupBookingComponent],
+    imports: [I18nTestingModule, GroupBookingComponent],
     providers: [
       provideRouter([]),
       { provide: ActivatedRoute, useValue: { snapshot: { paramMap: { get: () => '7' } } } },

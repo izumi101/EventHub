@@ -42,6 +42,8 @@ repos:
       - id: end-of-file-fixer
         exclude: ^EventHub/frontend/src/.*\.(ts|html)$
       - id: check-yaml
+        # Syntax only: compose overrides use Docker's custom tags (!override, !reset).
+        args: [--unsafe]
       - id: check-json
         # tsconfig*.json are JSONC (comments and trailing commas are valid).
         exclude: ^EventHub/frontend/tsconfig.*\.json$

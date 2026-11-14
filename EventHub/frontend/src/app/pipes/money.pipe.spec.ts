@@ -1,7 +1,14 @@
+import { TestBed } from '@angular/core/testing';
+import { LanguageService } from '../i18n/language.service';
+import { I18nTestingModule } from '../i18n/testing';
 import { MoneyPipe } from './money.pipe';
 
 describe('MoneyPipe', () => {
-  const money = new MoneyPipe();
+  let money: MoneyPipe;
+  beforeEach(() => {
+    TestBed.configureTestingModule({ imports: [I18nTestingModule] });
+    money = TestBed.runInInjectionContext(() => new MoneyPipe());
+  });
   // Intl puts a non-breaking space between a currency code and the amount.
   const fmt = (value: string | number | null, currency?: string) =>
     money.transform(value, currency).replace(/\u00a0/g, ' ');
@@ -38,5 +45,27 @@ describe('MoneyPipe', () => {
     expect(money.transform('', 'USD')).toBe('');
     expect(fmt(10)).toBe('$10.00');
     expect(money.transform(10, null).replace(/\u00a0/g, ' ')).toBe('$10.00');
+  });
+
+  it('follows the selected language and keeps the ISO currency correct', async () => {
+    const language = TestBed.inject(LanguageService);
+    const norm = (v: string) => v.replace(/[\s\u00a0\u202f]/g, ' ');
+    await language.setLang('ru');
+    expect(norm(money.transform(5000, 'KZT'))).toBe('5 000,00 ₸');
+    expect(norm(money.transform(15, 'USD'))).toContain('15,00');
+    await language.setLang('kk');
+    expect(norm(money.transform(5000, 'KZT'))).toBe('5 000,00 ₸');
+    await language.setLang('en');
+    expect(norm(money.transform(5000, 'KZT'))).toBe('KZT 5,000.00');
+  });
+
+  it('has a short form for cards: tenge sign, no cents on whole amounts', async () => {
+    const short = (v: number | string, c: string) =>
+      money.transform(v, c, 'short').replace(/[\u00a0\u202f]/g, ' ');
+    expect(short(12000, 'KZT')).toBe('₸12,000');
+    expect(short('25.00', 'USD')).toBe('$25');
+    expect(short(25.5, 'USD')).toBe('$25.50');
+    await TestBed.inject(LanguageService).setLang('ru');
+    expect(short(12000, 'KZT')).toBe('12 000 ₸');
   });
 });

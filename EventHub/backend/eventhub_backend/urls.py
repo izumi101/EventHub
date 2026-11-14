@@ -6,6 +6,8 @@ from django.http import JsonResponse
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerSplitView
 
+from mfa.admin_views import admin_verify
+
 
 def health_check(request):
     """Health check endpoint for monitoring and container probes."""
@@ -17,6 +19,8 @@ def health_check(request):
 
 
 api_patterns = [
+    # Before auth/: a separate app, so the accounts URLconf stays untouched.
+    path('auth/profile/notifications/', include('notifications.urls')),
     path('auth/', include('accounts.urls')),
     path('', include('events.urls')),
     path('payments/', include('payments.urls')),
@@ -25,6 +29,8 @@ api_patterns = [
 ]
 
 urlpatterns = [
+    # Second step of the admin login (mfa/middleware.py); before the admin's catch-all.
+    path('admin/mfa/verify/', admin_verify, name='admin_mfa_verify'),
     path('admin/', admin.site.urls),
     path('api/health/', health_check, name='health_check'),
     path('api/v1/schema/', SpectacularAPIView.as_view(), name='schema'),

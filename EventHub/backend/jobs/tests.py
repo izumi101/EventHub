@@ -34,7 +34,7 @@ class QueueTests(TestCase):
 
     def test_failures_are_retried_with_backoff_then_given_up(self):
         job = enqueue('send_email', {'subject': 's', 'body': 'b', 'to': ['a@example.com']}, max_attempts=2)
-        with patch('jobs.handlers.django_send_mail', side_effect=OSError('smtp down')):
+        with patch('jobs.handlers.EmailMultiAlternatives.send', side_effect=OSError('smtp down')):
             run_due_jobs()
             job.refresh_from_db()
             self.assertEqual((job.status, job.attempts), (Job.STATUS_PENDING, 1))

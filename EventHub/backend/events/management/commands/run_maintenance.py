@@ -18,7 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Release expired seat holds and group bookings, advance waitlists, complete past events.'
+    help = (
+        'Release expired seat holds and group bookings, advance waitlists, complete past events, send event reminders.'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument('--loop', type=int, default=0, help='Repeat every N seconds instead of running once.')
@@ -62,3 +64,13 @@ class Command(BaseCommand):
         Event.objects.filter(status=EventStatusChoices.PUBLISHED, end_date__isnull=True, date__lt=now).update(
             status=EventStatusChoices.COMPLETED,
         )
+
+        # Expired 2FA email codes (hashes only) are not kept around.
+        from mfa.email_codes import purge_expired
+
+        purge_expired()
+
+        # 24-hour reminders (idempotent: each one is recorded once).
+        from notifications.reminders import send_due_reminders
+
+        send_due_reminders(now)
