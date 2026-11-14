@@ -26,7 +26,9 @@ class Command(BaseCommand):
 
         # The superuser never gets a hard-coded password: take it from the
         # environment or generate one and print it once.
-        self.admin_password = os.environ.get('DJANGO_SEED_ADMIN_PASSWORD') or secrets.token_urlsafe(12)
+        configured = os.environ.get('DJANGO_SEED_ADMIN_PASSWORD')
+        self.admin_password = configured or secrets.token_urlsafe(12)
+        self.admin_password_generated = not configured
 
         users = self.seed_users()
         self.seed_test_totp(users)
@@ -40,8 +42,12 @@ class Command(BaseCommand):
             )
         )
         self.stdout.write('Demo logins: organizer/password123, attendee/password123')
-        if self.admin_created:
+        # A generated password exists nowhere else, so it is shown once; a
+        # configured one is a secret from .env and never goes to the log.
+        if self.admin_created and self.admin_password_generated:
             self.stdout.write(f'Admin login: admin / {self.admin_password}')
+        elif self.admin_created:
+            self.stdout.write('Admin login: admin / the password in DJANGO_SEED_ADMIN_PASSWORD')
 
     def seed_users(self):
         self.admin_created = False
