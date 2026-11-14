@@ -216,7 +216,9 @@ class RenderingTests(WorldMixin, TestCase):
         )
         self.assertIn('always sent', mandatory['html_body'])
         self.assertIn('could not refund your payment automatically', mandatory['body'])
-        self.assertEqual(mandatory['attachments'], [])
+        # No ticket: the only inline image is the brand mark in the header.
+        self.assertEqual([a['cid'] for a in mandatory['attachments']], ['eventhub-logo'])
+        self.assertIn('cid:eventhub-logo', mandatory['html_body'])
 
     def test_every_type_renders(self):
         booking = Booking.objects.create(owner=self.alice, event=self.event, status=Booking.Status.CONFIRMED)
@@ -344,7 +346,8 @@ class TriggerTests(WorldMixin, TestCase):
         registration = register_for_event(user=self.alice, event=self.event)
         self.assertEqual(registration.status, 'confirmed')
         self.assertNotified(self.alice, types.REGISTRATION_CONFIRMED)
-        self.assertEqual(len(email_jobs(self.alice).get().payload['attachments']), 1)
+        # One ticket QR code plus the logo.
+        self.assertEqual(len(email_jobs(self.alice).get().payload['attachments']), 2)
 
     def test_a_paid_registration_is_not_confirmed_until_paid(self):
         from events.services import register_for_event
@@ -443,7 +446,8 @@ class TriggerTests(WorldMixin, TestCase):
 
         confirm_booking(booking, amount_paid=Decimal('20.00'))
         self.assertNotified(self.alice, types.GROUP_BOOKING_CONFIRMED)
-        self.assertEqual(len(email_jobs(self.alice).get().payload['attachments']), 2)
+        # Two ticket QR codes plus the logo.
+        self.assertEqual(len(email_jobs(self.alice).get().payload['attachments']), 3)
         # Bob claimed while the booking was on hold: his ticket comes now.
         self.assertNotified(self.bob, types.GROUP_BOOKING_CLAIMED)
         self.assertIn(str(early.ticket_uuid)[:8].upper(), email_jobs(self.bob).get().payload['body'])

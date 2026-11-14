@@ -44,8 +44,8 @@ import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
         @if (!layout.collapsed()) {
           <a routerLink="/" class="sidebar-logo focus-ring rounded" (click)="layout.closeMobile()">
             <span class="ember-mark" aria-hidden="true"></span>
-            <span class="font-display font-semibold text-foreground text-base tracking-tight"
-              >EventHub</span
+            <span class="font-display text-foreground text-base tracking-tight"
+              >Event<span class="font-bold">Hub</span></span
             >
           </a>
         } @else {

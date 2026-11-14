@@ -410,24 +410,11 @@ video {
 
 /* Brand mark (Ember) */
 .ember-mark {
-  width: 28px;
-  height: 28px;
-  border-radius: 9px;
-  background: var(--ember-500);
-  position: relative;
+  /* The EventHub symbol: a ticket stub with a hub of connected dots. */
+  width: 30px;
+  height: 30px;
   flex-shrink: 0;
-  box-shadow: var(--shadow-card);
-}
-.ember-mark::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 12px;
-  height: 12px;
-  transform: translate(-50%, -50%);
-  background: radial-gradient(circle at 50% 35%, #ffd9c9, #ffb59a 60%, transparent 62%);
-  border-radius: 50%;
+  background: url('/assets/brand/symbol.svg') center / contain no-repeat;
 }
 
 /* Status notes (token-based, dark-adaptive) */

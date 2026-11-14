@@ -43,8 +43,10 @@ interface Crumb {
             <lucide-icon [img]="icons.Menu" class="w-5 h-5" aria-hidden="true" />
           </button>
           <a routerLink="/" class="flex items-center gap-2 focus-ring rounded">
-            <img src="assets/logo.png" alt="EventHub" class="w-6 h-6 rounded object-cover" />
-            <span class="font-semibold text-foreground text-sm">EventHub</span>
+            <img src="assets/brand/symbol.svg" alt="" aria-hidden="true" class="w-7 h-7" />
+            <span class="font-display text-foreground text-sm tracking-tight"
+              >Event<span class="font-bold">Hub</span></span
+            >
           </a>
         </div>
 
