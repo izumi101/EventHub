@@ -1,4 +1,5 @@
-import { APIResponse, expect, Page, test } from '@playwright/test';
+import { createHmac } from 'node:crypto';
+import { APIRequestContext, APIResponse, expect, Page, test } from '@playwright/test';
 import type { components } from '../src/app/api/openapi';
 
 type Schemas = components['schemas'];
@@ -20,6 +21,46 @@ async function login(page: Page, username: string, password: string) {
     page.click('button[type="submit"]'),
   ]);
   expect(response.status()).toBe(200);
+}
+
+/** RFC 6238 code (SHA-1, 6 digits, 30 s) for a base32 secret. */
+function totp(secret: string, now = Date.now()): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = '';
+  for (const ch of secret.replace(/=+$/, '').toUpperCase()) {
+    bits += alphabet.indexOf(ch).toString(2).padStart(5, '0');
+  }
+  const key = Buffer.from(bits.match(/.{8}/g)?.map((b) => parseInt(b, 2)) ?? []);
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(now / 30_000)));
+  const mac = createHmac('sha1', key).update(counter).digest();
+  const offset = mac[mac.length - 1] & 0xf;
+  return ((mac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).toString().padStart(6, '0');
+}
+
+/**
+ * API sign-in that completes the second step for accounts with 2FA (the demo
+ * organizer must use it): the stack is seeded with the TOTP secret in
+ * E2E_MFA_TOTP_SECRET (DJANGO_SEED_MFA_TOTP_SECRET on the backend).
+ */
+async function apiLogin(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+): Promise<Schemas['AuthPayload']> {
+  const first = await body<Schemas['LoginResult']>(
+    await request.post('/api/v1/auth/login/', { data: { username, password } }),
+  );
+  if ('tokens' in first) return first;
+  const secret = process.env['E2E_MFA_TOTP_SECRET'];
+  if (!('challenge_token' in first) || !secret) {
+    throw new Error(`${username} needs 2FA: set E2E_MFA_TOTP_SECRET and seed it`);
+  }
+  const verified = await request.post('/api/v1/auth/mfa/login/verify/', {
+    data: { challenge_token: first.challenge_token, method: 'totp', code: totp(secret) },
+  });
+  expect(verified.status()).toBe(200);
+  return body<Schemas['AuthPayload']>(verified);
 }
 
 function collectErrors(page: Page): string[] {
@@ -87,11 +128,7 @@ test('seat map updates arrive over the WebSocket through nginx', async ({ page }
   const id = events.results[0].id;
 
   // The demo data has no seat maps: the organizer creates one (400 if it exists).
-  const org = await body<Schemas['AuthPayload']>(
-    await page.request.post('/api/v1/auth/login/', {
-      data: { username: 'organizer', password: 'password123' },
-    }),
-  );
+  const org = await apiLogin(page.request, 'organizer', 'password123');
   await page.request.post(`/api/v1/events/${id}/seat-map/create/`, {
     data: { rows: 2, cols: 4, sync_capacity: false },
     headers: { Authorization: `Bearer ${org.tokens.access}` },
