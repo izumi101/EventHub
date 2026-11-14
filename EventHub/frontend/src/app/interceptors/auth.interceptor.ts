@@ -7,7 +7,7 @@ import { environment } from '../../environments/environment';
 
 /** Only our own API gets the bearer token — never a third-party URL that
  *  merely contains "/api/" somewhere. */
-function isOwnApi(url: string): boolean {
+export function isOwnApi(url: string): boolean {
   return url.startsWith(`${environment.apiUrl}/`);
 }
 
@@ -18,6 +18,10 @@ function withToken(req: HttpRequest<unknown>, token: string | null): HttpRequest
 }
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  // A request that brings its own credentials (the 2FA enrollment token) is
+  // sent as is: no stored token over it, no refresh on 401.
+  if (req.headers.has('Authorization')) return next(req);
+
   const authService = inject(AuthService);
   const router = inject(Router);
 
@@ -36,16 +40,28 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
         // Every request that hits a 401 waits for the same (shared) refresh
         // and is then retried — none of them fails just because another
         // request started the refresh first.
+        const endSession = (cause: unknown) => {
+          authService.forceLogout();
+          void router.navigate(['/login'], {
+            queryParams: { returnUrl: router.url },
+          });
+          return throwError(() => cause);
+        };
         return authService.refreshToken().pipe(
-          switchMap(() => next(withToken(req, authService.getToken()))),
-          catchError((refreshErr: unknown) => {
-            // Refresh failed — full logout
-            authService.forceLogout();
-            void router.navigate(['/login'], {
-              queryParams: { returnUrl: router.url },
-            });
-            return throwError(() => refreshErr);
-          }),
+          // A failed refresh ends the session.
+          catchError(endSession),
+          switchMap(() =>
+            next(withToken(req, authService.getToken())).pipe(
+              // So does a fresh token that is rejected too (no refresh loop).
+              // Any other error of the retry (409 "seat taken", 400, ...)
+              // belongs to the caller: the user stays signed in.
+              catchError((retryErr: unknown) =>
+                retryErr instanceof HttpErrorResponse && retryErr.status === 401
+                  ? endSession(retryErr)
+                  : throwError(() => retryErr),
+              ),
+            ),
+          ),
         );
       }
 

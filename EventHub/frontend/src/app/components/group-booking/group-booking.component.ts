@@ -23,6 +23,8 @@ import {
   Ticket,
 } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-group-booking',
@@ -34,6 +36,7 @@ import { apiErrorMessage } from '../../api/api-error';
     LucideAngularModule,
     PaymentQrComponent,
     MoneyPipe,
+    TranslocoPipe,
   ],
   template: `
     <div class="page-root">
@@ -42,7 +45,8 @@ import { apiErrorMessage } from '../../api/api-error';
           [routerLink]="['/events', eventId]"
           class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
         >
-          <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4" /> Back to event
+          <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4" />
+          {{ 'groupBooking.backToEvent' | transloco }}
         </a>
 
         @if (loading) {
@@ -53,8 +57,12 @@ import { apiErrorMessage } from '../../api/api-error';
               <lucide-icon [img]="icons.Users" class="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h1 class="text-xl font-bold text-foreground">Group booking</h1>
-              <p class="text-sm text-muted-foreground">{{ event.title }} · pick up to 8 seats</p>
+              <h1 class="text-xl font-bold text-foreground">
+                {{ 'groupBooking.groupBooking' | transloco }}
+              </h1>
+              <p class="text-sm text-muted-foreground">
+                {{ 'groupBooking.titlePickUpTo' | transloco: { title: event.title } }}
+              </p>
             </div>
           </div>
 
@@ -72,7 +80,7 @@ import { apiErrorMessage } from '../../api/api-error';
                 />
               } @else {
                 <p class="text-sm text-muted-foreground py-10 text-center">
-                  No seat map for this event.
+                  {{ 'groupBooking.noSeatMapFor' | transloco }}
                 </p>
               }
             </div>
@@ -82,17 +90,21 @@ import { apiErrorMessage } from '../../api/api-error';
               <div class="card p-5">
                 @if (!booking) {
                   <!-- SELECT PHASE -->
-                  <h2 class="font-semibold text-foreground mb-3">Your selection</h2>
+                  <h2 class="font-semibold text-foreground mb-3">
+                    {{ 'groupBooking.yourSelection' | transloco }}
+                  </h2>
                   @if (selected.length === 0) {
                     <p class="text-sm text-muted-foreground py-6 text-center">
-                      Tap seats on the map to add them.
+                      {{ 'groupBooking.tapSeatsOnThe' | transloco }}
                     </p>
                   } @else {
                     <ul class="space-y-2 mb-4">
                       @for (s of selected; track s.id) {
                         <li class="flex items-center justify-between text-sm">
                           <span class="text-foreground"
-                            >Row {{ s.row }}, Seat {{ s.col }}
+                            >{{
+                              'bookingClaim.rowRowSeatCol' | transloco: { row: s.row, col: s.col }
+                            }}
                             <span class="text-xs text-muted-foreground capitalize ml-1"
                               >({{ s.price_zone }})</span
                             >
@@ -104,9 +116,10 @@ import { apiErrorMessage } from '../../api/api-error';
                       }
                     </ul>
                     <div class="flex items-center justify-between border-t border-border pt-3 mb-4">
-                      <span class="text-sm text-muted-foreground"
-                        >{{ selected.length }} seat(s)</span
-                      >
+                      <span class="text-sm text-muted-foreground">{{
+                        'groupBooking.selectedlengthSeatS'
+                          | transloco: { selectedLength: selected.length }
+                      }}</span>
                       <span class="text-lg font-bold text-foreground">{{
                         selectionTotal | money: currency
                       }}</span>
@@ -117,12 +130,17 @@ import { apiErrorMessage } from '../../api/api-error';
                     [disabled]="selected.length === 0 || holding"
                     class="btn btn-primary btn-full"
                   >
-                    {{ holding ? 'Holding…' : 'Hold seats for 10 min' }}
+                    {{
+                      (holding ? 'groupBooking.holding' : 'groupBooking.holdSeatsForMin')
+                        | transloco
+                    }}
                   </button>
                 } @else {
                   <!-- HOLD PHASE -->
                   <div class="flex items-center justify-between mb-3">
-                    <h2 class="font-semibold text-foreground">Seats held</h2>
+                    <h2 class="font-semibold text-foreground">
+                      {{ 'groupBooking.seatsHeld' | transloco }}
+                    </h2>
                     <span
                       class="flex items-center gap-1 text-sm font-mono font-semibold"
                       [class]="secondsLeft < 60 ? 'text-ember' : 'text-warning'"
@@ -136,13 +154,15 @@ import { apiErrorMessage } from '../../api/api-error';
                     @for (s of booking.seats; track s.id) {
                       <li class="flex items-center justify-between text-sm">
                         <span class="text-foreground">
-                          Row {{ s.row }}, Seat {{ s.col }}
+                          {{ 'bookingClaim.rowRowSeatCol' | transloco: { row: s.row, col: s.col } }}
                           @if (s.attendee_name) {
                             <span class="text-xs text-[color:var(--pine-600)] ml-1"
                               >· {{ s.attendee_name }}</span
                             >
                           } @else {
-                            <span class="text-xs text-muted-foreground ml-1">· unclaimed</span>
+                            <span class="text-xs text-muted-foreground ml-1">{{
+                              'groupBooking.unclaimed' | transloco
+                            }}</span>
                           }
                         </span>
                         <span class="font-semibold text-foreground">{{
@@ -153,15 +173,17 @@ import { apiErrorMessage } from '../../api/api-error';
                   </ul>
 
                   <div class="flex items-center justify-between border-t border-border pt-3 mb-4">
-                    <span class="text-sm text-muted-foreground"
-                      >{{ booking.seat_count }} seats</span
-                    >
+                    <span class="text-sm text-muted-foreground">{{
+                      'groupBooking.seatcountSeats' | transloco: { seatCount: booking.seat_count }
+                    }}</span>
                     <span class="text-right">
                       <span class="text-lg font-bold text-foreground">{{
                         booking.total_due | money: booking.currency
                       }}</span>
                       @if (booking.total_due !== booking.total_price) {
-                        <span class="block text-xs text-muted-foreground">incl. tax & fees</span>
+                        <span class="block text-xs text-muted-foreground">{{
+                          'groupBooking.inclTaxFees' | transloco
+                        }}</span>
                       }
                     </span>
                   </div>
@@ -171,7 +193,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     <label
                       for="group-booking-share-url"
                       class="block text-xs font-medium text-muted-foreground mb-1.5"
-                      >Invite friends to claim a seat</label
+                      >{{ 'groupBooking.inviteFriendsToClaim' | transloco }}</label
                     >
                     <div class="flex gap-2">
                       <input
@@ -189,15 +211,16 @@ import { apiErrorMessage } from '../../api/api-error';
                   <button (click)="pay()" [disabled]="paying" class="btn btn-primary btn-full mb-2">
                     {{
                       paying
-                        ? 'Processing…'
-                        : 'Pay for group — ' + (booking.total_due | money: booking.currency)
+                        ? ('common.processing' | transloco)
+                        : ('groupBooking.payForGroup'
+                          | transloco: { amount: (booking.total_due | money: booking.currency) })
                     }}
                   </button>
                   <button
                     (click)="cancelHold()"
                     class="btn btn-ghost btn-full btn-sm text-muted-foreground"
                   >
-                    Release seats
+                    {{ 'groupBooking.releaseSeats' | transloco }}
                   </button>
                 }
               </div>
@@ -213,6 +236,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class GroupBookingComponent implements OnInit, OnDestroy {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   private eventService = inject(EventService);
@@ -306,7 +330,9 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.holding = false;
-        this.toast.error(apiErrorMessage(err, 'Could not hold seats. Some may be taken.', 'error'));
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('groupBooking.couldNotHoldSeats'), 'error'),
+        );
         // refresh map
         this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
           this.seats = sm.seats;
@@ -322,7 +348,9 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       next: (res) => this.startCheckout(res),
       error: (err) => {
         this.paying = false;
-        this.toast.error(apiErrorMessage(err, 'Payment could not be started.', 'error'));
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('groupBooking.paymentCouldNotBe'), 'error'),
+        );
       },
     });
   }
@@ -384,12 +412,12 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
         this.booking = null;
         this.selected = [];
         if (this.timer) clearInterval(this.timer);
-        this.toast.success('Seats released');
+        this.toast.success(this.i18n.t('groupBooking.seatsReleased'));
         this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
           this.seats = sm.seats;
         });
       },
-      error: () => this.toast.error('Could not release seats'),
+      error: () => this.toast.error(this.i18n.t('groupBooking.couldNotReleaseSeats')),
     });
   }
 
@@ -410,7 +438,7 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       const s = this.secondsLeft % 60;
       this.countdown = `${m}:${s.toString().padStart(2, '0')}`;
       if (this.secondsLeft <= 0) {
-        this.toast.error('Your seat hold has expired.');
+        this.toast.error(this.i18n.t('groupBooking.yourSeatHoldHas'));
         this.clearHold();
       }
     };

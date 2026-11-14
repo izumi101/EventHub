@@ -1,0 +1,18 @@
+{% load i18n %}{% autoescape off %}{{ message.headline }}
+
+{% for paragraph in message.paragraphs %}{{ paragraph }}
+
+{% endfor %}{% for label, value in message.details %}{{ label }}: {{ value }}
+{% endfor %}{% for item in tickets %}
+{% translate "E-ticket" %} — {{ item.ticket.label }}
+{% for label, value in item.ticket.details %}{{ label }}: {{ value }}
+{% endfor %}{% translate "Ticket" %}: #{{ item.ticket.short_id }}
+{% translate "The QR code is attached to this email and shown in My Tickets." %}
+{% endfor %}{% if more_tickets %}
+{% blocktranslate count counter=more_tickets %}{{ counter }} more ticket is in your account.{% plural %}{{ counter }} more tickets are in your account.{% endblocktranslate %}
+{% endif %}{% if message.cta_url %}
+{{ message.cta_label }}: {{ message.cta_url }}
+{% endif %}
+--
+{% if email_optional %}{% translate "Unsubscribe or change your email preferences:" %}{% else %}{% translate "This email is about your tickets or payments, so it is always sent. Other email preferences:" %}{% endif %} {{ preferences_url }}
+{% endautoescape %}

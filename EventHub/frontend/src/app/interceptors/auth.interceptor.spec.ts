@@ -130,31 +130,21 @@ describe('authInterceptor', () => {
       http.expectNone(`${API}/auth/token/refresh/`);
     });
 
-    // Known defect F1 from the 2026-11-11 review: the retry is inside the same
-    // catchError that handles refresh failures (auth.interceptor.ts:39-48), so a
-    // business error from the retried request (e.g. 409 "seat taken") is treated
-    // like a failed refresh: the session is wiped and the buyer is sent to /login.
-    // Expected (correct) behaviour is asserted below; `it.fails` keeps the suite
-    // green while the defect exists and turns red once it is fixed (then drop `.fails`).
-    it.fails(
-      'F1: keeps the user logged in when the retried request fails with 409 after a successful refresh',
-      () => {
-        let status = 0;
-        client
-          .post(checkout, {})
-          .subscribe({ error: (e: HttpErrorResponse) => (status = e.status) });
-        http.expectOne(checkout).flush(null, unauthorized);
-        http
-          .expectOne(`${API}/auth/token/refresh/`)
-          .flush({ access: 'fresh', refresh: 'refresh-2' });
-        http
-          .expectOne(checkout)
-          .flush({ error: 'Seat taken' }, { status: 409, statusText: 'Conflict' });
+    // Regression for defect F1 from the 2026-11-11 review: the retried
+    // request's own error (409 "seat taken") must not be handled like a
+    // failed refresh, which wiped the session and sent the buyer to /login.
+    it('F1: keeps the user logged in when the retried request fails with 409 after a successful refresh', () => {
+      let status = 0;
+      client.post(checkout, {}).subscribe({ error: (e: HttpErrorResponse) => (status = e.status) });
+      http.expectOne(checkout).flush(null, unauthorized);
+      http.expectOne(`${API}/auth/token/refresh/`).flush({ access: 'fresh', refresh: 'refresh-2' });
+      http
+        .expectOne(checkout)
+        .flush({ error: 'Seat taken' }, { status: 409, statusText: 'Conflict' });
 
-        expect(status).toBe(409);
-        expect(localStorage.getItem('access_token')).toBe('fresh');
-        expect(router.navigate).not.toHaveBeenCalled();
-      },
-    );
+      expect(status).toBe(409);
+      expect(localStorage.getItem('access_token')).toBe('fresh');
+      expect(router.navigate).not.toHaveBeenCalled();
+    });
   });
 });

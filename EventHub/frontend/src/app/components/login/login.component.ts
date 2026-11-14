@@ -1,15 +1,43 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../services/auth.service';
+import {
+  AuthService,
+  MfaChallenge,
+  isMfaChallenge,
+  isMfaEnrollmentRequired,
+} from '../../services/auth.service';
+import { FactorAdded, MfaService } from '../../services/mfa.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { MfaVerifier, MfaVerifyComponent } from '../mfa/mfa-verify.component';
+import { MfaEnrollComponent } from '../mfa/mfa-enroll.component';
+import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
+
+/**
+ * Sign-in as a small state machine:
+ *   password → (session)                       → returnUrl
+ *   password → mfa (challenge)                 → returnUrl
+ *   password → enroll (role must use 2FA)      → recovery codes → returnUrl
+ */
+export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    RouterModule,
+    FormsModule,
+    LucideAngularModule,
+    MfaVerifyComponent,
+    MfaEnrollComponent,
+    RecoveryCodesComponent,
+    TranslocoPipe,
+  ],
   template: `
     <div class="min-h-dvh flex bg-background">
       <!-- Left: editorial brand panel -->
@@ -21,23 +49,24 @@ import { apiErrorMessage } from '../../api/api-error';
           <span class="font-display font-semibold text-lg text-white">EventHub</span>
         </a>
         <div class="relative z-10 max-w-md">
-          <p class="kicker mb-4" style="color:var(--ember-500)">What's on · Tonight</p>
+          <p class="kicker mb-4" style="color:var(--ember-500)">{{ 'login.kicker' | transloco }}</p>
           <h2
             class="font-display font-semibold leading-[1.05] text-white"
             style="font-size:clamp(2rem,3vw,2.75rem)"
           >
-            Every great night starts with a ticket.
+            {{ 'login.headline' | transloco }}
           </h2>
           <p class="mt-5 text-[0.95rem] leading-relaxed" style="color:rgba(245,239,230,0.72)">
-            Discover concerts, gallery nights and conferences — and keep every ticket in one place.
+            {{ 'login.tagline' | transloco }}
           </p>
         </div>
         <div
           class="relative z-10 flex items-center gap-3 text-xs"
           style="color:rgba(245,239,230,0.55)"
         >
-          <span>Secure checkout</span><span aria-hidden="true">·</span
-          ><span>Trusted by organizers</span>
+          <span>{{ 'login.secureCheckout' | transloco }}</span
+          ><span aria-hidden="true">·</span
+          ><span>{{ 'login.trustedByOrganizers' | transloco }}</span>
         </div>
         <span class="auth-ring" style="right:-120px;bottom:-120px;width:340px;height:340px"></span>
         <span
@@ -58,94 +87,155 @@ import { apiErrorMessage } from '../../api/api-error';
             <span class="font-display font-semibold text-foreground text-lg">EventHub</span>
           </a>
 
-          <p class="kicker mb-2">Welcome back</p>
-          <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">Sign in</h1>
-          <p class="text-sm text-muted-foreground mb-7">Continue to your tickets and events.</p>
-
-          <form (ngSubmit)="onSubmit()" class="space-y-4" novalidate>
-            <div>
-              <label for="username" class="block text-sm font-medium text-foreground mb-1.5">
-                Username or email
-              </label>
-              <input
-                id="username"
-                type="text"
-                [(ngModel)]="username"
-                name="username"
-                placeholder="@username or email"
-                class="input"
-                [class.input-error]="error && !username"
-                autocapitalize="none"
-                autocorrect="off"
-                autocomplete="username"
-                required
+          @switch (step()) {
+            @case ('mfa') {
+              <p class="kicker mb-2">{{ 'login.mfaKicker' | transloco }}</p>
+              <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
+                {{ 'mfa.confirmTitle' | transloco }}
+              </h1>
+              <p class="text-sm text-muted-foreground mb-7">
+                {{ 'login.mfaIntro' | transloco }}
+              </p>
+              <app-mfa-verify
+                [methods]="challenge()?.methods ?? []"
+                [verifier]="loginVerifier"
+                [submitLabel]="'login.signIn' | transloco"
+                (verified)="finish()"
               />
-            </div>
-
-            <div>
-              <div class="flex items-center justify-between mb-1.5">
-                <label for="password" class="text-sm font-medium text-foreground">Password</label>
-                <a routerLink="/forgot-password" class="text-xs text-primary hover:underline">
-                  Forgot password?
-                </a>
-              </div>
-              <div
-                class="flex items-center gap-2 border rounded-md px-3 h-10 bg-background transition-shadow"
-                [class]="
-                  error && !password
-                    ? 'border-destructive'
-                    : 'border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20'
-                "
-              >
-                <input
-                  id="password"
-                  [type]="showPassword ? 'text' : 'password'"
-                  [(ngModel)]="password"
-                  name="password"
-                  placeholder="••••••••"
-                  class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-                  autocomplete="current-password"
-                  required
-                />
-                <button
-                  type="button"
-                  (click)="showPassword = !showPassword"
-                  class="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                  [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
-                >
-                  <lucide-icon
-                    [img]="showPassword ? icons.EyeOff : icons.Eye"
-                    class="w-4 h-4"
-                    aria-hidden="true"
-                  />
-                </button>
-              </div>
-            </div>
-
-            @if (error) {
-              <div role="alert" class="note note-error">{{ error }}</div>
+              <button type="button" class="btn btn-ghost btn-sm mt-4" (click)="startOver()">
+                {{ 'login.backToSignIn' | transloco }}
+              </button>
             }
+            @case ('enroll') {
+              <p class="kicker mb-2">{{ 'login.enrollKicker' | transloco }}</p>
+              <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
+                {{ 'login.enrollTitle' | transloco }}
+              </h1>
+              <p class="text-sm text-muted-foreground mb-7">
+                {{ 'login.enrollIntro' | transloco }}
+              </p>
+              <app-mfa-enroll
+                [enrollmentToken]="enrollmentToken()"
+                (completed)="onEnrolled($event)"
+                (cancelled)="startOver()"
+              />
+              <button type="button" class="btn btn-ghost btn-sm mt-4" (click)="startOver()">
+                {{ 'login.backToSignIn' | transloco }}
+              </button>
+            }
+            @case ('recovery') {
+              <p class="kicker mb-2">{{ 'login.recoveryKicker' | transloco }}</p>
+              <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
+                {{ 'login.recoveryTitle' | transloco }}
+              </h1>
+              <p class="text-sm text-muted-foreground mb-7">
+                {{ 'login.recoveryIntro' | transloco }}
+              </p>
+              <app-recovery-codes
+                [codes]="recoveryCodes()"
+                [continueLabel]="'login.continueToEventHub' | transloco"
+                (done)="finish()"
+              />
+            }
+            @default {
+              <p class="kicker mb-2">{{ 'login.welcomeBack' | transloco }}</p>
+              <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
+                {{ 'login.signIn' | transloco }}
+              </h1>
+              <p class="text-sm text-muted-foreground mb-7">
+                {{ 'login.signInIntro' | transloco }}
+              </p>
 
-            <button
-              type="submit"
-              class="btn btn-primary btn-full btn-lg mt-1"
-              [disabled]="submitting"
-            >
-              @if (submitting) {
-                <span class="spinner spinner-sm"></span>
-                Signing in...
-              } @else {
-                Sign in
-              }
-            </button>
-          </form>
+              <form (ngSubmit)="onSubmit()" class="space-y-4" novalidate>
+                <div>
+                  <label for="username" class="block text-sm font-medium text-foreground mb-1.5">
+                    {{ 'login.usernameOrEmail' | transloco }}
+                  </label>
+                  <input
+                    id="username"
+                    type="text"
+                    [(ngModel)]="username"
+                    name="username"
+                    [placeholder]="'login.usernamePlaceholder' | transloco"
+                    class="input"
+                    [class.input-error]="error && !username"
+                    autocapitalize="none"
+                    autocorrect="off"
+                    autocomplete="username"
+                    required
+                  />
+                </div>
 
-          <p class="text-sm text-muted-foreground text-center mt-6">
-            Don't have an account?
-            <a routerLink="/register" class="text-ember font-semibold hover:underline ml-1"
-              >Create one</a
-            >
-          </p>
+                <div>
+                  <div class="flex items-center justify-between mb-1.5">
+                    <label for="password" class="text-sm font-medium text-foreground">{{
+                      'login.password' | transloco
+                    }}</label>
+                    <a routerLink="/forgot-password" class="text-xs text-primary hover:underline">
+                      {{ 'login.forgotPassword' | transloco }}
+                    </a>
+                  </div>
+                  <div
+                    class="flex items-center gap-2 border rounded-md px-3 h-10 bg-background transition-shadow"
+                    [class]="
+                      error && !password
+                        ? 'border-destructive'
+                        : 'border-border focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20'
+                    "
+                  >
+                    <input
+                      id="password"
+                      [type]="showPassword ? 'text' : 'password'"
+                      [(ngModel)]="password"
+                      name="password"
+                      placeholder="••••••••"
+                      class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
+                      autocomplete="current-password"
+                      required
+                    />
+                    <button
+                      type="button"
+                      (click)="showPassword = !showPassword"
+                      class="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                      [attr.aria-label]="
+                        (showPassword ? 'login.hidePassword' : 'login.showPassword') | transloco
+                      "
+                    >
+                      <lucide-icon
+                        [img]="showPassword ? icons.EyeOff : icons.Eye"
+                        class="w-4 h-4"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                @if (error) {
+                  <div role="alert" class="note note-error">{{ error }}</div>
+                }
+
+                <button
+                  type="submit"
+                  class="btn btn-primary btn-full btn-lg mt-1"
+                  [disabled]="submitting"
+                >
+                  @if (submitting) {
+                    <span class="spinner spinner-sm"></span>
+                    {{ 'login.signingIn' | transloco }}
+                  } @else {
+                    {{ 'login.signIn' | transloco }}
+                  }
+                </button>
+              </form>
+
+              <p class="text-sm text-muted-foreground text-center mt-6">
+                {{ 'login.noAccount' | transloco }}
+                <a routerLink="/register" class="text-ember font-semibold hover:underline ml-1">{{
+                  'login.createOne' | transloco
+                }}</a>
+              </p>
+            }
+          }
         </div>
       </main>
     </div>
@@ -153,7 +243,21 @@ import { apiErrorMessage } from '../../api/api-error';
 })
 export class LoginComponent {
   private authService = inject(AuthService);
+  private mfa = inject(MfaService);
   private router = inject(Router);
+  private lang = inject(LanguageService);
+
+  readonly step = signal<LoginStep>('password');
+  readonly challenge = signal<MfaChallenge | null>(null);
+  readonly enrollmentToken = signal<string | null>(null);
+  readonly recoveryCodes = signal<string[]>([]);
+
+  /** The second step of sign-in, bound to the current challenge token. */
+  readonly loginVerifier: MfaVerifier = {
+    sendEmailCode: () => this.mfa.loginSendEmailCode(this.challengeToken()),
+    passkeyOptions: () => this.mfa.loginPasskeyOptions(this.challengeToken()),
+    verify: (proof) => this.mfa.loginVerify(this.challengeToken(), proof),
+  };
 
   username = '';
   password = '';
@@ -172,21 +276,57 @@ export class LoginComponent {
 
   onSubmit(): void {
     if (!this.username.trim() || !this.password.trim()) {
-      this.error = 'Please fill in all fields.';
+      this.error = this.lang.t('login.fillAllFields');
       return;
     }
     this.error = '';
     this.submitting = true;
 
     this.authService.login(this.username.trim(), this.password).subscribe({
-      next: () => {
+      next: (res) => {
         this.submitting = false;
-        void this.router.navigateByUrl(this.returnUrl);
+        this.password = '';
+        if (isMfaChallenge(res)) {
+          this.challenge.set(res);
+          this.step.set('mfa');
+        } else if (isMfaEnrollmentRequired(res)) {
+          this.enrollmentToken.set(res.enrollment_token);
+          this.step.set('enroll');
+        } else {
+          this.finish();
+        }
       },
       error: (err) => {
-        this.error = apiErrorMessage(err, 'Invalid username or password.', 'detail');
+        this.error = apiErrorMessage(err, this.lang.t('login.invalidCredentials'), 'detail');
         this.submitting = false;
       },
     });
+  }
+
+  /** Enrollment at sign-in: the first factor came with a session; show the codes once. */
+  onEnrolled(res: FactorAdded): void {
+    this.enrollmentToken.set(null);
+    if (res.recovery_codes?.length) {
+      this.recoveryCodes.set(res.recovery_codes);
+      this.step.set('recovery');
+    } else {
+      this.finish();
+    }
+  }
+
+  startOver(): void {
+    this.challenge.set(null);
+    this.enrollmentToken.set(null);
+    this.recoveryCodes.set([]);
+    this.error = '';
+    this.step.set('password');
+  }
+
+  finish(): void {
+    void this.router.navigateByUrl(this.returnUrl);
+  }
+
+  private challengeToken(): string {
+    return this.challenge()?.challenge_token ?? '';
   }
 }

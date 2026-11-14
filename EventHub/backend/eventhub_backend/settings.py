@@ -10,6 +10,10 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+from common.db_schemas import connection_options as db_schema_connection_options
+from common.throttle_rates import parse_overrides as parse_throttle_overrides
+from mfa.conf import DEV_ENCRYPTION_KEY as _default_mfa_key
+from mfa.conf import production_problems as mfa_production_problems
 from payments.providers.conf import parse_enabled as parse_enabled_providers
 from payments.providers.conf import production_problems as payment_production_problems
 from payments.providers.conf import unknown_codes as unknown_payment_providers
@@ -71,6 +75,8 @@ INSTALLED_APPS = [
     'bookings',
     'jobs',
     'featureflags',
+    'mfa',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +89,8 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    # Staff sessions in /admin/ must pass a second factor (docs/SECURITY_2FA.md).
+    'mfa.middleware.AdminMFAMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -145,7 +153,7 @@ DB_APP_USER = os.environ.get('POSTGRES_APP_USER', '').strip() or 'eventhub_app'
 DB_APP_PASSWORD = os.environ.get('POSTGRES_APP_PASSWORD', '')
 DB_READONLY_USER = os.environ.get('POSTGRES_READONLY_USER', '').strip() or 'eventhub_readonly'
 DB_READONLY_PASSWORD = os.environ.get('POSTGRES_READONLY_PASSWORD', '')
-DB_OWNER_COMMANDS = {'migrate', 'setup_db_roles', 'verify_db_roles'}
+DB_OWNER_COMMANDS = {'migrate', 'setup_db_roles', 'verify_db_roles', 'db_schemas'}
 DB_AS_OWNER = (
     TESTING
     or env_bool('DJANGO_DB_AS_OWNER', False)
@@ -168,6 +176,9 @@ DATABASES = {
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+        # One schema per domain; the search path keeps unqualified table
+        # names working (docs/DATABASE_SCHEMAS.md).
+        'OPTIONS': {'options': db_schema_connection_options()},
     }
 }
 
@@ -191,7 +202,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': ('rest_framework_simplejwt.authentication.JWTAuthentication',),
+    # SimpleJWT access tokens plus the 2FA policy (mfa/authentication.py).
+    'DEFAULT_AUTHENTICATION_CLASSES': ('mfa.authentication.MFAJWTAuthentication',),
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticatedOrReadOnly',),
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 12,
@@ -265,6 +277,7 @@ SPECTACULAR_SETTINGS = {
         'TicketKindEnum': 'events.models.TicketType.KIND_CHOICES',
         'CheckInActionEnum': 'events.models.CheckInLog.ACTION_CHOICES',
         'WebhookTriggerEnum': 'events.models.Webhook.TRIGGER_CHOICES',
+        'MFAMethodEnum': 'mfa.serializers.METHOD_CHOICES',
     },
 }
 
@@ -293,6 +306,63 @@ SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:4200').rstrip('/')
+
+# ---- Two-factor authentication (docs/adr/0002-two-factor-authentication.md) ---- #
+# Roles that must use 2FA: organizer, staff (is_staff), superuser, attendee.
+# Empty turns enforcement off (staged rollout); users who enrolled keep
+# being asked for their factor either way.
+MFA_REQUIRED_ROLES = env_list('MFA_REQUIRED_ROLES', ['organizer', 'staff', 'superuser'])
+if _unknown_mfa_roles := sorted(set(MFA_REQUIRED_ROLES) - {'attendee', 'organizer', 'staff', 'superuser'}):
+    raise ImproperlyConfigured(
+        f'MFA_REQUIRED_ROLES lists unknown roles: {", ".join(_unknown_mfa_roles)} '
+        '(allowed: attendee, organizer, staff, superuser)'
+    )
+# Key(s) for encrypting TOTP secrets at rest; comma separated for rotation
+# (the first encrypts, all decrypt). Required when DJANGO_DEBUG=0.
+MFA_ENCRYPTION_KEYS = env_list('MFA_ENCRYPTION_KEY', []) or [_default_mfa_key]
+# How long a second-factor proof covers sensitive actions (step-up).
+MFA_STEP_UP_MAX_AGE_SECONDS = int(os.environ.get('MFA_STEP_UP_MAX_AGE_SECONDS', '600'))
+MFA_CHALLENGE_TTL_SECONDS = 300
+MFA_ENROLLMENT_TTL_SECONDS = 900
+MFA_WEBAUTHN_CHALLENGE_TTL_SECONDS = 300
+MFA_TOTP_ISSUER = os.environ.get('MFA_TOTP_ISSUER', 'EventHub')
+# Lockout: after MFA_MAX_FAILED_ATTEMPTS consecutive wrong codes the user is
+# locked for MFA_LOCKOUT_SECONDS, doubling per further failure up to the max.
+MFA_MAX_FAILED_ATTEMPTS = 5
+MFA_LOCKOUT_SECONDS = 60
+MFA_LOCKOUT_MAX_SECONDS = 3600
+# DRF throttles of the second-factor endpoints (per client IP / per user).
+MFA_THROTTLE_RATES = {'mfa_ip': '20/min', 'mfa_user': '10/min'}
+# Email codes as a second factor (ADR 0002, amendment 1). Weaker than TOTP or
+# passkeys (a taken-over mailbox gets both the password reset and the code):
+# set MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0 to make organizers/staff use an
+# authenticator app or a passkey instead.
+MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES = env_bool('MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES', True)
+MFA_EMAIL_CODE_TTL_SECONDS = 600
+MFA_EMAIL_CODE_MAX_ATTEMPTS = 5
+# Sending limits per user and purpose (sign-in, step-up, enrollment): one code
+# a minute, five an hour.
+MFA_EMAIL_RESEND_SECONDS = 60
+MFA_EMAIL_MAX_PER_HOUR = 5
+# WebAuthn: the RP ID is the site's host name (no scheme or port) and every
+# origin the SPA is opened from must be listed. Passkeys need a secure
+# context: https, or http://localhost; a plain-HTTP LAN IP can't use them.
+WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost').strip()
+WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'EventHub')
+WEBAUTHN_ORIGINS = env_list('WEBAUTHN_ORIGINS', ['http://localhost:4200', 'https://localhost'])
+
+# Rate limits per scope can be replaced without a code change, e.g.
+# DJANGO_THROTTLE_RATES=login=60/min,mfa_ip=120/min (common/throttle_rates.py).
+try:
+    _throttle_overrides = parse_throttle_overrides(
+        os.environ.get('DJANGO_THROTTLE_RATES', ''),
+        known_scopes=set(REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']) | set(MFA_THROTTLE_RATES),
+    )
+except ValueError as _exc:
+    raise ImproperlyConfigured(f'DJANGO_THROTTLE_RATES: {_exc}') from None
+for _scope, _rate in _throttle_overrides.items():
+    _rates = MFA_THROTTLE_RATES if _scope in MFA_THROTTLE_RATES else REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']
+    _rates[_scope] = _rate
 
 # ---- Payments (docs/adr/0001-payment-provider-layer.md) ---- #
 # Providers that may take money, comma separated. Each enabled provider must
@@ -355,8 +425,11 @@ _default_email_backend = (
     if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD
     else 'django.core.mail.backends.console.EmailBackend'
 )
-EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', _default_email_backend)
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND') or _default_email_backend
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@eventhub.local>')
+# Time zone of the dates in notification emails (event start, reminders).
+# The app stores UTC; set the zone your events happen in, e.g. Asia/Almaty.
+NOTIFICATION_TIME_ZONE = os.environ.get('NOTIFICATION_TIME_ZONE', '') or TIME_ZONE
 
 # Background jobs (emails, webhooks, search indexing) are executed by
 # `manage.py run_worker`. JOBS_RUN_INLINE=1 runs them right after the request's
@@ -444,6 +517,12 @@ LOGGING = {
             'level': 'INFO',
             'propagate': False,
         },
+        # 2FA audit trail: enable/disable, failures, lockouts, resets (no secrets).
+        'mfa': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         # The Unleash SDK and its scheduler log every poll at INFO.
         'UnleashClient': {
             'handlers': ['console'],
@@ -477,6 +556,9 @@ if not DEBUG and not TESTING:
             'POSTGRES_APP_USER must be its own role, not POSTGRES_USER or POSTGRES_READONLY_USER '
             '(docs/DATABASE_ROLES.md)'
         )
+    _problems += mfa_production_problems(
+        encryption_keys=env_list('MFA_ENCRYPTION_KEY', []), rp_id=WEBAUTHN_RP_ID, origins=WEBAUTHN_ORIGINS
+    )
     if _problems:
         raise ImproperlyConfigured(
             'Refusing to start with DJANGO_DEBUG=0: '
@@ -487,6 +569,8 @@ if not DEBUG and not TESTING:
 if TESTING:
     REST_FRAMEWORK['DEFAULT_THROTTLE_CLASSES'] = []
     REST_FRAMEWORK['DEFAULT_THROTTLE_RATES'] = {}
+    # Tests share one client IP; throttling tests turn these on explicitly.
+    MFA_THROTTLE_RATES = {}
     EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
     PASSWORD_HASHERS = [
         'django.contrib.auth.hashers.MD5PasswordHasher',

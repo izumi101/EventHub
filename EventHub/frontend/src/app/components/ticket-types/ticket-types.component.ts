@@ -13,6 +13,9 @@ import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 /** The "new tier" form; numeric inputs are null while empty. */
 interface TierForm {
@@ -38,57 +41,69 @@ const emptyTierForm = (): TierForm => ({
 @Component({
   selector: 'app-ticket-types',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
-            >Dashboard</a
-          >
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">{{
+            'nav.dashboard' | transloco
+          }}</a>
           <span>/</span>
           @if (eventId) {
             <a
               [routerLink]="['/organizer/events', eventId, 'attendees']"
               class="hover:text-foreground transition-colors truncate max-w-[180px]"
-              >{{ event?.title || 'Event' }}</a
+              >{{ event?.title || ('nav.event' | transloco) }}</a
             >
           }
           <span>/</span>
-          <span class="text-foreground font-medium">Ticket types</span>
+          <span class="text-foreground font-medium">{{
+            'ticketTypes.ticketTypes' | transloco
+          }}</span>
         </nav>
 
         <div class="flex items-center justify-between mb-2">
           <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
             <lucide-icon [img]="icons.Ticket" class="w-6 h-6 text-primary" />
-            Ticket types
+            {{ 'ticketTypes.ticketTypes' | transloco }}
           </h1>
           <button
             (click)="showForm = !showForm"
             class="btn btn-primary btn-sm flex items-center gap-1.5"
           >
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4" /> New tier
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
+            {{ 'ticketTypes.newTier' | transloco }}
           </button>
         </div>
         <p class="text-sm text-muted-foreground mb-6">
-          Offer multiple tiers for {{ event?.title }} — General, VIP, Early Bird, or a donation.
-          When you add tiers, they replace the single price at checkout.
+          {{ 'ticketTypes.offerMultipleTiersFor' | transloco: { title: event?.title } }}
         </p>
 
         @if (showForm) {
           <div class="card p-5 mb-6 animate-slide-up">
-            <h2 class="font-semibold text-foreground mb-4">New ticket tier</h2>
+            <h2 class="font-semibold text-foreground mb-4">
+              {{ 'ticketTypes.newTicketTier' | transloco }}
+            </h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="sm:col-span-2">
                 <label
                   for="ticket-types-name"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Name</label
+                  >{{ 'common.name' | transloco }}</label
                 >
                 <input
                   id="ticket-types-name"
                   [(ngModel)]="form.name"
-                  placeholder="e.g. VIP, Early Bird, General Admission"
+                  [placeholder]="'ticketTypes.eGVipEarly' | transloco"
                   class="input w-full"
                 />
               </div>
@@ -96,13 +111,15 @@ const emptyTierForm = (): TierForm => ({
                 <label
                   for="ticket-types-description"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Description
-                  <span class="text-muted-foreground font-normal">(optional)</span></label
+                  >{{ 'common.description' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span></label
                 >
                 <input
                   id="ticket-types-description"
                   [(ngModel)]="form.description"
-                  placeholder="What's included with this tier?"
+                  [placeholder]="'ticketTypes.whatSIncludedWith' | transloco"
                   class="input w-full"
                 />
               </div>
@@ -110,12 +127,14 @@ const emptyTierForm = (): TierForm => ({
                 <label
                   for="ticket-types-kind"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Type</label
+                  >{{ 'promo.type' | transloco }}</label
                 >
                 <select id="ticket-types-kind" [(ngModel)]="form.kind" class="input w-full">
-                  <option value="paid">Paid</option>
-                  <option value="free">Free</option>
-                  <option value="donation">Donation (pay what you want)</option>
+                  <option value="paid">{{ 'common.paid' | transloco }}</option>
+                  <option value="free">{{ 'common.free' | transloco }}</option>
+                  <option value="donation">
+                    {{ 'ticketTypes.donationPayWhatYou' | transloco }}
+                  </option>
                 </select>
               </div>
               <div>
@@ -123,7 +142,10 @@ const emptyTierForm = (): TierForm => ({
                   for="ticket-types-price"
                   class="block text-sm font-medium text-foreground mb-1.5"
                 >
-                  {{ form.kind === 'donation' ? 'Minimum ($)' : 'Price ($)' }}
+                  {{
+                    (form.kind === 'donation' ? 'ticketTypes.minimum' : 'ticketTypes.price')
+                      | transloco
+                  }}
                 </label>
                 <input
                   id="ticket-types-price"
@@ -139,15 +161,17 @@ const emptyTierForm = (): TierForm => ({
                 <label
                   for="ticket-types-quantity"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Quantity
-                  <span class="text-muted-foreground font-normal">(blank = ∞)</span></label
+                  >{{ 'common.quantity' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'promo.blank' | transloco
+                  }}</span></label
                 >
                 <input
                   id="ticket-types-quantity"
                   type="number"
                   [(ngModel)]="form.quantity"
                   min="1"
-                  placeholder="Unlimited"
+                  [placeholder]="'promo.unlimited' | transloco"
                   class="input w-full"
                 />
               </div>
@@ -156,8 +180,10 @@ const emptyTierForm = (): TierForm => ({
                 <label
                   for="ticket-types-sale-start"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Sales start
-                  <span class="text-muted-foreground font-normal">(optional)</span></label
+                  >{{ 'ticketTypes.salesStart' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span></label
                 >
                 <input
                   id="ticket-types-sale-start"
@@ -170,8 +196,10 @@ const emptyTierForm = (): TierForm => ({
                 <label
                   for="ticket-types-sale-end"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Sales end
-                  <span class="text-muted-foreground font-normal">(optional)</span></label
+                  >{{ 'ticketTypes.salesEnd' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span></label
                 >
                 <input
                   id="ticket-types-sale-end"
@@ -182,13 +210,15 @@ const emptyTierForm = (): TierForm => ({
               </div>
             </div>
             <div class="flex gap-2 mt-4">
-              <button (click)="showForm = false" class="btn btn-secondary flex-1">Cancel</button>
+              <button (click)="showForm = false" class="btn btn-secondary flex-1">
+                {{ 'common.cancel' | transloco }}
+              </button>
               <button
                 (click)="create()"
                 [disabled]="!form.name.trim() || saving"
                 class="btn btn-primary flex-1"
               >
-                {{ saving ? 'Creating…' : 'Create tier' }}
+                {{ (saving ? 'checkin.creating' : 'ticketTypes.createTier') | transloco }}
               </button>
             </div>
           </div>
@@ -201,9 +231,11 @@ const emptyTierForm = (): TierForm => ({
             <div class="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
               <lucide-icon [img]="icons.Ticket" class="w-7 h-7 text-muted-foreground/50" />
             </div>
-            <h3 class="font-semibold text-foreground mb-1">No ticket tiers</h3>
+            <h3 class="font-semibold text-foreground mb-1">
+              {{ 'ticketTypes.noTicketTiers' | transloco }}
+            </h3>
             <p class="text-sm text-muted-foreground">
-              This event uses its single price. Add tiers for VIP/Early Bird pricing.
+              {{ 'ticketTypes.thisEventUsesIts' | transloco }}
             </p>
           </div>
         } @else {
@@ -221,12 +253,12 @@ const emptyTierForm = (): TierForm => ({
                   "
                 >
                   @if (t.kind === 'free') {
-                    <span class="text-sm">Free</span>
+                    <span class="text-sm">{{ 'common.free' | transloco }}</span>
                   } @else {
                     <span class="text-base">{{ t.price | money: event?.currency }}</span>
                   }
                   @if (t.kind === 'donation') {
-                    <span class="text-[9px] uppercase">min</span>
+                    <span class="text-[9px] uppercase">{{ 'ticketTypes.min' | transloco }}</span>
                   }
                 </div>
                 <div class="flex-1 min-w-0">
@@ -243,16 +275,24 @@ const emptyTierForm = (): TierForm => ({
                     <p class="text-xs text-muted-foreground mt-0.5">{{ t.description }}</p>
                   }
                   <p class="text-xs text-muted-foreground mt-0.5">
-                    Sold {{ t.sold }}{{ t.quantity ? ' / ' + t.quantity : '' }}
+                    {{
+                      (t.quantity ? 'ticketTypes.soldOf' : 'ticketTypes.sold')
+                        | transloco: { sold: t.sold, quantity: t.quantity }
+                    }}
                     @if (t.sale_end) {
-                      · ends {{ t.sale_end | date: 'MMM d, HH:mm' }}
+                      {{
+                        'ticketTypes.endsSaleend'
+                          | transloco: { saleEnd: (t.sale_end | localDate: 'MMM d, HH:mm') }
+                      }}
                     }
                   </p>
                 </div>
                 <button
                   (click)="toggleActive(t)"
                   class="btn btn-ghost btn-sm"
-                  [title]="t.is_active ? 'Disable' : 'Enable'"
+                  [title]="
+                    (t.is_active ? 'eventSettings.disable' : 'eventSettings.enable') | transloco
+                  "
                 >
                   <lucide-icon [img]="t.is_active ? icons.X : icons.Check" class="w-4 h-4" />
                 </button>
@@ -271,6 +311,7 @@ const emptyTierForm = (): TierForm => ({
   `,
 })
 export class TicketTypesComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private eventService = inject(EventService);
   private toast = inject(ToastService);
@@ -301,7 +342,7 @@ export class TicketTypesComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
-        this.toast.error('Failed to load ticket types.');
+        this.toast.error(this.i18n.t('ticketTypes.failedToLoadTicket'));
       },
     });
   }
@@ -322,7 +363,7 @@ export class TicketTypesComponent implements OnInit {
 
     this.eventService.createTicketType(this.eventId, payload).subscribe({
       next: () => {
-        this.toast.success('Ticket tier created.');
+        this.toast.success(this.i18n.t('ticketTypes.ticketTierCreated'));
         this.saving = false;
         this.showForm = false;
         this.form = emptyTierForm();
@@ -330,7 +371,9 @@ export class TicketTypesComponent implements OnInit {
       },
       error: (err) => {
         this.saving = false;
-        this.toast.error(apiErrorMessage(err, 'Could not create tier.', 'price', 'detail'));
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('ticketTypes.couldNotCreateTier'), 'price', 'detail'),
+        );
       },
     });
   }
@@ -340,7 +383,7 @@ export class TicketTypesComponent implements OnInit {
       next: (u) => {
         Object.assign(t, u);
       },
-      error: () => this.toast.error('Update failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.updateFailed')),
     });
   }
 
@@ -348,20 +391,20 @@ export class TicketTypesComponent implements OnInit {
     this.eventService.deleteTicketType(t.id).subscribe({
       next: () => {
         this.tiers = this.tiers.filter((x) => x.id !== t.id);
-        this.toast.success('Deleted.');
+        this.toast.success(this.i18n.t('eventSettings.deleted'));
       },
-      error: () => this.toast.error('Delete failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.deleteFailed')),
     });
   }
 
   saleStateLabel(s: string): string {
     return (
       {
-        on_sale: 'On sale',
-        sold_out: 'Sold out',
-        scheduled: 'Scheduled',
-        ended: 'Ended',
-        inactive: 'Off',
+        on_sale: this.i18n.t('ticketTypes.onSale'),
+        sold_out: this.i18n.t('event.soldOut'),
+        scheduled: this.i18n.t('ticketTypes.scheduled'),
+        ended: this.i18n.t('ticketTypes.ended'),
+        inactive: this.i18n.t('ticketTypes.off'),
       }[s] ?? s
     );
   }

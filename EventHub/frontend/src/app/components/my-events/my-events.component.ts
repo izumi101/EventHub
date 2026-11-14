@@ -16,23 +16,30 @@ import {
   Eye,
   Copy,
 } from 'lucide-angular';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-my-events',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, LucideAngularModule, TranslocoPipe, LocalDatePipe],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
         <!-- Header -->
         <div class="flex items-center justify-between mb-7">
           <div>
-            <h1 class="text-2xl font-bold text-foreground">My Events</h1>
-            <p class="text-sm text-muted-foreground mt-1">Events you have created</p>
+            <h1 class="text-2xl font-bold text-foreground">
+              {{ 'myEvents.myEvents' | transloco }}
+            </h1>
+            <p class="text-sm text-muted-foreground mt-1">
+              {{ 'myEvents.eventsYouHaveCreated' | transloco }}
+            </p>
           </div>
           <a routerLink="/create-event" class="btn btn-primary flex items-center gap-1.5">
             <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true" />
-            Create event
+            {{ 'dashboard.createEvent' | transloco }}
           </a>
         </div>
 
@@ -40,7 +47,7 @@ import {
         @if (loading) {
           <div class="flex items-center justify-center py-20 gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading your events...</span>
+            <span class="text-sm">{{ 'myEvents.loadingYourEvents' | transloco }}</span>
           </div>
         } @else if (events.length === 0) {
           <!-- Empty -->
@@ -52,13 +59,15 @@ import {
                 aria-hidden="true"
               />
             </div>
-            <h3 class="text-base font-semibold text-foreground mb-1">No events yet</h3>
+            <h3 class="text-base font-semibold text-foreground mb-1">
+              {{ 'myEvents.noEventsYet' | transloco }}
+            </h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
-              Create your first event to start managing attendees.
+              {{ 'myEvents.createYourFirstEvent' | transloco }}
             </p>
             <a routerLink="/create-event" class="btn btn-primary btn-sm flex items-center gap-1.5">
               <lucide-icon [img]="icons.Plus" class="w-3.5 h-3.5" aria-hidden="true" />
-              Create event
+              {{ 'dashboard.createEvent' | transloco }}
             </a>
           </div>
         } @else {
@@ -93,7 +102,7 @@ import {
                   <div class="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                     <span class="flex items-center gap-1">
                       <lucide-icon [img]="icons.Calendar" class="w-3 h-3" aria-hidden="true" />
-                      {{ event.date | date: 'MMM d, y' }}
+                      {{ event.date | localDate: 'MMM d, y' }}
                     </span>
                     <span class="flex items-center gap-1 truncate">
                       <lucide-icon [img]="icons.MapPin" class="w-3 h-3" aria-hidden="true" />
@@ -107,24 +116,24 @@ import {
                   <a
                     [routerLink]="['/events', event.id]"
                     class="btn btn-ghost btn-sm p-2"
-                    title="Preview event"
-                    aria-label="Preview event"
+                    [title]="'myEvents.previewEvent' | transloco"
+                    [attr.aria-label]="'myEvents.previewEvent' | transloco"
                   >
                     <lucide-icon [img]="icons.Eye" class="w-4 h-4" aria-hidden="true" />
                   </a>
                   <a
                     [routerLink]="['/organizer/events', event.id, 'attendees']"
                     class="btn btn-ghost btn-sm p-2"
-                    title="Manage attendees"
-                    aria-label="Manage attendees"
+                    [title]="'myEvents.manageAttendees' | transloco"
+                    [attr.aria-label]="'myEvents.manageAttendees' | transloco"
                   >
                     <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
                   </a>
                   <a
                     [routerLink]="['/edit-event', event.id]"
                     class="btn btn-ghost btn-sm p-2"
-                    title="Edit event"
-                    aria-label="Edit event"
+                    [title]="'dashboard.editEvent' | transloco"
+                    [attr.aria-label]="'dashboard.editEvent' | transloco"
                   >
                     <lucide-icon [img]="icons.SquarePen" class="w-4 h-4" aria-hidden="true" />
                   </a>
@@ -132,8 +141,8 @@ import {
                     (click)="cloneEvent(event.id)"
                     [disabled]="cloningId === event.id"
                     class="btn btn-ghost btn-sm p-2"
-                    title="Duplicate event"
-                    aria-label="Duplicate event"
+                    [title]="'myEvents.duplicateEvent' | transloco"
+                    [attr.aria-label]="'myEvents.duplicateEvent' | transloco"
                   >
                     @if (cloningId === event.id) {
                       <span class="spinner spinner-sm"></span>
@@ -144,8 +153,8 @@ import {
                   <button
                     (click)="deleteEvent(event.id, event.title)"
                     class="btn btn-ghost btn-sm p-2 text-muted-foreground hover:text-destructive hover:bg-[color:var(--destructive-50)]"
-                    title="Delete event"
-                    aria-label="Delete event"
+                    [title]="'myEvents.deleteEvent' | transloco"
+                    [attr.aria-label]="'myEvents.deleteEvent' | transloco"
                   >
                     <lucide-icon [img]="icons.Trash2" class="w-4 h-4" aria-hidden="true" />
                   </button>
@@ -159,6 +168,7 @@ import {
   `,
 })
 export class MyEventsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private modalService = inject(ModalService);
   private toastService = inject(ToastService);
@@ -181,7 +191,7 @@ export class MyEventsComponent implements OnInit {
         this.loading = false;
       },
       error: () => {
-        this.toastService.error('Failed to load events.');
+        this.toastService.error(this.i18n.t('myEvents.failedToLoadEvents'));
         this.loading = false;
       },
     });
@@ -192,12 +202,12 @@ export class MyEventsComponent implements OnInit {
     this.eventService.cloneEvent(id).subscribe({
       next: () => {
         this.cloningId = null;
-        this.toastService.success('Event duplicated as a draft.');
+        this.toastService.success(this.i18n.t('myEvents.eventDuplicatedAsA'));
         this.loadEvents();
       },
       error: () => {
         this.cloningId = null;
-        this.toastService.error('Could not duplicate event.');
+        this.toastService.error(this.i18n.t('myEvents.couldNotDuplicateEvent'));
       },
     });
   }
@@ -215,19 +225,19 @@ export class MyEventsComponent implements OnInit {
 
   async deleteEvent(id: number, title: string): Promise<void> {
     const ok = await this.modalService.open({
-      title: 'Delete Event',
-      message: `Delete "${title}"? This cannot be undone and all registrations will be cancelled.`,
-      confirmText: 'Delete Event',
-      cancelText: 'Keep Event',
+      title: this.i18n.t('dashboard.deleteEvent'),
+      message: this.i18n.t('myEvents.deleteTitleThisCannot', { title: title }),
+      confirmText: this.i18n.t('dashboard.deleteEvent'),
+      cancelText: this.i18n.t('myEvents.keepEvent'),
       isDestructive: true,
     });
     if (!ok) return;
     this.eventService.deleteEvent(id).subscribe({
       next: () => {
         this.events = this.events.filter((e) => e.id !== id);
-        this.toastService.success('Event deleted.');
+        this.toastService.success(this.i18n.t('dashboard.eventDeleted'));
       },
-      error: () => this.toastService.error('Failed to delete event.'),
+      error: () => this.toastService.error(this.i18n.t('dashboard.failedToDeleteEvent')),
     });
   }
 }

@@ -1,7 +1,6 @@
-import { APIResponse, expect, Page, test } from '@playwright/test';
-import type { components } from '../src/app/api/openapi';
-
-type Schemas = components['schemas'];
+import { APIResponse, expect, test } from '@playwright/test';
+import { createAttendee, Schemas, SEEDED_TOTP_SECRET, signIn } from './support/api';
+import { collectErrors, signInWithPassword } from './support/ui';
 
 /** The JSON body of an API response, typed by the OpenAPI contract. */
 async function body<T>(response: APIResponse): Promise<T> {
@@ -10,31 +9,6 @@ async function body<T>(response: APIResponse): Promise<T> {
 
 // Demo data from `seed_data` (DJANGO_SEED_DATA=1 in .env.example).
 const PAID_ONLINE_EVENT = 'Online Django REST Workshop';
-
-async function login(page: Page, username: string, password: string) {
-  await page.goto('/login');
-  await page.fill('input[name="username"]', username);
-  await page.fill('input[name="password"]', password);
-  const [response] = await Promise.all([
-    page.waitForResponse((r) => r.url().includes('/api/v1/auth/login/')),
-    page.click('button[type="submit"]'),
-  ]);
-  expect(response.status()).toBe(200);
-}
-
-function collectErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => {
-    // CSP violations and runtime errors show up as console errors.
-    if (m.type() !== 'error') return;
-    // "No seat map for this event" is an expected 404 the checkout handles.
-    if (m.text().startsWith('Failed to load resource') && m.location().url.endsWith('/seat_map/'))
-      return;
-    errors.push(`console: ${m.text()} (${m.location().url})`);
-  });
-  return errors;
-}
 
 test('home page renders, styled, under the CSP', async ({ page }) => {
   const errors = collectErrors(page);
@@ -47,16 +21,18 @@ test('home page renders, styled, under the CSP', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-test('attendee buys a paid ticket and gets the online link', async ({ page }) => {
+test('attendee buys a paid ticket and gets the online link', async ({ page, request }) => {
   const errors = collectErrors(page);
-  await login(page, 'attendee', 'password123');
+  // A new attendee each run, so the spec can run again on the same stack.
+  const { account } = await createAttendee(request);
+  await signInWithPassword(page, account.username, account.password);
 
   await page.goto('/');
   await page.getByText(PAID_ONLINE_EVENT).first().click();
   await page.getByRole('button', { name: /Get tickets/ }).click();
   await page.getByRole('button', { name: /Proceed to payment/ }).click();
 
-  // Mock payments (DEBUG + STRIPE_MOCK_MODE=1) confirm on the server first.
+  // Mock payments (DEBUG + PAYMENTS_MOCK_MODE=1) confirm on the server first.
   await expect(page.getByText('Payment confirmed')).toBeVisible();
 
   await page.goto('/my-registrations');
@@ -86,18 +62,21 @@ test('seat map updates arrive over the WebSocket through nginx', async ({ page }
   );
   const id = events.results[0].id;
 
-  // The demo data has no seat maps: the organizer creates one (400 if it exists).
-  const org = await body<Schemas['AuthPayload']>(
-    await page.request.post('/api/v1/auth/login/', {
-      data: { username: 'organizer', password: 'password123' },
-    }),
-  );
+  // The demo data has no seat maps: the organizer creates one (400 if it
+  // exists). The seeded organizer must use 2FA: the stack is seeded with the
+  // TOTP secret in E2E_MFA_TOTP_SECRET (DJANGO_SEED_MFA_TOTP_SECRET).
+  const org = await signIn(page.request, {
+    username: 'organizer',
+    email: '',
+    password: 'password123',
+    totpSecret: SEEDED_TOTP_SECRET,
+  });
   await page.request.post(`/api/v1/events/${id}/seat-map/create/`, {
     data: { rows: 2, cols: 4, sync_capacity: false },
-    headers: { Authorization: `Bearer ${org.tokens.access}` },
+    headers: { Authorization: `Bearer ${org.access}` },
   });
 
-  await login(page, 'attendee', 'password123');
+  await signInWithPassword(page, 'attendee', 'password123');
 
   const snapshot = page
     .waitForEvent('websocket', (ws) => ws.url().includes(`/ws/seats/${id}/`))

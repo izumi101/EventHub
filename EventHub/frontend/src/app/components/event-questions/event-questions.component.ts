@@ -7,60 +7,65 @@ import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-event-questions',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [CommonModule, FormsModule, RouterModule, LucideAngularModule, TranslocoPipe],
   template: `
     <div class="page-root">
       <div class="container max-w-3xl py-8">
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
-            >Dashboard</a
-          >
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">{{
+            'nav.dashboard' | transloco
+          }}</a>
           <span>/</span>
           @if (eventId) {
             <a
               [routerLink]="['/organizer/events', eventId, 'attendees']"
               class="hover:text-foreground transition-colors truncate max-w-[180px]"
-              >{{ event?.title || 'Event' }}</a
+              >{{ event?.title || ('nav.event' | transloco) }}</a
             >
           }
           <span>/</span>
-          <span class="text-foreground font-medium">Questions</span>
+          <span class="text-foreground font-medium">{{ 'nav.questions' | transloco }}</span>
         </nav>
 
         <div class="flex items-center justify-between mb-2">
           <h1 class="text-2xl font-bold text-foreground flex items-center gap-2">
             <lucide-icon [img]="icons.MessageSquare" class="w-6 h-6 text-primary" />
-            Checkout questions
+            {{ 'questions.checkoutQuestions' | transloco }}
           </h1>
           <button
             (click)="showForm = !showForm"
             class="btn btn-primary btn-sm flex items-center gap-1.5"
           >
-            <lucide-icon [img]="icons.Plus" class="w-4 h-4" /> Add question
+            <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
+            {{ 'questions.addQuestion' | transloco }}
           </button>
         </div>
         <p class="text-sm text-muted-foreground mb-6">
-          Ask attendees for extra info when they register for {{ event?.title }}.
+          {{ 'questions.askAttendeesForExtra' | transloco: { title: event?.title } }}
         </p>
 
         @if (showForm) {
           <div class="card p-5 mb-6 animate-slide-up">
-            <h2 class="font-semibold text-foreground mb-4">New question</h2>
+            <h2 class="font-semibold text-foreground mb-4">
+              {{ 'questions.newQuestion' | transloco }}
+            </h2>
             <div class="space-y-4">
               <div>
                 <label
                   for="event-questions-label"
                   class="block text-sm font-medium text-foreground mb-1.5"
-                  >Question</label
+                  >{{ 'questions.question' | transloco }}</label
                 >
                 <input
                   id="event-questions-label"
                   [(ngModel)]="form.label"
-                  placeholder="e.g. What's your t-shirt size?"
+                  [placeholder]="'questions.eGWhatS' | transloco"
                   class="input w-full"
                 />
               </div>
@@ -69,19 +74,19 @@ import { apiErrorMessage } from '../../api/api-error';
                   <label
                     for="event-questions-question-type"
                     class="block text-sm font-medium text-foreground mb-1.5"
-                    >Type</label
+                    >{{ 'promo.type' | transloco }}</label
                   >
                   <select
                     id="event-questions-question-type"
                     [(ngModel)]="form.question_type"
                     class="input w-full"
                   >
-                    <option value="text">Short text</option>
-                    <option value="textarea">Long text</option>
-                    <option value="dropdown">Dropdown</option>
-                    <option value="checkbox">Checkbox (yes/no)</option>
-                    <option value="date">Date</option>
-                    <option value="phone">Phone</option>
+                    <option value="text">{{ 'questions.shortText' | transloco }}</option>
+                    <option value="textarea">{{ 'questions.longText' | transloco }}</option>
+                    <option value="dropdown">{{ 'questions.dropdown' | transloco }}</option>
+                    <option value="checkbox">{{ 'questions.checkboxYesNo' | transloco }}</option>
+                    <option value="date">{{ 'common.date' | transloco }}</option>
+                    <option value="phone">{{ 'common.phone' | transloco }}</option>
                   </select>
                 </div>
                 <div class="flex items-end">
@@ -89,7 +94,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     class="flex items-center gap-2 text-sm text-foreground cursor-pointer pb-2"
                   >
                     <input type="checkbox" [(ngModel)]="form.is_required" class="w-4 h-4 rounded" />
-                    Required
+                    {{ 'common.required' | transloco }}
                   </label>
                 </div>
               </div>
@@ -98,26 +103,28 @@ import { apiErrorMessage } from '../../api/api-error';
                   <label
                     for="event-questions-options-text"
                     class="block text-sm font-medium text-foreground mb-1.5"
-                    >Options (one per line)</label
+                    >{{ 'questions.optionsOnePerLine' | transloco }}</label
                   >
                   <textarea
                     id="event-questions-options-text"
                     [(ngModel)]="optionsText"
                     rows="3"
-                    placeholder="Small&#10;Medium&#10;Large"
+                    [placeholder]="'questions.smallMediumLarge' | transloco"
                     class="input resize-none w-full"
                   ></textarea>
                 </div>
               }
             </div>
             <div class="flex gap-2 mt-4">
-              <button (click)="showForm = false" class="btn btn-secondary flex-1">Cancel</button>
+              <button (click)="showForm = false" class="btn btn-secondary flex-1">
+                {{ 'common.cancel' | transloco }}
+              </button>
               <button
                 (click)="create()"
                 [disabled]="!form.label.trim() || saving"
                 class="btn btn-primary flex-1"
               >
-                {{ saving ? 'Adding…' : 'Add question' }}
+                {{ (saving ? 'questions.adding' : 'questions.addQuestion') | transloco }}
               </button>
             </div>
           </div>
@@ -130,8 +137,12 @@ import { apiErrorMessage } from '../../api/api-error';
             <div class="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4">
               <lucide-icon [img]="icons.MessageSquare" class="w-7 h-7 text-muted-foreground/50" />
             </div>
-            <h3 class="font-semibold text-foreground mb-1">No questions yet</h3>
-            <p class="text-sm text-muted-foreground">Add questions to collect info at checkout.</p>
+            <h3 class="font-semibold text-foreground mb-1">
+              {{ 'questions.noQuestionsYet' | transloco }}
+            </h3>
+            <p class="text-sm text-muted-foreground">
+              {{ 'questions.addQuestionsToCollect' | transloco }}
+            </p>
           </div>
         } @else {
           <div class="space-y-2">
@@ -147,7 +158,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     @if (q.is_required) {
                       <span
                         class="text-[10px] font-bold uppercase text-ember bg-[color:var(--destructive-50)] px-1.5 py-0.5 rounded"
-                        >Required</span
+                        >{{ 'common.required' | transloco }}</span
                       >
                     }
                   </div>
@@ -173,6 +184,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class EventQuestionsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private eventService = inject(EventService);
   private toast = inject(ToastService);
@@ -208,7 +220,7 @@ export class EventQuestionsComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
-        this.toast.error('Failed to load questions.');
+        this.toast.error(this.i18n.t('questions.failedToLoadQuestions'));
       },
     });
   }
@@ -230,7 +242,7 @@ export class EventQuestionsComponent implements OnInit {
     }
     this.eventService.createQuestion(this.eventId, payload).subscribe({
       next: () => {
-        this.toast.success('Question added.');
+        this.toast.success(this.i18n.t('questions.questionAdded'));
         this.saving = false;
         this.showForm = false;
         this.form = { label: '', question_type: 'text', is_required: false };
@@ -239,7 +251,9 @@ export class EventQuestionsComponent implements OnInit {
       },
       error: (err) => {
         this.saving = false;
-        this.toast.error(apiErrorMessage(err, 'Could not add question.', 'options'));
+        this.toast.error(
+          apiErrorMessage(err, this.i18n.t('questions.couldNotAddQuestion'), 'options'),
+        );
       },
     });
   }
@@ -248,9 +262,9 @@ export class EventQuestionsComponent implements OnInit {
     this.eventService.deleteQuestion(q.id).subscribe({
       next: () => {
         this.questions = this.questions.filter((x) => x.id !== q.id);
-        this.toast.success('Deleted.');
+        this.toast.success(this.i18n.t('eventSettings.deleted'));
       },
-      error: () => this.toast.error('Delete failed.'),
+      error: () => this.toast.error(this.i18n.t('eventSettings.deleteFailed')),
     });
   }
 }

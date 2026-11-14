@@ -5,7 +5,6 @@ from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import F
-from rest_framework_simplejwt.tokens import RefreshToken
 
 from common.auth import (
     email_in_use,
@@ -65,16 +64,17 @@ def _code_matches(model, entry, code) -> bool:
     return False
 
 
-def build_auth_payload(user):
-    refresh = RefreshToken.for_user(user)
+def build_auth_payload(user, tokens=None):
+    """{user, tokens}. Without `tokens` a password-only pair is issued — the
+    login view only does that for users who neither have nor need 2FA
+    (mfa.services.login_response)."""
+    from mfa.tokens import issue_jwt_pair
+
     from .serializers import UserSerializer
 
     return {
         'user': UserSerializer(user).data,
-        'tokens': {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-        },
+        'tokens': tokens or issue_jwt_pair(user),
     }
 
 
@@ -185,7 +185,9 @@ def login_user(identifier: str, password: str):
 @transaction.atomic
 def request_password_reset(identifier: str):
     user = get_user_by_identifier(identifier)
-    if not user:
+    # No address, no code: the email job would only fail (and be retried)
+    # for a recipient that does not exist. The answer stays the same.
+    if not user or not user.email:
         return None
 
     reset_code = PasswordResetCode.create_for_user(user)
@@ -241,9 +243,13 @@ def confirm_password_reset(reset_token: str, new_password: str, new_password2: s
 
 
 @transaction.atomic
-def change_password(user, old_password: str, new_password: str, new_password2: str):
+def change_password(user, old_password: str, new_password: str, new_password2: str, current_token=None):
     """Returns a fresh token pair for the current device; every other session
-    (all previously issued refresh tokens) is signed out."""
+    (all previously issued refresh tokens) is signed out. The second-factor
+    claims of `current_token` (amr, mfa_at) carry over unchanged."""
+    from mfa.policy import token_mfa_at
+    from mfa.tokens import issue_jwt_pair
+
     if not user.check_password(old_password):
         raise ValueError('Current password is incorrect.')
     if new_password != new_password2:
@@ -254,5 +260,6 @@ def change_password(user, old_password: str, new_password: str, new_password2: s
     user.set_password(new_password)
     user.save(update_fields=['password'])
     revoke_all_refresh_tokens(user)
-    refresh = RefreshToken.for_user(user)
-    return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+    mfa_at = token_mfa_at(current_token)
+    amr = current_token.get('amr') if mfa_at is not None else None
+    return issue_jwt_pair(user, amr=amr, mfa_at=mfa_at)
