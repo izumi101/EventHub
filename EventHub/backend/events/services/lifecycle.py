@@ -3,6 +3,7 @@
 import logging
 
 from django.db import transaction
+from django.utils.translation import gettext_lazy as _
 
 from common.choices import EventStatusChoices
 
@@ -15,10 +16,44 @@ def create_event(*, organizer, validated_data):
     return Event.objects.create(organizer=organizer, **validated_data)
 
 
+# Changes ticket holders are told about: (field, label shown to them).
+NOTIFIED_CHANGES = (
+    ('date', _('Date')),
+    ('end_date', _('End')),
+    ('location', _('Venue')),
+    ('address', _('Address')),
+    ('is_online', _('Online')),
+    ('online_link', _('Online link')),
+)
+
+
+def _display(field, value):
+    from notifications.messages import format_datetime
+
+    if field in ('date', 'end_date'):
+        return format_datetime(value)
+    if field == 'is_online':
+        return str(_('Yes') if value else _('No'))
+    return value or ''
+
+
+@transaction.atomic
 def update_event(*, event: Event, validated_data):
+    before = {field: getattr(event, field) for field, _label in NOTIFIED_CHANGES}
     for attr, value in validated_data.items():
         setattr(event, attr, value)
     event.save()
+
+    changes = [
+        (str(label), _display(field, before[field]), _display(field, getattr(event, field)))
+        for field, label in NOTIFIED_CHANGES
+        if getattr(event, field) != before[field]
+    ]
+    if changes and event.status == EventStatusChoices.PUBLISHED:
+        from notifications import types
+        from notifications.service import notify_many, ticket_holders
+
+        notify_many(ticket_holders(event), types.EVENT_UPDATED, event=event, changes=changes)
     return event
 
 
@@ -173,9 +208,10 @@ def cancel_event(*, event: Event, actor):
     that was already returned — and the attendee is told the truth.
     """
     from common.permissions import can_manage_event
+    from notifications import types
+    from notifications.service import notify
     from payments.services import refund_payment
 
-    from ..notify import notify
     from .registration import cancel_registration
 
     if not can_manage_event(event, actor):
@@ -211,51 +247,63 @@ def cancel_event(*, event: Event, actor):
             outcome[reg.id] = 'failed'
             logger.exception('Refund failed for registration %s while cancelling event %s', reg.id, event.id)
 
-    bookings_refunded, bookings_failed = _cancel_group_bookings(event, actor)
+    booking_outcome = _cancel_group_bookings(event, actor)
+    bookings_refunded = sum(1 for state, _users in booking_outcome if state == 'refunded')
+    bookings_failed = sum(1 for state, _users in booking_outcome if state == 'failed')
 
+    # One notice per ticket holder, with the worst refund outcome of their
+    # tickets: a failed refund must not be hidden behind a successful one.
+    rank = {'failed': 2, 'refunded': 1, 'voided': 0}
+    recipients = {}
     for reg in regs:
-        state = outcome.get(reg.id)
-        if state == 'refunded':
-            extra = ' Your payment has been refunded.'
-        elif state == 'failed':
-            extra = ' We could not refund your payment automatically — the organizer will contact you.'
-        else:
-            extra = ''
-        notify(
-            reg.user,
-            'event_cancelled',
-            f'❌ Event cancelled: {event.title}',
-            'The organizer has cancelled this event.' + extra,
-            event=event,
-        )
+        recipients.setdefault(reg.user_id, [reg.user, 'voided'])
+        state = outcome.get(reg.id, 'voided')
+        if rank[state] > rank[recipients[reg.user_id][1]]:
+            recipients[reg.user_id][1] = state
+    for state, users in booking_outcome:
+        for index, user in enumerate(users):
+            # The owner paid; friends who claimed a seat were not charged.
+            user_state = state if index == 0 else 'voided'
+            recipients.setdefault(user.pk, [user, 'voided'])
+            if rank[user_state] > rank[recipients[user.pk][1]]:
+                recipients[user.pk][1] = user_state
+    for user, state in recipients.values():
+        notify(user, types.EVENT_CANCELLED, event=event, refund=state)
 
     return {
-        'notified': len(regs),
+        'notified': len(recipients),
         'refunded': refunded + bookings_refunded,
         'refund_failed': failed + bookings_failed,
     }
 
 
 def _cancel_group_bookings(event, actor):
+    """Refund paid group bookings and release held ones. Returns one
+    (state, [owner, *friends who claimed a seat]) per booking, state being
+    'refunded', 'voided' or 'failed'."""
     from bookings.models import Booking
     from bookings.services import cancel_booking, refund_booking
 
-    refunded, failed = 0, 0
+    outcome = []
     for booking in Booking.objects.filter(
         event=event,
         status__in=[Booking.Status.HOLDING, Booking.Status.CONFIRMED],
-    ):
+    ).select_related('owner'):
+        holders = [booking.owner]
+        holders += [bs.claimed_by for bs in booking.seats.select_related('claimed_by') if bs.claimed_by_id]
         try:
             with transaction.atomic():
                 if booking.status == Booking.Status.CONFIRMED:
-                    # Notifies the owner and fires the refund webhook.
+                    # Fires the refund webhook; the cancellation notice
+                    # below tells the owner about the refund.
                     refund_booking(
                         booking, actor=actor, reason='Event cancelled by the organizer', event_cancelled=True
                     )
-                    refunded += 1
+                    outcome.append(('refunded', holders))
                 else:
                     cancel_booking(booking)
+                    outcome.append(('voided', holders))
         except Exception:
-            failed += 1
+            outcome.append(('failed', holders))
             logger.exception('Could not cancel group booking %s for event %s', booking.pk, event.id)
-    return refunded, failed
+    return outcome

@@ -19,6 +19,8 @@ def health_check(request):
 
 
 api_patterns = [
+    # Before auth/: a separate app, so the accounts URLconf stays untouched.
+    path('auth/profile/notifications/', include('notifications.urls')),
     path('auth/', include('accounts.urls')),
     path('', include('events.urls')),
     path('payments/', include('payments.urls')),

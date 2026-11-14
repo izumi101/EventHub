@@ -115,6 +115,15 @@ import { apiErrorMessage } from '../../api/api-error';
             <a routerLink="/profile/security" class="btn btn-sm btn-secondary">Manage</a>
           </div>
 
+          <!-- Notifications -->
+          <div class="card p-5 mb-4 flex items-center justify-between gap-4 flex-wrap">
+            <div>
+              <h2 class="text-sm font-semibold text-foreground">Notifications</h2>
+              <p class="text-xs text-muted-foreground mt-0.5">Choose which emails you receive.</p>
+            </div>
+            <a routerLink="/profile/notifications" class="btn btn-sm btn-secondary">Manage</a>
+          </div>
+
           <!-- Form -->
           <form (ngSubmit)="onSubmit()" novalidate>
             <div class="card divide-y divide-border">

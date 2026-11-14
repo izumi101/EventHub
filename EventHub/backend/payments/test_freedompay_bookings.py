@@ -197,7 +197,7 @@ class FreedomPayBookingTests(BookingFixtures, APITestCase):
         self.assertEqual(self.seats_available(), [False, False])
         event = PaymentEvent.objects.get()
         self.assertEqual((event.outcome, event.payment), ('processed', payment))
-        self.assertEqual(Notification.objects.filter(user=self.buyer, type='ticket_purchased').count(), 1)
+        self.assertEqual(Notification.objects.filter(user=self.buyer, type='group_booking_confirmed').count(), 1)
         self.assertFalse(Refund.objects.exists())
 
     def test_a_bad_signature_changes_nothing(self):
@@ -231,7 +231,7 @@ class FreedomPayBookingTests(BookingFixtures, APITestCase):
         self.assertEqual(reply['pg_status'], 'ok')
         self.assertEqual(PaymentEvent.objects.count(), 1)
         self.assertEqual(self.gateway.scripts().count('get_status3.php'), 1)
-        self.assertEqual(Notification.objects.filter(user=self.buyer, type='ticket_purchased').count(), 1)
+        self.assertEqual(Notification.objects.filter(user=self.buyer, type='group_booking_confirmed').count(), 1)
         self.assertFalse(Refund.objects.exists())
 
     def test_a_payment_after_the_hold_expired_is_refunded_and_not_confirmed(self):
@@ -256,7 +256,7 @@ class FreedomPayBookingTests(BookingFixtures, APITestCase):
         self.assertEqual(self.gateway.payments[pid]['refunded'], Decimal('10000'))
         self.assertEqual(PaymentEvent.objects.get().outcome, 'late_payment')
         self.assertTrue(Notification.objects.filter(user=self.buyer, type='payment_failed').exists())
-        self.assertFalse(Notification.objects.filter(user=self.buyer, type='ticket_purchased').exists())
+        self.assertFalse(Notification.objects.filter(user=self.buyer, type='group_booking_confirmed').exists())
 
     def test_a_payment_for_a_cancelled_hold_is_refunded(self):
         payment, pid = self.opened()

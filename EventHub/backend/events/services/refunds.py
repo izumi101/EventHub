@@ -45,16 +45,18 @@ def request_refund(*, user, event: Event, reason: str = ''):
     else:
         req = RefundRequest.objects.create(registration=registration, reason=reason)
 
-    # Notify the organizer in-app (notify() never raises; it logs its own failures).
-    from ..notify import notify
+    # Tell the organizer (notify() never raises; it logs its own failures).
+    from notifications import types
+    from notifications.service import notify
 
     notify(
         event.organizer,
-        'event_updated',
-        f'💸 Refund requested: {event.title}',
-        f'{user.username} requested a refund of {payment.net_amount} {event.currency}.'
-        + (f' Reason: {reason}' if reason else ''),
+        types.REFUND_REQUESTED,
         event=event,
+        attendee=user.username,
+        amount=payment.net_amount,
+        currency=payment.currency or event.currency,
+        reason=reason,
     )
 
     return req
@@ -66,6 +68,8 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
     from django.utils import timezone as _tz
 
     from common.permissions import can_manage_event
+    from notifications import types
+    from notifications.service import notify
 
     from ..models import RefundRequest
 
@@ -93,22 +97,18 @@ def resolve_refund_request(*, refund_request, actor, approve: bool, note: str = 
                 notify_user=False,
             )
         refund_request.status = RefundRequest.STATUS_APPROVED
-        notify_type, title = 'ticket_purchased', f'✅ Refund approved: {event.title}'
-        body = 'Your refund has been approved and processed.'
+        notify_type = types.REFUND_APPROVED
     else:
         # Rejection means "no refund" — the attendee keeps their paid ticket,
         # so the registration stays confirmed.
         refund_request.status = RefundRequest.STATUS_REJECTED
-        notify_type, title = 'payment_failed', f'❌ Refund rejected: {event.title}'
-        body = 'Your refund request was declined — your ticket remains valid.'
+        notify_type = types.REFUND_REJECTED
 
     refund_request.organizer_note = note
     refund_request.resolved_at = _tz.now()
     refund_request.save(update_fields=['status', 'organizer_note', 'resolved_at'])
 
     # notify() never raises: it logs its own failures.
-    from ..notify import notify
-
-    notify(registration.user, notify_type, title, body + (f' Note: {note}' if note else ''), event=event)
+    notify(registration.user, notify_type, event=event, note=note)
 
     return refund_request

@@ -72,6 +72,15 @@ export const routes: Routes = [
     title: 'EventHub — Security',
   },
   {
+    path: 'profile/notifications',
+    loadComponent: () =>
+      import('./components/notification-preferences/notification-preferences.component').then(
+        (m) => m.NotificationPreferencesComponent,
+      ),
+    canActivate: [authGuard],
+    title: 'EventHub — Notification Settings',
+  },
+  {
     path: 'favorites',
     loadComponent: () =>
       import('./components/favorites/favorites.component').then((m) => m.FavoritesComponent),

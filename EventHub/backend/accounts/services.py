@@ -185,7 +185,9 @@ def login_user(identifier: str, password: str):
 @transaction.atomic
 def request_password_reset(identifier: str):
     user = get_user_by_identifier(identifier)
-    if not user:
+    # No address, no code: the email job would only fail (and be retried)
+    # for a recipient that does not exist. The answer stays the same.
+    if not user or not user.email:
         return None
 
     reset_code = PasswordResetCode.create_for_user(user)

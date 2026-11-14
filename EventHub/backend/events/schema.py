@@ -120,7 +120,7 @@ class BroadcastResultSerializer(serializers.Serializer):
     recipients = serializers.IntegerField()
     notified = serializers.IntegerField()
     emailed = serializers.IntegerField()
-    email_enabled = serializers.BooleanField(help_text='False when SMTP is not configured.')
+    email_enabled = serializers.BooleanField(help_text='True when at least one email was queued.')
 
 
 # ---- Buying ---- #
