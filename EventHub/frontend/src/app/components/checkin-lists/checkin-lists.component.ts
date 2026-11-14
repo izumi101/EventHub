@@ -22,63 +22,77 @@ import {
   X,
 } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-checkin-lists',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    RouterModule,
+    FormsModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-5xl py-8">
         <!-- Breadcrumb -->
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
-            >Dashboard</a
-          >
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">{{
+            'nav.dashboard' | transloco
+          }}</a>
           <span>/</span>
           <a
             [routerLink]="['/organizer/events', eventId, 'attendees']"
             class="hover:text-foreground transition-colors"
-            >Attendees</a
+            >{{ 'nav.attendees' | transloco }}</a
           >
           <span>/</span>
-          <span class="text-foreground font-medium">Check-in Lists</span>
+          <span class="text-foreground font-medium">{{ 'checkin.checkInLists' | transloco }}</span>
         </nav>
 
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 class="text-2xl font-bold text-foreground">Check-in Lists</h1>
+            <h1 class="text-2xl font-bold text-foreground">
+              {{ 'checkin.checkInLists' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground mt-1">
-              Create named entrances and track who scans each gate
+              {{ 'checkin.createNamedEntrancesAnd' | transloco }}
             </p>
           </div>
           <button (click)="showCreateForm = true" class="btn btn-primary flex items-center gap-2">
             <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
-            New list
+            {{ 'checkin.newList' | transloco }}
           </button>
         </div>
 
         <!-- Create list form -->
         @if (showCreateForm) {
           <div class="card p-4 mb-6 border-primary/30 bg-primary/5 animate-fade-in">
-            <h3 class="text-sm font-semibold text-foreground mb-3">New check-in list</h3>
+            <h3 class="text-sm font-semibold text-foreground mb-3">
+              {{ 'checkin.newCheckInList' | transloco }}
+            </h3>
             <div class="flex flex-wrap gap-3">
               <input
                 [(ngModel)]="newName"
-                placeholder="e.g. General Entrance"
+                [placeholder]="'checkin.eGGeneralEntrance' | transloco"
                 class="input flex-1 min-w-40"
                 maxlength="120"
               />
               <input
                 [(ngModel)]="newDescription"
-                placeholder="Description (optional)"
+                [placeholder]="'checkin.descriptionOptional' | transloco"
                 class="input flex-1 min-w-40"
                 maxlength="300"
               />
               <div class="flex items-center gap-2">
-                <label for="checkin-lists-new-color" class="text-xs text-muted-foreground"
-                  >Color</label
-                >
+                <label for="checkin-lists-new-color" class="text-xs text-muted-foreground">{{
+                  'checkin.color' | transloco
+                }}</label>
                 <input
                   id="checkin-lists-new-color"
                   type="color"
@@ -91,9 +105,11 @@ import { apiErrorMessage } from '../../api/api-error';
                 [disabled]="creating || !newName.trim()"
                 class="btn btn-primary"
               >
-                {{ creating ? 'Creating…' : 'Create' }}
+                {{ (creating ? 'checkin.creating' : 'common.create') | transloco }}
               </button>
-              <button (click)="showCreateForm = false" class="btn btn-secondary">Cancel</button>
+              <button (click)="showCreateForm = false" class="btn btn-secondary">
+                {{ 'common.cancel' | transloco }}
+              </button>
             </div>
           </div>
         }
@@ -101,7 +117,7 @@ import { apiErrorMessage } from '../../api/api-error';
         @if (loading) {
           <div class="flex items-center justify-center py-20 gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading lists…</span>
+            <span class="text-sm">{{ 'checkin.loadingLists' | transloco }}</span>
           </div>
         } @else if (lists.length === 0) {
           <div class="card p-12 flex flex-col items-center text-center">
@@ -109,13 +125,15 @@ import { apiErrorMessage } from '../../api/api-error';
               [img]="icons.ClipboardList"
               class="w-10 h-10 text-muted-foreground/30 mb-4"
             />
-            <p class="text-foreground font-semibold mb-1">No check-in lists yet</p>
+            <p class="text-foreground font-semibold mb-1">
+              {{ 'checkin.noCheckInLists' | transloco }}
+            </p>
             <p class="text-sm text-muted-foreground mb-4">
-              Create your first list to start scanning tickets by entrance.
+              {{ 'checkin.createYourFirstList' | transloco }}
             </p>
             <button (click)="showCreateForm = true" class="btn btn-primary">
               <lucide-icon [img]="icons.Plus" class="w-4 h-4 mr-1.5" />
-              Create a list
+              {{ 'checkin.createAList' | transloco }}
             </button>
           </div>
         } @else {
@@ -153,13 +171,17 @@ import { apiErrorMessage } from '../../api/api-error';
                           @if (list.is_default) {
                             <span
                               class="ml-1.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-semibold uppercase"
-                              >Default</span
+                              >{{ 'checkin.default' | transloco }}</span
                             >
                           }
                         </p>
                       }
                       <p class="text-xs text-muted-foreground mt-0.5">
-                        {{ list.checked_in_count }} checked in · {{ list.log_count }} scans
+                        {{
+                          'checkin.checkedincountCheckedInLogcount'
+                            | transloco
+                              : { checkedInCount: list.checked_in_count, logCount: list.log_count }
+                        }}
                       </p>
                     </div>
                     <!-- Keeps clicks on the row actions from also selecting the list. -->
@@ -185,7 +207,7 @@ import { apiErrorMessage } from '../../api/api-error';
                         <button
                           (click)="startEdit(list)"
                           class="p-1 text-muted-foreground hover:text-foreground"
-                          title="Rename"
+                          [title]="'checkin.rename' | transloco"
                         >
                           <lucide-icon [img]="icons.Pencil" class="w-3.5 h-3.5" />
                         </button>
@@ -193,14 +215,14 @@ import { apiErrorMessage } from '../../api/api-error';
                           <button
                             (click)="setDefault(list)"
                             class="p-1 text-muted-foreground hover:text-primary"
-                            title="Set as default"
+                            [title]="'checkin.setAsDefault' | transloco"
                           >
                             <lucide-icon [img]="icons.Check" class="w-3.5 h-3.5" />
                           </button>
                           <button
                             (click)="deleteList(list)"
                             class="p-1 text-muted-foreground hover:text-[color:var(--destructive)]"
-                            title="Delete"
+                            [title]="'common.delete' | transloco"
                           >
                             <lucide-icon [img]="icons.Trash2" class="w-3.5 h-3.5" />
                           </button>
@@ -216,21 +238,24 @@ import { apiErrorMessage } from '../../api/api-error';
                 <div class="flex items-center justify-between mb-3">
                   <h3 class="text-sm font-semibold text-foreground flex items-center gap-2">
                     <lucide-icon [img]="icons.Clock" class="w-4 h-4 text-muted-foreground" />
-                    Scan log
+                    {{ 'checkin.scanLog' | transloco }}
                   </h3>
                   <button
                     (click)="loadLogs()"
                     class="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1"
                   >
-                    <lucide-icon [img]="icons.RefreshCw" class="w-3 h-3" /> Refresh
+                    <lucide-icon [img]="icons.RefreshCw" class="w-3 h-3" />
+                    {{ 'common.refresh' | transloco }}
                   </button>
                 </div>
                 @if (logsLoading) {
                   <div class="flex items-center gap-2 text-muted-foreground text-xs">
-                    <span class="spinner spinner-sm"></span> Loading…
+                    <span class="spinner spinner-sm"></span> {{ 'common.loading' | transloco }}
                   </div>
                 } @else if (logs.length === 0) {
-                  <p class="text-xs text-muted-foreground">No scans yet.</p>
+                  <p class="text-xs text-muted-foreground">
+                    {{ 'checkin.noScansYet' | transloco }}
+                  </p>
                 } @else {
                   <div class="space-y-2 max-h-64 overflow-y-auto">
                     @for (log of logs; track log.id) {
@@ -246,11 +271,14 @@ import { apiErrorMessage } from '../../api/api-error';
                             log.attendee.full_name
                           }}</span>
                           <span class="text-muted-foreground">
-                            · {{ log.created_at | date: 'HH:mm' }}</span
+                            · {{ log.created_at | localDate: 'HH:mm' }}</span
                           >
                           @if (log.scanned_by_username) {
                             <span class="text-muted-foreground">
-                              by {{ log.scanned_by_username }}</span
+                              {{
+                                'checkin.byScannedbyusername'
+                                  | transloco: { scannedByUsername: log.scanned_by_username }
+                              }}</span
                             >
                           }
                         </div>
@@ -270,7 +298,7 @@ import { apiErrorMessage } from '../../api/api-error';
                     class="w-8 h-8 text-muted-foreground/30 mb-3"
                   />
                   <p class="text-sm text-muted-foreground">
-                    Select a list on the left to see attendees
+                    {{ 'checkin.selectAListOn' | transloco }}
                   </p>
                 </div>
               } @else {
@@ -284,7 +312,11 @@ import { apiErrorMessage } from '../../api/api-error';
                       <h2 class="font-semibold text-foreground">{{ selectedList.name }}</h2>
                     </div>
                     <div class="flex items-center gap-3 text-sm text-muted-foreground">
-                      <span>{{ checkedInCount }} / {{ attendees.length }} checked in</span>
+                      <span>{{
+                        'checkin.checkedincountAttendeeslengthCheckedIn'
+                          | transloco
+                            : { checkedInCount: checkedInCount, attendeesLength: attendees.length }
+                      }}</span>
                       <button (click)="loadAttendees()" class="hover:text-foreground">
                         <lucide-icon [img]="icons.RefreshCw" class="w-4 h-4" />
                       </button>
@@ -296,13 +328,13 @@ import { apiErrorMessage } from '../../api/api-error';
                     <label
                       for="checkin-lists-scan-uuid"
                       class="text-xs font-medium text-muted-foreground mb-1.5 block"
-                      >Quick scan by ticket UUID</label
+                      >{{ 'checkin.quickScanByTicket' | transloco }}</label
                     >
                     <div class="flex gap-2">
                       <input
                         id="checkin-lists-scan-uuid"
                         [(ngModel)]="scanUuid"
-                        placeholder="Paste ticket UUID…"
+                        [placeholder]="'checkin.pasteTicketUuid' | transloco"
                         class="input flex-1 text-sm"
                         (keydown.enter)="quickScan()"
                       />
@@ -320,12 +352,12 @@ import { apiErrorMessage } from '../../api/api-error';
                   @if (attendeesLoading) {
                     <div class="flex items-center justify-center py-12 gap-3 text-muted-foreground">
                       <span class="spinner"></span>
-                      <span class="text-sm">Loading attendees…</span>
+                      <span class="text-sm">{{ 'checkin.loadingAttendees' | transloco }}</span>
                     </div>
                   } @else if (attendees.length === 0) {
                     <div class="flex flex-col items-center py-12 text-muted-foreground">
                       <lucide-icon [img]="icons.Users" class="w-8 h-8 mb-3 opacity-30" />
-                      <p class="text-sm">No attendees yet</p>
+                      <p class="text-sm">{{ 'checkin.noAttendeesYet' | transloco }}</p>
                     </div>
                   } @else {
                     <div class="divide-y divide-border max-h-[520px] overflow-y-auto">
@@ -346,9 +378,15 @@ import { apiErrorMessage } from '../../api/api-error';
                             <p class="text-xs text-muted-foreground truncate">{{ att.email }}</p>
                             @if (att.is_checked_in && att.checked_in_at) {
                               <p class="text-xs text-[color:var(--pine-600)]">
-                                Checked in {{ att.checked_in_at | date: 'HH:mm' }}
+                                {{
+                                  'checkin.checkedInCheckedinat'
+                                    | transloco
+                                      : { checkedInAt: (att.checked_in_at | localDate: 'HH:mm') }
+                                }}
                                 @if (att.scanned_by) {
-                                  · by {{ att.scanned_by }}
+                                  {{
+                                    'checkin.byScannedby' | transloco: { scannedBy: att.scanned_by }
+                                  }}
                                 }
                               </p>
                             }
@@ -363,7 +401,7 @@ import { apiErrorMessage } from '../../api/api-error';
                                 (click)="undoCheckIn(att)"
                                 class="btn btn-secondary btn-sm text-xs"
                               >
-                                Undo
+                                {{ 'checkin.undo' | transloco }}
                               </button>
                             } @else {
                               <lucide-icon
@@ -374,7 +412,7 @@ import { apiErrorMessage } from '../../api/api-error';
                                 (click)="doCheckIn(att)"
                                 class="btn btn-primary btn-sm text-xs"
                               >
-                                Check in
+                                {{ 'checkin.checkIn' | transloco }}
                               </button>
                             }
                           </div>
@@ -392,6 +430,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class CheckinListsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private eventService = inject(EventService);
   private toastService = inject(ToastService);
@@ -462,7 +501,7 @@ export class CheckinListsComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
-        this.toastService.error('Failed to load lists.');
+        this.toastService.error(this.i18n.t('checkin.failedToLoadLists'));
       },
     });
   }
@@ -503,7 +542,7 @@ export class CheckinListsComponent implements OnInit {
       },
       error: () => {
         this.attendeesLoading = false;
-        this.toastService.error('Failed to load attendees.');
+        this.toastService.error(this.i18n.t('checkin.failedToLoadAttendees'));
       },
     });
   }
@@ -525,11 +564,11 @@ export class CheckinListsComponent implements OnInit {
           this.newDescription = '';
           this.newColor = '#E8552D';
           this.loadLists();
-          this.toastService.success('List created.');
+          this.toastService.success(this.i18n.t('checkin.listCreated'));
         },
         error: () => {
           this.creating = false;
-          this.toastService.error('Failed to create list.');
+          this.toastService.error(this.i18n.t('checkin.failedToCreateList'));
         },
       });
   }
@@ -548,9 +587,9 @@ export class CheckinListsComponent implements OnInit {
       next: () => {
         this.editingListId = null;
         this.loadLists();
-        this.toastService.success('Renamed.');
+        this.toastService.success(this.i18n.t('checkin.renamed'));
       },
-      error: () => this.toastService.error('Failed to rename.'),
+      error: () => this.toastService.error(this.i18n.t('checkin.failedToRename')),
     });
   }
 
@@ -558,14 +597,14 @@ export class CheckinListsComponent implements OnInit {
     this.eventService.updateCheckInList(list.id, { is_default: true }).subscribe({
       next: () => {
         this.loadLists();
-        this.toastService.success(`"${list.name}" is now the default list.`);
+        this.toastService.success(this.i18n.t('checkin.listnameIsNowThe', { listName: list.name }));
       },
-      error: () => this.toastService.error('Failed to update.'),
+      error: () => this.toastService.error(this.i18n.t('checkin.failedToUpdate')),
     });
   }
 
   deleteList(list: CheckInList): void {
-    if (!confirm(`Delete "${list.name}"? All logs for this list will be removed.`)) return;
+    if (!confirm(this.i18n.t('checkin.deleteListConfirm', { name: list.name }))) return;
     this.eventService.deleteCheckInList(list.id).subscribe({
       next: () => {
         if (this.selectedList?.id === list.id) {
@@ -573,9 +612,9 @@ export class CheckinListsComponent implements OnInit {
           this.attendees = [];
         }
         this.loadLists();
-        this.toastService.success('List deleted.');
+        this.toastService.success(this.i18n.t('checkin.listDeleted'));
       },
-      error: () => this.toastService.error('Failed to delete list.'),
+      error: () => this.toastService.error(this.i18n.t('checkin.failedToDeleteList')),
     });
   }
 
@@ -586,14 +625,16 @@ export class CheckinListsComponent implements OnInit {
       next: (res) => {
         this.scanning = false;
         this.scanUuid = '';
-        this.toastService.success(`${res.attendee} checked in.`);
+        this.toastService.success(
+          this.i18n.t('checkin.attendeeCheckedIn', { attendee: res.attendee }),
+        );
         this.loadAttendees();
         this.loadLogs();
         this.loadLists();
       },
       error: (err) => {
         this.scanning = false;
-        this.toastService.error(apiErrorMessage(err, 'Scan failed.', 'error'));
+        this.toastService.error(apiErrorMessage(err, this.i18n.t('checkin.scanFailed'), 'error'));
       },
     });
   }
@@ -607,7 +648,10 @@ export class CheckinListsComponent implements OnInit {
         this.loadLogs();
         this.loadLists();
       },
-      error: (err) => this.toastService.error(apiErrorMessage(err, 'Check-in failed.', 'error')),
+      error: (err) =>
+        this.toastService.error(
+          apiErrorMessage(err, this.i18n.t('checkin.checkInFailed'), 'error'),
+        ),
     });
   }
 
@@ -620,7 +664,8 @@ export class CheckinListsComponent implements OnInit {
         this.loadLogs();
         this.loadLists();
       },
-      error: (err) => this.toastService.error(apiErrorMessage(err, 'Undo failed.', 'error')),
+      error: (err) =>
+        this.toastService.error(apiErrorMessage(err, this.i18n.t('checkin.undoFailed'), 'error')),
     });
   }
 }
