@@ -1,0 +1,52 @@
+# Isolated copy of the stack for the cross-team browser tests
+# (docs/TEST_REPORT.md). It runs next to a developer's own `eventhub` stack
+# without sharing a container name, a published port or a volume:
+#
+#   docker compose -p ehqa --env-file <qa .env> \
+#     -f docker-compose.yml -f docker-compose.qa.yml up -d --build --wait
+#
+# The QA .env is .env.example with fresh secrets and these addresses:
+# FRONTEND_URL / CORS / CSRF on http://localhost:24200,
+# FPAY_PUBLIC_URL=http://localhost:38080, POSTGRES_HOST_PORT=25433.
+# `ports: !override` replaces the base file's list (Compose >= 2.24).
+x-qa-env: &qa-env
+  # Passkeys are checked against the origin the browser uses.
+  WEBAUTHN_ORIGINS: http://localhost:24200
+  # Step-up proofs expire quickly, so the browser tests can reach the
+  # "Confirm it's you" dialog without waiting ten minutes.
+  MFA_STEP_UP_MAX_AGE_SECONDS: ${QA_MFA_STEP_UP_MAX_AGE_SECONDS:-45}
+  # The suite signs dozens of fresh accounts in from one address.
+  DJANGO_THROTTLE_RATES: login=120/min,register=120/min,password_reset=60/min,change_password=60/min,mfa_ip=240/min,mfa_user=60/min
+
+services:
+  db:
+    container_name: ehqa_postgres
+    ports: !override
+      - "127.0.0.1:25433:5432"
+  redis:
+    container_name: ehqa_redis
+    ports: !override
+      - "127.0.0.1:26379:6379"
+  backend:
+    container_name: ehqa_backend
+    environment: *qa-env
+    ports: !override
+      - "127.0.0.1:28000:8000"
+  worker:
+    container_name: ehqa_worker
+    environment: *qa-env
+  frontend:
+    container_name: ehqa_frontend
+    ports: !override
+      - "127.0.0.1:24200:80"
+      - "127.0.0.1:24443:443"
+  fpay-emulator:
+    container_name: ehqa_fpay_emulator
+    ports: !override
+      - "127.0.0.1:38080:8080"
+  unleash-db:
+    container_name: ehqa_unleash_db
+  unleash:
+    container_name: ehqa_unleash
+    ports: !override
+      - "127.0.0.1:24242:4242"
