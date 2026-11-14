@@ -5,11 +5,13 @@ import { AuthService } from '../../services/auth.service';
 import { SearchService } from '../../services/search.service';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
 
 @Component({
   selector: 'app-footer',
   standalone: true,
-  imports: [DialogDirective, RouterModule, LucideAngularModule],
+  imports: [DialogDirective, RouterModule, LucideAngularModule, TranslocoPipe, LocalDatePipe],
   template: `
     <footer class="bg-card border-t border-border mt-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -25,8 +27,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
               <span class="text-foreground font-semibold text-lg tracking-tight">EventHub</span>
             </a>
             <p class="text-muted-foreground text-sm leading-relaxed max-w-xs">
-              Built for event lovers, by event lovers. Discover, book, and enjoy unforgettable
-              experiences worldwide.
+              {{ 'footer.tagline' | transloco }}
             </p>
             <div class="flex items-center gap-4 mt-6">
               <a
@@ -61,7 +62,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
 
           <!-- Discover Column -->
           <div>
-            <h3 class="text-foreground font-semibold mb-4">Discover</h3>
+            <h3 class="text-foreground font-semibold mb-4">{{ 'footer.discover' | transloco }}</h3>
             <ul class="space-y-3">
               <li>
                 <button
@@ -69,7 +70,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateToCategory('Concert')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
                 >
-                  Concerts
+                  {{ 'footer.concerts' | transloco }}
                 </button>
               </li>
               <li>
@@ -78,7 +79,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateToCategory('Festival')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
                 >
-                  Festivals
+                  {{ 'footer.festivals' | transloco }}
                 </button>
               </li>
               <li>
@@ -87,7 +88,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateToCategory('Conference')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
                 >
-                  Conferences
+                  {{ 'footer.conferences' | transloco }}
                 </button>
               </li>
               <li>
@@ -96,7 +97,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateToCategory('Workshop')"
                   class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
                 >
-                  Workshops
+                  {{ 'footer.workshops' | transloco }}
                 </button>
               </li>
             </ul>
@@ -104,7 +105,9 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
 
           <!-- Organizer Column -->
           <div>
-            <h3 class="text-sm font-semibold text-foreground mb-4">Organizer</h3>
+            <h3 class="text-sm font-semibold text-foreground mb-4">
+              {{ 'footer.organizer' | transloco }}
+            </h3>
             <ul class="space-y-3">
               <li>
                 <button
@@ -112,7 +115,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateAuthenticated('/organizer/dashboard')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
                 >
-                  Dashboard
+                  {{ 'nav.dashboard' | transloco }}
                 </button>
               </li>
               <li>
@@ -121,7 +124,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateAuthenticated('/create-event')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
                 >
-                  Create Event
+                  {{ 'nav.createEvent' | transloco }}
                 </button>
               </li>
               <li>
@@ -130,7 +133,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="navigateAuthenticated('/my-events')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
                 >
-                  My Events
+                  {{ 'nav.myEvents' | transloco }}
                 </button>
               </li>
             </ul>
@@ -138,27 +141,29 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
 
           <!-- Support Column -->
           <div>
-            <h3 class="text-sm font-semibold text-foreground mb-4">Support</h3>
+            <h3 class="text-sm font-semibold text-foreground mb-4">
+              {{ 'footer.support' | transloco }}
+            </h3>
             <ul class="space-y-3">
               <li>
                 <a
                   href="mailto:eventhub.supporting@gmail.com?subject=Help%20Request"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit"
-                  >Help Center</a
+                  >{{ 'footer.helpCenter' | transloco }}</a
                 >
               </li>
               <li>
                 <a
                   href="mailto:eventhub.supporting@gmail.com?subject=General%20Inquiry"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit"
-                  >Contact Us</a
+                  >{{ 'footer.contactUs' | transloco }}</a
                 >
               </li>
               <li>
                 <a
                   href="mailto:eventhub.supporting@gmail.com?subject=Refund%20Request"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit"
-                  >Refunds</a
+                  >{{ 'footer.refunds' | transloco }}</a
                 >
               </li>
               <li>
@@ -167,7 +172,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                   (click)="openModal('faq')"
                   class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
                 >
-                  FAQ
+                  {{ 'footer.faq.title' | transloco }}
                 </button>
               </li>
             </ul>
@@ -178,26 +183,28 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
         <div
           class="mt-12 pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4"
         >
-          <p class="text-sm text-muted-foreground">© 2026 EventHub. All rights reserved.</p>
+          <p class="text-sm text-muted-foreground">
+            {{ 'footer.rights' | transloco: { year: 2026 } }}
+          </p>
           <div class="flex items-center gap-6">
             <button
               type="button"
               (click)="openModal('terms')"
               class="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              Terms of Service
+              {{ 'footer.termsTitle' | transloco }}
             </button>
             <button
               type="button"
               (click)="openModal('privacy')"
               class="text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              Privacy Policy
+              {{ 'footer.privacyTitle' | transloco }}
             </button>
             <span class="text-xs text-muted-foreground opacity-50">|</span>
-            <span class="text-xs text-primary font-medium tracking-wide"
-              >Made with ♥ in Almaty</span
-            >
+            <span class="text-xs text-primary font-medium tracking-wide">{{
+              'footer.madeIn' | transloco
+            }}</span>
           </div>
         </div>
       </div>
@@ -207,7 +214,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
         <button
           (click)="scrollToTop()"
           class="fixed bottom-6 right-6 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all z-40 animate-fade-in"
-          aria-label="Back to top"
+          [attr.aria-label]="'footer.backToTop' | transloco"
         >
           <lucide-icon [img]="icons.ChevronUp" class="w-5 h-5" />
         </button>
@@ -228,153 +235,42 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
             <div
               class="sticky top-0 bg-card border-b border-border px-6 py-4 flex items-center justify-between rounded-t-2xl z-10"
             >
-              <h2 class="text-lg font-semibold text-foreground">{{ modalTitle }}</h2>
+              <h2 class="text-lg font-semibold text-foreground">
+                {{ 'footer.' + activeModal + 'Title' | transloco }}
+              </h2>
               <button
                 (click)="closeModal()"
+                [attr.aria-label]="'common.close' | transloco"
                 class="w-8 h-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
               >
                 <lucide-icon [img]="icons.X" class="w-4 h-4" />
               </button>
             </div>
 
-            <!-- Terms of Service Content -->
-            @if (activeModal === 'terms') {
+            <!-- Terms of Service / Privacy Policy content -->
+            @if (activeModal === 'terms' || activeModal === 'privacy') {
               <div class="px-6 py-6 space-y-6 text-sm text-muted-foreground leading-relaxed">
-                <p class="text-foreground font-medium">Last updated: April 15, 2026</p>
+                <p class="text-foreground font-medium">
+                  {{
+                    'footer.lastUpdated' | transloco: { date: (legalDate | localDate: 'longDate') }
+                  }}
+                </p>
+
+                @for (n of legalSections; track n) {
+                  <div>
+                    <h3 class="text-foreground font-semibold mb-2">
+                      {{ n }}. {{ 'footer.' + activeModal + '.s' + n + 'Title' | transloco }}
+                    </h3>
+                    <p>{{ 'footer.' + activeModal + '.s' + n + 'Body' | transloco }}</p>
+                  </div>
+                }
 
                 <div>
-                  <h3 class="text-foreground font-semibold mb-2">1. Acceptance of Terms</h3>
+                  <h3 class="text-foreground font-semibold mb-2">
+                    7. {{ 'footer.contactTitle' | transloco }}
+                  </h3>
                   <p>
-                    By accessing and using EventHub, you agree to be bound by these Terms of Service
-                    and all applicable laws and regulations. If you do not agree with any of these
-                    terms, you are prohibited from using or accessing this site.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">2. Use License</h3>
-                  <p>
-                    Permission is granted to temporarily access the materials on EventHub for
-                    personal, non-commercial transitory viewing only. This license shall
-                    automatically terminate if you violate any of these restrictions.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">3. Event Listings</h3>
-                  <p>
-                    EventHub acts as a marketplace connecting event organizers with attendees. We do
-                    not guarantee the accuracy, completeness, or usefulness of any event listing.
-                    Event organizers are solely responsible for the accuracy of their listings.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">4. Ticket Purchases</h3>
-                  <p>
-                    All ticket sales are final unless the event is cancelled by the organizer.
-                    Refund policies are set by individual event organizers. EventHub facilitates the
-                    transaction but is not responsible for refund disputes between buyers and
-                    organizers.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">5. Account Responsibility</h3>
-                  <p>
-                    You are responsible for maintaining the confidentiality of your account
-                    credentials and for all activities that occur under your account. You must
-                    notify EventHub immediately of any unauthorized use of your account.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">6. Limitation of Liability</h3>
-                  <p>
-                    EventHub shall not be held liable for any damages arising from the use or
-                    inability to use the materials on the platform, even if EventHub has been
-                    notified orally or in writing of the possibility of such damage.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">7. Contact</h3>
-                  <p>
-                    For questions about these Terms, contact us at
-                    <a
-                      href="mailto:eventhub.supporting@gmail.com"
-                      class="text-primary hover:underline"
-                      >eventhub.supporting@gmail.com</a
-                    >.
-                  </p>
-                </div>
-              </div>
-            }
-
-            <!-- Privacy Policy Content -->
-            @if (activeModal === 'privacy') {
-              <div class="px-6 py-6 space-y-6 text-sm text-muted-foreground leading-relaxed">
-                <p class="text-foreground font-medium">Last updated: April 15, 2026</p>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">1. Information We Collect</h3>
-                  <p>
-                    We collect information you provide directly to us, such as when you create an
-                    account, purchase tickets, or contact us for support. This includes your name,
-                    email address, and payment information.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">2. How We Use Your Information</h3>
-                  <p>
-                    We use the information we collect to provide, maintain, and improve our
-                    services, process transactions, send you confirmations and updates about events
-                    you're registered for, and respond to your comments and questions.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">3. Information Sharing</h3>
-                  <p>
-                    We do not sell, trade, or otherwise transfer your personal information to
-                    outside parties. This does not include trusted third parties who assist us in
-                    operating our platform, conducting our business, or serving you, as long as
-                    those parties agree to keep this information confidential.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">4. Data Security</h3>
-                  <p>
-                    We implement industry-standard security measures to protect your personal
-                    information. All sensitive data is encrypted using SSL technology. However, no
-                    method of transmission over the Internet is 100% secure.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">5. Cookies</h3>
-                  <p>
-                    We use cookies to enhance your experience on our platform. You can choose to
-                    disable cookies through your browser settings, but this may affect the
-                    functionality of certain features.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">6. Your Rights</h3>
-                  <p>
-                    You have the right to access, correct, or delete your personal data at any time.
-                    You can manage your account information from your profile settings or by
-                    contacting our support team.
-                  </p>
-                </div>
-
-                <div>
-                  <h3 class="text-foreground font-semibold mb-2">7. Contact</h3>
-                  <p>
-                    For privacy-related inquiries, contact us at
+                    {{ 'footer.' + activeModal + '.contactBody' | transloco }}
                     <a
                       href="mailto:eventhub.supporting@gmail.com"
                       class="text-primary hover:underline"
@@ -388,13 +284,13 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
             <!-- FAQ Content -->
             @if (activeModal === 'faq') {
               <div class="px-6 py-6 space-y-5 text-sm text-muted-foreground leading-relaxed">
-                @for (faq of faqItems; track faq) {
+                @for (faq of faqItems; track faq.n) {
                   <div class="border-b border-border pb-5 last:border-b-0">
                     <button
                       (click)="faq.open = !faq.open"
                       class="w-full flex items-center justify-between text-foreground font-semibold text-left gap-4"
                     >
-                      <span>{{ faq.question }}</span>
+                      <span>{{ 'footer.faq.q' + faq.n | transloco }}</span>
                       <span
                         class="text-primary text-lg flex-shrink-0 transition-transform"
                         [class.rotate-45]="faq.open"
@@ -403,7 +299,7 @@ import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
                     </button>
                     @if (faq.open) {
                       <p class="mt-3 text-muted-foreground animate-fade-in">
-                        {{ faq.answer }}
+                        {{ 'footer.faq.a' + faq.n | transloco }}
                       </p>
                     }
                   </div>
@@ -450,47 +346,14 @@ export class FooterComponent {
   };
 
   activeModal: 'terms' | 'privacy' | 'faq' | null = null;
-  modalTitle = '';
   showBackToTop = false;
 
-  faqItems = [
-    {
-      question: 'How do I purchase tickets?',
-      answer:
-        "Browse events on the homepage, click on an event you like, and follow the checkout process to secure your tickets. You'll receive a confirmation email with your digital ticket.",
-      open: false,
-    },
-    {
-      question: 'Can I get a refund?',
-      answer:
-        'Refund policies are set by individual event organizers. If an event is cancelled, you will automatically receive a full refund. For other cases, contact the organizer directly or email eventhub.supporting@gmail.com.',
-      open: false,
-    },
-    {
-      question: 'How do I become an organizer?',
-      answer:
-        "Organizer accounts are created by EventHub administrators. Email eventhub.supporting@gmail.com to request one — once it's set up, you can create and manage events.",
-      open: false,
-    },
-    {
-      question: 'Is my payment information secure?',
-      answer:
-        'Yes. We use industry-standard SSL encryption and never store your full payment details on our servers. All transactions are processed through secure third-party payment providers.',
-      open: false,
-    },
-    {
-      question: 'How do I contact support?',
-      answer:
-        'You can reach our support team by emailing eventhub.supporting@gmail.com. We typically respond within 24 hours on business days.',
-      open: false,
-    },
-    {
-      question: 'Can I transfer my ticket to someone else?',
-      answer:
-        "Ticket transfer policies depend on the event organizer's settings. Check the event details page or contact the organizer for transfer options.",
-      open: false,
-    },
-  ];
+  /** Questions and answers live in the translation files as `footer.faq.q<n>` / `a<n>`. */
+  faqItems = [1, 2, 3, 4, 5, 6].map((n) => ({ n, open: false }));
+
+  /** Legal documents have six numbered sections plus a contact section (rendered separately). */
+  readonly legalSections = [1, 2, 3, 4, 5, 6];
+  readonly legalDate = '2026-04-15';
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -522,12 +385,6 @@ export class FooterComponent {
   /** Open a legal/info modal */
   openModal(type: 'terms' | 'privacy' | 'faq'): void {
     this.activeModal = type;
-    const titles: Record<string, string> = {
-      terms: 'Terms of Service',
-      privacy: 'Privacy Policy',
-      faq: 'Frequently Asked Questions',
-    };
-    this.modalTitle = titles[type];
     document.body.style.overflow = 'hidden';
   }
 

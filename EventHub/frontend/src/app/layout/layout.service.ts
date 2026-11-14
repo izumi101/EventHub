@@ -2,6 +2,7 @@ import { Injectable, signal, inject } from '@angular/core';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { EventService } from '../services/event.service';
+import { LanguageService } from '../i18n/language.service';
 
 export interface EventContext {
   id: string;
@@ -10,6 +11,7 @@ export interface EventContext {
 
 @Injectable({ providedIn: 'root' })
 export class LayoutService {
+  private i18n = inject(LanguageService);
   private router = inject(Router);
   private eventService = inject(EventService);
 
@@ -49,7 +51,7 @@ export class LayoutService {
         this.cachedEventId = id;
         this.eventService.getEvent(+id).subscribe({
           next: (event) => this.eventContext.set({ id, title: event.title }),
-          error: () => this.eventContext.set({ id, title: 'Event' }),
+          error: () => this.eventContext.set({ id, title: this.i18n.t('nav.event') }),
         });
       }
     } else {

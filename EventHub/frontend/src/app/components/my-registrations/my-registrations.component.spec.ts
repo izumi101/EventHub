@@ -5,6 +5,7 @@ import { EventService } from '../../services/event.service';
 import { PaymentService } from '../../services/payment.service';
 import { ToastService } from '../../services/toast.service';
 import type { Registration } from '../../models/models';
+import { I18nTestingModule } from '../../i18n/testing';
 
 const reg = (over: Record<string, unknown> = {}): Registration =>
   ({
@@ -24,7 +25,7 @@ function setup() {
   };
   const paymentService = { createCheckoutSession: vi.fn() };
   TestBed.configureTestingModule({
-    imports: [MyRegistrationsComponent],
+    imports: [I18nTestingModule, MyRegistrationsComponent],
     providers: [
       { provide: EventService, useValue: eventService },
       { provide: PaymentService, useValue: paymentService },

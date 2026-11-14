@@ -5,11 +5,21 @@ import { EventService, type Favorite } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { LucideAngularModule, Heart, Calendar, MapPin, Ticket } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-favorites',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, RouterModule, LucideAngularModule],
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
@@ -20,8 +30,12 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             <lucide-icon [img]="icons.Heart" class="w-5 h-5 text-ember" aria-hidden="true" />
           </div>
           <div>
-            <h1 class="text-2xl font-bold text-foreground">Favorites</h1>
-            <p class="text-sm text-muted-foreground mt-0.5">Events you saved</p>
+            <h1 class="text-2xl font-bold text-foreground">
+              {{ 'favorites.favorites' | transloco }}
+            </h1>
+            <p class="text-sm text-muted-foreground mt-0.5">
+              {{ 'favorites.eventsYouSaved' | transloco }}
+            </p>
           </div>
         </div>
 
@@ -38,11 +52,15 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 aria-hidden="true"
               />
             </div>
-            <h3 class="text-base font-semibold text-foreground mb-1">No favorites yet</h3>
+            <h3 class="text-base font-semibold text-foreground mb-1">
+              {{ 'favorites.noFavoritesYet' | transloco }}
+            </h3>
             <p class="text-sm text-muted-foreground mb-5 max-w-xs">
-              Tap ❤ on any event to save it here for quick access.
+              {{ 'favorites.tapOnAnyEvent' | transloco }}
             </p>
-            <a routerLink="/" class="btn btn-primary btn-sm">Discover events</a>
+            <a routerLink="/" class="btn btn-primary btn-sm">{{
+              'favorites.discoverEvents' | transloco
+            }}</a>
           </div>
         } @else {
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -98,7 +116,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                         class="w-3.5 h-3.5 flex-shrink-0"
                         aria-hidden="true"
                       />
-                      <span>{{ fav.event.date | date: 'EEE, MMM d, y' }}</span>
+                      <span>{{ fav.event.date | localDate: 'EEE, MMM d, y' }}</span>
                     </div>
                     <div class="flex items-center gap-1.5">
                       <lucide-icon
@@ -113,11 +131,13 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   <div class="flex items-center justify-between mt-3 pt-3 border-t border-border">
                     <span class="text-sm font-semibold text-foreground">
                       {{
-                        fav.event.is_free ? 'Free' : (fav.event.price | money: fav.event.currency)
+                        fav.event.is_free
+                          ? ('common.free' | transloco)
+                          : (fav.event.price | money: fav.event.currency)
                       }}
                     </span>
                     <a [routerLink]="['/events', fav.event.id]" class="btn btn-sm btn-primary">
-                      Get tickets
+                      {{ 'favorites.getTickets' | transloco }}
                     </a>
                   </div>
                 </div>
@@ -130,6 +150,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   `,
 })
 export class FavoritesComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private toast = inject(ToastService);
 
@@ -154,9 +175,9 @@ export class FavoritesComponent implements OnInit {
     this.eventService.toggleFavorite(fav.event.id).subscribe({
       next: () => {
         this.favorites = this.favorites.filter((f) => f.id !== fav.id);
-        this.toast.success('Removed from favorites');
+        this.toast.success(this.i18n.t('eventDetail.removedFromFavorites'));
       },
-      error: () => this.toast.error('Failed to remove'),
+      error: () => this.toast.error(this.i18n.t('favorites.failedToRemove')),
     });
   }
 }

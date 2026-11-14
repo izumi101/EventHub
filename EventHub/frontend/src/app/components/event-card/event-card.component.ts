@@ -4,16 +4,26 @@ import { RouterModule } from '@angular/router';
 import { Event } from '../../models/models';
 import { LucideAngularModule, MapPin, Users, ArrowRight } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe, PluralPipe } from '../../i18n/locale.pipes';
 
 @Component({
   selector: 'app-event-card',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, RouterModule, LucideAngularModule],
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+    PluralPipe,
+  ],
   template: `
     <article
       class="card-ticket card-hover flex flex-col cursor-pointer focus-ring h-full"
       [routerLink]="['/events', event.id]"
-      [attr.aria-label]="'View details for ' + event.title"
+      [attr.aria-label]="'event.viewDetailsFor' | transloco: { title: event.title }"
       tabindex="0"
       (keydown.enter)="$event.preventDefault()"
     >
@@ -46,16 +56,16 @@ import { MoneyPipe } from '../../pipes/money.pipe';
         <!-- Badges -->
         <div class="absolute top-2.5 left-2.5 flex gap-1.5">
           @if (event.is_free) {
-            <span class="badge badge-free">Free</span>
+            <span class="badge badge-free">{{ 'common.free' | transloco }}</span>
           }
           @if (event.is_online) {
-            <span class="badge badge-online">Online</span>
+            <span class="badge badge-online">{{ 'home.online' | transloco }}</span>
           }
           @if (!event.is_free && event.available_spots > 0 && event.available_spots < 10) {
-            <span class="badge badge-hot">Selling fast</span>
+            <span class="badge badge-hot">{{ 'event.sellingFast' | transloco }}</span>
           }
           @if (event.available_spots === 0) {
-            <span class="badge badge-soldout">Sold out</span>
+            <span class="badge badge-soldout">{{ 'event.soldOut' | transloco }}</span>
           }
         </div>
       </div>
@@ -67,17 +77,17 @@ import { MoneyPipe } from '../../pipes/money.pipe';
       <div class="flex gap-3.5 p-4 flex-1">
         <!-- Date block -->
         <div class="date-block">
-          <div class="d num">{{ event.date | date: 'd' }}</div>
-          <div class="m">{{ event.date | date: 'MMM' }}</div>
+          <div class="d num">{{ event.date | localDate: 'd' }}</div>
+          <div class="m">{{ event.date | localDate: 'LLL' }}</div>
         </div>
 
         <!-- Content -->
         <div class="flex flex-col flex-1 min-w-0">
           <p class="kicker mb-1.5 truncate" [class.kicker-hot]="featured">
             @if (featured) {
-              Featured ·
+              {{ 'event.featured' | transloco }} ·
             }
-            {{ event.category.name || 'Event' }}
+            {{ event.category.name || ('nav.event' | transloco) }}
           </p>
           <h3
             class="font-display font-medium text-foreground leading-snug line-clamp-2"
@@ -110,7 +120,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   class="w-3.5 h-3.5 flex-shrink-0"
                   aria-hidden="true"
                 />
-                <span>{{ event.available_spots }} spots left</span>
+                <span>{{ 'event.spotsLeft' | tPlural: event.available_spots }}</span>
               </div>
             }
           </div>
@@ -125,10 +135,12 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               class="font-display text-base font-semibold num"
               [class.text-pine-600]="event.is_free"
             >
-              {{ event.is_free ? 'Free' : (event.price | money: event.currency) }}
+              {{
+                event.is_free ? ('common.free' | transloco) : (event.price | money: event.currency)
+              }}
             </span>
             <span class="text-xs font-semibold text-ember inline-flex items-center gap-1 cta">
-              {{ featured ? 'Get tickets' : 'View event' }}
+              {{ (featured ? 'event.getTickets' : 'event.viewEvent') | transloco }}
               <lucide-icon
                 [img]="icons.ArrowRight"
                 class="w-3.5 h-3.5 cta-arrow transition-transform"

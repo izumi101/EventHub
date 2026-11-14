@@ -12,31 +12,40 @@ import {
   ChartColumn,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
 
 @Component({
   selector: 'app-event-analytics',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, RouterModule, LucideAngularModule],
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
         <nav class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6">
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
-            >Dashboard</a
-          >
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">{{
+            'nav.dashboard' | transloco
+          }}</a>
           <span>/</span>
           @if (eventId) {
             <a
               [routerLink]="['/organizer/events', eventId, 'attendees']"
               class="hover:text-foreground transition-colors truncate max-w-[180px]"
-              >{{ event?.title || 'Event' }}</a
+              >{{ event?.title || ('nav.event' | transloco) }}</a
             >
           }
           <span>/</span>
-          <span class="text-foreground font-medium">Analytics</span>
+          <span class="text-foreground font-medium">{{ 'nav.analytics' | transloco }}</span>
         </nav>
 
-        <p class="kicker mb-2">Sales analytics</p>
+        <p class="kicker mb-2">{{ 'analytics.salesAnalytics' | transloco }}</p>
         <h1 class="font-display text-2xl font-semibold text-foreground mb-6">{{ event?.title }}</h1>
 
         @if (loading) {
@@ -47,47 +56,68 @@ import { MoneyPipe } from '../../pipes/money.pipe';
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                 <lucide-icon [img]="icons.Wallet" class="w-4 h-4" />
-                <span class="text-xs font-medium uppercase tracking-wide">Net revenue</span>
+                <span class="text-xs font-medium uppercase tracking-wide">{{
+                  'analytics.netRevenue' | transloco
+                }}</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">
                 {{ data.kpis.net_revenue | money: data.currency }}
               </p>
               @if (data.kpis.refunded > 0) {
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  −{{ data.kpis.refunded | money: data.currency }} refunded
+                  {{
+                    'analytics.refundedRefunded'
+                      | transloco: { refunded: (data.kpis.refunded | money: data.currency) }
+                  }}
                 </p>
               }
             </div>
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                 <lucide-icon [img]="icons.Ticket" class="w-4 h-4" />
-                <span class="text-xs font-medium uppercase tracking-wide">Tickets sold</span>
+                <span class="text-xs font-medium uppercase tracking-wide">{{
+                  'analytics.ticketsSold' | transloco
+                }}</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">{{ data.kpis.tickets_sold }}</p>
               <p class="text-xs text-muted-foreground mt-0.5">
-                {{ data.kpis.sold_through_pct }}% of {{ data.kpis.capacity }} capacity
+                {{
+                  'analytics.soldthroughpctOfCapacityCapacity'
+                    | transloco
+                      : { soldThroughPct: data.kpis.sold_through_pct, capacity: data.kpis.capacity }
+                }}
               </p>
             </div>
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                 <lucide-icon [img]="icons.UserCheck" class="w-4 h-4" />
-                <span class="text-xs font-medium uppercase tracking-wide">Checked in</span>
+                <span class="text-xs font-medium uppercase tracking-wide">{{
+                  'analytics.checkedIn' | transloco
+                }}</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">{{ data.kpis.checked_in }}</p>
               <p class="text-xs text-muted-foreground mt-0.5">
-                {{ data.kpis.checkin_rate_pct }}% of sold
+                {{
+                  'analytics.checkinratepctOfSold'
+                    | transloco: { checkinRatePct: data.kpis.checkin_rate_pct }
+                }}
               </p>
             </div>
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                 <lucide-icon [img]="icons.TrendingUp" class="w-4 h-4" />
-                <span class="text-xs font-medium uppercase tracking-wide">Avg order</span>
+                <span class="text-xs font-medium uppercase tracking-wide">{{
+                  'analytics.avgOrder' | transloco
+                }}</span>
               </div>
               <p class="num text-2xl font-bold text-foreground">
                 {{ data.kpis.avg_order_value | money: data.currency }}
               </p>
               <p class="text-xs text-muted-foreground mt-0.5">
-                {{ data.kpis.paid_orders }} paid · {{ data.kpis.pending }} pending
+                {{
+                  'analytics.paidordersPaidPendingPending'
+                    | transloco: { paidOrders: data.kpis.paid_orders, pending: data.kpis.pending }
+                }}
               </p>
             </div>
           </div>
@@ -96,11 +126,11 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           <div class="card p-5 mb-8">
             <h2 class="text-sm font-semibold text-foreground mb-4 flex items-center gap-2">
               <lucide-icon [img]="icons.ChartColumn" class="w-4 h-4 text-muted-foreground" />
-              Registrations — last 30 days
+              {{ 'analytics.registrationsLastDays' | transloco }}
             </h2>
             @if (maxTickets === 0) {
               <p class="text-sm text-muted-foreground py-6 text-center">
-                No registrations in the last 30 days.
+                {{ 'analytics.noRegistrationsInThe' | transloco }}
               </p>
             } @else {
               <div class="flex items-end gap-[3px] h-32">
@@ -113,15 +143,15 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                     <div
                       class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-foreground text-background text-[10px] font-medium rounded px-1.5 py-0.5 whitespace-nowrap z-10"
                     >
-                      {{ day.date | date: 'MMM d' }}: {{ day.tickets }} ·
+                      {{ day.date | localDate: 'MMM d' }}: {{ day.tickets }} ·
                       {{ day.revenue | money: data.currency }}
                     </div>
                   </div>
                 }
               </div>
               <div class="flex justify-between text-[10px] text-muted-foreground mt-1.5">
-                <span>{{ data.timeline[0].date | date: 'MMM d' }}</span>
-                <span>{{ data.timeline[data.timeline.length - 1].date | date: 'MMM d' }}</span>
+                <span>{{ data.timeline[0].date | localDate: 'MMM d' }}</span>
+                <span>{{ data.timeline[data.timeline.length - 1].date | localDate: 'MMM d' }}</span>
               </div>
             }
           </div>
@@ -129,9 +159,13 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <!-- By ticket type -->
             <div class="card p-5">
-              <h2 class="text-sm font-semibold text-foreground mb-3">Sales by ticket type</h2>
+              <h2 class="text-sm font-semibold text-foreground mb-3">
+                {{ 'analytics.salesByTicketType' | transloco }}
+              </h2>
               @if (data.by_ticket_type.length === 0) {
-                <p class="text-sm text-muted-foreground py-4 text-center">No sales yet.</p>
+                <p class="text-sm text-muted-foreground py-4 text-center">
+                  {{ 'analytics.noSalesYet' | transloco }}
+                </p>
               } @else {
                 <div class="space-y-2">
                   @for (t of data.by_ticket_type; track t.name) {
@@ -153,10 +187,12 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 
             <!-- By promoter -->
             <div class="card p-5">
-              <h2 class="text-sm font-semibold text-foreground mb-3">Sales by promoter</h2>
+              <h2 class="text-sm font-semibold text-foreground mb-3">
+                {{ 'analytics.salesByPromoter' | transloco }}
+              </h2>
               @if (data.by_affiliate.length === 0) {
                 <p class="text-sm text-muted-foreground py-4 text-center">
-                  No affiliate-attributed sales.
+                  {{ 'analytics.noAffiliateAttributedSales' | transloco }}
                 </p>
               } @else {
                 <div class="space-y-2">
@@ -179,7 +215,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           </div>
         } @else {
           <p class="text-sm text-muted-foreground text-center py-16">
-            Could not load analytics for this event.
+            {{ 'analytics.couldNotLoadAnalytics' | transloco }}
           </p>
         }
       </div>
