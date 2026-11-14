@@ -6,6 +6,7 @@ import {
 } from '@angular/core';
 import {
   provideRouter,
+  TitleStrategy,
   withComponentInputBinding,
   withInMemoryScrolling,
   withViewTransitions,
@@ -15,6 +16,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './interceptors/auth.interceptor';
 import { SeoService } from './services/seo.service';
 import { provideI18n } from './i18n/i18n.providers';
+import { TranslatedTitleStrategy } from './i18n/title.strategy';
 import { acceptLanguageInterceptor } from './i18n/accept-language.interceptor';
 
 export const appConfig: ApplicationConfig = {
@@ -28,6 +30,7 @@ export const appConfig: ApplicationConfig = {
     ),
     provideHttpClient(withFetch(), withInterceptors([acceptLanguageInterceptor, authInterceptor])),
     provideI18n(),
+    { provide: TitleStrategy, useExisting: TranslatedTitleStrategy },
     // Eagerly instantiate SeoService so its router subscription starts at boot
     provideAppInitializer(() => {
       inject(SeoService);

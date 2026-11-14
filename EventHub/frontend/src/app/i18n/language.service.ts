@@ -35,6 +35,12 @@ export class LanguageService {
     return this.transloco.translate(key, params);
   }
 
+  /** Like `t`, but returns `fallback` (not the key) when the key has no translation. */
+  tOr(key: string, fallback: string): string {
+    const text = this.transloco.translate(key);
+    return text === key ? fallback : text;
+  }
+
   /**
    * Picks `<key>_one|few|many|other` for the count using the active language's
    * plural rules, falling back to `<key>_other`. `count` is always available
