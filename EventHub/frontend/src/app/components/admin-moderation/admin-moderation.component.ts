@@ -21,26 +21,41 @@ import {
   UserPlus,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-admin-moderation',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, FormsModule, RouterModule, LucideAngularModule],
+  imports: [
+    MoneyPipe,
+    CommonModule,
+    FormsModule,
+    RouterModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
-        <p class="kicker mb-2">Admin</p>
+        <p class="kicker mb-2">{{ 'dashboard.admin' | transloco }}</p>
         <h1
           class="font-display text-2xl font-semibold text-foreground mb-6 flex items-center gap-2"
         >
           <lucide-icon [img]="icons.Shield" class="w-6 h-6 text-ember" />
-          Moderation
+          {{ 'moderation.moderation' | transloco }}
         </h1>
 
         @if (!isAdmin) {
           <div class="card p-8 text-center">
-            <p class="text-sm text-muted-foreground">This page is for administrators only.</p>
-            <a routerLink="/" class="btn btn-secondary btn-sm mt-4">Back to events</a>
+            <p class="text-sm text-muted-foreground">
+              {{ 'moderation.thisPageIsFor' | transloco }}
+            </p>
+            <a routerLink="/" class="btn btn-secondary btn-sm mt-4">{{
+              'eventDetail.backToEvents' | transloco
+            }}</a>
           </div>
         } @else {
           <!-- Platform stats -->
@@ -49,36 +64,50 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               <div class="card p-4">
                 <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                   <lucide-icon [img]="icons.Users" class="w-4 h-4" />
-                  <span class="text-xs font-medium uppercase tracking-wide">Users</span>
+                  <span class="text-xs font-medium uppercase tracking-wide">{{
+                    'moderation.users' | transloco
+                  }}</span>
                 </div>
                 <p class="num text-2xl font-bold text-foreground">{{ stats.total_users }}</p>
               </div>
               <div class="card p-4">
                 <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                   <lucide-icon [img]="icons.CalendarDays" class="w-4 h-4" />
-                  <span class="text-xs font-medium uppercase tracking-wide">Events</span>
+                  <span class="text-xs font-medium uppercase tracking-wide">{{
+                    'dashboard.events' | transloco
+                  }}</span>
                 </div>
                 <p class="num text-2xl font-bold text-foreground">{{ stats.total_events }}</p>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  {{ stats.published_events }} published
+                  {{
+                    'moderation.publishedeventsPublished'
+                      | transloco: { publishedEvents: stats.published_events }
+                  }}
                 </p>
               </div>
               <div class="card p-4">
                 <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                   <lucide-icon [img]="icons.Ticket" class="w-4 h-4" />
-                  <span class="text-xs font-medium uppercase tracking-wide">Registrations</span>
+                  <span class="text-xs font-medium uppercase tracking-wide">{{
+                    'dashboard.registrations' | transloco
+                  }}</span>
                 </div>
                 <p class="num text-2xl font-bold text-foreground">
                   {{ stats.total_registrations }}
                 </p>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  {{ stats.confirmed_registrations }} confirmed
+                  {{
+                    'moderation.confirmedregistrationsConfirmed'
+                      | transloco: { confirmedRegistrations: stats.confirmed_registrations }
+                  }}
                 </p>
               </div>
               <div class="card p-4">
                 <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                   <lucide-icon [img]="icons.Wallet" class="w-4 h-4" />
-                  <span class="text-xs font-medium uppercase tracking-wide">Revenue</span>
+                  <span class="text-xs font-medium uppercase tracking-wide">{{
+                    'dashboard.revenue' | transloco
+                  }}</span>
                 </div>
                 <!-- One line per currency: amounts in different currencies can't be added up. -->
                 @for (r of stats.revenue_by_currency; track r.currency) {
@@ -98,7 +127,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           <!-- Pending queue -->
           <h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
             <lucide-icon [img]="icons.Clock" class="w-4 h-4 text-warning" />
-            Awaiting approval ({{ pending.length }})
+            {{
+              'moderation.awaitingApprovalPendinglength'
+                | transloco: { pendingLength: pending.length }
+            }}
           </h2>
 
           @if (loading) {
@@ -106,7 +138,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           } @else if (pending.length === 0) {
             <div class="card p-8 text-center mb-8">
               <p class="text-sm text-muted-foreground">
-                Nothing to review — the moderation queue is empty. 🎉
+                {{ 'moderation.nothingToReviewThe' | transloco }}
               </p>
             </div>
           } @else {
@@ -121,17 +153,27 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       {{ ev.title }}
                     </a>
                     <p class="text-xs text-muted-foreground mt-0.5">
-                      by @{{ ev.organizer.username }} · {{ ev.date | date: 'MMM d, y · h:mm a' }} ·
-                      {{ ev.location }}
+                      {{
+                        'moderation.byUsernameDateLocation'
+                          | transloco
+                            : {
+                                username: ev.organizer.username,
+                                date: (ev.date | localDate: 'MMM d, y · h:mm a'),
+                                location: ev.location,
+                              }
+                      }}
                     </p>
                     <p class="text-sm text-foreground/80 mt-1.5 line-clamp-2">
                       {{ ev.description }}
                     </p>
                     <p class="text-xs text-muted-foreground mt-1">
-                      {{ ev.is_free ? 'Free' : (ev.price | money: ev.currency) }} · capacity
-                      {{ ev.max_participants }}
+                      {{
+                        ev.is_free ? ('common.free' | transloco) : (ev.price | money: ev.currency)
+                      }}
+                      ·
+                      {{ 'moderation.capacityCount' | transloco: { count: ev.max_participants } }}
                       @if (ev.is_online) {
-                        · online
+                        {{ 'moderation.online' | transloco }}
                       }
                     </p>
                   </div>
@@ -143,7 +185,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       style="background:#15803d;color:#fff;border-color:#15803d"
                     >
                       <lucide-icon [img]="icons.Check" class="w-3.5 h-3.5" />
-                      Approve
+                      {{ 'common.approve' | transloco }}
                     </button>
                     <button
                       (click)="reject(ev)"
@@ -151,7 +193,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                       class="btn btn-sm btn-danger flex items-center gap-1"
                     >
                       <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" />
-                      Reject
+                      {{ 'common.reject' | transloco }}
                     </button>
                   </div>
                 </div>
@@ -162,17 +204,18 @@ import { MoneyPipe } from '../../pipes/money.pipe';
           <!-- Create organizer -->
           <h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
             <lucide-icon [img]="icons.UserPlus" class="w-4 h-4 text-ember" />
-            Create an organizer account
+            {{ 'moderation.createAnOrganizerAccount' | transloco }}
           </h2>
           <form class="card p-5 mb-8" (ngSubmit)="createOrganizer()" novalidate>
             <p class="text-xs text-muted-foreground mb-4">
-              Attendees cannot become organizers on their own — new organizer accounts are
-              provisioned here.
+              {{ 'moderation.attendeesCannotBecomeOrganizers' | transloco }}
             </p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
-                <label for="org-username" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Username</label
+                <label
+                  for="org-username"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >{{ 'eventSettings.username' | transloco }}</label
                 >
                 <input
                   id="org-username"
@@ -180,28 +223,30 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   [(ngModel)]="orgForm.username"
                   name="username"
                   class="input"
-                  placeholder="organizer_name"
+                  [placeholder]="'moderation.organizerName' | transloco"
                   autocomplete="off"
                 />
               </div>
               <div>
-                <label for="org-email" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Email</label
-                >
+                <label for="org-email" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'common.email' | transloco
+                }}</label>
                 <input
                   id="org-email"
                   type="email"
                   [(ngModel)]="orgForm.email"
                   name="email"
                   class="input"
-                  placeholder="organizer@example.com"
+                  [placeholder]="'moderation.organizerExampleCom' | transloco"
                   autocomplete="off"
                 />
               </div>
               <div>
                 <label for="org-first" class="block text-sm font-medium text-foreground mb-1.5"
-                  >First name
-                  <span class="text-muted-foreground font-normal">(optional)</span></label
+                  >{{ 'moderation.firstName' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span></label
                 >
                 <input
                   id="org-first"
@@ -213,8 +258,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               </div>
               <div>
                 <label for="org-last" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Last name
-                  <span class="text-muted-foreground font-normal">(optional)</span></label
+                  >{{ 'moderation.lastName' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span></label
                 >
                 <input
                   id="org-last"
@@ -225,8 +272,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                 />
               </div>
               <div class="sm:col-span-2">
-                <label for="org-password" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Temporary password</label
+                <label
+                  for="org-password"
+                  class="block text-sm font-medium text-foreground mb-1.5"
+                  >{{ 'moderation.temporaryPassword' | transloco }}</label
                 >
                 <input
                   id="org-password"
@@ -234,7 +283,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   [(ngModel)]="orgForm.password"
                   name="password"
                   class="input"
-                  placeholder="Min 8 characters, with a number"
+                  [placeholder]="'moderation.minCharactersWithA' | transloco"
                   autocomplete="new-password"
                 />
               </div>
@@ -247,13 +296,15 @@ import { MoneyPipe } from '../../pipes/money.pipe';
               @if (creatingOrganizer) {
                 <span class="spinner spinner-sm"></span>
               }
-              Create organizer
+              {{ 'moderation.createOrganizer' | transloco }}
             </button>
           </form>
 
           <!-- Top events -->
           @if (stats && stats.top_events.length) {
-            <h2 class="text-sm font-semibold text-foreground mb-3">Top events by registrations</h2>
+            <h2 class="text-sm font-semibold text-foreground mb-3">
+              {{ 'moderation.topEventsByRegistrations' | transloco }}
+            </h2>
             <div class="card divide-y divide-border">
               @for (ev of stats.top_events; track ev.id) {
                 <a
@@ -261,9 +312,10 @@ import { MoneyPipe } from '../../pipes/money.pipe';
                   class="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/40 transition-colors"
                 >
                   <span class="text-sm font-medium text-foreground truncate">{{ ev.title }}</span>
-                  <span class="text-xs text-muted-foreground flex-shrink-0"
-                    >{{ ev.registered_count }} registered</span
-                  >
+                  <span class="text-xs text-muted-foreground flex-shrink-0">{{
+                    'moderation.registeredcountRegistered'
+                      | transloco: { registeredCount: ev.registered_count }
+                  }}</span>
                 </a>
               }
             </div>
@@ -274,6 +326,7 @@ import { MoneyPipe } from '../../pipes/money.pipe';
   `,
 })
 export class AdminModerationComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private authService = inject(AuthService);
   private toast = inject(ToastService);
@@ -315,17 +368,17 @@ export class AdminModerationComponent implements OnInit {
       },
       error: () => {
         this.loading = false;
-        this.toast.error('Failed to load the moderation queue.');
+        this.toast.error(this.i18n.t('moderation.failedToLoadThe'));
       },
     });
   }
 
   async approve(ev: EventModel): Promise<void> {
     const ok = await this.modal.open({
-      title: 'Approve Event',
-      message: `Approve and publish "${ev.title}"?`,
-      confirmText: 'Approve',
-      cancelText: 'Cancel',
+      title: this.i18n.t('eventDetail.approveEvent'),
+      message: this.i18n.t('eventDetail.approveAndPublishTitle', { title: ev.title }),
+      confirmText: this.i18n.t('common.approve'),
+      cancelText: this.i18n.t('common.cancel'),
     });
     if (!ok) return;
     this.actingId = ev.id;
@@ -333,11 +386,11 @@ export class AdminModerationComponent implements OnInit {
       next: () => {
         this.actingId = null;
         this.pending = this.pending.filter((e) => e.id !== ev.id);
-        this.toast.success(`"${ev.title}" published.`);
+        this.toast.success(this.i18n.t('moderation.titlePublished', { title: ev.title }));
       },
       error: () => {
         this.actingId = null;
-        this.toast.error('Approve failed.');
+        this.toast.error(this.i18n.t('moderation.approveFailed'));
       },
     });
   }
@@ -345,7 +398,7 @@ export class AdminModerationComponent implements OnInit {
   createOrganizer(): void {
     const f = this.orgForm;
     if (!f.username.trim() || !f.email.trim() || !f.password) {
-      this.toast.error('Username, email and password are required.');
+      this.toast.error(this.i18n.t('moderation.usernameEmailAndPassword'));
       return;
     }
     this.creatingOrganizer = true;
@@ -361,25 +414,27 @@ export class AdminModerationComponent implements OnInit {
         next: (user) => {
           this.creatingOrganizer = false;
           this.orgForm = { username: '', email: '', password: '', first_name: '', last_name: '' };
-          this.toast.success(`Organizer "${user.username}" created.`);
+          this.toast.success(
+            this.i18n.t('moderation.organizerUsernameCreated', { username: user.username }),
+          );
         },
         error: (err) => {
           this.creatingOrganizer = false;
           const data = apiErrorBody(err);
           const msg = data
             ? Object.values(data).flat().join(' ')
-            : 'Could not create the organizer.';
-          this.toast.error(msg || 'Could not create the organizer.');
+            : this.i18n.t('moderation.couldNotCreateThe');
+          this.toast.error(msg || this.i18n.t('moderation.couldNotCreateThe'));
         },
       });
   }
 
   async reject(ev: EventModel): Promise<void> {
     const ok = await this.modal.open({
-      title: 'Reject Event',
-      message: `Reject "${ev.title}"? The organizer will see it as declined.`,
-      confirmText: 'Reject',
-      cancelText: 'Cancel',
+      title: this.i18n.t('eventDetail.rejectEvent'),
+      message: this.i18n.t('eventDetail.rejectTitleTheOrganizer', { title: ev.title }),
+      confirmText: this.i18n.t('common.reject'),
+      cancelText: this.i18n.t('common.cancel'),
       isDestructive: true,
     });
     if (!ok) return;
@@ -388,11 +443,11 @@ export class AdminModerationComponent implements OnInit {
       next: () => {
         this.actingId = null;
         this.pending = this.pending.filter((e) => e.id !== ev.id);
-        this.toast.success(`"${ev.title}" rejected.`);
+        this.toast.success(this.i18n.t('moderation.titleRejected', { title: ev.title }));
       },
       error: () => {
         this.actingId = null;
-        this.toast.error('Reject failed.');
+        this.toast.error(this.i18n.t('moderation.rejectFailed'));
       },
     });
   }

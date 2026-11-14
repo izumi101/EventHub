@@ -20,37 +20,48 @@ import {
 } from 'lucide-angular';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-attendee-list',
   standalone: true,
-  imports: [DialogDirective, CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [
+    DialogDirective,
+    CommonModule,
+    RouterModule,
+    FormsModule,
+    LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
         <!-- Breadcrumb -->
         <nav
           class="flex items-center gap-1.5 text-sm text-muted-foreground mb-6"
-          aria-label="Breadcrumb"
+          [attr.aria-label]="'attendees.breadcrumb' | transloco"
         >
-          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors"
-            >Dashboard</a
-          >
+          <a routerLink="/organizer/dashboard" class="hover:text-foreground transition-colors">{{
+            'nav.dashboard' | transloco
+          }}</a>
           <span>/</span>
           <span class="text-foreground font-medium truncate max-w-xs">
-            {{ event?.title || 'Event' }}
+            {{ event?.title || ('nav.event' | transloco) }}
           </span>
           <span>/</span>
-          <span class="text-muted-foreground">Attendees</span>
+          <span class="text-muted-foreground">{{ 'nav.attendees' | transloco }}</span>
         </nav>
 
         <!-- Header -->
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 class="text-2xl font-bold text-foreground">Attendees</h1>
+            <h1 class="text-2xl font-bold text-foreground">{{ 'nav.attendees' | transloco }}</h1>
             @if (event) {
               <p class="text-sm text-muted-foreground mt-1">
-                {{ event.title }} · {{ event.date | date: 'MMM d, y' }}
+                {{ event.title }} · {{ event.date | localDate: 'MMM d, y' }}
               </p>
             }
           </div>
@@ -61,7 +72,7 @@ import { apiErrorMessage } from '../../api/api-error';
               class="btn btn-secondary btn-sm flex items-center gap-1.5"
             >
               <lucide-icon [img]="icons.Mail" class="w-4 h-4" aria-hidden="true" />
-              Message
+              {{ 'attendees.message' | transloco }}
             </button>
             <button
               (click)="exportCsv()"
@@ -69,11 +80,11 @@ import { apiErrorMessage } from '../../api/api-error';
               class="btn btn-secondary btn-sm flex items-center gap-1.5"
             >
               <lucide-icon [img]="icons.Download" class="w-4 h-4" aria-hidden="true" />
-              {{ exporting ? 'Exporting…' : 'Export Excel' }}
+              {{ (exporting ? 'attendees.exporting' : 'attendees.exportExcel') | transloco }}
             </button>
             <a routerLink="/scan" class="btn btn-primary btn-sm flex items-center gap-1.5">
               <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true" />
-              Scan tickets
+              {{ 'attendees.scanTickets' | transloco }}
             </a>
 
             <!-- Stats -->
@@ -81,17 +92,21 @@ import { apiErrorMessage } from '../../api/api-error';
               <div class="flex items-center gap-4 text-sm">
                 <div class="text-center">
                   <p class="font-bold text-foreground text-lg">{{ stats.total_registrations }}</p>
-                  <p class="text-xs text-muted-foreground">Registered</p>
+                  <p class="text-xs text-muted-foreground">
+                    {{ 'attendees.registered' | transloco }}
+                  </p>
                 </div>
                 <div class="w-px h-8 bg-border"></div>
                 <div class="text-center">
                   <p class="font-bold text-foreground text-lg">{{ stats.checked_in }}</p>
-                  <p class="text-xs text-muted-foreground">Checked in</p>
+                  <p class="text-xs text-muted-foreground">
+                    {{ 'analytics.checkedIn' | transloco }}
+                  </p>
                 </div>
                 <div class="w-px h-8 bg-border"></div>
                 <div class="text-center">
                   <p class="font-bold text-primary text-lg">{{ stats.check_in_rate }}%</p>
-                  <p class="text-xs text-muted-foreground">Rate</p>
+                  <p class="text-xs text-muted-foreground">{{ 'attendees.rate' | transloco }}</p>
                 </div>
               </div>
             }
@@ -111,9 +126,9 @@ import { apiErrorMessage } from '../../api/api-error';
             type="search"
             [(ngModel)]="searchQuery"
             (input)="onSearch()"
-            placeholder="Search attendees..."
+            [placeholder]="'attendees.searchAttendees' | transloco"
             class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-            aria-label="Search attendees"
+            [attr.aria-label]="'attendees.searchAttendees2' | transloco"
           />
         </label>
 
@@ -121,7 +136,7 @@ import { apiErrorMessage } from '../../api/api-error';
         @if (loading) {
           <div class="flex items-center justify-center py-16 gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading attendees...</span>
+            <span class="text-sm">{{ 'attendees.loadingAttendees' | transloco }}</span>
           </div>
         } @else if (filtered.length === 0) {
           <div class="flex flex-col items-center justify-center py-16 text-center">
@@ -131,7 +146,10 @@ import { apiErrorMessage } from '../../api/api-error';
               aria-hidden="true"
             />
             <p class="text-sm text-muted-foreground">
-              {{ searchQuery ? 'No attendees match your search.' : 'No attendees yet.' }}
+              {{
+                (searchQuery ? 'attendees.noAttendeesMatchYour' : 'attendees.noAttendeesYet')
+                  | transloco
+              }}
             </p>
           </div>
         } @else {
@@ -143,27 +161,27 @@ import { apiErrorMessage } from '../../api/api-error';
                   <th
                     class="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                   >
-                    Attendee
+                    {{ 'attendees.attendee' | transloco }}
                   </th>
                   <th
                     class="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                   >
-                    Status
+                    {{ 'common.status' | transloco }}
                   </th>
                   <th
                     class="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                   >
-                    Payment
+                    {{ 'attendees.payment' | transloco }}
                   </th>
                   <th
                     class="text-left px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                   >
-                    Check-in
+                    {{ 'attendees.checkIn' | transloco }}
                   </th>
                   <th
                     class="text-right px-4 py-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide"
                   >
-                    Actions
+                    {{ 'common.actions' | transloco }}
                   </th>
                 </tr>
               </thead>
@@ -222,9 +240,14 @@ import { apiErrorMessage } from '../../api/api-error';
                     <td class="px-4 py-3">
                       @if (reg.payment) {
                         @if (reg.payment.status === 'refunded') {
-                          <span class="text-xs text-[color:var(--destructive)] font-medium"
-                            >Refunded {{ reg.payment.refunded_amount }} {{ currency }}</span
-                          >
+                          <span class="text-xs text-[color:var(--destructive)] font-medium">{{
+                            'attendees.refundedRefundedamountCurrency'
+                              | transloco
+                                : {
+                                    refundedAmount: reg.payment.refunded_amount,
+                                    currency: currency,
+                                  }
+                          }}</span>
                         } @else if (+reg.payment.refunded_amount > 0) {
                           <span class="text-xs text-foreground"
                             >{{ reg.payment.net_amount }} {{ currency }}</span
@@ -254,10 +277,12 @@ import { apiErrorMessage } from '../../api/api-error';
                             class="w-3.5 h-3.5"
                             aria-hidden="true"
                           />
-                          {{ reg.checked_in_at | date: 'HH:mm' }}
+                          {{ reg.checked_in_at | localDate: 'HH:mm' }}
                         </span>
                       } @else if (reg.status === 'confirmed') {
-                        <span class="text-xs text-muted-foreground">Awaiting scan</span>
+                        <span class="text-xs text-muted-foreground">{{
+                          'attendees.awaitingScan' | transloco
+                        }}</span>
                       } @else {
                         <span class="text-xs text-muted-foreground">—</span>
                       }
@@ -270,7 +295,7 @@ import { apiErrorMessage } from '../../api/api-error';
                           class="text-xs font-medium text-[color:var(--pine-600)] hover:text-[color:var(--pine-600)] inline-flex items-center gap-1"
                         >
                           <lucide-icon [img]="icons.DollarSign" class="w-3.5 h-3.5" />
-                          Mark paid
+                          {{ 'attendees.markPaid' | transloco }}
                         </button>
                       } @else if (reg.payment?.is_refundable) {
                         <button
@@ -278,7 +303,7 @@ import { apiErrorMessage } from '../../api/api-error';
                           class="text-xs font-medium text-[color:var(--destructive)] hover:text-[color:var(--destructive)] inline-flex items-center gap-1"
                         >
                           <lucide-icon [img]="icons.RotateCcw" class="w-3.5 h-3.5" />
-                          Refund
+                          {{ 'attendees.refund' | transloco }}
                         </button>
                       }
                     </td>
@@ -321,13 +346,19 @@ import { apiErrorMessage } from '../../api/api-error';
                   @if (reg.payment) {
                     <span class="text-foreground font-medium">
                       @if (reg.payment.status === 'refunded') {
-                        Refunded {{ reg.payment.refunded_amount }} {{ currency }}
+                        {{
+                          'attendees.refundedRefundedamountCurrency'
+                            | transloco
+                              : { refundedAmount: reg.payment.refunded_amount, currency: currency }
+                        }}
                       } @else {
                         {{ reg.payment.net_amount }} {{ currency }}
                       }
                     </span>
                   } @else {
-                    <span class="text-muted-foreground">No payment</span>
+                    <span class="text-muted-foreground">{{
+                      'attendees.noPayment' | transloco
+                    }}</span>
                   }
 
                   @if (reg.status === 'pending') {
@@ -336,14 +367,14 @@ import { apiErrorMessage } from '../../api/api-error';
                       [disabled]="actingId === reg.id"
                       class="text-[color:var(--pine-600)] font-medium"
                     >
-                      Mark paid
+                      {{ 'attendees.markPaid' | transloco }}
                     </button>
                   } @else if (reg.payment?.is_refundable) {
                     <button
                       (click)="openRefund(reg)"
                       class="text-[color:var(--destructive)] font-medium"
                     >
-                      Refund
+                      {{ 'attendees.refund' | transloco }}
                     </button>
                   }
                 </div>
@@ -356,25 +387,40 @@ import { apiErrorMessage } from '../../api/api-error';
         @if (bookings.length) {
           <section class="mt-10" aria-labelledby="group-bookings-heading">
             <h2 id="group-bookings-heading" class="text-base font-semibold text-foreground mb-3">
-              Group bookings
+              {{ 'attendees.groupBookings' | transloco }}
             </h2>
             <div class="card divide-y divide-border">
               @for (b of bookings; track b.id) {
                 <div class="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div class="min-w-0">
                     <p class="text-sm font-semibold text-foreground">
-                      {{ b.owner_username }} · {{ b.seat_count || b.seats.length }} seats
+                      {{
+                        'attendees.ownerusernameSeatcountSeats'
+                          | transloco
+                            : {
+                                ownerUsername: b.owner_username,
+                                seatCount: b.seat_count || b.seats.length,
+                              }
+                      }}
                     </p>
                     <p class="text-xs text-muted-foreground">
-                      {{ b.created_at | date: 'MMM d, y · h:mm a' }} ·
+                      {{ b.created_at | localDate: 'MMM d, y · h:mm a' }} ·
                       @if (b.status === 'refunded') {
-                        <span class="text-[color:var(--destructive)] font-medium"
-                          >Refunded {{ b.amount_paid }} {{ b.currency }}</span
-                        >
+                        <span class="text-[color:var(--destructive)] font-medium">{{
+                          'attendees.refundedAmountpaidCurrency'
+                            | transloco: { amountPaid: b.amount_paid, currency: b.currency }
+                        }}</span>
                       } @else if (b.status === 'confirmed') {
-                        Paid {{ b.amount_paid || b.total_due }} {{ b.currency }}
+                        {{
+                          'attendees.paidAmountpaidCurrency'
+                            | transloco
+                              : { amountPaid: b.amount_paid || b.total_due, currency: b.currency }
+                        }}
                       } @else {
-                        Awaiting payment · {{ b.total_due }} {{ b.currency }}
+                        {{
+                          'attendees.awaitingPaymentTotaldueCurrency'
+                            | transloco: { totalDue: b.total_due, currency: b.currency }
+                        }}
                       }
                     </p>
                   </div>
@@ -384,7 +430,12 @@ import { apiErrorMessage } from '../../api/api-error';
                       [disabled]="refundingBookingId === b.id"
                       class="btn btn-secondary btn-sm text-[color:var(--destructive)] flex-shrink-0"
                     >
-                      {{ refundingBookingId === b.id ? 'Refunding…' : 'Refund booking' }}
+                      {{
+                        (refundingBookingId === b.id
+                          ? 'attendees.refunding'
+                          : 'attendees.refundBooking'
+                        ) | transloco
+                      }}
                     </button>
                   }
                 </div>
@@ -406,16 +457,25 @@ import { apiErrorMessage } from '../../api/api-error';
           dismissOnBackdrop
           (dismiss)="refundReg = null"
         >
-          <h3 class="text-lg font-bold text-foreground mb-1">Refund ticket</h3>
+          <h3 class="text-lg font-bold text-foreground mb-1">
+            {{ 'attendees.refundTicket' | transloco }}
+          </h3>
           <p class="text-sm text-muted-foreground mb-4">
-            {{ refundReg.full_name || refundReg.username }} · paid
-            {{ refundReg.payment?.net_amount }} {{ currency }}
+            {{
+              'attendees.fullnamePaidNetamountCurrency'
+                | transloco
+                  : {
+                      fullName: refundReg.full_name || refundReg.username,
+                      netAmount: refundReg.payment?.net_amount,
+                      currency: currency,
+                    }
+            }}
           </p>
 
           <label
             for="attendee-list-refund-amount"
             class="block text-sm font-medium text-foreground mb-1.5"
-            >Amount to refund</label
+            >{{ 'attendees.amountToRefund' | transloco }}</label
           >
           <div class="flex items-center gap-2 mb-2">
             <span class="text-muted-foreground">$</span>
@@ -432,30 +492,37 @@ import { apiErrorMessage } from '../../api/api-error';
               (click)="refundAmount = refundReg.payment?.net_amount || ''"
               class="btn btn-ghost btn-sm text-xs"
             >
-              Full
+              {{ 'attendees.full' | transloco }}
             </button>
           </div>
 
           <label
             for="attendee-list-refund-reason"
             class="block text-sm font-medium text-foreground mb-1.5 mt-3"
-            >Reason (optional)</label
+            >{{ 'attendees.reasonOptional' | transloco }}</label
           >
           <input
             id="attendee-list-refund-reason"
             [(ngModel)]="refundReason"
-            placeholder="e.g. Event cancelled"
+            [placeholder]="'attendees.eGEventCancelled' | transloco"
             class="input w-full mb-4"
           />
 
           <div class="flex gap-2">
-            <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
+            <button (click)="refundReg = null" class="btn btn-secondary flex-1">
+              {{ 'common.cancel' | transloco }}
+            </button>
             <button
               (click)="confirmRefund()"
               [disabled]="refunding || !refundAmount"
               class="btn btn-danger flex-1"
             >
-              {{ refunding ? 'Refunding…' : 'Refund ' + (refundAmount || '0') + ' ' + currency }}
+              {{
+                refunding
+                  ? ('attendees.refunding' | transloco)
+                  : ('attendees.refundAmount'
+                    | transloco: { amount: refundAmount || '0', currency: currency })
+              }}
             </button>
           </div>
         </div>
@@ -475,61 +542,63 @@ import { apiErrorMessage } from '../../api/api-error';
         >
           <h3 class="text-lg font-bold text-foreground mb-1 flex items-center gap-2">
             <lucide-icon [img]="icons.Mail" class="w-5 h-5 text-primary" />
-            Message attendees
+            {{ 'attendees.messageAttendees' | transloco }}
           </h3>
           <p class="text-sm text-muted-foreground mb-4">
-            Sends an in-app notification (and email if configured).
+            {{ 'attendees.sendsAnInApp' | transloco }}
           </p>
 
           <label
             for="attendee-list-msg-audience"
             class="block text-sm font-medium text-foreground mb-1.5"
-            >Send to</label
+            >{{ 'attendees.sendTo' | transloco }}</label
           >
           <select
             id="attendee-list-msg-audience"
             [(ngModel)]="msgAudience"
             class="input w-full mb-3"
           >
-            <option value="all">Everyone</option>
-            <option value="confirmed">Confirmed only</option>
-            <option value="pending">Pending payment</option>
-            <option value="checked_in">Checked in</option>
+            <option value="all">{{ 'attendees.everyone' | transloco }}</option>
+            <option value="confirmed">{{ 'attendees.confirmedOnly' | transloco }}</option>
+            <option value="pending">{{ 'attendees.pendingPayment' | transloco }}</option>
+            <option value="checked_in">{{ 'analytics.checkedIn' | transloco }}</option>
           </select>
 
           <label
             for="attendee-list-msg-subject"
             class="block text-sm font-medium text-foreground mb-1.5"
-            >Subject</label
+            >{{ 'attendees.subject' | transloco }}</label
           >
           <input
             id="attendee-list-msg-subject"
             [(ngModel)]="msgSubject"
-            placeholder="e.g. Schedule update"
+            [placeholder]="'attendees.eGScheduleUpdate' | transloco"
             class="input w-full mb-3"
           />
 
           <label
             for="attendee-list-msg-body"
             class="block text-sm font-medium text-foreground mb-1.5"
-            >Message</label
+            >{{ 'attendees.message' | transloco }}</label
           >
           <textarea
             id="attendee-list-msg-body"
             [(ngModel)]="msgBody"
             rows="4"
-            placeholder="Write your message to attendees…"
+            [placeholder]="'attendees.writeYourMessageTo' | transloco"
             class="input resize-none w-full mb-4"
           ></textarea>
 
           <div class="flex gap-2">
-            <button (click)="showMessage = false" class="btn btn-secondary flex-1">Cancel</button>
+            <button (click)="showMessage = false" class="btn btn-secondary flex-1">
+              {{ 'common.cancel' | transloco }}
+            </button>
             <button
               (click)="sendMessage()"
               [disabled]="sending || !msgSubject.trim() || !msgBody.trim()"
               class="btn btn-primary flex-1"
             >
-              {{ sending ? 'Sending…' : 'Send message' }}
+              {{ (sending ? 'attendees.sending' : 'attendees.sendMessage') | transloco }}
             </button>
           </div>
         </div>
@@ -538,6 +607,7 @@ import { apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class AttendeeListComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private route = inject(ActivatedRoute);
   private eventService = inject(EventService);
   private toastService = inject(ToastService);
@@ -642,10 +712,10 @@ export class AttendeeListComponent implements OnInit {
 
   statusLabel(status: string): string {
     const map: Record<string, string> = {
-      confirmed: 'Confirmed',
-      pending: 'Pending payment',
-      rejected: 'Cancelled',
-      cancelled: 'Cancelled',
+      confirmed: this.i18n.t('common.confirmed'),
+      pending: this.i18n.t('attendees.pendingPayment'),
+      rejected: this.i18n.t('common.cancelled'),
+      cancelled: this.i18n.t('common.cancelled'),
     };
     return map[status] ?? status;
   }
@@ -665,7 +735,7 @@ export class AttendeeListComponent implements OnInit {
       },
       error: () => {
         this.exporting = false;
-        this.toastService.error('Export failed.');
+        this.toastService.error(this.i18n.t('attendees.exportFailed'));
       },
     });
   }
@@ -674,13 +744,13 @@ export class AttendeeListComponent implements OnInit {
     this.actingId = reg.id;
     this.eventService.markOfflinePaid(reg.id).subscribe({
       next: () => {
-        this.toastService.success('Marked as paid.');
+        this.toastService.success(this.i18n.t('attendees.markedAsPaid'));
         this.actingId = null;
         this.loadData();
       },
       error: () => {
         this.actingId = null;
-        this.toastService.error('Could not mark as paid.');
+        this.toastService.error(this.i18n.t('attendees.couldNotMarkAs'));
       },
     });
   }
@@ -701,25 +771,30 @@ export class AttendeeListComponent implements OnInit {
       })
       .subscribe({
         next: () => {
-          this.toastService.success('Refund issued.');
+          this.toastService.success(this.i18n.t('attendees.refundIssued'));
           this.refunding = false;
           this.refundReg = null;
           this.loadData();
         },
         error: (err) => {
           this.refunding = false;
-          this.toastService.error(apiErrorMessage(err, 'Refund failed.', 'error'));
+          this.toastService.error(
+            apiErrorMessage(err, this.i18n.t('attendees.refundFailed'), 'error'),
+          );
         },
       });
   }
 
   async refundBooking(b: BookingDto): Promise<void> {
     const ok = await this.modalService.open({
-      title: 'Refund group booking?',
-      message:
-        `${b.owner_username} gets ${b.amount_paid || b.total_due} ${b.currency} back and all ` +
-        `${b.seats.length} seats return to sale. Their QR tickets stop working.`,
-      confirmText: 'Refund',
+      title: this.i18n.t('attendees.refundGroupBooking'),
+      message: this.i18n.t('attendees.refundBookingMessage', {
+        ownerUsername: b.owner_username,
+        amountPaid: b.amount_paid || b.total_due,
+        currency: b.currency,
+        seatsLength: b.seats.length,
+      }),
+      confirmText: this.i18n.t('attendees.refund'),
       isDestructive: true,
     });
     if (!ok) return;
@@ -727,12 +802,14 @@ export class AttendeeListComponent implements OnInit {
     this.bookingService.refund(b.id).subscribe({
       next: () => {
         this.refundingBookingId = null;
-        this.toastService.success('Group booking refunded.');
+        this.toastService.success(this.i18n.t('attendees.groupBookingRefunded'));
         this.loadData();
       },
       error: (err) => {
         this.refundingBookingId = null;
-        this.toastService.error(apiErrorMessage(err, 'Refund failed.', 'error'));
+        this.toastService.error(
+          apiErrorMessage(err, this.i18n.t('attendees.refundFailed'), 'error'),
+        );
       },
     });
   }
@@ -752,12 +829,18 @@ export class AttendeeListComponent implements OnInit {
           this.showMessage = false;
           this.msgSubject = '';
           this.msgBody = '';
-          const emailNote = res.email_enabled ? ` (${res.emailed} emailed)` : '';
-          this.toastService.success(`Sent to ${res.recipients} attendee(s)${emailNote}.`);
+          this.toastService.success(
+            this.i18n.t(res.email_enabled ? 'attendees.sentToEmailed' : 'attendees.sentTo', {
+              recipients: res.recipients,
+              emailed: res.emailed,
+            }),
+          );
         },
         error: (err) => {
           this.sending = false;
-          this.toastService.error(apiErrorMessage(err, 'Could not send message.', 'error'));
+          this.toastService.error(
+            apiErrorMessage(err, this.i18n.t('attendees.couldNotSendMessage'), 'error'),
+          );
         },
       });
   }
