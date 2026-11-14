@@ -78,6 +78,9 @@ services:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      # Rate limits per scope, e.g. login=60/min,mfa_ip=120/min (settings
+      # REST_FRAMEWORK / MFA_THROTTLE_RATES); empty keeps the defaults.
+      DJANGO_THROTTLE_RATES: ${DJANGO_THROTTLE_RATES:-}
       # Payments (docs/adr/0001-payment-provider-layer.md): every enabled
       # provider must be configured when DJANGO_DEBUG=0.
       # .env.example enables freedompay for the demo (KZT events).

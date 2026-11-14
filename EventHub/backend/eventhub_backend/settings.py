@@ -11,6 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
 from common.db_schemas import connection_options as db_schema_connection_options
+from common.throttle_rates import parse_overrides as parse_throttle_overrides
 from mfa.conf import DEV_ENCRYPTION_KEY as _default_mfa_key
 from mfa.conf import production_problems as mfa_production_problems
 from payments.providers.conf import parse_enabled as parse_enabled_providers
@@ -349,6 +350,19 @@ MFA_EMAIL_MAX_PER_HOUR = 5
 WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost').strip()
 WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'EventHub')
 WEBAUTHN_ORIGINS = env_list('WEBAUTHN_ORIGINS', ['http://localhost:4200', 'https://localhost'])
+
+# Rate limits per scope can be replaced without a code change, e.g.
+# DJANGO_THROTTLE_RATES=login=60/min,mfa_ip=120/min (common/throttle_rates.py).
+try:
+    _throttle_overrides = parse_throttle_overrides(
+        os.environ.get('DJANGO_THROTTLE_RATES', ''),
+        known_scopes=set(REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']) | set(MFA_THROTTLE_RATES),
+    )
+except ValueError as _exc:
+    raise ImproperlyConfigured(f'DJANGO_THROTTLE_RATES: {_exc}') from None
+for _scope, _rate in _throttle_overrides.items():
+    _rates = MFA_THROTTLE_RATES if _scope in MFA_THROTTLE_RATES else REST_FRAMEWORK['DEFAULT_THROTTLE_RATES']
+    _rates[_scope] = _rate
 
 # ---- Payments (docs/adr/0001-payment-provider-layer.md) ---- #
 # Providers that may take money, comma separated. Each enabled provider must
