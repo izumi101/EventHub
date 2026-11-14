@@ -47,6 +47,8 @@ services:
       DJANGO_CSRF_TRUSTED_ORIGINS: ${DJANGO_CSRF_TRUSTED_ORIGINS:-http://localhost:4200,https://localhost}
       DJANGO_SEED_DATA: ${DJANGO_SEED_DATA:-0}
       DJANGO_SEED_ADMIN_PASSWORD: ${DJANGO_SEED_ADMIN_PASSWORD:-}
+      # Browser tests only: a known TOTP secret for the demo organizer and admin.
+      DJANGO_SEED_MFA_TOTP_SECRET: ${DJANGO_SEED_MFA_TOTP_SECRET:-}
       DJANGO_COLLECTSTATIC: ${DJANGO_COLLECTSTATIC:-0}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4200}
       POSTGRES_DB: ${POSTGRES_DB:-eventhub}
