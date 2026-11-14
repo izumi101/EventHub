@@ -127,19 +127,23 @@ import { LocalDatePipe, PluralPipe } from '../../i18n/locale.pipes';
 
           <!-- Footer -->
           <div
-            class="flex items-center justify-between pt-3.5 mt-auto"
+            class="flex items-center justify-between gap-3 pt-3.5 mt-auto"
             [class.border-t]="featured"
             [class.border-border]="featured"
           >
             <span
-              class="font-display text-base font-semibold num"
+              class="font-display text-base font-semibold num min-w-0"
               [class.text-pine-600]="event.is_free"
             >
               {{
-                event.is_free ? ('common.free' | transloco) : (event.price | money: event.currency)
+                event.is_free
+                  ? ('common.free' | transloco)
+                  : (event.price | money: event.currency : 'short')
               }}
             </span>
-            <span class="text-xs font-semibold text-ember inline-flex items-center gap-1 cta">
+            <span
+              class="text-xs font-semibold text-ember inline-flex items-center gap-1 cta shrink-0 whitespace-nowrap"
+            >
               {{ (featured ? 'event.getTickets' : 'event.viewEvent') | transloco }}
               <lucide-icon
                 [img]="icons.ArrowRight"
