@@ -19,7 +19,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
           <div class="col-span-1 md:col-span-2">
             <a routerLink="/" class="flex items-center gap-2 mb-4 group w-fit">
               <img
-                src="assets/brand/symbol.svg"
+                src="assets/brand/symbol.svg?v=2"
                 alt=""
                 aria-hidden="true"
                 class="w-9 h-9 transition-transform group-hover:scale-110"
