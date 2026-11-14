@@ -414,7 +414,7 @@ video {
   width: 30px;
   height: 30px;
   flex-shrink: 0;
-  background: url('/assets/brand/symbol.svg') center / contain no-repeat;
+  background: url('/assets/brand/symbol.svg?v=2') center / contain no-repeat;
 }
 
 /* Status notes (token-based, dark-adaptive) */
