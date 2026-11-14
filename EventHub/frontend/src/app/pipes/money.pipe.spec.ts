@@ -58,4 +58,14 @@ describe('MoneyPipe', () => {
     await language.setLang('en');
     expect(norm(money.transform(5000, 'KZT'))).toBe('KZT 5,000.00');
   });
+
+  it('has a short form for cards: tenge sign, no cents on whole amounts', async () => {
+    const short = (v: number | string, c: string) =>
+      money.transform(v, c, 'short').replace(/[\u00a0\u202f]/g, ' ');
+    expect(short(12000, 'KZT')).toBe('₸12,000');
+    expect(short('25.00', 'USD')).toBe('$25');
+    expect(short(25.5, 'USD')).toBe('$25.50');
+    await TestBed.inject(LanguageService).setLang('ru');
+    expect(short(12000, 'KZT')).toBe('12 000 ₸');
+  });
 });
