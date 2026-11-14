@@ -63,6 +63,15 @@ export const routes: Routes = [
     title: 'EventHub — Profile',
   },
   {
+    path: 'profile/security',
+    loadComponent: () =>
+      import('./components/security/security-settings.component').then(
+        (m) => m.SecuritySettingsComponent,
+      ),
+    canActivate: [authGuard],
+    title: 'EventHub — Security',
+  },
+  {
     path: 'favorites',
     loadComponent: () =>
       import('./components/favorites/favorites.component').then((m) => m.FavoritesComponent),

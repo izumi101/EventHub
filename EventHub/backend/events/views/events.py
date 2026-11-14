@@ -30,6 +30,7 @@ from common.choices import EventStatusChoices, RegistrationStatusChoices
 from common.exceptions import error_response
 from common.permissions import can_manage_event
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED, MessageSerializer
+from mfa.stepup import require_recent_mfa
 
 from .. import schema as api
 from ..analytics import event_analytics, net_revenue
@@ -409,12 +410,21 @@ class EventViewSet(viewsets.ModelViewSet):
 
     @extend_schema(
         request=None,
-        responses={200: api.EventCancelResultSerializer, 400: ERROR, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND},
+        responses={
+            200: api.EventCancelResultSerializer,
+            400: ERROR,
+            403: OpenApiResponse(ERROR.response, description='Refused; `code` mfa_step_up_required asks for 2FA.'),
+            401: UNAUTHENTICATED,
+            404: NOT_FOUND,
+        },
     )
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated], url_path='cancel-event')
     def cancel_event(self, request, pk=None):
-        """Organizer cancels the event: refunds paid tickets, notifies attendees."""
+        """Organizer cancels the event: refunds paid tickets, notifies attendees.
+        Needs a recent second factor (step-up)."""
         event = self.get_object()
+        if can_manage_event(event, request.user):
+            require_recent_mfa(request)
         try:
             result = cancel_event_service(event=event, actor=request.user)
         except PermissionError as exc:
@@ -624,17 +634,19 @@ class EventViewSet(viewsets.ModelViewSet):
     @extend_schema(
         responses={
             (200, 'text/csv'): OpenApiResponse(OpenApiTypes.STR, description='Attendee list as CSV.'),
-            403: ERROR,
+            403: OpenApiResponse(ERROR.response, description='Refused; `code` mfa_step_up_required asks for 2FA.'),
             401: UNAUTHENTICATED,
             404: NOT_FOUND,
         }
     )
     @action(detail=True, methods=['get'], permission_classes=[IsAuthenticated], url_path='export-attendees')
     def export_attendees(self, request, pk=None):
-        """CSV of all attendees for the organizer to download."""
+        """CSV of all attendees for the organizer to download (personal data:
+        needs a recent second factor)."""
         event = self.get_object()
         if not can_manage_event(event, request.user):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        require_recent_mfa(request)
         return attendees_csv_response(event)
 
     @extend_schema(auth=[], responses={200: SeatMapSerializer, 404: ERROR})

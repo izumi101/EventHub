@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from bookings.models import Booking
 from events.models import Event, Registration
+from mfa.testing import mark_admin_session_verified
 from payments.models import Payment, PaymentEvent, Refund
 
 
@@ -210,6 +211,8 @@ class AdminTests(LedgerBase):
         super().setUp()
         self.admin = User.objects.create_superuser('root', 'root@example.com', 'Str0ng-pass!')
         self.client.force_login(self.admin)
+        # The admin asks staff for a second factor first (mfa/middleware.py).
+        mark_admin_session_verified(self.client, self.admin)
         self.payment = Payment.objects.create(registration=self.registration(), amount=Decimal('10.00'))
         self.refund = Refund.objects.create(
             payment=self.payment, amount=Decimal('5.00'), currency='KZT', kind=Refund.Kind.ORGANIZER

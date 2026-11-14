@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from . import views
 
@@ -18,4 +18,6 @@ urlpatterns = [
     path('change-password/', views.ChangePasswordView.as_view(), name='change_password'),
     # Admin-only organizer provisioning
     path('admin/organizers/', views.AdminCreateOrganizerView.as_view(), name='admin_create_organizer'),
+    # Two-factor authentication (docs/adr/0002-two-factor-authentication.md)
+    path('mfa/', include('mfa.urls')),
 ]

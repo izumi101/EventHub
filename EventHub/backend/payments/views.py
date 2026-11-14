@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from common.permissions import can_manage_event
 from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED
 from events.models import Registration
+from mfa.stepup import require_recent_mfa
 
 from . import schema
 from .models import Payment
@@ -216,18 +217,26 @@ class VerifyPaymentView(APIView):
 
 
 class RefundPaymentView(APIView):
-    """Organizer refunds a registration's payment (full or partial)."""
+    """Organizer refunds a registration's payment (full or partial). Needs a
+    recent second factor (step-up)."""
 
     permission_classes = [IsAuthenticated]
 
     @extend_schema(
         request=schema.RefundRequestSerializer,
-        responses={200: schema.RefundResultSerializer, 400: ERROR, 401: UNAUTHENTICATED, 403: ERROR, 404: ERROR},
+        responses={
+            200: schema.RefundResultSerializer,
+            400: ERROR,
+            401: UNAUTHENTICATED,
+            403: OpenApiResponse(ERROR.response, description='Refused; `code` mfa_step_up_required asks for 2FA.'),
+            404: ERROR,
+        },
     )
     def post(self, request, registration_id):
         registration = get_object_or_404(Registration, id=registration_id)
         if not can_manage_event(registration.event, request.user):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
+        require_recent_mfa(request)
 
         payment = getattr(registration, 'payment', None)
         if not payment:

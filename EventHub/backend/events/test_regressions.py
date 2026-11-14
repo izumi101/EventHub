@@ -21,6 +21,7 @@ from events.models import (
     Review,
     TicketType,
 )
+from mfa.testing import authenticate_with_recent_mfa
 from payments.models import Payment
 
 
@@ -186,7 +187,7 @@ class MoneyTests(Base):
         Payment.objects.create(registration=paid, amount=100, status='completed')
         free = Registration.objects.create(user=self.other, event=self.event, status='confirmed')
         with patch('payments.services.refund_payment', side_effect=RuntimeError('stripe down')):
-            self.client.force_authenticate(self.organizer)
+            authenticate_with_recent_mfa(self.client, self.organizer)  # cancelling needs step-up
             response = self.client.post(f'/api/v1/events/{self.event.id}/cancel-event/')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['refund_failed'], 1)
@@ -308,7 +309,7 @@ class ExportTests(Base):
         evil.first_name = '=HYPERLINK("http://evil.example","click")'
         evil.save()
         Registration.objects.create(user=evil, event=self.event, status='confirmed')
-        self.client.force_authenticate(self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)  # exports need step-up
         response = self.client.get(f'/api/v1/events/{self.event.id}/export-attendees/')
         sheet = load_workbook(BytesIO(response.content)).active
         self.assertTrue(sheet['A2'].value.startswith("'="))
@@ -351,7 +352,7 @@ class WaitlistTests(Base):
         self.event.save()
         Registration.objects.create(user=self.attendee, event=self.event, status='confirmed')
         WaitlistEntry.objects.create(user=self.other, event=self.event)
-        self.client.force_authenticate(self.organizer)
+        authenticate_with_recent_mfa(self.client, self.organizer)
         self.client.post(f'/api/v1/events/{self.event.id}/cancel-event/')
         self.assertEqual(WaitlistEntry.objects.get(user=self.other).status, 'waiting')
         self.assertFalse(self.other.notifications.filter(type='seat_available').exists())
