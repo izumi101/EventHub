@@ -15,7 +15,7 @@ An existing `.env` must contain the Freedom Pay demo block and (optionally) the 
 - `PAYMENT_PROVIDERS_ENABLED=stripe,freedompay`, `FREEDOMPAY_API_URL=http://fpay-emulator:8080`, `FREEDOMPAY_MERCHANT_ID`, `FREEDOMPAY_SECRET_KEY`, `FREEDOMPAY_TESTING_MODE=1`, `FPAY_PUBLIC_URL=http://localhost:18080`. Compose refuses to start without `FREEDOMPAY_MERCHANT_ID` and `FREEDOMPAY_SECRET_KEY`.
 - `POSTGRES_APP_PASSWORD` and `POSTGRES_READONLY_PASSWORD`: with them the backend and worker connect as the least-privilege `eventhub_app` role. Without them the app connects as the owner and logs a warning.
 
-Services: site <http://localhost:4200>, API docs <http://localhost:4200/api/v1/docs/>, Freedom Pay emulator <http://localhost:18080>. Demo logins (seed data, `DJANGO_DEBUG=1` only): `attendee` / `password123`, `organizer` / `password123`.
+Services: site <http://localhost:4200>, API docs <http://localhost:4200/api/v1/docs/>, Freedom Pay emulator <http://localhost:18080>. Demo logins (seed data, `DJANGO_DEBUG=1` only): `attendee` / `password123`, `organizer` / `password123`. The organizer and the admin must use two-factor authentication: see section 6 for their first sign-in.
 
 Demo content: `seed_showcase` adds 18 hand-picked events in Almaty and Astana for `organizer` (15 in KZT, 2 in USD, free ones, seat maps, ticket tiers, one waiting for moderation) and no registrations, so the audience sees a clean catalogue and buys live. For volume (about 4 800 registrations, for the SQL checks) add `seed_demo_kz`. `index_events` builds the search embeddings. With `DJANGO_SEED_DATA=0` in `.env` a restart does not add the small default seed again.
 
@@ -83,6 +83,32 @@ Report: `docs/reports/database-checks-report.md` (findings, analytical queries, 
 
 - Backend: `docs/reports/backend-payment-test-report.md` — 41 cases (checkout, Stripe webhook signature, Freedom Pay signature and callbacks, refunds, races, business rules). Run: `docker compose exec backend python manage.py test --noinput payments`.
 - Frontend: `docs/reports/frontend-payment-test-report.md` — 61 cases (price breakdown, payment services, success/cancel pages, group booking hold, refunds, token refresh during checkout, QR dialog). Run: `cd frontend && npm test`.
+
+## 6. Two-factor authentication
+
+Organizers, staff and superusers must use a second factor (`MFA_REQUIRED_ROLES`, ADR 0002); attendees may turn it on in **Profile → Security**. Factors: authenticator app (TOTP), passkey, email code, plus one-time recovery codes.
+
+**Read email codes in the demo.** With `DJANGO_DEBUG=1` the console email backend prints every email in the worker log:
+
+```bash
+docker compose logs worker | grep "Your EventHub code is" | tail -1
+```
+
+**First sign-in of the organizer (enrollment).**
+
+1. Sign in as `organizer` / `password123`. Instead of a session the page says **Set up two-factor authentication**.
+2. Choose **Email code**, click **Send code**, read the code from the worker log and enter it. (Or choose **Authenticator app**: scan the QR code with any authenticator app and enter its code.)
+3. The page shows 10 **recovery codes** once, with **Copy codes** / **Download .txt**. Tick "I saved my recovery codes" and continue: you are signed in.
+
+The admin (`admin`, password from `DJANGO_SEED_ADMIN_PASSWORD` or printed in the backend log at start) enrolls the same way in the SPA; the Django admin at `/admin/` then asks for the second factor too (authenticator code, recovery code, or **Email me a code**).
+
+**Next sign-ins.** After the password the page asks **Confirm it's you**: **Send code**, enter the code from the worker log (a new code can be requested after 60 s; it expires in 10 minutes and works once). Other methods are offered below the form (recovery code, authenticator app, passkey).
+
+**Step-up for sensitive actions.** Refunds, event cancellation, the attendee CSV export, password change and removing a factor need a second-factor proof that is at most 10 minutes old. Show it in **Profile → Security**: after 10 minutes click **Generate new codes** → **Continue**; a **Confirm it's you** dialog opens, verify with an email code, and the action completes by itself (the original request is retried once with the new token). For a shorter wait during the demo set `MFA_STEP_UP_MAX_AGE_SECONDS=60` in `.env` and recreate the backend.
+
+**Locked out?** `docker compose exec backend python manage.py mfa_reset organizer --yes-i-verified-the-user` removes every factor; the next sign-in enrolls again.
+
+Passkeys need a secure context: they work on `http://localhost:4200`, not on the plain-HTTP LAN address of `scripts/demo-lan.sh` (use email codes or the authenticator app there).
 
 ## If something goes wrong
 
