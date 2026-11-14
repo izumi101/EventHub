@@ -14,9 +14,12 @@ Three roles:
 `migrate` (entrypoint.sh): it creates missing roles, resets their passwords
 from the environment, re-grants privileges on every existing table and sets
 default privileges so that tables created by later migrations are usable at
-once. Every identifier and password goes through `psycopg.sql`; passwords
-are sent as SCRAM-SHA-256 verifiers computed by libpq, never in clear text,
-so they cannot leak into the server log.
+once. It covers `public` and every domain schema that exists
+(common/db_schemas.py, docs/DATABASE_SCHEMAS.md) and persists the search
+path for both roles in this database. Every identifier and password goes
+through `psycopg.sql`; passwords are sent as SCRAM-SHA-256 verifiers
+computed by libpq, never in clear text, so they cannot leak into the server
+log.
 """
 
 import secrets
@@ -27,7 +30,7 @@ from django.conf import settings
 from django.db import connection, transaction
 from psycopg import errors, sql
 
-SCHEMA = 'public'
+from common.db_schemas import DOMAIN_SCHEMAS, SEARCH_PATH, connection_options, persist_search_path
 
 # Tables the read-only role must not read at all: sessions, refresh tokens
 # and one-time codes are credentials.
@@ -80,11 +83,20 @@ def _ident(name):
     return sql.Identifier(name)
 
 
+def _schemas(cur):
+    """public and the domain schemas that exist, in search-path order."""
+    rows = cur.execute('SELECT nspname FROM pg_namespace WHERE nspname = ANY(%s)', [list(SEARCH_PATH)]).fetchall()
+    present = {row[0] for row in rows}
+    return [schema for schema in SEARCH_PATH if schema in present]
+
+
 def _existing_tables(cur, names):
+    """[(schema, table)] for the named tables, wherever they live."""
     rows = cur.execute(
-        'SELECT tablename FROM pg_tables WHERE schemaname = %s AND tablename = ANY(%s)', [SCHEMA, list(names)]
+        'SELECT schemaname, tablename FROM pg_tables WHERE schemaname = ANY(%s) AND tablename = ANY(%s) ORDER BY 1, 2',
+        [list(SEARCH_PATH), list(names)],
     ).fetchall()
-    return {row[0] for row in rows}
+    return [(schema, table) for schema, table in rows]
 
 
 def _validate(roles, owner):
@@ -143,68 +155,76 @@ def _upsert_role(cur, raw, role):
     return 'updated' if row else 'created'
 
 
-def _grant_common(cur, dbname, role):
-    name, db, schema = _ident(role.name), _ident(dbname), _ident(SCHEMA)
+def _grant_common(cur, dbname, schemas, role):
+    name, db = _ident(role.name), _ident(dbname)
     cur.execute(_q('GRANT CONNECT ON DATABASE {} TO {}', db, name))
     cur.execute(_q('REVOKE CREATE, TEMPORARY ON DATABASE {} FROM {}', db, name))
-    cur.execute(_q('GRANT USAGE ON SCHEMA {} TO {}', schema, name))
-    cur.execute(_q('REVOKE CREATE ON SCHEMA {} FROM {}', schema, name))
+    for schema in map(_ident, schemas):
+        cur.execute(_q('GRANT USAGE ON SCHEMA {} TO {}', schema, name))
+        cur.execute(_q('REVOKE CREATE ON SCHEMA {} FROM {}', schema, name))
+    # psql, DataGrip and the probes below connect without settings.py's
+    # options; the database default covers them too, this pins it per role.
+    persist_search_path(cur, dbname, role=role.name)
 
 
-def _grant_app(cur, owner, role):
-    name, schema, owner_id = _ident(role.name), _ident(SCHEMA), _ident(owner)
-    cur.execute(_q('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {} TO {}', schema, name))
-    cur.execute(_q('REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA {} FROM {}', schema, name))
-    for table in sorted(_existing_tables(cur, APP_READ_ONLY_TABLES)):
-        cur.execute(_q('REVOKE INSERT, UPDATE, DELETE ON TABLE {}.{} FROM {}', schema, _ident(table), name))
-    cur.execute(_q('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA {} TO {}', schema, name))
-    cur.execute(_q('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA {} TO {}', schema, name))
-    # Tables, sequences and functions the owner creates later (new migrations).
+def _grant_app(cur, owner, schemas, role):
+    name, owner_id = _ident(role.name), _ident(owner)
     default = 'ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {} '
-    cur.execute(_q(default + 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {}', owner_id, schema, name))
-    cur.execute(_q(default + 'GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {}', owner_id, schema, name))
-    cur.execute(_q(default + 'GRANT EXECUTE ON FUNCTIONS TO {}', owner_id, schema, name))
+    for schema in map(_ident, schemas):
+        cur.execute(_q('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {} TO {}', schema, name))
+        cur.execute(_q('REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA {} FROM {}', schema, name))
+        cur.execute(_q('GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA {} TO {}', schema, name))
+        cur.execute(_q('GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA {} TO {}', schema, name))
+        # Tables, sequences and functions the owner creates later (new migrations).
+        cur.execute(_q(default + 'GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {}', owner_id, schema, name))
+        cur.execute(_q(default + 'GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO {}', owner_id, schema, name))
+        cur.execute(_q(default + 'GRANT EXECUTE ON FUNCTIONS TO {}', owner_id, schema, name))
+    for schema, table in _existing_tables(cur, APP_READ_ONLY_TABLES):
+        cur.execute(_q('REVOKE INSERT, UPDATE, DELETE ON TABLE {}.{} FROM {}', _ident(schema), _ident(table), name))
 
 
-def _grant_readonly(cur, owner, role):
-    name, schema, owner_id = _ident(role.name), _ident(SCHEMA), _ident(owner)
-    cur.execute(_q('GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {}', schema, name))
-    cur.execute(
-        _q(
-            'REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA {} FROM {}',
-            schema,
-            name,
+def _grant_readonly(cur, owner, schemas, role):
+    name, owner_id = _ident(role.name), _ident(owner)
+    for schema in map(_ident, schemas):
+        cur.execute(_q('GRANT SELECT ON ALL TABLES IN SCHEMA {} TO {}', schema, name))
+        cur.execute(
+            _q(
+                'REVOKE INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA {} FROM {}',
+                schema,
+                name,
+            )
         )
-    )
-    cur.execute(_q('REVOKE ALL ON ALL SEQUENCES IN SCHEMA {} FROM {}', schema, name))
-    for table in sorted(_existing_tables(cur, READONLY_HIDDEN_TABLES)):
-        cur.execute(_q('REVOKE ALL ON TABLE {}.{} FROM {}', schema, _ident(table), name))
-    for table in sorted(_existing_tables(cur, READONLY_HIDDEN_COLUMNS)):
+        cur.execute(_q('REVOKE ALL ON ALL SEQUENCES IN SCHEMA {} FROM {}', schema, name))
+        cur.execute(
+            _q('ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {} GRANT SELECT ON TABLES TO {}', owner_id, schema, name)
+        )
+    for schema, table in _existing_tables(cur, READONLY_HIDDEN_TABLES):
+        cur.execute(_q('REVOKE ALL ON TABLE {}.{} FROM {}', _ident(schema), _ident(table), name))
+    for schema, table in _existing_tables(cur, READONLY_HIDDEN_COLUMNS):
         hidden = READONLY_HIDDEN_COLUMNS[table]
         visible = [
             row[0]
             for row in cur.execute(
                 'SELECT column_name FROM information_schema.columns '
                 'WHERE table_schema = %s AND table_name = %s ORDER BY ordinal_position',
-                [SCHEMA, table],
+                [schema, table],
             ).fetchall()
             if row[0] not in hidden
         ]
-        target = _q('{}.{}', schema, _ident(table))
+        target = _q('{}.{}', _ident(schema), _ident(table))
         cur.execute(_q('REVOKE SELECT ON TABLE {} FROM {}', target, name))
         cur.execute(_q('REVOKE SELECT ({}) ON TABLE {} FROM {}', sql.SQL(', ').join(map(_ident, hidden)), target, name))
         cur.execute(_q('GRANT SELECT ({}) ON TABLE {} TO {}', sql.SQL(', ').join(map(_ident, visible)), target, name))
-    cur.execute(
-        _q('ALTER DEFAULT PRIVILEGES FOR ROLE {} IN SCHEMA {} GRANT SELECT ON TABLES TO {}', owner_id, schema, name)
-    )
 
 
-def _verify_attributes(cur, dbname, role):
+def _verify_attributes(cur, dbname, schemas, role):
     row = cur.execute(
         'SELECT rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls, '
-        "has_database_privilege(rolname, %s, 'CREATE'), has_schema_privilege(rolname, %s, 'CREATE') "
-        'FROM pg_roles WHERE rolname = %s',
-        [dbname, SCHEMA, role.name],
+        "has_database_privilege(rolname, %s, 'CREATE'), "
+        "bool_or(has_schema_privilege(rolname, s, 'CREATE')) "
+        'FROM pg_roles, unnest(%s::text[]) s WHERE rolname = %s '
+        'GROUP BY rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls, rolname',
+        [dbname, list(schemas), role.name],
     ).fetchone()
     if row is None or any(row):
         raise RoleSetupError(f'Role "{role.name}" still has elevated privileges after setup: {row}')
@@ -230,19 +250,21 @@ def setup_roles(*, log=lambda message: None):
     results = []
     with transaction.atomic(), raw.cursor() as cur:
         _check_owner(cur, owner)
-        # Nobody gets CREATE in the schema or access to the database by default.
-        cur.execute(_q('REVOKE CREATE ON SCHEMA {} FROM PUBLIC', _ident(SCHEMA)))
+        schemas = _schemas(cur)
+        # Nobody gets CREATE in a schema or access to the database by default.
+        for schema in schemas:
+            cur.execute(_q('REVOKE CREATE ON SCHEMA {} FROM PUBLIC', _ident(schema)))
         cur.execute(_q('REVOKE CONNECT, TEMPORARY ON DATABASE {} FROM PUBLIC', _ident(dbname)))
         for role in roles:
             action = _upsert_role(cur, raw, role)
-            _grant_common(cur, dbname, role)
+            _grant_common(cur, dbname, schemas, role)
             if role.kind == 'app':
-                _grant_app(cur, owner, role)
+                _grant_app(cur, owner, schemas, role)
             else:
-                _grant_readonly(cur, owner, role)
-            _verify_attributes(cur, dbname, role)
+                _grant_readonly(cur, owner, schemas, role)
+            _verify_attributes(cur, dbname, schemas, role)
             results.append((role.name, role.kind, action))
-            log(f'{role.kind} role "{role.name}": {action}, privileges granted.')
+            log(f'{role.kind} role "{role.name}": {action}, privileges granted in schemas {", ".join(schemas)}.')
     return results
 
 
@@ -264,9 +286,15 @@ class Probe:
         return self.outcome == self.expected
 
 
-def connect_as(user, password, **overrides):
-    """A psycopg connection to the current database as another role."""
+def connect_as(user, password, *, search_path=True, **overrides):
+    """A psycopg connection to the current database as another role.
+
+    search_path=False leaves the search path to the server (the persisted
+    database / role setting), as psql or DataGrip would see it.
+    """
     params = connection.settings_dict
+    if search_path:
+        overrides.setdefault('options', connection_options())
     return psycopg.connect(
         host=params['HOST'] or None,
         port=params['PORT'] or None,
@@ -326,13 +354,59 @@ READONLY_PROBES = (
 )
 
 
+def _search_path_probe():
+    """Fails (an error, not ALLOWED) unless the server-side search path is SEARCH_PATH."""
+    return _q(
+        'DO $$ BEGIN '
+        "IF regexp_replace(current_setting('search_path'), '[[:space:]\"]', '', 'g') <> {} THEN "
+        "RAISE EXCEPTION 'search_path is %', current_setting('search_path'); "
+        'END IF; END $$',
+        sql.Literal(','.join(SEARCH_PATH)),
+    )
+
+
+def _schema_probes(kind):
+    """Per domain schema: USAGE works on one of its tables, CREATE is denied."""
+    hidden = set(READONLY_HIDDEN_TABLES) | set(READONLY_HIDDEN_COLUMNS) if kind == 'readonly' else set()
+    connection.ensure_connection()
+    with connection.connection.cursor() as cur:
+        rows = cur.execute(
+            'SELECT schemaname, min(tablename) FROM pg_tables '
+            'WHERE schemaname = ANY(%s) AND NOT (tablename = ANY(%s)) GROUP BY schemaname',
+            [list(DOMAIN_SCHEMAS), sorted(hidden)],
+        ).fetchall()
+        sample = dict(rows)
+        present = set(_schemas(cur))
+    probes = []
+    for schema in DOMAIN_SCHEMAS:
+        if schema not in present:
+            continue
+        if schema in sample:
+            table = sample[schema]
+            probes.append(
+                (
+                    f'SELECT {schema}.{table}',
+                    ALLOWED,
+                    _q('SELECT count(*) FROM {}.{}', _ident(schema), _ident(table)),
+                )
+            )
+        probes.append(
+            (f'CREATE TABLE in {schema}', DENIED, _q('CREATE TABLE {}.roles_probe (id integer)', _ident(schema)))
+        )
+    return probes
+
+
 def verify_roles():
     """Connect as each configured role and try what it may and may not do.
 
-    Every probe runs in a transaction that is rolled back. The last group
-    proves ALTER DEFAULT PRIVILEGES: the owner creates a throwaway table (as
-    a new migration would), the app role writes and reads it, the read-only
-    role reads it but cannot write; the table is dropped afterwards.
+    Every probe runs in a transaction that is rolled back. The connections
+    do not pass a search path, so the unqualified probes also prove the
+    persisted search path (what psql and DataGrip get). Per domain schema:
+    USAGE works, CREATE is denied. The last group proves ALTER DEFAULT
+    PRIVILEGES: the owner creates a throwaway table in public and in every
+    domain schema (as a new migration or a later move would), the app role
+    writes and reads it, the read-only role reads it but cannot write; the
+    tables are dropped afterwards.
     """
     roles = {role.kind: role for role in configured_roles()}
     probes = []
@@ -340,11 +414,12 @@ def verify_roles():
         role = roles.get(kind)
         if role is None:
             continue
-        with connect_as(role.name, role.password) as conn:
+        checks = [('search_path persisted', ALLOWED, _search_path_probe()), *table, *_schema_probes(kind)]
+        with connect_as(role.name, role.password, search_path=False) as conn:
             # The read-only role also defaults to read-only transactions; turn
             # that off here so the probes test the privileges themselves.
             conn.execute('SET default_transaction_read_only = off')
-            for action, expected, statement in table:
+            for action, expected, statement in checks:
                 probes.append(_run_probe(conn, Probe(role.name, action, expected), statement))
     if roles:
         probes += _verify_default_privileges(roles)
@@ -353,33 +428,41 @@ def verify_roles():
 
 def _verify_default_privileges(roles):
     probe_table = f'roles_probe_{secrets.token_hex(4)}'
-    table = _ident(probe_table)
     connection.ensure_connection()
     # The raw psycopg connection: Composed SQL, and outside any transaction
     # the CREATE commits at once, so the other roles can see the table.
     with connection.connection.cursor() as cur:
-        cur.execute(_q('CREATE TABLE {} (id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, note text)', table))
+        schemas = _schemas(cur)
+    targets = [(f'{schema}.{probe_table}', _q('{}.{}', _ident(schema), _ident(probe_table))) for schema in schemas]
     probes = []
     try:
+        with connection.connection.cursor() as cur:
+            for _, table in targets:
+                cur.execute(
+                    _q('CREATE TABLE {} (id bigint GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY, note text)', table)
+                )
         app, readonly = roles.get('app'), roles.get('readonly')
         if app is not None:
-            with connect_as(app.name, app.password) as conn:
-                for action, statement in (
-                    ('INSERT new table', _q("INSERT INTO {} (note) VALUES ('probe')", table)),
-                    ('SELECT new table', _q('SELECT count(*) FROM {}', table)),
-                ):
-                    probes.append(_run_probe(conn, Probe(app.name, f'{action} ({probe_table})', ALLOWED), statement))
+            with connect_as(app.name, app.password, search_path=False) as conn:
+                for label, table in targets:
+                    for action, statement in (
+                        ('INSERT new table', _q("INSERT INTO {} (note) VALUES ('probe')", table)),
+                        ('SELECT new table', _q('SELECT count(*) FROM {}', table)),
+                    ):
+                        probes.append(_run_probe(conn, Probe(app.name, f'{action} ({label})', ALLOWED), statement))
         if readonly is not None:
-            with connect_as(readonly.name, readonly.password) as conn:
+            with connect_as(readonly.name, readonly.password, search_path=False) as conn:
                 conn.execute('SET default_transaction_read_only = off')
-                for action, expected, statement in (
-                    ('SELECT new table', ALLOWED, _q('SELECT count(*) FROM {}', table)),
-                    ('INSERT new table', DENIED, _q("INSERT INTO {} (note) VALUES ('probe')", table)),
-                ):
-                    probes.append(
-                        _run_probe(conn, Probe(readonly.name, f'{action} ({probe_table})', expected), statement)
-                    )
+                for label, table in targets:
+                    for action, expected, statement in (
+                        ('SELECT new table', ALLOWED, _q('SELECT count(*) FROM {}', table)),
+                        ('INSERT new table', DENIED, _q("INSERT INTO {} (note) VALUES ('probe')", table)),
+                    ):
+                        probes.append(
+                            _run_probe(conn, Probe(readonly.name, f'{action} ({label})', expected), statement)
+                        )
     finally:
         with connection.connection.cursor() as cur:
-            cur.execute(_q('DROP TABLE IF EXISTS {}', table))
+            for _, table in targets:
+                cur.execute(_q('DROP TABLE IF EXISTS {}', table))
     return probes

@@ -10,6 +10,7 @@ from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
+from common.db_schemas import connection_options as db_schema_connection_options
 from payments.providers.conf import parse_enabled as parse_enabled_providers
 from payments.providers.conf import production_problems as payment_production_problems
 from payments.providers.conf import unknown_codes as unknown_payment_providers
@@ -145,7 +146,7 @@ DB_APP_USER = os.environ.get('POSTGRES_APP_USER', '').strip() or 'eventhub_app'
 DB_APP_PASSWORD = os.environ.get('POSTGRES_APP_PASSWORD', '')
 DB_READONLY_USER = os.environ.get('POSTGRES_READONLY_USER', '').strip() or 'eventhub_readonly'
 DB_READONLY_PASSWORD = os.environ.get('POSTGRES_READONLY_PASSWORD', '')
-DB_OWNER_COMMANDS = {'migrate', 'setup_db_roles', 'verify_db_roles'}
+DB_OWNER_COMMANDS = {'migrate', 'setup_db_roles', 'verify_db_roles', 'db_schemas'}
 DB_AS_OWNER = (
     TESTING
     or env_bool('DJANGO_DB_AS_OWNER', False)
@@ -168,6 +169,9 @@ DATABASES = {
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
         'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+        # One schema per domain; the search path keeps unqualified table
+        # names working (docs/DATABASE_SCHEMAS.md).
+        'OPTIONS': {'options': db_schema_connection_options()},
     }
 }
 
