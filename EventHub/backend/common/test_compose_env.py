@@ -45,3 +45,5 @@ class ComposeEnvironmentTests(SimpleTestCase):
             with self.subTest(service=service):
                 self.assertEqual(documented_2fa_settings() - env, set())
 
+    def test_rate_limit_overrides_reach_the_backend(self):
+        self.assertIn('DJANGO_THROTTLE_RATES', self.env['backend'])
