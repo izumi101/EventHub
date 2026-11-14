@@ -1,15 +1,14 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, effect, inject } from '@angular/core';
 import { Meta, Title } from '@angular/platform-browser';
 import { Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Event as EventModel } from '../models/models';
+import { LanguageService } from '../i18n/language.service';
 
 const SITE_NAME = 'EventHub';
 // Canonical/OG URLs follow the host the app is actually served from.
 const BASE_URL = window.location.origin;
-const DEFAULT_DESCRIPTION =
-  'Discover and book concerts, festivals, conferences, and workshops worldwide.';
 const DEFAULT_IMAGE = `${BASE_URL}/assets/og-default.png`;
 
 @Injectable({ providedIn: 'root' })
@@ -17,6 +16,8 @@ export class SeoService {
   private meta = inject(Meta);
   private title = inject(Title);
   private router = inject(Router);
+  private i18n = inject(LanguageService);
+  private showingDefault = false;
 
   constructor() {
     // Reset to site defaults on every navigation (individual pages override after)
@@ -26,13 +27,19 @@ export class SeoService {
         takeUntilDestroyed(),
       )
       .subscribe(() => this.setDefault());
+    // The default page title/description follow the selected language.
+    effect(() => {
+      this.i18n.lang();
+      if (this.showingDefault) this.setDefault();
+    });
   }
 
   setDefault(): void {
-    const t = `${SITE_NAME} — Discover Events That Matter`;
+    this.showingDefault = true;
+    const t = `${SITE_NAME} — ${this.i18n.t('meta.defaultTitle')}`;
     this._apply({
       title: t,
-      description: DEFAULT_DESCRIPTION,
+      description: this.i18n.t('meta.defaultDescription'),
       image: DEFAULT_IMAGE,
       url: `${BASE_URL}${this.router.url}`,
       type: 'website',
@@ -40,12 +47,13 @@ export class SeoService {
   }
 
   setEvent(event: EventModel): void {
+    this.showingDefault = false;
     const seoTitle = event.seo_title || event.title;
     const seoDesc =
       event.seo_description ||
       (event.description
         ? event.description.slice(0, 200).replace(/\s+/g, ' ').trim()
-        : DEFAULT_DESCRIPTION);
+        : this.i18n.t('meta.defaultDescription'));
     const image = event.image
       ? event.image.startsWith('http')
         ? event.image

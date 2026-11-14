@@ -5,11 +5,13 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
 import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-register',
   standalone: true,
-  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule],
+  imports: [CommonModule, RouterModule, FormsModule, LucideAngularModule, TranslocoPipe],
   template: `
     <!-- Each step of this multi-step form shows the one field to fill next, which
          takes focus on purpose: a deliberate exception to no-autofocus. -->
@@ -24,22 +26,25 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
           <span class="font-display font-semibold text-lg text-white">EventHub</span>
         </a>
         <div class="relative z-10 max-w-md">
-          <p class="kicker mb-4" style="color:var(--ember-500)">Join EventHub</p>
+          <p class="kicker mb-4" style="color:var(--ember-500)">
+            {{ 'register.joinEventhub' | transloco }}
+          </p>
           <h2
             class="font-display font-semibold leading-[1.05] text-white"
             style="font-size:clamp(2rem,3vw,2.75rem)"
           >
-            Your seat at the city's best events.
+            {{ 'register.yourSeatAtThe' | transloco }}
           </h2>
           <p class="mt-5 text-[0.95rem] leading-relaxed" style="color:rgba(245,239,230,0.72)">
-            Create an account to book tickets, save favourites and host your own events.
+            {{ 'register.createAnAccountTo' | transloco }}
           </p>
         </div>
         <div
           class="relative z-10 flex items-center gap-3 text-xs"
           style="color:rgba(245,239,230,0.55)"
         >
-          <span>Free to join</span><span aria-hidden="true">·</span><span>Cancel anytime</span>
+          <span>{{ 'register.freeToJoin' | transloco }}</span
+          ><span aria-hidden="true">·</span><span>{{ 'register.cancelAnytime' | transloco }}</span>
         </div>
         <span class="auth-ring" style="right:-120px;bottom:-120px;width:340px;height:340px"></span>
         <span
@@ -72,37 +77,40 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
 
           <h1 class="text-lg font-bold text-foreground mb-0.5">{{ stepTitle }}</h1>
           <p class="text-sm text-muted-foreground mb-6">
-            Step {{ currentStep }} of {{ steps.length }}
+            {{
+              'register.stepCurrentstepOfStepslength'
+                | transloco: { currentStep: currentStep, stepsLength: steps.length }
+            }}
           </p>
 
           <form (ngSubmit)="onSubmit()" novalidate class="space-y-4">
             <!-- Step 1: Email + Username -->
             @if (currentStep === 1) {
               <div>
-                <label for="email" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Email</label
-                >
+                <label for="email" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'common.email' | transloco
+                }}</label>
                 <input
                   id="email"
                   type="email"
                   [(ngModel)]="email"
                   name="email"
-                  placeholder="your@email.com"
+                  [placeholder]="'register.yourEmailCom' | transloco"
                   class="input"
                   autocomplete="email"
                   autofocus
                 />
               </div>
               <div>
-                <label for="username" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Username</label
-                >
+                <label for="username" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'eventSettings.username' | transloco
+                }}</label>
                 <input
                   id="username"
                   type="text"
                   [(ngModel)]="username"
                   name="username"
-                  placeholder="choose_username"
+                  [placeholder]="'register.chooseUsername' | transloco"
                   class="input"
                   autocapitalize="none"
                   autocomplete="username"
@@ -114,22 +122,22 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
             @if (currentStep === 2) {
               <div class="text-center mb-4">
                 <p class="text-sm text-muted-foreground">
-                  We sent a 6-digit code to
+                  {{ 'forgotPassword.weSentADigit' | transloco }}
                   <span class="font-semibold text-foreground">{{ email }}</span
                   >.
                 </p>
               </div>
               @if (devCode) {
                 <div class="note note-info">
-                  Email is not configured on this server — your code is
+                  {{ 'register.emailIsNotConfigured' | transloco }}
                   <span class="font-mono font-bold">{{ devCode }}</span
                   >.
                 </div>
               }
               <div>
-                <label for="code" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Verification code</label
-                >
+                <label for="code" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'register.verificationCode' | transloco
+                }}</label>
                 <input
                   id="code"
                   type="text"
@@ -148,30 +156,32 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
             @if (currentStep === 3) {
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label for="first_name" class="block text-sm font-medium text-foreground mb-1.5"
-                    >First name</label
+                  <label
+                    for="first_name"
+                    class="block text-sm font-medium text-foreground mb-1.5"
+                    >{{ 'moderation.firstName' | transloco }}</label
                   >
                   <input
                     id="first_name"
                     type="text"
                     [(ngModel)]="first_name"
                     name="first_name"
-                    placeholder="John"
+                    [placeholder]="'register.john' | transloco"
                     class="input"
                     autocomplete="given-name"
                     autofocus
                   />
                 </div>
                 <div>
-                  <label for="last_name" class="block text-sm font-medium text-foreground mb-1.5"
-                    >Last name</label
-                  >
+                  <label for="last_name" class="block text-sm font-medium text-foreground mb-1.5">{{
+                    'moderation.lastName' | transloco
+                  }}</label>
                   <input
                     id="last_name"
                     type="text"
                     [(ngModel)]="last_name"
                     name="last_name"
-                    placeholder="Doe"
+                    [placeholder]="'register.doe' | transloco"
                     class="input"
                     autocomplete="family-name"
                   />
@@ -179,7 +189,10 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
               </div>
               <div>
                 <label for="phone" class="block text-sm font-medium text-foreground mb-1.5">
-                  Phone <span class="text-muted-foreground font-normal">(optional)</span>
+                  {{ 'common.phone' | transloco }}
+                  <span class="text-muted-foreground font-normal">{{
+                    'checkout.optional' | transloco
+                  }}</span>
                 </label>
                 <input
                   id="phone"
@@ -196,9 +209,9 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
             <!-- Step 4: Password -->
             @if (currentStep === 4) {
               <div>
-                <label for="password" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Password</label
-                >
+                <label for="password" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'register.password' | transloco
+                }}</label>
                 <div
                   class="flex items-center gap-2 border border-border rounded-md px-3 h-10 bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-shadow"
                 >
@@ -216,7 +229,9 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
                     type="button"
                     (click)="showPassword = !showPassword"
                     class="text-muted-foreground hover:text-foreground flex-shrink-0"
-                    [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+                    [attr.aria-label]="
+                      (showPassword ? 'register.hidePassword' : 'register.showPassword') | transloco
+                    "
                   >
                     <lucide-icon
                       [img]="showPassword ? icons.EyeOff : icons.Eye"
@@ -232,22 +247,24 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
                       [class.text-[color:var(--pine-600)]]="password.length >= 8"
                       [class.text-muted-foreground]="password.length < 8"
                     >
-                      <span>{{ password.length >= 8 ? '✓' : '○' }}</span> At least 8 characters
+                      <span>{{ password.length >= 8 ? '✓' : '○' }}</span>
+                      {{ 'register.atLeastCharacters' | transloco }}
                     </li>
                     <li
                       class="flex items-center gap-1.5"
                       [class.text-[color:var(--pine-600)]]="hasDigit(password)"
                       [class.text-muted-foreground]="!hasDigit(password)"
                     >
-                      <span>{{ hasDigit(password) ? '✓' : '○' }}</span> Contains a number
+                      <span>{{ hasDigit(password) ? '✓' : '○' }}</span>
+                      {{ 'register.containsANumber' | transloco }}
                     </li>
                   </ul>
                 }
               </div>
               <div>
-                <label for="password2" class="block text-sm font-medium text-foreground mb-1.5"
-                  >Confirm password</label
-                >
+                <label for="password2" class="block text-sm font-medium text-foreground mb-1.5">{{
+                  'forgotPassword.confirmPassword' | transloco
+                }}</label>
                 <input
                   id="password2"
                   type="password"
@@ -259,7 +276,9 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
                   autocomplete="new-password"
                 />
                 @if (password2 && password !== password2) {
-                  <p class="text-xs text-destructive mt-1">Passwords do not match.</p>
+                  <p class="text-xs text-destructive mt-1">
+                    {{ 'forgotPassword.passwordsDoNotMatch' | transloco }}
+                  </p>
                 }
               </div>
             }
@@ -281,7 +300,7 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
             <div class="flex gap-2 pt-1">
               @if (currentStep > 1) {
                 <button type="button" (click)="prevStep()" class="btn btn-secondary flex-1">
-                  Back
+                  {{ 'common.back' | transloco }}
                 </button>
               }
 
@@ -294,18 +313,21 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
                 >
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
-                    {{ currentStep === 1 ? 'Sending code...' : 'Verifying...' }}
+                    {{
+                      (currentStep === 1 ? 'register.sendingCode' : 'forgotPassword.verifying')
+                        | transloco
+                    }}
                   } @else {
-                    Continue →
+                    {{ 'register.continue' | transloco }}
                   }
                 </button>
               } @else {
                 <button type="submit" [disabled]="submitting" class="btn btn-primary flex-1">
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
-                    Creating account...
+                    {{ 'register.creatingAccount' | transloco }}
                   } @else {
-                    Create account
+                    {{ 'register.createAccount' | transloco }}
                   }
                 </button>
               }
@@ -313,8 +335,10 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
           </form>
 
           <p class="text-sm text-muted-foreground text-center mt-6">
-            Already have an account?
-            <a routerLink="/login" class="text-ember font-semibold hover:underline ml-1">Sign in</a>
+            {{ 'register.alreadyHaveAnAccount' | transloco }}
+            <a routerLink="/login" class="text-ember font-semibold hover:underline ml-1">{{
+              'bookingClaim.signIn' | transloco
+            }}</a>
           </p>
         </div>
       </main>
@@ -322,6 +346,7 @@ import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
   `,
 })
 export class RegisterComponent {
+  private i18n = inject(LanguageService);
   private authService = inject(AuthService);
   private router = inject(Router);
 
@@ -346,10 +371,10 @@ export class RegisterComponent {
 
   get stepTitle(): string {
     const titles: Record<number, string> = {
-      1: 'Create your account',
-      2: 'Verify your email',
-      3: 'Personal details',
-      4: 'Set a password',
+      1: this.i18n.t('register.createYourAccount'),
+      2: this.i18n.t('register.verifyYourEmail'),
+      3: this.i18n.t('register.personalDetails'),
+      4: this.i18n.t('register.setAPassword'),
     };
     return titles[this.currentStep] ?? '';
   }
@@ -359,11 +384,11 @@ export class RegisterComponent {
 
     if (this.currentStep === 1) {
       if (!this.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(this.email)) {
-        this.errors.push('Enter a valid email address.');
+        this.errors.push(this.i18n.t('register.enterAValidEmail'));
         return;
       }
       if (!this.username || this.username.length < 3) {
-        this.errors.push('Username must be at least 3 characters.');
+        this.errors.push(this.i18n.t('register.usernameMustBeAt'));
         return;
       }
       this.submitting = true;
@@ -375,7 +400,9 @@ export class RegisterComponent {
         },
         error: (err) => {
           this.submitting = false;
-          this.errors.push(apiErrorMessage(err, 'Failed to send verification code.', 'error'));
+          this.errors.push(
+            apiErrorMessage(err, this.i18n.t('register.failedToSendVerification'), 'error'),
+          );
         },
       });
       return;
@@ -383,7 +410,7 @@ export class RegisterComponent {
 
     if (this.currentStep === 2) {
       if (this.verification_code.length !== 6) {
-        this.errors.push('Enter the 6-digit code from your email.');
+        this.errors.push(this.i18n.t('register.enterTheDigitCode'));
         return;
       }
       this.submitting = true;
@@ -394,7 +421,9 @@ export class RegisterComponent {
         },
         error: (err) => {
           this.submitting = false;
-          this.errors.push(apiErrorMessage(err, 'Invalid or expired code.', 'error'));
+          this.errors.push(
+            apiErrorMessage(err, this.i18n.t('forgotPassword.invalidOrExpiredCode'), 'error'),
+          );
         },
       });
       return;
@@ -416,11 +445,11 @@ export class RegisterComponent {
     this.errors = [];
 
     if (!this.password || this.password.length < 8 || !this.hasDigit(this.password)) {
-      this.errors.push('Password must be at least 8 characters and contain a number.');
+      this.errors.push(this.i18n.t('register.passwordMustBeAt'));
       return;
     }
     if (this.password !== this.password2) {
-      this.errors.push('Passwords do not match.');
+      this.errors.push(this.i18n.t('register.passwordsDoNotMatch'));
       return;
     }
 
@@ -450,7 +479,7 @@ export class RegisterComponent {
               this.errors.push(String(messages));
             }
           } else {
-            this.errors.push('Registration failed. Please try again.');
+            this.errors.push(this.i18n.t('register.registrationFailedPleaseTry'));
           }
         },
       });

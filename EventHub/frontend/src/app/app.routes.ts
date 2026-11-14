@@ -15,8 +15,8 @@ import { PaymentCancelComponent } from './components/payment-cancel/payment-canc
 import { NotFoundComponent } from './components/not-found/not-found.component';
 
 export const routes: Routes = [
-  { path: '', component: HomeComponent, title: 'EventHub — Discover Events' },
-  { path: 'events/:id', component: EventDetailComponent, title: 'EventHub — Event Details' },
+  { path: '', component: HomeComponent, title: 'routeTitles.discoverEvents' },
+  { path: 'events/:id', component: EventDetailComponent, title: 'routeTitles.eventDetails' },
   {
     path: 'events/:id/group',
     loadComponent: () =>
@@ -24,7 +24,7 @@ export const routes: Routes = [
         (m) => m.GroupBookingComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Group Booking',
+    title: 'routeTitles.groupBooking',
   },
   {
     path: 'booking/:token',
@@ -32,61 +32,61 @@ export const routes: Routes = [
       import('./components/booking-claim/booking-claim.component').then(
         (m) => m.BookingClaimComponent,
       ),
-    title: 'EventHub — Claim Your Seat',
+    title: 'routeTitles.claimYourSeat',
   },
   {
     path: 'create-event',
     component: EventFormComponent,
     canActivate: [roleGuard('organizer')],
-    title: 'EventHub — Create Event',
+    title: 'routeTitles.createEvent',
   },
   {
     path: 'edit-event/:id',
     component: EventFormComponent,
     canActivate: [authGuard],
-    title: 'EventHub — Edit Event',
+    title: 'routeTitles.editEvent',
   },
-  { path: 'login', component: LoginComponent, title: 'EventHub — Sign In' },
+  { path: 'login', component: LoginComponent, title: 'routeTitles.signIn' },
   {
     path: 'forgot-password',
     loadComponent: () =>
       import('./components/forgot-password/forgot-password.component').then(
         (m) => m.ForgotPasswordComponent,
       ),
-    title: 'EventHub — Reset Password',
+    title: 'routeTitles.resetPassword',
   },
-  { path: 'register', component: RegisterComponent, title: 'EventHub — Create Account' },
+  { path: 'register', component: RegisterComponent, title: 'routeTitles.createAccount' },
   {
     path: 'profile',
     component: ProfileComponent,
     canActivate: [authGuard],
-    title: 'EventHub — Profile',
+    title: 'routeTitles.profile',
   },
   {
     path: 'favorites',
     loadComponent: () =>
       import('./components/favorites/favorites.component').then((m) => m.FavoritesComponent),
     canActivate: [authGuard],
-    title: 'EventHub — Favorites',
+    title: 'routeTitles.favorites',
   },
   {
     path: 'my-events',
     component: MyEventsComponent,
     canActivate: [authGuard],
-    title: 'EventHub — My Events',
+    title: 'routeTitles.myEvents',
   },
   {
     path: 'my-registrations',
     component: MyRegistrationsComponent,
     canActivate: [authGuard],
-    title: 'EventHub — My Tickets',
+    title: 'routeTitles.myTickets',
   },
   {
     path: 'my-bookings',
     loadComponent: () =>
       import('./components/my-bookings/my-bookings.component').then((m) => m.MyBookingsComponent),
     canActivate: [authGuard],
-    title: 'EventHub — My Bookings',
+    title: 'routeTitles.myBookings',
   },
   {
     path: 'admin/moderation',
@@ -95,14 +95,14 @@ export const routes: Routes = [
         (m) => m.AdminModerationComponent,
       ),
     canActivate: [roleGuard('admin')],
-    title: 'EventHub — Moderation',
+    title: 'routeTitles.moderation',
   },
   {
     path: 'organizer/dashboard',
     loadComponent: () =>
       import('./components/dashboard/dashboard.component').then((m) => m.DashboardComponent),
     canActivate: [roleGuard('organizer')],
-    title: 'EventHub — Organizer Dashboard',
+    title: 'routeTitles.organizerDashboard',
   },
   {
     path: 'organizer/events/:id/attendees',
@@ -111,7 +111,7 @@ export const routes: Routes = [
         (m) => m.AttendeeListComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Attendee List',
+    title: 'routeTitles.attendeeList',
   },
   {
     path: 'organizer/events/:id/analytics',
@@ -120,7 +120,7 @@ export const routes: Routes = [
         (m) => m.EventAnalyticsComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Analytics',
+    title: 'routeTitles.analytics',
   },
   {
     path: 'organizer/events/:id/checkin-lists',
@@ -129,7 +129,7 @@ export const routes: Routes = [
         (m) => m.CheckinListsComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Check-in Lists',
+    title: 'routeTitles.checkInLists',
   },
   {
     path: 'organizer/events/:id/waitlist',
@@ -138,14 +138,14 @@ export const routes: Routes = [
         (m) => m.EventWaitlistComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Waitlist',
+    title: 'routeTitles.waitlist',
   },
   {
     path: 'organizer/events/:id/promo-codes',
     loadComponent: () =>
       import('./components/promo-codes/promo-codes.component').then((m) => m.PromoCodesComponent),
     canActivate: [authGuard],
-    title: 'EventHub — Promo Codes',
+    title: 'routeTitles.promoCodes',
   },
   {
     path: 'organizer/events/:id/questions',
@@ -154,7 +154,7 @@ export const routes: Routes = [
         (m) => m.EventQuestionsComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Checkout Questions',
+    title: 'routeTitles.checkoutQuestions',
   },
   {
     path: 'organizer/events/:id/ticket-types',
@@ -163,7 +163,7 @@ export const routes: Routes = [
         (m) => m.TicketTypesComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Ticket Types',
+    title: 'routeTitles.ticketTypes',
   },
   {
     path: 'organizer/events/:id/settings',
@@ -172,13 +172,13 @@ export const routes: Routes = [
         (m) => m.EventSettingsComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Event Settings',
+    title: 'routeTitles.eventSettings',
   },
   {
     path: 'scan',
     loadComponent: () => import('./components/scan/scan.component').then((m) => m.ScanComponent),
     canActivate: [authGuard],
-    title: 'EventHub — Scan Tickets',
+    title: 'routeTitles.scanTickets',
   },
   {
     path: 'validate/:uuid',
@@ -187,17 +187,17 @@ export const routes: Routes = [
         (m) => m.ValidateTicketComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Validate Ticket',
+    title: 'routeTitles.validateTicket',
   },
   {
     path: 'payment/success',
     component: PaymentSuccessComponent,
-    title: 'EventHub — Payment Success',
+    title: 'routeTitles.paymentSuccess',
   },
   {
     path: 'payment/cancel',
     component: PaymentCancelComponent,
-    title: 'EventHub — Payment Cancelled',
+    title: 'routeTitles.paymentCancelled',
   },
-  { path: '**', component: NotFoundComponent, title: 'EventHub — Page Not Found' },
+  { path: '**', component: NotFoundComponent, title: 'routeTitles.pageNotFound' },
 ];
