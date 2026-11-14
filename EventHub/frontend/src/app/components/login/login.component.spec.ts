@@ -5,6 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { LoginComponent } from './login.component';
 import { authInterceptor } from '../../interceptors/auth.interceptor';
 import { PasskeyClient } from '../../utils/passkey-client';
+import { I18nTestingModule } from '../../i18n/testing';
 import { environment } from '../../../environments/environment';
 
 const API = environment.apiUrl;
@@ -23,7 +24,7 @@ const TOKENS = { access: 'access-1', refresh: 'refresh-1' };
 function setup() {
   localStorage.clear();
   TestBed.configureTestingModule({
-    imports: [LoginComponent],
+    imports: [LoginComponent, I18nTestingModule],
     providers: [
       provideRouter([]),
       provideHttpClient(withInterceptors([authInterceptor])),

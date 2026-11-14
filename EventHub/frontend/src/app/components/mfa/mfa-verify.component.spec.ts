@@ -1,3 +1,4 @@
+import { I18nTestingModule } from '../../i18n/testing';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
@@ -12,7 +13,7 @@ function setup(methods: MfaMethod[], verifier: Partial<MfaVerifier>, passkeysSup
     errorMessage: () => 'The passkey prompt was closed or timed out. Try again.',
   };
   TestBed.configureTestingModule({
-    imports: [MfaVerifyComponent],
+    imports: [MfaVerifyComponent, I18nTestingModule],
     providers: [{ provide: PasskeyClient, useValue: passkeys }],
   });
   const fixture = TestBed.createComponent(MfaVerifyComponent);

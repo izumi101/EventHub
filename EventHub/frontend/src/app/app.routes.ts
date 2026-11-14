@@ -69,7 +69,7 @@ export const routes: Routes = [
         (m) => m.SecuritySettingsComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Security',
+    title: 'routeTitles.security',
   },
   {
     path: 'profile/notifications',
@@ -78,7 +78,7 @@ export const routes: Routes = [
         (m) => m.NotificationPreferencesComponent,
       ),
     canActivate: [authGuard],
-    title: 'EventHub — Notification Settings',
+    title: 'routeTitles.notificationSettings',
   },
   {
     path: 'favorites',

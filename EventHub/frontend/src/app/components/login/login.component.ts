@@ -14,6 +14,8 @@ import { apiErrorMessage } from '../../api/api-error';
 import { MfaVerifier, MfaVerifyComponent } from '../mfa/mfa-verify.component';
 import { MfaEnrollComponent } from '../mfa/mfa-enroll.component';
 import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 /**
  * Sign-in as a small state machine:
@@ -34,6 +36,7 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
     MfaVerifyComponent,
     MfaEnrollComponent,
     RecoveryCodesComponent,
+    TranslocoPipe,
   ],
   template: `
     <div class="min-h-dvh flex bg-background">
@@ -46,23 +49,24 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
           <span class="font-display font-semibold text-lg text-white">EventHub</span>
         </a>
         <div class="relative z-10 max-w-md">
-          <p class="kicker mb-4" style="color:var(--ember-500)">What's on · Tonight</p>
+          <p class="kicker mb-4" style="color:var(--ember-500)">{{ 'login.kicker' | transloco }}</p>
           <h2
             class="font-display font-semibold leading-[1.05] text-white"
             style="font-size:clamp(2rem,3vw,2.75rem)"
           >
-            Every great night starts with a ticket.
+            {{ 'login.headline' | transloco }}
           </h2>
           <p class="mt-5 text-[0.95rem] leading-relaxed" style="color:rgba(245,239,230,0.72)">
-            Discover concerts, gallery nights and conferences — and keep every ticket in one place.
+            {{ 'login.tagline' | transloco }}
           </p>
         </div>
         <div
           class="relative z-10 flex items-center gap-3 text-xs"
           style="color:rgba(245,239,230,0.55)"
         >
-          <span>Secure checkout</span><span aria-hidden="true">·</span
-          ><span>Trusted by organizers</span>
+          <span>{{ 'login.secureCheckout' | transloco }}</span
+          ><span aria-hidden="true">·</span
+          ><span>{{ 'login.trustedByOrganizers' | transloco }}</span>
         </div>
         <span class="auth-ring" style="right:-120px;bottom:-120px;width:340px;height:340px"></span>
         <span
@@ -85,31 +89,30 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
 
           @switch (step()) {
             @case ('mfa') {
-              <p class="kicker mb-2">Two-step sign-in</p>
+              <p class="kicker mb-2">{{ 'login.mfaKicker' | transloco }}</p>
               <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
-                Confirm it's you
+                {{ 'mfa.confirmTitle' | transloco }}
               </h1>
               <p class="text-sm text-muted-foreground mb-7">
-                Your account is protected with two-factor authentication.
+                {{ 'login.mfaIntro' | transloco }}
               </p>
               <app-mfa-verify
                 [methods]="challenge()?.methods ?? []"
                 [verifier]="loginVerifier"
-                submitLabel="Sign in"
+                [submitLabel]="'login.signIn' | transloco"
                 (verified)="finish()"
               />
               <button type="button" class="btn btn-ghost btn-sm mt-4" (click)="startOver()">
-                Back to sign in
+                {{ 'login.backToSignIn' | transloco }}
               </button>
             }
             @case ('enroll') {
-              <p class="kicker mb-2">One more step</p>
+              <p class="kicker mb-2">{{ 'login.enrollKicker' | transloco }}</p>
               <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
-                Set up two-factor authentication
+                {{ 'login.enrollTitle' | transloco }}
               </h1>
               <p class="text-sm text-muted-foreground mb-7">
-                Organizer and admin accounts must use a second factor. Choose how you want to
-                confirm your sign-ins.
+                {{ 'login.enrollIntro' | transloco }}
               </p>
               <app-mfa-enroll
                 [enrollmentToken]="enrollmentToken()"
@@ -117,39 +120,43 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
                 (cancelled)="startOver()"
               />
               <button type="button" class="btn btn-ghost btn-sm mt-4" (click)="startOver()">
-                Back to sign in
+                {{ 'login.backToSignIn' | transloco }}
               </button>
             }
             @case ('recovery') {
-              <p class="kicker mb-2">Two-factor authentication is on</p>
+              <p class="kicker mb-2">{{ 'login.recoveryKicker' | transloco }}</p>
               <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
-                Save your recovery codes
+                {{ 'login.recoveryTitle' | transloco }}
               </h1>
               <p class="text-sm text-muted-foreground mb-7">
-                Use one if you can't get a code from your app or email.
+                {{ 'login.recoveryIntro' | transloco }}
               </p>
               <app-recovery-codes
                 [codes]="recoveryCodes()"
-                continueLabel="Continue to EventHub"
+                [continueLabel]="'login.continueToEventHub' | transloco"
                 (done)="finish()"
               />
             }
             @default {
-              <p class="kicker mb-2">Welcome back</p>
-              <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">Sign in</h1>
-              <p class="text-sm text-muted-foreground mb-7">Continue to your tickets and events.</p>
+              <p class="kicker mb-2">{{ 'login.welcomeBack' | transloco }}</p>
+              <h1 class="font-display text-3xl font-semibold text-foreground mb-1.5">
+                {{ 'login.signIn' | transloco }}
+              </h1>
+              <p class="text-sm text-muted-foreground mb-7">
+                {{ 'login.signInIntro' | transloco }}
+              </p>
 
               <form (ngSubmit)="onSubmit()" class="space-y-4" novalidate>
                 <div>
                   <label for="username" class="block text-sm font-medium text-foreground mb-1.5">
-                    Username or email
+                    {{ 'login.usernameOrEmail' | transloco }}
                   </label>
                   <input
                     id="username"
                     type="text"
                     [(ngModel)]="username"
                     name="username"
-                    placeholder="@username or email"
+                    [placeholder]="'login.usernamePlaceholder' | transloco"
                     class="input"
                     [class.input-error]="error && !username"
                     autocapitalize="none"
@@ -161,11 +168,11 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
 
                 <div>
                   <div class="flex items-center justify-between mb-1.5">
-                    <label for="password" class="text-sm font-medium text-foreground"
-                      >Password</label
-                    >
+                    <label for="password" class="text-sm font-medium text-foreground">{{
+                      'login.password' | transloco
+                    }}</label>
                     <a routerLink="/forgot-password" class="text-xs text-primary hover:underline">
-                      Forgot password?
+                      {{ 'login.forgotPassword' | transloco }}
                     </a>
                   </div>
                   <div
@@ -190,7 +197,9 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
                       type="button"
                       (click)="showPassword = !showPassword"
                       class="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                      [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'"
+                      [attr.aria-label]="
+                        (showPassword ? 'login.hidePassword' : 'login.showPassword') | transloco
+                      "
                     >
                       <lucide-icon
                         [img]="showPassword ? icons.EyeOff : icons.Eye"
@@ -212,18 +221,18 @@ export type LoginStep = 'password' | 'mfa' | 'enroll' | 'recovery';
                 >
                   @if (submitting) {
                     <span class="spinner spinner-sm"></span>
-                    Signing in...
+                    {{ 'login.signingIn' | transloco }}
                   } @else {
-                    Sign in
+                    {{ 'login.signIn' | transloco }}
                   }
                 </button>
               </form>
 
               <p class="text-sm text-muted-foreground text-center mt-6">
-                Don't have an account?
-                <a routerLink="/register" class="text-ember font-semibold hover:underline ml-1"
-                  >Create one</a
-                >
+                {{ 'login.noAccount' | transloco }}
+                <a routerLink="/register" class="text-ember font-semibold hover:underline ml-1">{{
+                  'login.createOne' | transloco
+                }}</a>
               </p>
             }
           }
@@ -236,6 +245,7 @@ export class LoginComponent {
   private authService = inject(AuthService);
   private mfa = inject(MfaService);
   private router = inject(Router);
+  private lang = inject(LanguageService);
 
   readonly step = signal<LoginStep>('password');
   readonly challenge = signal<MfaChallenge | null>(null);
@@ -266,7 +276,7 @@ export class LoginComponent {
 
   onSubmit(): void {
     if (!this.username.trim() || !this.password.trim()) {
-      this.error = 'Please fill in all fields.';
+      this.error = this.lang.t('login.fillAllFields');
       return;
     }
     this.error = '';
@@ -287,7 +297,7 @@ export class LoginComponent {
         }
       },
       error: (err) => {
-        this.error = apiErrorMessage(err, 'Invalid username or password.', 'detail');
+        this.error = apiErrorMessage(err, this.lang.t('login.invalidCredentials'), 'detail');
         this.submitting = false;
       },
     });

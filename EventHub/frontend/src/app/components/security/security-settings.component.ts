@@ -1,5 +1,4 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Observable } from 'rxjs';
@@ -9,6 +8,9 @@ import { FactorAdded, MfaService, MfaStatus, Passkey } from '../../services/mfa.
 import { ModalService } from '../../services/modal.service';
 import { ToastService } from '../../services/toast.service';
 import { PasskeyClient } from '../../utils/passkey-client';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
+import { LocalDatePipe, PluralPipe } from '../../i18n/locale.pipes';
 import { EnrollMethod, MfaEnrollComponent } from '../mfa/mfa-enroll.component';
 import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
 
@@ -21,23 +23,33 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
 @Component({
   selector: 'app-security-settings',
   standalone: true,
-  imports: [DatePipe, FormsModule, RouterModule, MfaEnrollComponent, RecoveryCodesComponent],
+  imports: [
+    FormsModule,
+    RouterModule,
+    MfaEnrollComponent,
+    RecoveryCodesComponent,
+    TranslocoPipe,
+    LocalDatePipe,
+    PluralPipe,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-2xl py-8">
         <div class="mb-7">
-          <a routerLink="/profile" class="text-xs text-primary hover:underline">← Profile</a>
-          <p class="kicker mt-3 mb-2">Account</p>
-          <h1 class="text-3xl font-semibold text-foreground">Security</h1>
+          <a routerLink="/profile" class="text-xs text-primary hover:underline">{{
+            'profile.back' | transloco
+          }}</a>
+          <p class="kicker mt-3 mb-2">{{ 'profile.account' | transloco }}</p>
+          <h1 class="text-3xl font-semibold text-foreground">{{ 'security.title' | transloco }}</h1>
           <p class="text-sm text-muted-foreground mt-1.5">
-            Two-factor authentication protects your account even if your password leaks.
+            {{ 'security.intro' | transloco }}
           </p>
         </div>
 
         @if (loading()) {
           <div class="card p-8 flex items-center justify-center gap-3 text-muted-foreground">
             <span class="spinner" aria-hidden="true"></span>
-            <span class="text-sm">Loading security settings...</span>
+            <span class="text-sm">{{ 'security.loading' | transloco }}</span>
           </div>
         } @else if (loadError()) {
           <div role="alert" class="note note-error">{{ loadError() }}</div>
@@ -45,36 +57,42 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
           <!-- Summary -->
           <section class="card p-5 mb-4 flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 class="text-sm font-semibold text-foreground">Two-factor authentication</h2>
+              <h2 class="text-sm font-semibold text-foreground">
+                {{ 'security.tfaTitle' | transloco }}
+              </h2>
               <p class="text-xs text-muted-foreground mt-0.5">
                 @if (s.enabled) {
-                  On. Signing in asks for a second factor.
+                  {{ 'security.tfaOn' | transloco }}
                 } @else {
-                  Off. Turn on at least one method below.
+                  {{ 'security.tfaOff' | transloco }}
                 }
                 @if (s.required) {
-                  Required for your account.
+                  {{ 'security.tfaRequired' | transloco }}
                 }
               </p>
             </div>
             <span class="badge" [class]="s.enabled ? 'badge-success' : 'badge-warning'">
-              {{ s.enabled ? 'On' : 'Off' }}
+              {{ (s.enabled ? 'security.badgeOn' : 'security.badgeOff') | transloco }}
             </span>
           </section>
 
           @if (recoveryCodes(); as codes) {
             <section class="card p-5 mb-4" aria-labelledby="new-codes-title">
               <h2 id="new-codes-title" class="text-sm font-semibold text-foreground mb-3">
-                Your new recovery codes
+                {{ 'security.newCodesTitle' | transloco }}
               </h2>
-              <app-recovery-codes [codes]="codes" continueLabel="Done" (done)="closeCodes()" />
+              <app-recovery-codes
+                [codes]="codes"
+                [continueLabel]="'common.done' | transloco"
+                (done)="closeCodes()"
+              />
             </section>
           }
 
           @if (adding(); as method) {
             <section class="card p-5 mb-4" aria-labelledby="adding-title">
               <h2 id="adding-title" class="text-sm font-semibold text-foreground mb-3">
-                {{ addingTitle[method] }}
+                {{ addingTitleKeys[method] | transloco }}
               </h2>
               <app-mfa-enroll
                 [startWith]="method"
@@ -88,12 +106,17 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
             <!-- Authenticator app -->
             <section class="p-5 flex items-start justify-between gap-4 flex-wrap">
               <div class="min-w-0">
-                <h2 class="text-sm font-semibold text-foreground">Authenticator app</h2>
+                <h2 class="text-sm font-semibold text-foreground">
+                  {{ 'mfa.method.totp' | transloco }}
+                </h2>
                 <p class="text-xs text-muted-foreground mt-0.5">
                   @if (s.totp_enabled) {
-                    On since {{ s.totp_confirmed_at | date: 'mediumDate' }}.
+                    {{
+                      'security.onSince'
+                        | transloco: { date: (s.totp_confirmed_at | localDate: 'mediumDate') }
+                    }}
                   } @else {
-                    6-digit codes from an app such as Google Authenticator or 1Password.
+                    {{ 'security.totpHint' | transloco }}
                   }
                 </p>
               </div>
@@ -104,7 +127,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                   [disabled]="busy()"
                   (click)="removeTotp()"
                 >
-                  Remove
+                  {{ 'common.remove' | transloco }}
                 </button>
               } @else {
                 <button
@@ -113,7 +136,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                   [disabled]="busy() || !!adding()"
                   (click)="adding.set('totp')"
                 >
-                  Set up
+                  {{ 'security.setUp' | transloco }}
                 </button>
               }
             </section>
@@ -121,14 +144,19 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
             <!-- Email codes -->
             <section class="p-5 flex items-start justify-between gap-4 flex-wrap">
               <div class="min-w-0">
-                <h2 class="text-sm font-semibold text-foreground">Email codes</h2>
+                <h2 class="text-sm font-semibold text-foreground">
+                  {{ 'security.emailTitle' | transloco }}
+                </h2>
                 <p class="text-xs text-muted-foreground mt-0.5">
                   @if (s.email_enabled) {
-                    On since {{ s.email_confirmed_at | date: 'mediumDate' }}.
+                    {{
+                      'security.onSince'
+                        | transloco: { date: (s.email_confirmed_at | localDate: 'mediumDate') }
+                    }}
                   } @else if (!s.email_allowed) {
-                    Not available for your account: use an authenticator app or a passkey.
+                    {{ 'security.emailUnavailable' | transloco }}
                   } @else {
-                    A code sent to your account email. Simpler, but only as safe as your mailbox.
+                    {{ 'security.emailHint' | transloco }}
                   }
                 </p>
               </div>
@@ -139,7 +167,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                   [disabled]="busy()"
                   (click)="disableEmail()"
                 >
-                  Turn off
+                  {{ 'security.turnOff' | transloco }}
                 </button>
               } @else if (s.email_allowed) {
                 <button
@@ -148,7 +176,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                   [disabled]="busy() || !!adding()"
                   (click)="adding.set('email')"
                 >
-                  Turn on
+                  {{ 'security.turnOn' | transloco }}
                 </button>
               }
             </section>
@@ -157,13 +185,14 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
             <section class="p-5">
               <div class="flex items-start justify-between gap-4 flex-wrap">
                 <div class="min-w-0">
-                  <h2 class="text-sm font-semibold text-foreground">Passkeys</h2>
+                  <h2 class="text-sm font-semibold text-foreground">
+                    {{ 'security.passkeysTitle' | transloco }}
+                  </h2>
                   <p class="text-xs text-muted-foreground mt-0.5">
                     @if (passkeys.supported) {
-                      Face ID, Touch ID, Windows Hello or a security key.
+                      {{ 'security.passkeysHint' | transloco }}
                     } @else {
-                      This browser or connection can't create passkeys (they need https or
-                      localhost).
+                      {{ 'security.passkeysUnsupported' | transloco }}
                     }
                   </p>
                 </div>
@@ -174,7 +203,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                     [disabled]="busy() || !!adding()"
                     (click)="adding.set('webauthn')"
                   >
-                    Add passkey
+                    {{ 'security.addPasskeyButton' | transloco }}
                   </button>
                 }
               </div>
@@ -190,9 +219,9 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                           (ngSubmit)="saveName(key)"
                           novalidate
                         >
-                          <label class="sr-only" [attr.for]="'passkey-name-' + key.id"
-                            >Passkey name</label
-                          >
+                          <label class="sr-only" [attr.for]="'passkey-name-' + key.id">{{
+                            'security.passkeyName' | transloco
+                          }}</label>
                           <input
                             [id]="'passkey-name-' + key.id"
                             name="name"
@@ -205,14 +234,14 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                             class="btn btn-sm btn-primary"
                             [disabled]="busy() || !newName.trim()"
                           >
-                            Save
+                            {{ 'common.save' | transloco }}
                           </button>
                           <button
                             type="button"
                             class="btn btn-sm btn-ghost"
                             (click)="renaming.set(null)"
                           >
-                            Cancel
+                            {{ 'common.cancel' | transloco }}
                           </button>
                         </form>
                       } @else {
@@ -220,13 +249,22 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                           <p class="text-sm font-medium text-foreground truncate">
                             {{ key.name }}
                             @if (key.backed_up) {
-                              <span class="badge badge-info ml-1">Synced</span>
+                              <span class="badge badge-info ml-1">{{
+                                'security.synced' | transloco
+                              }}</span>
                             }
                           </p>
                           <p class="text-xs text-muted-foreground">
-                            Added {{ key.created_at | date: 'mediumDate' }}
+                            {{
+                              'security.addedOn'
+                                | transloco: { date: (key.created_at | localDate: 'mediumDate') }
+                            }}
                             @if (key.last_used_at) {
-                              · last used {{ key.last_used_at | date: 'mediumDate' }}
+                              {{
+                                'security.lastUsed'
+                                  | transloco
+                                    : { date: (key.last_used_at | localDate: 'mediumDate') }
+                              }}
                             }
                           </p>
                         </div>
@@ -236,18 +274,22 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                             class="btn btn-sm btn-ghost"
                             [disabled]="busy()"
                             (click)="startRename(key)"
-                            [attr.aria-label]="'Rename passkey ' + key.name"
+                            [attr.aria-label]="
+                              'security.renameAria' | transloco: { name: key.name }
+                            "
                           >
-                            Rename
+                            {{ 'security.rename' | transloco }}
                           </button>
                           <button
                             type="button"
                             class="btn btn-sm btn-secondary"
                             [disabled]="busy()"
                             (click)="removePasskey(key)"
-                            [attr.aria-label]="'Remove passkey ' + key.name"
+                            [attr.aria-label]="
+                              'security.removeAria' | transloco: { name: key.name }
+                            "
                           >
-                            Remove
+                            {{ 'common.remove' | transloco }}
                           </button>
                         </div>
                       }
@@ -260,13 +302,14 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
             <!-- Recovery codes -->
             <section class="p-5 flex items-start justify-between gap-4 flex-wrap">
               <div class="min-w-0">
-                <h2 class="text-sm font-semibold text-foreground">Recovery codes</h2>
+                <h2 class="text-sm font-semibold text-foreground">
+                  {{ 'mfa.recovery.listLabel' | transloco }}
+                </h2>
                 <p class="text-xs text-muted-foreground mt-0.5">
                   @if (s.enabled) {
-                    {{ s.recovery_codes_remaining }} unused
-                    {{ s.recovery_codes_remaining === 1 ? 'code' : 'codes' }} left.
+                    {{ 'security.codesLeft' | tPlural: s.recovery_codes_remaining }}
                   } @else {
-                    Created when you turn on two-factor authentication.
+                    {{ 'security.codesCreatedWhen' | transloco }}
                   }
                 </p>
               </div>
@@ -277,7 +320,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                   [disabled]="busy()"
                   (click)="regenerateCodes()"
                 >
-                  Generate new codes
+                  {{ 'security.generateCodes' | transloco }}
                 </button>
               }
             </section>
@@ -287,10 +330,10 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
             <section class="card p-5 mt-4 flex items-start justify-between gap-4 flex-wrap">
               <div class="min-w-0">
                 <h2 class="text-sm font-semibold text-foreground">
-                  Turn off two-factor authentication
+                  {{ 'security.disableTitle' | transloco }}
                 </h2>
                 <p class="text-xs text-muted-foreground mt-0.5">
-                  Removes every method and recovery code. Not recommended.
+                  {{ 'security.disableHint' | transloco }}
                 </p>
               </div>
               <button
@@ -299,7 +342,7 @@ import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
                 [disabled]="busy()"
                 (click)="disableAll()"
               >
-                Turn off
+                {{ 'security.turnOff' | transloco }}
               </button>
             </section>
           }
@@ -323,10 +366,12 @@ export class SecuritySettingsComponent implements OnInit {
   readonly recoveryCodes = signal<string[] | null>(null);
   newName = '';
 
-  protected readonly addingTitle: Record<EnrollMethod, string> = {
-    totp: 'Set up an authenticator app',
-    email: 'Turn on email codes',
-    webauthn: 'Add a passkey',
+  private readonly lang = inject(LanguageService);
+
+  protected readonly addingTitleKeys: Record<EnrollMethod, string> = {
+    totp: 'security.addTotp',
+    email: 'security.addEmail',
+    webauthn: 'security.addPasskey',
   };
 
   ngOnInit(): void {
@@ -341,14 +386,14 @@ export class SecuritySettingsComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.loading.set(false);
-        this.loadError.set(apiErrorMessage(err, 'Could not load your security settings.', 'error'));
+        this.loadError.set(apiErrorMessage(err, this.lang.t('security.loadFailed'), 'error'));
       },
     });
   }
 
   onAdded(res: FactorAdded): void {
     this.adding.set(null);
-    this.toast.success('Sign-in method added.');
+    this.toast.success(this.lang.t('security.methodAdded'));
     if (res.recovery_codes?.length) this.recoveryCodes.set(res.recovery_codes);
     this.reload();
   }
@@ -360,34 +405,34 @@ export class SecuritySettingsComponent implements OnInit {
   async removeTotp(): Promise<void> {
     if (
       !(await this.confirm(
-        'Remove the authenticator app?',
-        'Codes from the app will stop working for this account.',
+        this.lang.t('security.removeTotpTitle'),
+        this.lang.t('security.removeTotpMessage'),
       ))
     )
       return;
-    this.act(this.mfa.totpRemove(), 'Authenticator app removed.');
+    this.act(this.mfa.totpRemove(), this.lang.t('security.totpRemoved'));
   }
 
   async disableEmail(): Promise<void> {
     if (
       !(await this.confirm(
-        'Turn off email codes?',
-        'Codes sent by email will no longer confirm your sign-ins.',
+        this.lang.t('security.disableEmailTitle'),
+        this.lang.t('security.disableEmailMessage'),
       ))
     )
       return;
-    this.act(this.mfa.emailDisable(), 'Email codes turned off.');
+    this.act(this.mfa.emailDisable(), this.lang.t('security.emailOff'));
   }
 
   async removePasskey(key: Passkey): Promise<void> {
     if (
       !(await this.confirm(
-        `Remove the passkey "${key.name}"?`,
-        'You will not be able to sign in with it any more.',
+        this.lang.t('security.removePasskeyTitle', { name: key.name }),
+        this.lang.t('security.removePasskeyMessage'),
       ))
     )
       return;
-    this.act(this.mfa.passkeyRemove(key.id), 'Passkey removed.');
+    this.act(this.mfa.passkeyRemove(key.id), this.lang.t('security.passkeyRemoved'));
   }
 
   startRename(key: Passkey): void {
@@ -398,7 +443,7 @@ export class SecuritySettingsComponent implements OnInit {
   saveName(key: Passkey): void {
     const name = this.newName.trim();
     if (!name) return;
-    this.act(this.mfa.passkeyRename(key.id, name), 'Passkey renamed.', () =>
+    this.act(this.mfa.passkeyRename(key.id, name), this.lang.t('security.passkeyRenamed'), () =>
       this.renaming.set(null),
     );
   }
@@ -406,8 +451,8 @@ export class SecuritySettingsComponent implements OnInit {
   async regenerateCodes(): Promise<void> {
     if (
       !(await this.confirm(
-        'Generate new recovery codes?',
-        'Your current recovery codes will stop working.',
+        this.lang.t('security.regenTitle'),
+        this.lang.t('security.regenMessage'),
         false,
       ))
     )
@@ -419,26 +464,26 @@ export class SecuritySettingsComponent implements OnInit {
         this.recoveryCodes.set(res.recovery_codes);
         this.reload();
       },
-      error: (err: unknown) => this.fail(err, 'Could not generate new codes.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('security.regenFailed')),
     });
   }
 
   async disableAll(): Promise<void> {
     if (
       !(await this.confirm(
-        'Turn off two-factor authentication?',
-        'Every sign-in method and recovery code will be removed. Your password alone will protect the account.',
+        this.lang.t('security.disableAllTitle'),
+        this.lang.t('security.disableAllMessage'),
       ))
     )
       return;
-    this.act(this.mfa.disableAll(), 'Two-factor authentication turned off.');
+    this.act(this.mfa.disableAll(), this.lang.t('security.disabled'));
   }
 
   private confirm(title: string, message: string, destructive = true): Promise<boolean> {
     return this.modal.open({
       title,
       message,
-      confirmText: 'Continue',
+      confirmText: this.lang.t('common.continue'),
       isDestructive: destructive,
     });
   }
@@ -452,7 +497,7 @@ export class SecuritySettingsComponent implements OnInit {
         this.toast.success(success);
         after?.();
       },
-      error: (err: unknown) => this.fail(err, 'That did not work. Try again.'),
+      error: (err: unknown) => this.fail(err, this.lang.t('security.actionFailed')),
     });
   }
 

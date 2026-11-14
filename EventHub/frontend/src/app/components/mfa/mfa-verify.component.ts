@@ -5,7 +5,7 @@ import { apiErrorMessage } from '../../api/api-error';
 import {
   EmailCodeSent,
   FactorProof,
-  METHOD_LABELS,
+  METHOD_LABEL_KEYS,
   MfaMethod,
   WebAuthnJson,
   isApiError,
@@ -14,6 +14,8 @@ import {
 } from '../../services/mfa.service';
 import { Countdown } from '../../utils/countdown';
 import { PasskeyClient } from '../../utils/passkey-client';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 /** What the form needs from its context (sign-in or step-up). */
 export interface MfaVerifier {
@@ -35,31 +37,29 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
 @Component({
   selector: 'app-mfa-verify',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, TranslocoPipe],
   template: `
     @if (method(); as current) {
       <form (ngSubmit)="submit()" class="space-y-4" novalidate>
         @switch (current) {
           @case ('totp') {
             <p class="text-sm text-muted-foreground">
-              Enter the 6-digit code from your authenticator app.
+              {{ 'mfa.verifyForm.totpHint' | transloco }}
             </p>
           }
           @case ('email') {
             <p class="text-sm text-muted-foreground">
-              We email a 6-digit code to the address on your account. It works once and expires in
-              10 minutes.
+              {{ 'mfa.verifyForm.emailHint' | transloco }}
             </p>
           }
           @case ('recovery_code') {
             <p class="text-sm text-muted-foreground">
-              Enter one of the recovery codes you saved when you turned on two-factor
-              authentication. Each code works once.
+              {{ 'mfa.verifyForm.recoveryHint' | transloco }}
             </p>
           }
           @case ('webauthn') {
             <p class="text-sm text-muted-foreground">
-              Use the passkey or security key you registered for this account.
+              {{ 'mfa.verifyForm.passkeyHint' | transloco }}
             </p>
           }
         }
@@ -67,8 +67,7 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
         @if (current === 'webauthn') {
           @if (!passkeys.supported) {
             <div role="alert" class="note note-warning">
-              This browser or connection can't use passkeys (they need https or localhost). Choose
-              another method.
+              {{ 'mfa.verifyForm.passkeyUnsupported' | transloco }}
             </div>
           }
           <button
@@ -79,9 +78,9 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
           >
             @if (busy()) {
               <span class="spinner spinner-sm" aria-hidden="true"></span>
-              Waiting for the passkey...
+              {{ 'mfa.verifyForm.waitingForPasskey' | transloco }}
             } @else {
-              Use passkey
+              {{ 'mfa.verifyForm.usePasskey' | transloco }}
             }
           </button>
         } @else {
@@ -93,20 +92,22 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
                 (click)="sendEmail()"
                 [disabled]="sending() || countdown.seconds() > 0"
               >
-                {{ emailSent() ? 'Resend code' : 'Send code' }}
+                {{ (emailSent() ? 'mfa.resendCode' : 'mfa.sendCode') | transloco }}
               </button>
               <span class="text-xs text-muted-foreground" aria-live="polite">
                 @if (countdown.seconds() > 0) {
-                  You can ask for a new code in {{ countdown.seconds() }} s.
+                  {{ 'mfa.resendIn' | transloco: { seconds: countdown.seconds() } }}
                 } @else if (emailSent()) {
-                  Code sent. Check your inbox (and spam).
+                  {{ 'mfa.codeSent' | transloco }}
                 }
               </span>
             </div>
           }
           <div>
             <label [attr.for]="inputId" class="block text-sm font-medium text-foreground mb-1.5">
-              {{ current === 'recovery_code' ? 'Recovery code' : 'Code' }}
+              {{
+                (current === 'recovery_code' ? 'mfa.method.recovery_code' : 'mfa.code') | transloco
+              }}
             </label>
             <input
               [id]="inputId"
@@ -139,9 +140,9 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
           >
             @if (busy()) {
               <span class="spinner spinner-sm" aria-hidden="true"></span>
-              Checking...
+              {{ 'mfa.verifyForm.checking' | transloco }}
             } @else {
-              {{ submitLabel() }}
+              {{ submitLabel() || ('mfa.verify' | transloco) }}
             }
           </button>
         }
@@ -150,7 +151,7 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
       @if (otherMethods().length) {
         <div class="mt-5 pt-4 border-t border-border">
           <p class="text-xs text-muted-foreground mb-2" [id]="inputId + '-others'">
-            Use another method
+            {{ 'mfa.verifyForm.otherMethod' | transloco }}
           </p>
           <div
             class="flex flex-wrap gap-2"
@@ -158,14 +159,16 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
             [attr.aria-labelledby]="inputId + '-others'"
           >
             @for (m of otherMethods(); track m) {
-              <button type="button" class="chip" (click)="choose(m)">{{ labels[m] }}</button>
+              <button type="button" class="chip" (click)="choose(m)">
+                {{ labelKeys[m] | transloco }}
+              </button>
             }
           </div>
         </div>
       }
     } @else {
       <div role="alert" class="note note-warning">
-        No second factor is available for this account. Contact support to regain access.
+        {{ 'mfa.verifyForm.noFactor' | transloco }}
       </div>
     }
   `,
@@ -173,11 +176,13 @@ const ORDER: MfaMethod[] = ['totp', 'webauthn', 'email', 'recovery_code'];
 export class MfaVerifyComponent {
   readonly methods = input.required<MfaMethod[]>();
   readonly verifier = input.required<MfaVerifier>();
-  readonly submitLabel = input('Verify');
+  /** Button text; empty means the default "Verify". */
+  readonly submitLabel = input('');
   readonly verified = output<unknown>();
 
   protected readonly passkeys = inject(PasskeyClient);
-  protected readonly labels = METHOD_LABELS;
+  protected readonly labelKeys = METHOD_LABEL_KEYS;
+  private readonly lang = inject(LanguageService);
   protected readonly countdown = new Countdown();
   protected readonly inputId = `mfa-code-${++nextId}`;
 
@@ -226,7 +231,7 @@ export class MfaVerifyComponent {
           this.sending.set(false);
           const wait = mfaRetryAfter(err);
           if (wait) this.countdown.start(wait);
-          this.error.set(apiErrorMessage(err, 'Could not send the code. Try again.', 'error'));
+          this.error.set(apiErrorMessage(err, this.lang.t('mfa.verifyForm.sendFailed'), 'error'));
         },
       });
   }
@@ -250,7 +255,7 @@ export class MfaVerifyComponent {
       this.busy.set(false);
       this.error.set(
         isApiError(err)
-          ? apiErrorMessage(err, 'Could not start the passkey check.', 'error')
+          ? apiErrorMessage(err, this.lang.t('mfa.verifyForm.passkeyStartFailed'), 'error')
           : this.passkeys.errorMessage(err),
       );
       return;
@@ -279,8 +284,8 @@ export class MfaVerifyComponent {
 
   private messageFor(err: unknown): string {
     if (mfaErrorCode(err) === 'mfa_token_invalid') {
-      return apiErrorMessage(err, 'This sign-in step has expired. Sign in again.', 'error');
+      return apiErrorMessage(err, this.lang.t('mfa.verifyForm.tokenExpired'), 'error');
     }
-    return apiErrorMessage(err, 'That did not work. Check the code and try again.', 'error');
+    return apiErrorMessage(err, this.lang.t('mfa.verifyForm.failed'), 'error');
   }
 }

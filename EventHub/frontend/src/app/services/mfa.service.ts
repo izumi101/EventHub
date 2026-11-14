@@ -31,11 +31,12 @@ export function isApiError(err: unknown): boolean {
   return typeof err === 'object' && err !== null && 'status' in err && 'error' in err;
 }
 
-export const METHOD_LABELS: Record<MfaMethod, string> = {
-  totp: 'Authenticator app',
-  webauthn: 'Passkey',
-  email: 'Email code',
-  recovery_code: 'Recovery code',
+/** Translation keys of the method names (translate with the `transloco` pipe). */
+export const METHOD_LABEL_KEYS: Record<MfaMethod, string> = {
+  totp: 'mfa.method.totp',
+  webauthn: 'mfa.method.webauthn',
+  email: 'mfa.method.email',
+  recovery_code: 'mfa.method.recovery_code',
 };
 
 /** The stable `code` of a refused call (mfa_invalid, mfa_locked, ...). */
