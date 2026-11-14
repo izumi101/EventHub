@@ -5,6 +5,7 @@ Read this first when continuing the production-readiness work in a new session.
 - **Branch:** work is merged into `main` (phase 0: PR #3, phase 1: PR #4 and the group-booking follow-up); a new branch per phase from `main`.
 - **Full roadmap:** the owner keeps `PLAN.md` (private, Russian, 11 phases + 1Б). Ask for it if you need task-level detail.
 - **Principle agreed with the owner:** everything at production level — no "minimal" variants.
+- **Cross-team tests (2026-11-14):** 23 Playwright browser tests over every feature, an isolated test stack (`docker-compose.qa.yml`), database checks (`scripts/qa-db-checks.sh`) and the report with results, bugs and gaps: [`TEST_REPORT.md`](TEST_REPORT.md).
 - **i18n (phase 2):** the UI is translated into kk / ru / en with Transloco; see [`I18N.md`](I18N.md). Login, profile, auth service and 2FA files are still English-only (follow-up).
 
 ## Working rules

@@ -5,6 +5,7 @@ Model: all-MiniLM-L6-v2 (22 MB, 384 dims, fast, free)
 Embeddings are stored on Event.embedding and updated on save.
 """
 
+import importlib.util
 import logging
 from functools import lru_cache
 
@@ -48,11 +49,24 @@ def index_event(event) -> None:
         logger.warning('[Search] Failed to index event %s: %s', event.id, exc)
 
 
+def semantic_search_installed() -> bool:
+    """sentence-transformers is part of the full image only
+    (INSTALL_SEMANTIC_SEARCH=1); the slim image searches by keyword."""
+    return importlib.util.find_spec('sentence_transformers') is not None
+
+
 def index_event_async(event) -> None:
     """Queue the embedding — loading the model and encoding can take seconds
-    and must not hold up the HTTP request that saved the event."""
+    and must not hold up the HTTP request that saved the event.
+
+    Without sentence-transformers there is nothing to compute: queueing a
+    job anyway left one permanently failed job per saved event, which the
+    `outbox_jobs_stuck` data check reports as undelivered work."""
     from jobs.queue import enqueue
 
+    if not semantic_search_installed():
+        logger.debug('[Search] sentence-transformers not installed; event %s not indexed', event.pk)
+        return
     enqueue('index_event', {'event_id': event.pk}, max_attempts=3)
 
 

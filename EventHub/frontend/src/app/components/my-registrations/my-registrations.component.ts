@@ -262,7 +262,7 @@ import { LanguageService } from '../../i18n/language.service';
                               class="inline-block text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md {{
                                 zoneBadgeClass(reg.seat.zone)
                               }}"
-                              >{{ reg.seat.zone }}</span
+                              >{{ zoneLabel(reg.seat.zone) }}</span
                             >
                           </div>
                         }
@@ -436,7 +436,7 @@ import { LanguageService } from '../../i18n/language.service';
                   'myRegistrations.rowRowSeatCol'
                     | transloco: { row: qrModalReg.seat.row, col: qrModalReg.seat.col }
                 }}
-                <span class="uppercase">({{ qrModalReg.seat.zone }})</span>
+                <span class="uppercase">({{ zoneLabel(qrModalReg.seat.zone) }})</span>
               </p>
             }
           </div>
@@ -611,6 +611,11 @@ export class MyRegistrationsComponent implements OnInit {
       'bg-gradient-to-br from-rose-600 via-ember to-amber-600',
     ];
     return gradients[eventId % gradients.length];
+  }
+
+  /** The seat zone in the active language ("standard" comes from the API as a code). */
+  zoneLabel(zone: string): string {
+    return this.i18n.tOr('seatSelector.zones.' + zone, zone);
   }
 
   zoneBadgeClass(zone: string): string {

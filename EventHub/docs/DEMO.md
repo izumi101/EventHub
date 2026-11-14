@@ -29,7 +29,7 @@ docker compose exec backend python manage.py seed_demo_kz      # optional, volum
 
 - Architecture: nginx (Angular SPA, proxy) → gunicorn with uvicorn workers (Django REST API and WebSockets) → PostgreSQL 16 + pgvector, Redis (channel layer, throttling, waiting room), outbox worker (emails, webhooks).
 - Show: browse events, open an event with a seat map in two windows and take a seat in one — the other updates live over the WebSocket.
-- Proof: `cd frontend && E2E_BASE_URL=http://localhost:4200 npx playwright test` runs 4 browser tests against the whole stack.
+- Proof: 23 browser tests walk through sign-up, 2FA, payments, notifications, languages and the business rules against the whole stack; how to run them and the latest results are in `TEST_REPORT.md`.
 
 ## 3. Payment by QR code (Freedom Pay, KZT)
 

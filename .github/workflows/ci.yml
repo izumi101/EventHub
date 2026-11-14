@@ -151,11 +151,15 @@ jobs:
 
   e2e:
     # The whole stack as a developer runs it: docker compose up with the
-    # example .env (DEBUG, mock payments, demo data), then a browser test.
+    # example .env (DEBUG, mock payments for USD, the Freedom Pay emulator
+    # for KZT, demo data), then the browser tests (docs/TEST_REPORT.md).
     runs-on: ubuntu-latest
     env:
       # Publicly known test secret (base32), not a credential.
       E2E_MFA_TOTP_SECRET: JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP
+      E2E_WORKER_CONTAINER: eventhub_worker
+      E2E_FPAY_URL: http://localhost:18080
+      E2E_STEP_UP_MAX_AGE_SECONDS: "45"
     defaults:
       run:
         working-directory: EventHub
@@ -165,8 +169,17 @@ jobs:
         run: |
           cp .env.example .env
           sed -i 's/^INSTALL_SEMANTIC_SEARCH=.*/INSTALL_SEMANTIC_SEARCH=0/' .env
-          # The demo organizer must use 2FA: give it a known test TOTP secret.
+          # The demo organizer and admin must use 2FA: give them a known test TOTP secret.
           sed -i "s/^DJANGO_SEED_MFA_TOTP_SECRET=.*/DJANGO_SEED_MFA_TOTP_SECRET=${E2E_MFA_TOTP_SECRET}/" .env
+          # The specs create organizers through the admin: a fresh password per run.
+          admin_password="$(openssl rand -hex 16)"
+          echo "::add-mask::${admin_password}"
+          echo "E2E_ADMIN_PASSWORD=${admin_password}" >> "$GITHUB_ENV"
+          sed -i "s/^DJANGO_SEED_ADMIN_PASSWORD=.*/DJANGO_SEED_ADMIN_PASSWORD=${admin_password}/" .env
+          # Step-up proofs expire after 45 s so the specs reach the
+          # "Confirm it's you" dialog; one run signs in dozens of accounts.
+          echo "MFA_STEP_UP_MAX_AGE_SECONDS=${E2E_STEP_UP_MAX_AGE_SECONDS}" >> .env
+          sed -i 's#^DJANGO_THROTTLE_RATES=.*#DJANGO_THROTTLE_RATES=login=120/min,register=120/min,password_reset=60/min,change_password=60/min,mfa_ip=240/min,mfa_user=60/min#' .env
           docker compose up -d --build --wait --wait-timeout 600
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -192,6 +205,8 @@ jobs:
           done
           docker compose logs worker
           exit 1
+      - name: Database checks (schemas, roles, app role without DDL, data invariants)
+        run: scripts/qa-db-checks.sh
       - name: Stack logs
         if: failure()
         run: docker compose logs --tail 200
