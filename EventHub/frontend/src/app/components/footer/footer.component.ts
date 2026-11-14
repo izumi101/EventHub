@@ -19,12 +19,14 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
           <div class="col-span-1 md:col-span-2">
             <a routerLink="/" class="flex items-center gap-2 mb-4 group w-fit">
               <img
-                src="assets/logo.png"
-                alt="EventHub"
-                class="w-8 h-8 rounded-lg object-cover transition-transform group-hover:scale-110"
-                style="background:#12101a"
+                src="assets/brand/symbol.svg"
+                alt=""
+                aria-hidden="true"
+                class="w-9 h-9 transition-transform group-hover:scale-110"
               />
-              <span class="text-foreground font-semibold text-lg tracking-tight">EventHub</span>
+              <span class="font-display text-foreground text-lg tracking-tight"
+                >Event<span class="font-bold">Hub</span></span
+              >
             </a>
             <p class="text-muted-foreground text-sm leading-relaxed max-w-xs">
               {{ 'footer.tagline' | transloco }}
