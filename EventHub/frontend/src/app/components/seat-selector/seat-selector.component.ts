@@ -14,15 +14,17 @@ import { Seat } from '../../models/models';
 import { SeatWsService, WsSeatUpdate } from '../../services/seat-ws.service';
 import { Subscription } from 'rxjs';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 const ZONE_ORDER = ['premium', 'vip', 'standard'];
-const ZONE_LABEL: Record<string, string> = { premium: 'Premium', vip: 'VIP', standard: 'Standard' };
 
 /** One price zone of the hall: which rows it covers and what a seat there costs. */
 export interface ZoneSummary {
   zone: string;
-  label: string;
-  rows: string;
+  /** Translation key and params of the row description, e.g. `seatSelector.rowRange`. */
+  rowsKey: string;
+  rowsParams: Record<string, string | number>;
   price: string | null;
 }
 
@@ -43,27 +45,31 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
       const first = sorted[0];
       const last = sorted[sorted.length - 1];
       const contiguous = last - first + 1 === sorted.length;
-      const rowText =
+      const [rowsKey, rowsParams]: [string, Record<string, string | number>] =
         sorted.length === 1
-          ? `Row ${first}`
+          ? ['seatSelector.row', { first }]
           : contiguous
-            ? `Rows ${first}–${last}`
-            : `Rows ${sorted.join(', ')}`;
-      return { zone, label: ZONE_LABEL[zone] ?? zone, rows: rowText, price };
+            ? ['seatSelector.rowRange', { first, last }]
+            : ['seatSelector.rowList', { list: sorted.join(', ') }];
+      return { zone, rowsKey, rowsParams, price };
     });
 }
 
 @Component({
   selector: 'app-seat-selector',
   standalone: true,
-  imports: [CommonModule, LucideAngularModule, MoneyPipe],
+  imports: [CommonModule, LucideAngularModule, MoneyPipe, TranslocoPipe],
   template: `
     <div class="space-y-4">
       <!-- Header + live indicator -->
       <div class="flex items-center justify-between">
         <div>
-          <h2 class="text-base font-semibold text-foreground">Select your seat</h2>
-          <p class="text-xs text-muted-foreground">Click an available seat</p>
+          <h2 class="text-base font-semibold text-foreground">
+            {{ 'seatSelector.selectYourSeat' | transloco }}
+          </h2>
+          <p class="text-xs text-muted-foreground">
+            {{ 'seatSelector.clickAnAvailableSeat' | transloco }}
+          </p>
         </div>
         <div
           class="flex items-center gap-1.5 text-xs"
@@ -81,7 +87,7 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
               <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-300"></span>
             }
           </span>
-          {{ wsConnected ? 'Live' : 'Offline' }}
+          {{ (wsConnected ? 'seatSelector.live' : 'seatSelector.offline') | transloco }}
         </div>
       </div>
 
@@ -89,23 +95,23 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
       <div class="flex flex-wrap gap-4 text-xs">
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded border-2 border-emerald-500 bg-[color:var(--pine-50)]"></div>
-          <span>Available</span>
+          <span>{{ 'seatSelector.available' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded border-2 border-blue-400 bg-blue-50"></div>
-          <span>VIP</span>
+          <span>{{ 'seatSelector.vip' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded border-2 border-purple-300 bg-purple-50"></div>
-          <span>Premium</span>
+          <span>{{ 'seatSelector.premium' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded bg-gray-200 border-2 border-gray-300"></div>
-          <span>Taken</span>
+          <span>{{ 'seatMap.taken2' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
           <div class="w-4 h-4 rounded border-2 border-primary bg-primary/20"></div>
-          <span>Selected</span>
+          <span>{{ 'seatSelector.selected' | transloco }}</span>
         </div>
       </div>
 
@@ -114,7 +120,7 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
         <div
           class="inline-block px-10 py-1.5 rounded-t-xl bg-muted border border-b-0 border-border text-xs font-medium text-muted-foreground tracking-widest uppercase"
         >
-          Stage
+          {{ 'seatSelector.stage' | transloco }}
         </div>
       </div>
 
@@ -134,7 +140,11 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
                       (click)="selectSeat(seat)"
                       [disabled]="!seat.is_available"
                       [class]="seatClass(seat)"
-                      [title]="'Row ' + seat.row + ', Seat ' + seat.col + ' — ' + seat.price_zone"
+                      [title]="
+                        'seatSelector.seatTitle'
+                          | transloco
+                            : { row: seat.row, col: seat.col, zone: zoneLabel(seat.price_zone) }
+                      "
                     >
                       <span class="text-[10px] font-medium">{{ seat.col }}</span>
                     </button>
@@ -167,7 +177,8 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
       >
         @for (z of zones; track z.zone) {
           <li>
-            {{ z.rows }}: <strong [class]="zoneTextClass(z.zone)">{{ z.label }}</strong>
+            {{ z.rowsKey | transloco: z.rowsParams }}:
+            <strong [class]="zoneTextClass(z.zone)">{{ zoneLabel(z.zone) }}</strong>
             @if (z.price) {
               · {{ z.price | money: currency }}
             }
@@ -182,10 +193,13 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
         >
           <div>
             <p class="text-sm font-semibold text-[color:var(--pine-600)]">
-              Row {{ selectedSeat.row }}, Seat {{ selectedSeat.col }}
+              {{
+                'bookingClaim.rowRowSeatCol'
+                  | transloco: { row: selectedSeat.row, col: selectedSeat.col }
+              }}
             </p>
             <p class="text-xs text-[color:var(--pine-600)] capitalize">
-              {{ selectedSeat.price_zone }} zone
+              {{ 'seatSelector.pricezoneZone' | transloco: { priceZone: selectedSeat.price_zone } }}
               @if (selectedSeat.price) {
                 · {{ selectedSeat.price | money: currency }}
               }
@@ -195,7 +209,7 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
             (click)="deselect()"
             class="text-xs text-[color:var(--pine-600)] hover:text-[color:var(--pine-600)] underline"
           >
-            Change
+            {{ 'seatSelector.change' | transloco }}
           </button>
         </div>
       } @else {
@@ -207,7 +221,7 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
             class="w-4 h-4 flex-shrink-0 mt-0.5"
             aria-hidden="true"
           />
-          <span>Select a seat to continue</span>
+          <span>{{ 'checkout.selectASeatTo' | transloco }}</span>
         </div>
       }
     </div>
@@ -226,6 +240,7 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
   rows: number[] = [];
   cols: number[] = [];
   seatsByRow: Record<number, Seat[]> = {};
+  private i18n = inject(LanguageService);
   zones: ZoneSummary[] = [];
   wsConnected = false;
 
@@ -257,6 +272,11 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
       this.seatsByRow[row] = this.seats.filter((s) => s.row === row).sort((a, b) => a.col - b.col);
     }
     this.zones = summariseZones(this.seats);
+  }
+
+  /** Translated zone name; unknown zones are shown as the backend sent them. */
+  zoneLabel(zone: string): string {
+    return this.i18n.tOr('seatSelector.zones.' + zone, zone);
   }
 
   zoneTextClass(zone: string): string {

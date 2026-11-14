@@ -16,6 +16,8 @@ import { Subscription } from 'rxjs';
 import { Seat, ZonePrice } from '../../models/models';
 import { SeatWsService, WsSeatUpdate } from '../../services/seat-ws.service';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 interface ViewBox {
   x: number;
@@ -33,7 +35,7 @@ const STAGE_H = 46;
 @Component({
   selector: 'app-seat-map-svg',
   standalone: true,
-  imports: [MoneyPipe, CommonModule, LucideAngularModule],
+  imports: [MoneyPipe, CommonModule, LucideAngularModule, TranslocoPipe],
   template: `
     <div class="seat-map-wrap relative select-none">
       <!-- Toolbar -->
@@ -54,16 +56,16 @@ const STAGE_H = 46;
               <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-300"></span>
             }
           </span>
-          {{ wsConnected ? 'Live availability' : 'Connecting…' }}
+          {{ (wsConnected ? 'seatMap.liveAvailability' : 'seatMap.connecting') | transloco }}
         </div>
         <div class="flex items-center gap-1">
-          <button (click)="zoomBy(0.8)" class="zoom-btn" title="Zoom out">
+          <button (click)="zoomBy(0.8)" class="zoom-btn" [title]="'seatMap.zoomOut' | transloco">
             <lucide-icon [img]="icons.Minus" class="w-4 h-4" />
           </button>
-          <button (click)="resetView()" class="zoom-btn" title="Reset">
+          <button (click)="resetView()" class="zoom-btn" [title]="'common.reset' | transloco">
             <lucide-icon [img]="icons.Maximize" class="w-3.5 h-3.5" />
           </button>
-          <button (click)="zoomBy(1.25)" class="zoom-btn" title="Zoom in">
+          <button (click)="zoomBy(1.25)" class="zoom-btn" [title]="'seatMap.zoomIn' | transloco">
             <lucide-icon [img]="icons.Plus" class="w-4 h-4" />
           </button>
         </div>
@@ -88,7 +90,7 @@ const STAGE_H = 46;
           width="100%"
           height="100%"
           role="group"
-          aria-label="Seat map. Arrow keys move between seats, Space or Enter selects."
+          [attr.aria-label]="'seatMap.seatMapArrowKeys' | transloco"
           [class.cursor-grabbing]="panning"
           [class.cursor-grab]="!panning"
         >
@@ -111,7 +113,7 @@ const STAGE_H = 46;
             letter-spacing="3"
             fill="var(--muted-foreground)"
           >
-            STAGE
+            {{ 'seatMap.stage' | transloco }}
           </text>
 
           <!-- Seats -->
@@ -178,7 +180,9 @@ const STAGE_H = 46;
             [style.left.px]="tipX"
             [style.top.px]="tipY"
           >
-            <span class="font-semibold">Row {{ hovered.row }}, Seat {{ hovered.col }}</span>
+            <span class="font-semibold">{{
+              'bookingClaim.rowRowSeatCol' | transloco: { row: hovered.row, col: hovered.col }
+            }}</span>
             <span class="opacity-70 mx-1">·</span>
             <span class="capitalize">{{ hovered.zone || hovered.price_zone }}</span>
             @if (hovered.price) {
@@ -186,7 +190,7 @@ const STAGE_H = 46;
               <span class="font-semibold">{{ hovered.price | money: currency }}</span>
             }
             @if (!hovered.is_available) {
-              <span class="ml-1 text-ember">· Taken</span>
+              <span class="ml-1 text-ember">{{ 'seatMap.taken' | transloco }}</span>
             }
           </div>
         }
@@ -195,7 +199,7 @@ const STAGE_H = 46;
         <div
           class="absolute bottom-2 left-2 text-[10px] text-muted-foreground bg-background/80 backdrop-blur px-2 py-0.5 rounded"
         >
-          Scroll to zoom · drag to pan · arrows + Space to pick
+          {{ 'seatMap.scrollToZoomDrag' | transloco }}
         </div>
       </div>
 
@@ -214,7 +218,7 @@ const STAGE_H = 46;
         }
         <div class="flex items-center gap-1.5">
           <span class="w-3.5 h-3.5 rounded bg-gray-300 border-2 border-gray-400"></span>
-          <span class="text-muted-foreground">Taken</span>
+          <span class="text-muted-foreground">{{ 'seatMap.taken2' | transloco }}</span>
         </div>
       </div>
     </div>
@@ -256,6 +260,7 @@ const STAGE_H = 46;
   ],
 })
 export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
+  private i18n = inject(LanguageService);
   private seatWs = inject(SeatWsService);
 
   @Input() seats: Seat[] = [];
@@ -408,7 +413,9 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
   // ───────── keyboard ─────────
   seatLabel(s: Seat): string {
     const price = s.price ? `, ${this.money.transform(s.price, this.currency)}` : '';
-    return `Row ${s.row}, seat ${s.col}, ${s.price_zone}${price}${s.is_available ? '' : ', taken'}`;
+    const zone = this.i18n.tOr('seatSelector.zones.' + s.price_zone, s.price_zone);
+    const base = this.i18n.t('seatMap.seatAria', { row: s.row, col: s.col, zone });
+    return `${base}${price}${s.is_available ? '' : ', ' + this.i18n.t('seatMap.takenSuffix')}`;
   }
 
   onSeatKey(s: Seat, e: KeyboardEvent): void {

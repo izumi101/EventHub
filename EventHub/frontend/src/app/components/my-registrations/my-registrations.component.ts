@@ -21,6 +21,9 @@ import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { apiErrorMessage } from '../../api/api-error';
 import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LanguageService } from '../../i18n/language.service';
 
 @Component({
   selector: 'app-my-registrations',
@@ -32,6 +35,8 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
     FormsModule,
     RouterModule,
     LucideAngularModule,
+    TranslocoPipe,
+    LocalDatePipe,
   ],
   template: `
     <div class="page-root">
@@ -39,8 +44,12 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
         <!-- Header -->
         <div class="flex items-center justify-between mb-7">
           <div>
-            <h1 class="text-2xl font-bold text-foreground">My Tickets</h1>
-            <p class="text-sm text-muted-foreground mt-1">Your event registrations and tickets</p>
+            <h1 class="text-2xl font-bold text-foreground">
+              {{ 'myRegistrations.myTickets' | transloco }}
+            </h1>
+            <p class="text-sm text-muted-foreground mt-1">
+              {{ 'myRegistrations.yourEventRegistrationsAnd' | transloco }}
+            </p>
           </div>
         </div>
 
@@ -57,7 +66,10 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
           >
             <span class="flex items-center gap-1.5">
               <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true" />
-              Upcoming ({{ upcomingRegs.length }})
+              {{
+                'myRegistrations.upcomingUpcomingregslength'
+                  | transloco: { upcomingRegsLength: upcomingRegs.length }
+              }}
             </span>
           </button>
           <button
@@ -71,7 +83,10 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
           >
             <span class="flex items-center gap-1.5">
               <lucide-icon [img]="icons.Clock" class="w-4 h-4" aria-hidden="true" />
-              Past ({{ pastRegs.length }})
+              {{
+                'myRegistrations.pastPastregslength'
+                  | transloco: { pastRegsLength: pastRegs.length }
+              }}
             </span>
           </button>
         </div>
@@ -80,7 +95,7 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
         @if (loading) {
           <div class="flex items-center justify-center py-20 gap-3 text-muted-foreground">
             <span class="spinner"></span>
-            <span class="text-sm">Loading tickets...</span>
+            <span class="text-sm">{{ 'myRegistrations.loadingTickets' | transloco }}</span>
           </div>
         } @else {
           @if (visibleRegs.length === 0) {
@@ -95,11 +110,15 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                     aria-hidden="true"
                   />
                 </div>
-                <h3 class="text-base font-semibold text-foreground mb-1">No tickets yet</h3>
+                <h3 class="text-base font-semibold text-foreground mb-1">
+                  {{ 'myRegistrations.noTicketsYet' | transloco }}
+                </h3>
                 <p class="text-sm text-muted-foreground mb-5 max-w-xs">
-                  When you register for an event, your tickets will appear here.
+                  {{ 'myRegistrations.whenYouRegisterFor' | transloco }}
                 </p>
-                <a routerLink="/" class="btn btn-primary btn-sm">Discover events</a>
+                <a routerLink="/" class="btn btn-primary btn-sm">{{
+                  'favorites.discoverEvents' | transloco
+                }}</a>
               </div>
             } @else {
               <div class="flex flex-col items-center justify-center py-20 text-center">
@@ -112,9 +131,11 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                     aria-hidden="true"
                   />
                 </div>
-                <h3 class="text-base font-semibold text-foreground mb-1">No past tickets</h3>
+                <h3 class="text-base font-semibold text-foreground mb-1">
+                  {{ 'myRegistrations.noPastTickets' | transloco }}
+                </h3>
                 <p class="text-sm text-muted-foreground">
-                  Your attended events will be archived here.
+                  {{ 'myRegistrations.yourAttendedEventsWill' | transloco }}
                 </p>
               </div>
             }
@@ -164,7 +185,7 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                           class="flex items-center gap-1 text-[11px] font-bold text-white bg-pine backdrop-blur-sm px-2.5 py-1 rounded-full"
                         >
                           <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
-                          Checked in
+                          {{ 'analytics.checkedIn' | transloco }}
                         </span>
                       </div>
                     }
@@ -198,20 +219,20 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                           <p
                             class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
                           >
-                            Date
+                            {{ 'common.date' | transloco }}
                           </p>
                           <p class="text-sm font-semibold text-foreground">
-                            {{ reg.event.date | date: 'MMM d, y' }}
+                            {{ reg.event.date | localDate: 'MMM d, y' }}
                           </p>
                           <p class="text-xs text-muted-foreground">
-                            {{ reg.event.date | date: 'h:mm a' }}
+                            {{ reg.event.date | localDate: 'h:mm a' }}
                           </p>
                         </div>
                         <div>
                           <p
                             class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
                           >
-                            Venue
+                            {{ 'eventForm.venue' | transloco }}
                           </p>
                           <p class="text-sm font-semibold text-foreground truncate">
                             {{ reg.event.location }}
@@ -222,17 +243,20 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                             <p
                               class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
                             >
-                              Seat
+                              {{ 'checkout.seat' | transloco }}
                             </p>
                             <p class="text-sm font-semibold text-foreground">
-                              Row {{ reg.seat.row }} · {{ reg.seat.col }}
+                              {{
+                                'myRegistrations.rowRowCol'
+                                  | transloco: { row: reg.seat.row, col: reg.seat.col }
+                              }}
                             </p>
                           </div>
                           <div>
                             <p
                               class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-0.5"
                             >
-                              Zone
+                              {{ 'myRegistrations.zone' | transloco }}
                             </p>
                             <span
                               class="inline-block text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-md {{
@@ -251,24 +275,28 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                         class="js-ticket-actions flex items-center gap-2 pt-3 border-t border-border/60"
                       >
                         @if (reg.refund_request?.status === 'pending') {
-                          <span class="text-xs font-medium text-warning"
-                            >Refund pending review</span
-                          >
+                          <span class="text-xs font-medium text-warning">{{
+                            'myRegistrations.refundPendingReview' | transloco
+                          }}</span>
                         } @else if (reg.refund_request?.status === 'rejected') {
-                          <span class="text-xs font-medium text-ember">Refund declined</span>
+                          <span class="text-xs font-medium text-ember">{{
+                            'myRegistrations.refundDeclined' | transloco
+                          }}</span>
                         } @else if (isPaidConfirmed(reg)) {
                           @if (reg.is_checked_in) {
-                            <span class="text-xs text-muted-foreground"
-                              >Ticket used for entry — refunds unavailable</span
-                            >
+                            <span class="text-xs text-muted-foreground">{{
+                              'myRegistrations.ticketUsedForEntry' | transloco
+                            }}</span>
                           } @else if (reg.event.refundable === false) {
-                            <span class="text-xs text-muted-foreground">🔒 Non-refundable</span>
+                            <span class="text-xs text-muted-foreground">{{
+                              'myRegistrations.nonRefundable' | transloco
+                            }}</span>
                           } @else {
                             <button
                               (click)="openRefund(reg)"
                               class="text-xs font-medium text-muted-foreground hover:text-destructive transition-colors"
                             >
-                              Request refund
+                              {{ 'myRegistrations.requestRefund' | transloco }}
                             </button>
                           }
                         }
@@ -282,7 +310,7 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                             @if (payingId === reg.id) {
                               <span class="spinner spinner-sm"></span>
                             }
-                            Complete payment
+                            {{ 'eventDetail.completePayment' | transloco }}
                           </button>
                         }
                         @if (reg.status === 'confirmed') {
@@ -292,7 +320,7 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                               class="btn btn-sm btn-ghost text-xs flex items-center gap-1 text-muted-foreground"
                             >
                               <lucide-icon [img]="icons.FileText" class="w-3.5 h-3.5" />
-                              Invoice
+                              {{ 'myRegistrations.invoice' | transloco }}
                             </button>
                           }
                           <button
@@ -308,7 +336,10 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                                 class="w-3.5 h-3.5"
                               />
                             }
-                            {{ isMobile ? 'Share' : 'Download PDF' }}
+                            {{
+                              (isMobile ? 'eventDetail.share' : 'myRegistrations.downloadPdf')
+                                | transloco
+                            }}
                           </button>
                         }
                       </div>
@@ -327,7 +358,7 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                         <button
                           (click)="showQr(reg)"
                           class="bg-white rounded-xl p-2 shadow-md ring-1 ring-border hover:ring-primary/50 hover:shadow-lg transition-all cursor-zoom-in"
-                          title="Tap to enlarge"
+                          [title]="'myBookings.tapToEnlarge' | transloco"
                         >
                           @if (qrCodes[reg.ticket_uuid]) {
                             <img
@@ -347,7 +378,9 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
                           >
                             #{{ reg.ticket_uuid.substring(0, 8).toUpperCase() }}
                           </p>
-                          <p class="text-[9px] text-muted-foreground mt-0.5">tap to enlarge</p>
+                          <p class="text-[9px] text-muted-foreground mt-0.5">
+                            {{ 'myRegistrations.tapToEnlarge2' | transloco }}
+                          </p>
                         </div>
                       </div>
                     }
@@ -371,17 +404,21 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
           dismissOnBackdrop
           (dismiss)="qrModalReg = null"
         >
-          <span class="badge badge-confirmed mb-3">Confirmed</span>
+          <span class="badge badge-confirmed mb-3">{{ 'common.confirmed' | transloco }}</span>
           <h3 class="text-base font-bold text-foreground leading-tight">
             {{ qrModalReg.event.title }}
           </h3>
           <p class="text-xs text-muted-foreground mt-1 mb-5">
-            Show this code to the organizer at the entrance
+            {{ 'myRegistrations.showThisCodeTo' | transloco }}
           </p>
 
           <div class="bg-white rounded-xl p-4 inline-block ring-1 ring-border shadow-sm">
             @if (qrCodes[qrModalReg.ticket_uuid]) {
-              <img [src]="qrCodes[qrModalReg.ticket_uuid]" alt="Ticket QR code" class="w-56 h-56" />
+              <img
+                [src]="qrCodes[qrModalReg.ticket_uuid]"
+                [alt]="'bookingClaim.ticketQrCode' | transloco"
+                class="w-56 h-56"
+              />
             } @else {
               <div class="w-56 h-56 flex items-center justify-center">
                 <span class="spinner"></span>
@@ -395,13 +432,18 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
             </p>
             @if (qrModalReg.seat) {
               <p class="text-xs text-muted-foreground">
-                Row {{ qrModalReg.seat.row }} · Seat {{ qrModalReg.seat.col }}
+                {{
+                  'myRegistrations.rowRowSeatCol'
+                    | transloco: { row: qrModalReg.seat.row, col: qrModalReg.seat.col }
+                }}
                 <span class="uppercase">({{ qrModalReg.seat.zone }})</span>
               </p>
             }
           </div>
 
-          <button (click)="qrModalReg = null" class="btn btn-secondary btn-full mt-5">Close</button>
+          <button (click)="qrModalReg = null" class="btn btn-secondary btn-full mt-5">
+            {{ 'common.close' | transloco }}
+          </button>
         </div>
       </div>
     }
@@ -417,32 +459,47 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
           dismissOnBackdrop
           (dismiss)="refundReg = null"
         >
-          <h3 class="text-lg font-bold text-foreground mb-1">Request a refund</h3>
+          <h3 class="text-lg font-bold text-foreground mb-1">
+            {{ 'eventDetail.requestARefund' | transloco }}
+          </h3>
           <p class="text-sm text-muted-foreground mb-4">
-            For "{{ refundReg.event.title }}" —
-            {{ refundReg.payment?.net_amount | money: refundReg.event.currency }}. The organizer
-            reviews and approves or declines it.
+            {{
+              'myRegistrations.forTitleNetamountThe'
+                | transloco
+                  : {
+                      title: refundReg.event.title,
+                      netAmount: (refundReg.payment?.net_amount | money: refundReg.event.currency),
+                    }
+            }}
           </p>
           <label
             for="my-registrations-refund-reason"
             class="block text-sm font-medium text-foreground mb-1.5"
-            >Reason <span class="text-muted-foreground font-normal">(optional)</span></label
+            >{{ 'myRegistrations.reason' | transloco }}
+            <span class="text-muted-foreground font-normal">{{
+              'checkout.optional' | transloco
+            }}</span></label
           >
           <textarea
             id="my-registrations-refund-reason"
             [(ngModel)]="refundReason"
             rows="3"
-            placeholder="Why are you requesting a refund?"
+            [placeholder]="'myRegistrations.whyAreYouRequesting' | transloco"
             class="input resize-none w-full mb-4"
           ></textarea>
           <div class="flex gap-2">
-            <button (click)="refundReg = null" class="btn btn-secondary flex-1">Cancel</button>
+            <button (click)="refundReg = null" class="btn btn-secondary flex-1">
+              {{ 'common.cancel' | transloco }}
+            </button>
             <button
               (click)="submitRefundRequest()"
               [disabled]="submittingRefund"
               class="btn btn-primary flex-1"
             >
-              {{ submittingRefund ? 'Submitting…' : 'Submit request' }}
+              {{
+                (submittingRefund ? 'eventDetail.submitting' : 'myRegistrations.submitRequest')
+                  | transloco
+              }}
             </button>
           </div>
         </div>
@@ -451,6 +508,7 @@ import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
   `,
 })
 export class MyRegistrationsComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private eventService = inject(EventService);
   private toastService = inject(ToastService);
   private paymentService = inject(PaymentService);
@@ -503,7 +561,7 @@ export class MyRegistrationsComponent implements OnInit {
         this.generateQrCodes();
       },
       error: () => {
-        this.toastService.error('Failed to load registrations.');
+        this.toastService.error(this.i18n.t('myRegistrations.failedToLoadRegistrations'));
         this.loading = false;
       },
     });
@@ -576,10 +634,10 @@ export class MyRegistrationsComponent implements OnInit {
 
   statusLabel(status: string): string {
     const map: Record<string, string> = {
-      confirmed: 'Confirmed',
-      pending: 'Payment pending',
-      rejected: 'Cancelled',
-      cancelled: 'Cancelled',
+      confirmed: this.i18n.t('common.confirmed'),
+      pending: this.i18n.t('myRegistrations.paymentPending'),
+      rejected: this.i18n.t('common.cancelled'),
+      cancelled: this.i18n.t('common.cancelled'),
     };
     return map[status] ?? status;
   }
@@ -597,7 +655,7 @@ export class MyRegistrationsComponent implements OnInit {
         window.open(url, '_blank');
         setTimeout(() => URL.revokeObjectURL(url), 60_000);
       },
-      error: () => this.toastService.error('Could not load the invoice.'),
+      error: () => this.toastService.error(this.i18n.t('myRegistrations.couldNotLoadThe')),
     });
   }
 
@@ -617,12 +675,14 @@ export class MyRegistrationsComponent implements OnInit {
       next: () => {
         this.submittingRefund = false;
         this.refundReg = null;
-        this.toastService.success('Refund request submitted — the organizer will review it.');
+        this.toastService.success(this.i18n.t('myRegistrations.refundRequestSubmittedThe'));
         this.loadRegistrations();
       },
       error: (err) => {
         this.submittingRefund = false;
-        this.toastService.error(apiErrorMessage(err, 'Could not submit request.', 'error'));
+        this.toastService.error(
+          apiErrorMessage(err, this.i18n.t('myRegistrations.couldNotSubmitRequest'), 'error'),
+        );
       },
     });
   }
@@ -660,14 +720,17 @@ export class MyRegistrationsComponent implements OnInit {
         const blob = pdf.output('blob');
         const file = new File([blob], fileName, { type: 'application/pdf' });
         if (canShareFiles([file])) {
-          await navigator.share({ files: [file], title: `Ticket: ${reg.event.title}` });
-          this.toastService.success('Ticket shared.');
+          await navigator.share({
+            files: [file],
+            title: this.i18n.t('myRegistrations.shareTitle', { title: reg.event.title }),
+          });
+          this.toastService.success(this.i18n.t('myRegistrations.ticketShared'));
           return;
         }
       }
       pdf.save(fileName);
     } catch {
-      this.toastService.error('Failed to export ticket.');
+      this.toastService.error(this.i18n.t('myRegistrations.failedToExportTicket'));
     } finally {
       this.exportingId = null;
     }
@@ -682,7 +745,7 @@ export class MyRegistrationsComponent implements OnInit {
       },
       error: () => {
         this.payingId = null;
-        this.toastService.error('Could not start payment. Your seat hold may have expired.');
+        this.toastService.error(this.i18n.t('eventDetail.couldNotStartPayment'));
         this.loadRegistrations();
       },
     });

@@ -15,6 +15,8 @@ import { BookingStatus, PaymentStatus } from '../../models/models';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { LucideAngularModule, CircleCheckBig, CircleAlert, Smartphone } from 'lucide-angular';
 import { apiErrorMessage } from '../../api/api-error';
+import { TranslocoPipe } from '@jsverse/transloco';
+import { LanguageService } from '../../i18n/language.service';
 
 // A Freedom Pay return is confirmed by its server notification, which can
 // lag the browser by a few seconds: poll for this long, then offer a button.
@@ -65,14 +67,16 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
 @Component({
   selector: 'app-payment-success',
   standalone: true,
-  imports: [CommonModule, RouterModule, LucideAngularModule, MoneyPipe],
+  imports: [CommonModule, RouterModule, LucideAngularModule, MoneyPipe, TranslocoPipe],
   template: `
     <div class="min-h-screen bg-muted flex items-center justify-center px-4 py-12 pt-20">
       <div class="card w-full max-w-sm p-8 shadow-md text-center animate-scale-in">
         @if (loading) {
           <div class="flex flex-col items-center gap-4 py-8">
             <span class="spinner spinner-lg"></span>
-            <p class="text-sm text-muted-foreground">Confirming your payment...</p>
+            <p class="text-sm text-muted-foreground">
+              {{ 'paymentSuccess.confirmingYourPayment' | transloco }}
+            </p>
           </div>
         } @else if (otherDevice) {
           <!-- Paid from a second device (QR code): the buyer is signed in elsewhere -->
@@ -86,13 +90,16 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
                 aria-hidden="true"
               />
             </div>
-            <h1 class="text-xl font-bold text-foreground">Payment sent</h1>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ 'paymentSuccess.paymentSent' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground">
-              Go back to the device where you started the purchase: the ticket appears there as soon
-              as the payment provider confirms it. You can close this page.
+              {{ 'paymentSuccess.goBackToThe' | transloco }}
             </p>
           </div>
-          <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">Back to events</a>
+          <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">{{
+            'eventDetail.backToEvents' | transloco
+          }}</a>
         } @else if (data && data.outcome === 'paid') {
           <div class="flex flex-col items-center gap-3 mb-6">
             <div
@@ -104,9 +111,16 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
                 aria-hidden="true"
               />
             </div>
-            <h1 class="text-xl font-bold text-foreground">Payment confirmed</h1>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ 'paymentSuccess.paymentConfirmed' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground">
-              {{ isBooking ? 'Your group booking is confirmed' : 'Your registration is complete' }}
+              {{
+                (isBooking
+                  ? 'paymentSuccess.yourGroupBookingIs'
+                  : 'paymentSuccess.yourRegistrationIsComplete'
+                ) | transloco
+              }}
             </p>
           </div>
 
@@ -114,35 +128,39 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             class="rounded-lg border border-border bg-muted/40 divide-y divide-border text-sm mb-6 text-left"
           >
             <div class="px-4 py-3 flex justify-between gap-3">
-              <span class="text-muted-foreground flex-shrink-0">Event</span>
+              <span class="text-muted-foreground flex-shrink-0">{{ 'nav.event' | transloco }}</span>
               <span class="font-medium text-foreground text-right">{{ data.event_title }}</span>
             </div>
             @if (data.amount) {
               <div class="px-4 py-3 flex justify-between gap-3">
-                <span class="text-muted-foreground flex-shrink-0">Amount</span>
+                <span class="text-muted-foreground flex-shrink-0">{{
+                  'checkout.amount' | transloco
+                }}</span>
                 <span class="font-semibold text-foreground">{{
                   data.amount | money: data.currency
                 }}</span>
               </div>
             }
             <div class="px-4 py-3 flex justify-between gap-3">
-              <span class="text-muted-foreground flex-shrink-0">Status</span>
-              <span class="badge badge-confirmed">Paid</span>
+              <span class="text-muted-foreground flex-shrink-0">{{
+                'common.status' | transloco
+              }}</span>
+              <span class="badge badge-confirmed">{{ 'common.paid' | transloco }}</span>
             </div>
           </div>
 
           <div class="flex flex-col gap-2">
             @if (isBooking) {
               <a routerLink="/my-bookings" class="btn btn-primary btn-full">
-                View booking & tickets
+                {{ 'paymentSuccess.viewBookingTickets' | transloco }}
               </a>
             } @else {
               <a routerLink="/my-registrations" class="btn btn-primary btn-full">
-                View my tickets
+                {{ 'paymentSuccess.viewMyTickets' | transloco }}
               </a>
             }
             <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">
-              Back to events
+              {{ 'eventDetail.backToEvents' | transloco }}
             </a>
           </div>
         } @else if (data) {
@@ -158,23 +176,30 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               />
             </div>
             @if (data.outcome === 'refunded') {
-              <h1 class="text-xl font-bold text-foreground">Payment refunded</h1>
+              <h1 class="text-xl font-bold text-foreground">
+                {{ 'paymentSuccess.paymentRefunded' | transloco }}
+              </h1>
               <p class="text-sm text-muted-foreground">
-                Your seat hold had ended before the payment arrived, so the money was returned
-                automatically. Please book again.
+                {{ 'paymentSuccess.yourSeatHoldHad' | transloco }}
               </p>
             } @else if (data.outcome === 'failed') {
-              <h1 class="text-xl font-bold text-foreground">Payment did not go through</h1>
+              <h1 class="text-xl font-bold text-foreground">
+                {{ 'paymentSuccess.paymentDidNotGo' | transloco }}
+              </h1>
               <p class="text-sm text-muted-foreground">
-                The payment was not completed and no money was taken. You can try again from your
-                tickets while your seat is still held.
+                {{ 'paymentSuccess.thePaymentWasNot' | transloco }}
               </p>
             } @else {
-              <h1 class="text-xl font-bold text-foreground">Payment is processing</h1>
+              <h1 class="text-xl font-bold text-foreground">
+                {{ 'paymentSuccess.paymentIsProcessing' | transloco }}
+              </h1>
               <p class="text-sm text-muted-foreground">
-                We haven't received the confirmation yet.
-                {{ isBooking ? 'Your tickets' : 'Your ticket' }} will appear in your account as soon
-                as it does.
+                {{
+                  (isBooking
+                    ? 'paymentSuccess.notConfirmedTickets'
+                    : 'paymentSuccess.notConfirmedTicket'
+                  ) | transloco
+                }}
               </p>
             }
           </div>
@@ -182,11 +207,11 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
             @if (data.outcome === 'processing' && canRecheck) {
               @if (polling) {
                 <p class="text-xs text-muted-foreground" role="status">
-                  Checking with the payment provider…
+                  {{ 'paymentSuccess.checkingWithThePayment' | transloco }}
                 </p>
               } @else {
                 <button type="button" class="btn btn-primary btn-full" (click)="refresh()">
-                  Check again
+                  {{ 'paymentSuccess.checkAgain' | transloco }}
                 </button>
               }
             }
@@ -194,11 +219,14 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
               [routerLink]="isBooking ? '/my-bookings' : '/my-registrations'"
               class="btn btn-secondary btn-full"
             >
-              {{ isBooking ? 'View my bookings' : 'View my tickets' }}
+              {{
+                (isBooking ? 'paymentSuccess.viewMyBookings' : 'paymentSuccess.viewMyTickets')
+                  | transloco
+              }}
             </a>
-            <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground"
-              >Back to events</a
-            >
+            <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">{{
+              'eventDetail.backToEvents' | transloco
+            }}</a>
           </div>
         } @else {
           <!-- Error -->
@@ -212,18 +240,20 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
                 aria-hidden="true"
               />
             </div>
-            <h1 class="text-xl font-bold text-foreground">Verification failed</h1>
+            <h1 class="text-xl font-bold text-foreground">
+              {{ 'paymentSuccess.verificationFailed' | transloco }}
+            </h1>
             <p class="text-sm text-muted-foreground">
-              {{ error || 'Could not verify your payment. Please contact support.' }}
+              {{ error || ('paymentSuccess.couldNotVerifyYour' | transloco) }}
             </p>
           </div>
 
           <div class="flex flex-col gap-2">
             <a routerLink="/my-registrations" class="btn btn-secondary btn-full">
-              View registrations
+              {{ 'paymentSuccess.viewRegistrations' | transloco }}
             </a>
             <a routerLink="/" class="btn btn-ghost btn-full text-muted-foreground">
-              Back to events
+              {{ 'eventDetail.backToEvents' | transloco }}
             </a>
           </div>
         }
@@ -232,6 +262,7 @@ const BOOKING_OUTCOME: Record<BookingStatus, Outcome> = {
   `,
 })
 export class PaymentSuccessComponent implements OnInit {
+  private i18n = inject(LanguageService);
   private paymentService = inject(PaymentService);
   private bookingService = inject(BookingService);
   private auth = inject(AuthService);
@@ -305,7 +336,7 @@ export class PaymentSuccessComponent implements OnInit {
             // Never claim success we couldn't verify.
             this.error = apiErrorMessage(
               err,
-              'We could not verify this payment yet.',
+              this.i18n.t('paymentSuccess.weCouldNotVerify'),
               'error',
               'detail',
             );
@@ -316,7 +347,7 @@ export class PaymentSuccessComponent implements OnInit {
       }
 
       if (!sessionId) {
-        this.error = 'No payment session found.';
+        this.error = this.i18n.t('paymentSuccess.noPaymentSessionFound');
         this.loading = false;
         return;
       }
@@ -346,7 +377,12 @@ export class PaymentSuccessComponent implements OnInit {
         this.loading = false;
       },
       error: (err) => {
-        this.error = apiErrorMessage(err, 'Verification failed.', 'error', 'detail');
+        this.error = apiErrorMessage(
+          err,
+          this.i18n.t('paymentSuccess.verificationFailed2'),
+          'error',
+          'detail',
+        );
         this.loading = false;
       },
     });
@@ -373,8 +409,7 @@ export class PaymentSuccessComponent implements OnInit {
         complete: () => {
           this.polling = false;
           if (!this.data) {
-            this.error =
-              'We could not reach the payment service yet. Check your tickets in a moment.';
+            this.error = this.i18n.t('paymentSuccess.weCouldNotReach');
             this.loading = false;
           }
         },
