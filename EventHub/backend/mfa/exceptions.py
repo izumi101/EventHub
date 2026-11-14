@@ -30,7 +30,7 @@ class MFAError(APIException):
 
 class StepUpRequired(MFAError):
     status_code = status.HTTP_403_FORBIDDEN
-    default_detail = 'Confirm it is you: enter a code from your authenticator app or use your passkey.'
+    default_detail = 'Confirm it is you with your second factor to continue.'
     default_code = STEP_UP_REQUIRED
 
 

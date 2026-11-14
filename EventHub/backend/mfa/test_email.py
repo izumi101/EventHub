@@ -253,6 +253,13 @@ class EmailLoginTests(EmailFactorBase):
         self.assertGreater(sixth.data['retry_after'], 60)
         self.assertEqual(self.code_emails(self.user).count(), 5)
 
+    def test_the_limits_are_per_purpose(self):
+        # Turning email codes on and signing in right after must not be blocked.
+        authenticate_with_recent_mfa(self.client, self.user)
+        self.assertEqual(self.client.post(SEND, {'purpose': 'step_up'}).status_code, 200)
+        self.client.force_authenticate(None)
+        self.assertEqual(self.client.post(LOGIN_SEND, {'challenge_token': self.challenge()}).status_code, 200)
+
     def test_a_bad_challenge_token_sends_nothing(self):
         response = self.client.post(LOGIN_SEND, {'challenge_token': 'nope'})
         self.assertEqual(response.status_code, 401)

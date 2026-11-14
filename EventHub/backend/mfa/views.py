@@ -162,7 +162,7 @@ class MFALoginEmailSendView(APIView):
         responses={200: serializers.EmailCodeSentSerializer, 400: ERROR, 401: MFA_ERROR, 429: MFA_ERROR},
         description=(
             'Answers the same whether or not the account has email codes turned on (nothing is sent '
-            'then). Limited to one code a minute and five an hour per user (429 `mfa_email_throttled` '
+            'then). Limited to one sign-in code a minute and five an hour per user (429 `mfa_email_throttled` '
             'with `retry_after`).'
         ),
     )

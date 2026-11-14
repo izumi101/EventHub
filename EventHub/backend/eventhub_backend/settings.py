@@ -334,7 +334,8 @@ MFA_THROTTLE_RATES = {'mfa_ip': '20/min', 'mfa_user': '10/min'}
 MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES = env_bool('MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES', True)
 MFA_EMAIL_CODE_TTL_SECONDS = 600
 MFA_EMAIL_CODE_MAX_ATTEMPTS = 5
-# Sending limits per user (all purposes together): one code a minute, five an hour.
+# Sending limits per user and purpose (sign-in, step-up, enrollment): one code
+# a minute, five an hour.
 MFA_EMAIL_RESEND_SECONDS = 60
 MFA_EMAIL_MAX_PER_HOUR = 5
 # WebAuthn: the RP ID is the site's host name (no scheme or port) and every
