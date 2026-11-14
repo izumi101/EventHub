@@ -203,7 +203,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Answers the same whether or not the account has email codes turned on (nothing is sent then). Limited to one code a minute and five an hour per user (429 `mfa_email_throttled` with `retry_after`). */
+        /** @description Answers the same whether or not the account has email codes turned on (nothing is sent then). Limited to one sign-in code a minute and five an hour per user (429 `mfa_email_throttled` with `retry_after`). */
         post: operations["auth_mfa_login_email_send_create"];
         delete?: never;
         options?: never;
