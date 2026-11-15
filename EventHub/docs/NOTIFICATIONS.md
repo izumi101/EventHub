@@ -21,7 +21,7 @@ notify(user, types.TICKET_PURCHASED, event=event, registration=reg, amount=payme
 
 `notify()` (`backend/notifications/service.py`):
 
-1. builds the message for the type (`notifications/messages.py`: in-app title/body and the email content),
+1. switches to the user's language (`NotificationPreference.language`, English by default) and builds the message for the type (`notifications/messages.py`: in-app title/body and the email content),
 2. writes the in-app row (`events.Notification`, table `events_notification`, shown under the bell in the top bar),
 3. if the user has an email address and the email of this type is on, renders the HTML + plain-text email and writes a `send_email` job (transactional outbox, `jobs/queue.py`).
 
@@ -44,9 +44,9 @@ Security emails — sign-up code, password reset code, the "sign-up attempt" hea
 | `seat_available` | next on the waitlist | a spot is offered (`events.waitlist.promote_waitlist`) | optional |
 | `group_booking_confirmed` | booking owner | group booking paid (`bookings.services.confirm_booking`) | QR of every seat (up to 10 inline) |
 | `group_booking_claimed` | friend | a signed-in friend claims a seat of a paid booking, or the booking they claimed in gets paid (`claim_seat`, `confirm_booking`) | QR of the seat |
-| `event_reminder` | ticket holders | 24 hours before the start (below) | optional |
+| `event_reminder` | ticket holders | 24 hours and 2 hours before the start (below) | optional |
 | `organizer_message` | chosen audience | organizer broadcast (`events.messaging.broadcast_to_attendees`) | optional |
-| `review_reminder` | — | defined, no trigger yet | in-app only |
+| `review_reminder` | attendees who may review | 2–48 hours after the event ended (below) | optional |
 
 "Ticket holders" (`service.ticket_holders`) are users with a confirmed registration, owners of confirmed group bookings and friends who claimed a seat in one — each person once.
 
@@ -56,31 +56,63 @@ Adding a type: add it to `notifications/types.py`, write its builder in `message
 
 - One layout for every type: `notifications/templates/notifications/email/message.html` (table layout, inline CSS, escaped user content) and `message.txt` (plain-text alternative).
 - Ticket QR codes encode `<FRONTEND_URL>/validate/<ticket_uuid>`, the same URL the frontend's ticket QR uses, so the door scanner accepts both. They are rendered with `segno` as PNG and attached inline (`Content-ID`, `<img src="cid:ticket-qr-N">`, `multipart/related`).
-- Footer: a link to the preferences page `<FRONTEND_URL>/profile/notifications`, also sent as `List-Unsubscribe`. Mandatory emails say so.
-- Dates use `NOTIFICATION_TIME_ZONE` (default `TIME_ZONE`, i.e. UTC), e.g. `Sat, 14 Nov 2026, 15:42 (Asia/Almaty)`.
-- i18n: copy is in `gettext` / `{% translate %}`; adding ru/kk is a translation task (`makemessages`), not a code change. Emails are rendered in the server's active language today.
+- Footer of optional emails: "Unsubscribe from these emails" (the `/unsubscribe` page, below) and "Manage email preferences" (`<FRONTEND_URL>/profile/notifications`). Mandatory emails (`payment_refunded`, `event_cancelled`, `security_alert`) say they are always sent and link only to the preferences.
+- Headers: optional emails carry `List-Unsubscribe: <FRONTEND_URL/api/v1/notifications/unsubscribe/?token=…>` and `List-Unsubscribe-Post: List-Unsubscribe=One-Click` (RFC 8058); mandatory emails carry neither.
+- Dates use `NOTIFICATION_TIME_ZONE` (default `TIME_ZONE`, i.e. UTC) and the reader's language: `Sat, 5 Dec 2026, 18:00 (Asia/Almaty)`, `сб, 5 декабря 2026, 18:00 (Asia/Almaty)`, `2026 ж. 5 желтоқсан, сб, 18:00 (Asia/Almaty)`.
 
 `jobs.handlers.send_email` accepts `html_body`, `attachments` (`{filename, mimetype, content_b64[, cid]}`) and `headers`. It allows only PNG/JPEG/PDF/iCalendar, at most 10 attachments of 256 KB each, safe file names and content ids, and only the `List-Unsubscribe` headers; line breaks are stripped from the subject. A malformed payload fails the job permanently (`PermanentJobError`) instead of being retried. Old payloads (subject/body only) still work.
 
+## Languages (en / ru / kk)
+
+Every notification — the in-app title and body, the email subject, text and HTML — is written in the recipient's language: `notify()` runs the builder and the templates inside `translation.override(<user language>)`. The language is `NotificationPreference.language` (`en`, `ru`, `kk`; empty = English). The frontend saves it: whenever a signed-in user switches the UI language, and once after sign-in if the stored one differs (`i18n/language-sync.service.ts`, fire-and-forget).
+
+There is no `LocaleMiddleware`: API responses (errors included) stay English. Only the preferences API and the unsubscribe endpoint localise their type labels, using the request's `Accept-Language` in a scoped `translation.override`.
+
+Catalogues: `backend/locale/{ru,kk}/LC_MESSAGES/django.po` (Russian; Cyrillic Kazakh; EventHub, QR and Freedom Pay stay untranslated) and the compiled `.mo` files, both committed (the image copies them; no `gettext` needed at runtime). `notifications/test_i18n.py` fails when a msgid of `messages.py`, `types.py`, the email templates or `events/services/lifecycle.py` has no ru or kk translation, when placeholders differ, or when a `.mo` is stale. Adding or changing a string:
+
+```bash
+# in a container with gettext (e.g. python:3.12-slim + apt-get install -y gettext)
+python manage.py makemessages -l ru -l kk -e py,html,txt --no-location
+# translate the new entries in both .po files, then
+python manage.py compilemessages -l ru -l kk
+```
+
+Text that callers pass in already written (organizer messages, refund reasons, 2FA alert titles from `mfa`) is shown as given.
+
 ## Preferences
 
-`GET /api/v1/auth/profile/notifications/` → the address emails go to and, per type, `label`, `description`, `email_enabled`, `email_optional`.
+`GET /api/v1/auth/profile/notifications/` → the address emails go to, `language`, and per type `label`, `description` (in the `Accept-Language` language), `email_enabled`, `email_optional`.
 
-`PATCH /api/v1/auth/profile/notifications/` with `{"email": {"event_reminder": false}}` changes only the listed types (JSON only). Types that are not optional (`event_cancelled`, `payment_refunded`) and unknown keys are rejected with 400. Authenticated users only, each sees and changes only their own settings.
+`PATCH /api/v1/auth/profile/notifications/` with `{"email": {"event_reminder": false}}`, `{"language": "kk"}` or both changes only what is sent (JSON only). Types that are not optional (`event_cancelled`, `payment_refunded`, `security_alert`), unknown keys and unknown languages are rejected with 400. Authenticated users only, each sees and changes only their own settings.
 
 Storage: `notifications.NotificationPreference` keeps only the opt-outs (`email_disabled`), so a new type is on by default and a mandatory type can never be switched off by stale data. In-app notifications are always created.
 
-Frontend: `/profile/notifications` (`components/notification-preferences`), linked from the profile page; switches save immediately.
+Frontend: `/profile/notifications` (`components/notification-preferences`), linked from the profile page; switches save immediately, labels follow the UI language.
 
-## 24-hour reminders
+## One-click unsubscribe
 
-`notifications.reminders.send_due_reminders()` notifies every ticket holder of each published event starting in the next 24 hours. It runs every minute inside the worker's maintenance pass (`run_maintenance`) and on demand:
+Each optional email carries a token: the user id and the type key signed with the secret key under the salt `notifications.unsubscribe.v1` (`notifications/unsubscribe.py`, `django.core.signing`). It can't be forged or altered and doesn't expire, so an old email's link keeps working.
+
+`/api/v1/notifications/unsubscribe/?token=…` (public: no sign-in, CSRF-exempt, throttled by the `unsubscribe` scope, 30/min):
+
+- `GET` → `{type, label}`; changes nothing (link scanners and mail previews open links).
+- `POST` (token in the query string or the body; mail providers send `List-Unsubscribe=One-Click` as a form) → switches that email type off for that user; idempotent; `{type, label}`.
+- A missing, malformed, tampered token, one for a mandatory type or for a deleted account → `400 {"error": "This unsubscribe link is invalid."}` — the same answer for every case.
+
+The footer link opens the frontend page `/unsubscribe?token=…` (`components/unsubscribe`): it shows the type, unsubscribes only after a click, then links to `/profile/notifications`. The email can be switched back on there.
+
+## Reminders and review requests
+
+`notifications.reminders` runs every minute inside the worker's maintenance pass (`run_maintenance`) and on demand:
 
 ```bash
 docker compose exec backend python manage.py send_event_reminders   # safe to run any number of times
 ```
 
-Idempotency: each reminder is recorded in `notifications_sentreminder` (unique on user, event, kind, event start) in the same transaction as its notification and email job. A second pass — or a second worker at the same moment — cannot insert the row again, so nothing is sent twice. If the notification fails, the record is rolled back and the next pass retries. A rescheduled event (new start) gets a new reminder; cancelled events get none.
+- **Event reminders** (`send_due_reminders`, type `event_reminder`): ticket holders of published events. The 24-hour reminder covers starts in (now + 2 h, now + 24 h], the 2-hour reminder (now, now + 2 h], so a ticket bought an hour before the start gets only the 2-hour one ("starts at 19:00, in less than 2 hours"). Both follow the `event_reminder` preference.
+- **Review requests** (`send_due_review_requests`, type `review_reminder`): events that ended between 2 and 48 hours ago — the end is `end_date`, or `date` + `EVENT_DEFAULT_DURATION_HOURS` (default 3) without one — with status completed or (still) published, never cancelled. Only users the review API accepts are asked (`events.services.reviews`: a confirmed ticket, the event has started, no review yet). The 48-hour bound keeps a deployment or an outage from mailing every past attendee.
+
+Idempotency: each notification is recorded in `notifications_sentreminder` (unique on user, event, kind — `24h`, `2h`, `review` — and event start) in the same transaction as its notification and email job. A second pass — or a second worker at the same moment — cannot insert the row again, so nothing is sent twice. If the notification fails, the record is rolled back and the next pass retries. A rescheduled event (new start) gets new reminders; cancelled events get none.
 
 ## SMTP
 
@@ -105,5 +137,5 @@ For real delivery set in `.env` (see the comments in `.env.example`), then resta
 
 - PDF ticket attachment and Apple/Google Wallet passes (roadmap phase 8); web push and SMS (phase 2 follow-up).
 - Stripe `checkout.session.async_payment_failed` / `charge.refunded` events do not notify yet: the full Stripe event set waits for the Stripe move onto the provider layer (`docs/HANDOFF.md`).
-- One-click unsubscribe without signing in (signed token, `List-Unsubscribe-Post`) — today the link opens the preferences page.
-- Emails are rendered in the server language; per-user language comes with i18n (phase 8).
+- Security alert titles and bodies come from `mfa` in English; refund reasons and organizer messages are shown as written.
+- A user who never signs in after this change keeps English notifications until the frontend saves their language.

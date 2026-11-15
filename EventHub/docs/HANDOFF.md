@@ -57,7 +57,8 @@ The defense demo script is `docs/DEMO.md`; test reports are in `docs/reports/`. 
 | 24-hour reminders, idempotent (`SentReminder`), run by the worker every minute and by `manage.py send_event_reminders` | done |
 | Preferences API `GET/PATCH /api/v1/auth/profile/notifications/` and page `/profile/notifications` | done |
 | SMTP configuration for the demo (Mailtrap / Gmail app password / Brevo) | documented in `.env.example`; needs the owner's credentials |
-| PDF ticket, web push, SMS, one-click unsubscribe, per-user email language | open (see `NOTIFICATIONS.md`) |
+| Follow-up (`phase-2/notifications-followup`, 2026-11-15): notifications in the user's language (en/ru/kk), one-click unsubscribe (RFC 8058) + `/unsubscribe` page, 2-hour reminder, review request email after the event | done |
+| PDF ticket, web push, SMS | open (see `NOTIFICATIONS.md`) |
 
 Details: `docs/NOTIFICATIONS.md`. The seed data (`seed_data`) creates one pending registration without a hold deadline, which `run_sql_checks` reports as `stale_holds` (pre-existing, not caused by notifications).
 
@@ -97,7 +98,7 @@ Open: production should set `MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0` and a real 
 
 1. Payments: `PaymentProvider` layer (move Stripe into it), Freedom Pay provider + protocol-compatible **emulator** (CI/demo), method selection by currency, reconciliation job, missing Stripe events. Freedom Pay test credentials are pending (owner wrote to them). `freedompay.kz` is blocked by the cloud session's network policy.
 1Б. Platform commission + **double-entry ledger** + organizer payouts (agency model, IBAN profile with 2FA-protected changes, weekly payouts, bank registry export, agent reports). Note: today `Event.service_fee_percent` is set by organizers — the platform commission must be admin-controlled.
-2. Buyer emails — done on `phase-2/notifications` (e-ticket with QR, cancellation, refunds, reminders, preferences; see `NOTIFICATIONS.md`); still open: ticket PDF, web push, SMS.
+2. Buyer emails — done on `phase-2/notifications` and `phase-2/notifications-followup` (e-ticket with QR, cancellation, refunds, 24 h + 2 h reminders, review requests, preferences, one-click unsubscribe, emails in en/ru/kk; see `NOTIFICATIONS.md`); still open: ticket PDF, web push, SMS.
 3. Legal & personal data (KZ law): offer, privacy policy, consents, data export/deletion, retention.
 4. Security: TOTP + passkeys, tamper-evident audit log, SAST/DAST/Trivy/SBOM/cosign.
 5. Infra: **Yandex Cloud kz1**, Terraform, Managed Kubernetes, Helm, Argo CD, canary (Argo Rollouts), preview envs, managed PostgreSQL (check pgvector), backups + restore tests, DR drills.
