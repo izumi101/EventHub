@@ -190,6 +190,15 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = 'en-us'
+# Languages notifications (in-app and email) are written in. There is no
+# LocaleMiddleware: API responses stay English; `notify()` switches to the
+# recipient's language (notifications.NotificationPreference.language).
+LANGUAGES = [
+    ('en', 'English'),
+    ('ru', 'Русский'),
+    ('kk', 'Қазақша'),
+]
+LOCALE_PATHS = [BASE_DIR / 'locale']
 TIME_ZONE = os.environ.get('DJANGO_TIME_ZONE', 'UTC')
 USE_I18N = True
 USE_TZ = True

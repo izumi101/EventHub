@@ -1,4 +1,7 @@
+from contextlib import contextmanager
+
 from django.db import transaction
+from django.utils import translation
 from drf_spectacular.utils import extend_schema
 from rest_framework.parsers import JSONParser
 from rest_framework.permissions import IsAuthenticated
@@ -12,9 +15,19 @@ from .models import NotificationPreference
 from .serializers import NotificationPreferencesSerializer, NotificationPreferencesUpdateSerializer
 
 
+@contextmanager
+def request_language(request):
+    """Labels and descriptions in the request's `Accept-Language` (en, ru,
+    kk). Scoped to these responses: there is no LocaleMiddleware, so every
+    other API text (errors included) stays English."""
+    with translation.override(translation.get_language_from_request(request)):
+        yield
+
+
 def _preferences_payload(user, preference: NotificationPreference) -> dict:
     return {
         'email_address': user.email or '',
+        'language': preference.language,
         'types': [
             {
                 'type': spec.key,
@@ -30,7 +43,7 @@ def _preferences_payload(user, preference: NotificationPreference) -> dict:
 
 
 class NotificationPreferencesView(APIView):
-    """The signed-in user's notification email preferences."""
+    """The signed-in user's notification email preferences and language."""
 
     permission_classes = [IsAuthenticated]
     parser_classes = [JSONParser]
@@ -42,7 +55,8 @@ class NotificationPreferencesView(APIView):
         preference = NotificationPreference.objects.filter(user=request.user).first() or NotificationPreference(
             user=request.user
         )
-        return Response(_preferences_payload(request.user, preference))
+        with request_language(request):
+            return Response(_preferences_payload(request.user, preference))
 
     @extend_schema(
         request=NotificationPreferencesUpdateSerializer,
@@ -51,14 +65,18 @@ class NotificationPreferencesView(APIView):
     def patch(self, request):
         serializer = NotificationPreferencesUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        changes = serializer.validated_data
         with transaction.atomic():
             preference, _ = NotificationPreference.objects.select_for_update().get_or_create(user=request.user)
             disabled = set(preference.email_disabled or [])
-            for key, enabled in serializer.validated_data['email'].items():
+            for key, enabled in changes.get('email', {}).items():
                 if enabled:
                     disabled.discard(key)
                 else:
                     disabled.add(key)
             preference.email_disabled = sorted(disabled)
-            preference.save(update_fields=['email_disabled', 'updated_at'])
-        return Response(_preferences_payload(request.user, preference))
+            if 'language' in changes:
+                preference.language = changes['language']
+            preference.save(update_fields=['email_disabled', 'language', 'updated_at'])
+        with request_language(request):
+            return Response(_preferences_payload(request.user, preference))

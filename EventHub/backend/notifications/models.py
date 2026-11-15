@@ -5,17 +5,26 @@ from . import types
 
 
 class NotificationPreference(models.Model):
-    """A user's email choices. No row means every email is on.
+    """A user's email choices and language. No row means every email is on
+    and notifications are written in English.
 
     Only opt-outs are stored, so a type added later is on by default and a
     type that is not optional can never be switched off by stale data.
     """
+
+    class Language(models.TextChoices):
+        EN = 'en', 'English'
+        RU = 'ru', 'Русский'
+        KK = 'kk', 'Қазақша'
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notification_preference'
     )
     # Keys of notifications.types whose email the user switched off.
     email_disabled = models.JSONField(default=list, blank=True)
+    # Language of the in-app notifications and emails; empty means English.
+    # The frontend saves the language the user picked in the UI.
+    language = models.CharField(max_length=8, choices=Language.choices, blank=True, default='')
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
@@ -28,6 +37,10 @@ class NotificationPreference(models.Model):
         if not spec.email_optional:
             return True
         return type_key not in (self.email_disabled or [])
+
+    @property
+    def effective_language(self) -> str:
+        return self.language or self.Language.EN.value
 
 
 class SentReminder(models.Model):
