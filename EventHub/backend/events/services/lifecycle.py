@@ -16,7 +16,9 @@ def create_event(*, organizer, validated_data):
     return Event.objects.create(organizer=organizer, **validated_data)
 
 
-# Changes ticket holders are told about: (field, label shown to them).
+# Changes ticket holders are told about: (field, label shown to them). The
+# labels stay lazy and the values raw: the notification renders both in each
+# recipient's language (notifications.messages.display_value).
 NOTIFIED_CHANGES = (
     ('date', _('Date')),
     ('end_date', _('End')),
@@ -27,16 +29,6 @@ NOTIFIED_CHANGES = (
 )
 
 
-def _display(field, value):
-    from notifications.messages import format_datetime
-
-    if field in ('date', 'end_date'):
-        return format_datetime(value)
-    if field == 'is_online':
-        return str(_('Yes') if value else _('No'))
-    return value or ''
-
-
 @transaction.atomic
 def update_event(*, event: Event, validated_data):
     before = {field: getattr(event, field) for field, _label in NOTIFIED_CHANGES}
@@ -45,7 +37,7 @@ def update_event(*, event: Event, validated_data):
     event.save()
 
     changes = [
-        (str(label), _display(field, before[field]), _display(field, getattr(event, field)))
+        (label, before[field], getattr(event, field))
         for field, label in NOTIFIED_CHANGES
         if getattr(event, field) != before[field]
     ]

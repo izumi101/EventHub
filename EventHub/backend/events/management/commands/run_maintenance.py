@@ -19,7 +19,8 @@ logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     help = (
-        'Release expired seat holds and group bookings, advance waitlists, complete past events, send event reminders.'
+        'Release expired seat holds and group bookings, advance waitlists, complete past events, '
+        'send event reminders and review requests.'
     )
 
     def add_arguments(self, parser):
@@ -70,7 +71,9 @@ class Command(BaseCommand):
 
         purge_expired()
 
-        # 24-hour reminders (idempotent: each one is recorded once).
-        from notifications.reminders import send_due_reminders
+        # 24-hour and 2-hour reminders, and review requests after the event
+        # (idempotent: each one is recorded once).
+        from notifications.reminders import send_due_reminders, send_due_review_requests
 
         send_due_reminders(now)
+        send_due_review_requests(now)

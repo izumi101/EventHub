@@ -1,0 +1,602 @@
+# EventHub notifications: Kazakh translation.
+# Sources: notifications/ (messages.py, types.py, email templates) and
+# events/services/lifecycle.py. See docs/NOTIFICATIONS.md (Languages).
+msgid ""
+msgstr ""
+"Project-Id-Version: EventHub\n"
+"PO-Revision-Date: 2026-11-15 00:00+0000\n"
+"Last-Translator: EventHub team\n"
+"Language-Team: Kazakh\n"
+"Language: kk\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Date"
+msgstr "Күні"
+
+msgid "End"
+msgstr "Аяқталуы"
+
+msgid "Venue"
+msgstr "Өтетін орны"
+
+msgid "Address"
+msgstr "Мекенжайы"
+
+msgid "Online"
+msgstr "Онлайн"
+
+msgid "Online link"
+msgstr "Онлайн сілтеме"
+
+msgctxt "short weekday in a date"
+msgid "Mon"
+msgstr "дс"
+
+msgctxt "short weekday in a date"
+msgid "Tue"
+msgstr "сс"
+
+msgctxt "short weekday in a date"
+msgid "Wed"
+msgstr "ср"
+
+msgctxt "short weekday in a date"
+msgid "Thu"
+msgstr "бс"
+
+msgctxt "short weekday in a date"
+msgid "Fri"
+msgstr "жм"
+
+msgctxt "short weekday in a date"
+msgid "Sat"
+msgstr "сб"
+
+msgctxt "short weekday in a date"
+msgid "Sun"
+msgstr "жс"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Jan"
+msgstr "қаңтар"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Feb"
+msgstr "ақпан"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Mar"
+msgstr "наурыз"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Apr"
+msgstr "сәуір"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "May"
+msgstr "мамыр"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Jun"
+msgstr "маусым"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Jul"
+msgstr "шілде"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Aug"
+msgstr "тамыз"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Sep"
+msgstr "қыркүйек"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Oct"
+msgstr "қазан"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Nov"
+msgstr "қараша"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Dec"
+msgstr "желтоқсан"
+
+#, python-format
+msgid "%(weekday)s, %(day)d %(month)s %(year)d, %(time)s"
+msgstr "%(year)d ж. %(day)d %(month)s, %(weekday)s, %(time)s"
+
+msgid "Yes"
+msgstr "Иә"
+
+msgid "No"
+msgstr "Жоқ"
+
+#, python-format
+msgid "Row %(row)s · Seat %(col)s (%(zone)s)"
+msgstr "%(row)s-қатар · %(col)s-орын (%(zone)s)"
+
+msgid "Event"
+msgstr "Іс-шара"
+
+msgid "Ends"
+msgstr "Аяқталуы"
+
+msgid "Seat"
+msgstr "Орын"
+
+msgid "Ticket type"
+msgstr "Билет түрі"
+
+msgid "Name"
+msgstr "Аты"
+
+#, python-format
+msgid "🎫 Ticket confirmed: %(event)s"
+msgstr "🎫 Билет расталды: %(event)s"
+
+#, python-format
+msgid "Your ticket for %(event)s is confirmed. Check My Tickets for your QR code."
+msgstr "«%(event)s» іс-шарасына билетіңіз расталды. QR коды «Менің билеттерім» бөлімінде."
+
+#, python-format
+msgid "Your ticket for %(event)s"
+msgstr "«%(event)s» іс-шарасына билетіңіз"
+
+msgid "Your ticket is confirmed"
+msgstr "Билетіңіз расталды"
+
+msgid "Thank you for your purchase. Show the QR code below at the entrance."
+msgstr "Сатып алғаныңызға рахмет. Кіреберісте төмендегі QR кодты көрсетіңіз."
+
+msgid "Paid"
+msgstr "Төленді"
+
+msgid "Open My Tickets"
+msgstr "«Менің билеттерім» бөлімін ашу"
+
+#, python-format
+msgid "✅ Registration confirmed: %(event)s"
+msgstr "✅ Тіркелу расталды: %(event)s"
+
+#, python-format
+msgid "You are registered for %(event)s. Check My Tickets for your QR code."
+msgstr "Сіз «%(event)s» іс-шарасына тіркелдіңіз. QR коды «Менің билеттерім» бөлімінде."
+
+#, python-format
+msgid "You are registered for %(event)s"
+msgstr "Сіз «%(event)s» іс-шарасына тіркелдіңіз"
+
+msgid "You are registered"
+msgstr "Сіз тіркелдіңіз"
+
+msgid "Your free ticket is ready. Show the QR code below at the entrance."
+msgstr "Тегін билетіңіз дайын. Кіреберісте төмендегі QR кодты көрсетіңіз."
+
+msgid "Your payment did not go through. You were not charged."
+msgstr "Төлем өтпеді. Ақша алынған жоқ."
+
+#, python-format
+msgid "⚠️ Payment failed: %(event)s"
+msgstr "⚠️ Төлем өтпеді: %(event)s"
+
+#, python-format
+msgid "Payment failed: %(event)s"
+msgstr "Төлем өтпеді: %(event)s"
+
+msgid "Your payment did not go through"
+msgstr "Төлеміңіз өтпеді"
+
+msgid "You can try again from the event page while tickets are available."
+msgstr "Билеттер бар кезде іс-шара бетінен қайта төлеп көруге болады."
+
+msgid "Back to the event"
+msgstr "Іс-шараға оралу"
+
+#, python-format
+msgid "You were refunded %(amount)s."
+msgstr "Сізге %(amount)s қайтарылды."
+
+#, python-format
+msgid "Reason: %(reason)s"
+msgstr "Себебі: %(reason)s"
+
+#, python-format
+msgid "💸 Refund issued: %(event)s"
+msgstr "💸 Ақша қайтарылды: %(event)s"
+
+#, python-format
+msgid "Refund of %(amount)s: %(event)s"
+msgstr "%(amount)s қайтару: %(event)s"
+
+msgid "Your money is on its way back"
+msgstr "Ақшаңыз қайтарылып жатыр"
+
+msgid "It goes back to the card or account you paid with. Banks usually take a few business days."
+msgstr "Ақша сіз төлеген картаға немесе шотқа түседі. Әдетте банкке бірнеше жұмыс күні қажет."
+
+msgid "Refunded"
+msgstr "Қайтарылды"
+
+#, python-format
+msgid "%(attendee)s requested a refund of %(amount)s."
+msgstr "%(attendee)s %(amount)s қайтаруды сұрады."
+
+#, python-format
+msgid "💸 Refund requested: %(event)s"
+msgstr "💸 Ақшаны қайтару сұралды: %(event)s"
+
+#, python-format
+msgid "Refund requested: %(event)s"
+msgstr "Ақшаны қайтару сұралды: %(event)s"
+
+msgid "An attendee asked for a refund"
+msgstr "Қатысушы ақшаны қайтаруды сұрады"
+
+msgid "Approve or reject it in the attendee list of the event."
+msgstr "Сұрауды іс-шара қатысушыларының тізімінде мақұлдаңыз немесе қабылдамаңыз."
+
+msgid "Review the request"
+msgstr "Сұрауды қарау"
+
+#, python-format
+msgid "Note: %(note)s"
+msgstr "Ескертпе: %(note)s"
+
+msgid "Your refund has been approved and processed."
+msgstr "Ақшаны қайтару мақұлданып, орындалды."
+
+#, python-format
+msgid "✅ Refund approved: %(event)s"
+msgstr "✅ Қайтару мақұлданды: %(event)s"
+
+#, python-format
+msgid "Refund approved: %(event)s"
+msgstr "Қайтару мақұлданды: %(event)s"
+
+msgid "Your refund was approved"
+msgstr "Ақшаны қайтару мақұлданды"
+
+msgid "Your ticket for this event is no longer valid."
+msgstr "Бұл іс-шараға билетіңіз енді жарамсыз."
+
+msgid "Your refund request was declined — your ticket remains valid."
+msgstr "Ақшаны қайтару сұрауыңыз қабылданбады — билетіңіз жарамды болып қалады."
+
+#, python-format
+msgid "❌ Refund rejected: %(event)s"
+msgstr "❌ Қайтару қабылданбады: %(event)s"
+
+#, python-format
+msgid "Refund request declined: %(event)s"
+msgstr "Қайтару сұрауы қабылданбады: %(event)s"
+
+msgid "Your refund request was declined"
+msgstr "Ақшаны қайтару сұрауыңыз қабылданбады"
+
+#, python-format
+msgid "The organizer changed %(fields)s of %(event)s. Please check the new details."
+msgstr "Ұйымдастырушы «%(event)s» іс-шарасының мына мәліметтерін өзгертті: %(fields)s. Жаңа мәліметтерді тексеріңіз."
+
+msgid "the details"
+msgstr "мәліметтер"
+
+#, python-format
+msgid "%(new)s (was %(old)s)"
+msgstr "%(new)s (бұрын: %(old)s)"
+
+#, python-format
+msgid "📝 Event updated: %(event)s"
+msgstr "📝 Іс-шара өзгертілді: %(event)s"
+
+#, python-format
+msgid "Changed: %(event)s"
+msgstr "Өзгерістер: %(event)s"
+
+msgid "Your event has changed"
+msgstr "Іс-шараңыз өзгерді"
+
+msgid "Your ticket stays valid."
+msgstr "Билетіңіз жарамды болып қалады."
+
+msgid "View the event"
+msgstr "Іс-шараны ашу"
+
+msgid "The organizer has cancelled this event."
+msgstr "Ұйымдастырушы бұл іс-шараны тоқтатты."
+
+msgid "Your payment has been refunded."
+msgstr "Төлеміңіз қайтарылды."
+
+msgid "We could not refund your payment automatically — the organizer will contact you."
+msgstr "Төлемді автоматты түрде қайтару мүмкін болмады — ұйымдастырушы сізбен хабарласады."
+
+#, python-format
+msgid "❌ Event cancelled: %(event)s"
+msgstr "❌ Іс-шара тоқтатылды: %(event)s"
+
+#, python-format
+msgid "Cancelled: %(event)s"
+msgstr "Тоқтатылды: %(event)s"
+
+msgid "This event was cancelled"
+msgstr "Бұл іс-шара тоқтатылды"
+
+msgid "Your tickets for it are no longer valid."
+msgstr "Оған берілген билеттеріңіз енді жарамсыз."
+
+#, python-format
+msgid "You have %(minutes)d minute to grab your ticket before it passes to the next person."
+msgid_plural "You have %(minutes)d minutes to grab your ticket before it passes to the next person."
+msgstr[0] "Билет келесі адамға өткенше оны алуға %(minutes)d минутыңыз бар."
+msgstr[1] "Билет келесі адамға өткенше оны алуға %(minutes)d минутыңыз бар."
+
+#, python-format
+msgid "🎉 A spot opened up: %(event)s"
+msgstr "🎉 Орын босады: %(event)s"
+
+#, python-format
+msgid "A spot opened up: %(event)s"
+msgstr "Орын босады: %(event)s"
+
+msgid "A spot is waiting for you"
+msgstr "Сізге орын бар"
+
+msgid "Someone gave up their place and you are next on the waitlist."
+msgstr "Біреу орнынан бас тартты, ал күту тізімінде келесі кезек сіздікі."
+
+msgid "Get my ticket"
+msgstr "Билетті алу"
+
+#, python-format
+msgid "Your group booking of %(count)d seat is confirmed. Tickets are in My Bookings."
+msgid_plural "Your group booking of %(count)d seats is confirmed. Tickets are in My Bookings."
+msgstr[0] "%(count)d орынға топтық брондауыңыз расталды. Билеттер «Менің брондауларым» бөлімінде."
+msgstr[1] "%(count)d орынға топтық брондауыңыз расталды. Билеттер «Менің брондауларым» бөлімінде."
+
+#, python-format
+msgid "🎫 %(count)d ticket confirmed: %(event)s"
+msgid_plural "🎫 %(count)d tickets confirmed: %(event)s"
+msgstr[0] "🎫 %(count)d билет расталды: %(event)s"
+msgstr[1] "🎫 %(count)d билет расталды: %(event)s"
+
+#, python-format
+msgid "Your group booking for %(event)s"
+msgstr "«%(event)s» іс-шарасына топтық брондауыңыз"
+
+msgid "Your group booking is confirmed"
+msgstr "Топтық брондау расталды"
+
+msgid "Share the booking link with your friends so they can put their names on their seats."
+msgstr "Достарыңыз орындарына өз аттарын жазуы үшін брондау сілтемесін оларға жіберіңіз."
+
+msgid "Open My Bookings"
+msgstr "«Менің брондауларым» бөлімін ашу"
+
+#, python-format
+msgid "You claimed %(seat)s in %(owner)s’s group booking for %(event)s."
+msgstr "Сіз %(owner)s жасаған «%(event)s» топтық брондауынан %(seat)s орнын алдыңыз."
+
+#, python-format
+msgid "💺 Seat claimed: %(event)s"
+msgstr "💺 Орын сіздікі: %(event)s"
+
+#, python-format
+msgid "Your seat for %(event)s"
+msgstr "«%(event)s» іс-шарасындағы орныңыз"
+
+msgid "Your seat is yours"
+msgstr "Орын сізге бекітілді"
+
+msgid "Show the QR code below at the entrance."
+msgstr "Кіреберісте төмендегі QR кодты көрсетіңіз."
+
+#, python-format
+msgid "%(event)s starts at %(time)s, in less than 2 hours."
+msgstr "«%(event)s» басталуына 2 сағаттан аз уақыт қалды, басталу уақыты — %(time)s."
+
+#, python-format
+msgid "⏰ Starting soon: %(event)s at %(time)s"
+msgstr "⏰ Жақында басталады: %(event)s, сағат %(time)s"
+
+#, python-format
+msgid "Starting in 2 hours: %(event)s at %(time)s"
+msgstr "2 сағаттан кейін басталады: %(event)s, сағат %(time)s"
+
+msgid "Your event starts in less than 2 hours"
+msgstr "Іс-шараңыз 2 сағатқа жетпей басталады"
+
+#, python-format
+msgid "%(event)s starts on %(when)s."
+msgstr "«%(event)s» басталуы: %(when)s."
+
+#, python-format
+msgid "⏰ Coming up: %(event)s"
+msgstr "⏰ Жақында: %(event)s"
+
+#, python-format
+msgid "Reminder: %(event)s starts soon"
+msgstr "Еске салу: «%(event)s» жақында басталады"
+
+msgid "Your event is coming up"
+msgstr "Іс-шараңыз жақында басталады"
+
+msgid "Have your ticket QR code ready at the entrance."
+msgstr "Кіреберісте билеттің QR кодын дайындап қойыңыз."
+
+#, python-format
+msgid "Join online: %(link)s"
+msgstr "Онлайн қосылу: %(link)s"
+
+#, python-format
+msgid "⭐ How was %(event)s?"
+msgstr "⭐ «%(event)s» қалай өтті?"
+
+msgid "Share your experience and help others discover great events."
+msgstr "Әсеріңізбен бөлісіп, басқаларға тамаша іс-шаралар табуға көмектесіңіз."
+
+#, python-format
+msgid "How was %(event)s?"
+msgstr "«%(event)s» қалай өтті?"
+
+msgid "How was it?"
+msgstr "Қалай өтті?"
+
+#, python-format
+msgid "Thank you for coming to %(event)s."
+msgstr "«%(event)s» іс-шарасына келгеніңізге рахмет."
+
+msgid "Share your experience and help others discover great events. It takes less than a minute."
+msgstr "Әсеріңізбен бөлісіп, басқаларға тамаша іс-шаралар табуға көмектесіңіз. Бұл бір минуттан аз уақыт алады."
+
+msgid "Leave a review"
+msgstr "Пікір қалдыру"
+
+msgid "If this was not you, reset your password and contact support right away."
+msgstr "Егер бұл сіз болмасаңыз, құпиясөзді дереу қалпына келтіріп, қолдау қызметіне хабарласыңыз."
+
+msgid "Review security settings"
+msgstr "Қауіпсіздік параметрлерін тексеру"
+
+msgid "E-ticket"
+msgstr "Электрондық билет"
+
+msgid "Ticket"
+msgstr "Билет"
+
+msgid "Ticket QR code"
+msgstr "Билеттің QR коды"
+
+#, python-format
+msgid "%(counter)s more ticket is in your account."
+msgid_plural "%(counter)s more tickets are in your account."
+msgstr[0] "Тағы %(counter)s билет аккаунтыңызда."
+msgstr[1] "Тағы %(counter)s билет аккаунтыңызда."
+
+msgid "You receive this email because of your EventHub notification settings."
+msgstr "Бұл хат EventHub хабарландыру параметрлеріңізге сәйкес жіберілді."
+
+msgid "Unsubscribe from these emails"
+msgstr "Бұл хаттардан бас тарту"
+
+msgid "Manage email preferences"
+msgstr "Email хабарландыруларын баптау"
+
+msgid "This email is about your tickets or payments, so it is always sent."
+msgstr "Бұл хат билеттеріңіз немесе төлемдеріңіз туралы, сондықтан ол әрқашан жіберіледі."
+
+msgid "Manage your other email preferences"
+msgstr "Басқа email хабарландыруларын баптау"
+
+msgid "The QR code is attached to this email and shown in My Tickets."
+msgstr "QR коды осы хатқа тіркелген және «Менің билеттерім» бөлімінде көрсетілген."
+
+msgid "Unsubscribe from these emails:"
+msgstr "Бұл хаттардан бас тарту:"
+
+msgid "Manage email preferences:"
+msgstr "Email хабарландыруларын баптау:"
+
+msgid "Manage your other email preferences:"
+msgstr "Басқа email хабарландыруларын баптау:"
+
+msgid "Ticket purchased"
+msgstr "Билет сатып алу"
+
+msgid "Your e-ticket with the QR code after a successful payment."
+msgstr "Сәтті төлемнен кейін QR коды бар электрондық билет."
+
+msgid "Free registration confirmed"
+msgstr "Тегін тіркелу расталды"
+
+msgid "Your e-ticket after registering for a free event."
+msgstr "Тегін іс-шараға тіркелгеннен кейінгі электрондық билет."
+
+msgid "Payment failed"
+msgstr "Төлем өтпеді"
+
+msgid "A payment did not go through or arrived too late."
+msgstr "Төлем өтпеді немесе тым кеш түсті."
+
+msgid "Payment refunded"
+msgstr "Төлемді қайтару"
+
+msgid "Money was returned to you. Always emailed: it is a record of the refund."
+msgstr "Ақшаңыз қайтарылды. Хат әрқашан жіберіледі: бұл қайтарудың растамасы."
+
+msgid "Refund requested"
+msgstr "Ақшаны қайтару сұрауы"
+
+msgid "Organizers: an attendee asked for a refund."
+msgstr "Ұйымдастырушыларға: қатысушы ақшаны қайтаруды сұрады."
+
+msgid "Refund request approved"
+msgstr "Қайтару сұрауы мақұлданды"
+
+msgid "The organizer approved your refund request."
+msgstr "Ұйымдастырушы ақшаны қайтару сұрауыңызды мақұлдады."
+
+msgid "Refund request rejected"
+msgstr "Қайтару сұрауы қабылданбады"
+
+msgid "The organizer declined your refund request."
+msgstr "Ұйымдастырушы ақшаны қайтару сұрауыңызды қабылдамады."
+
+msgid "Event changed"
+msgstr "Іс-шараның өзгеруі"
+
+msgid "The date or venue of an event you have a ticket for changed."
+msgstr "Билетіңіз бар іс-шараның күні немесе өтетін орны өзгерді."
+
+msgid "Event cancelled"
+msgstr "Іс-шараның тоқтатылуы"
+
+msgid "An event you have a ticket for was cancelled. Always emailed."
+msgstr "Билетіңіз бар іс-шара тоқтатылды. Хат әрқашан жіберіледі."
+
+msgid "Waitlist spot available"
+msgstr "Күту тізімінен орын"
+
+msgid "A spot opened up for an event you are waiting for."
+msgstr "Сіз күтіп жүрген іс-шарада орын босады."
+
+msgid "Group booking confirmed"
+msgstr "Топтық брондау расталды"
+
+msgid "Your group booking is paid, with the tickets for every seat."
+msgstr "Топтық брондау төленді — әр орынға билеттерімен."
+
+msgid "Group booking seat claimed"
+msgstr "Топтық брондаудағы орын"
+
+msgid "You claimed a seat in a friend’s group booking."
+msgstr "Сіз досыңыздың топтық брондауынан орын алдыңыз."
+
+msgid "Event reminder"
+msgstr "Іс-шара туралы еске салу"
+
+msgid "Reminders 24 hours and 2 hours before an event you have a ticket for."
+msgstr "Билетіңіз бар іс-шара басталарға 24 сағат және 2 сағат қалғанда еске салу."
+
+msgid "Review reminder"
+msgstr "Пікір қалдыру туралы өтініш"
+
+msgid "An invitation to review an event you attended, sent after it ends."
+msgstr "Қатысқан іс-шараңызға пікір қалдыруға шақыру — ол аяқталғаннан кейін."
+
+msgid "Messages from organizers"
+msgstr "Ұйымдастырушылардың хабарлары"
+
+msgid "Announcements an organizer sends to the attendees of an event."
+msgstr "Ұйымдастырушы іс-шара қатысушыларына жіберетін хабарландырулар."
+
+msgid "Security alert"
+msgstr "Қауіпсіздік туралы хабарлама"
+
+msgid "A change to your sign-in or two-factor settings. Always emailed."
+msgstr "Кіру немесе екі факторлы аутентификация параметрлерінің өзгеруі. Хат әрқашан жіберіледі."

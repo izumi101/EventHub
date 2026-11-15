@@ -570,8 +570,9 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         fields = ['rating', 'comment']
 
     def validate(self, attrs):
-        """Only confirmed attendees may review, and only once the event started."""
-        from django.utils import timezone
+        """Only confirmed attendees may review, and only once the event started
+        (events.services.reviews — the review request email uses the same rule)."""
+        from .services.reviews import review_refusal
 
         request = self.context.get('request')
         event_id = self.context.get('event_id')
@@ -581,18 +582,9 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
         event = Event.objects.filter(pk=event_id).first()
         if event is None:
             raise serializers.ValidationError('Event not found.')
-        if event.date > timezone.now():
-            raise serializers.ValidationError('You can review an event after it has taken place.')
-
-        attended = Registration.objects.filter(
-            event_id=event_id,
-            user=request.user,
-            status=RegistrationStatusChoices.CONFIRMED,
-        ).exists()
-        if not attended:
-            raise serializers.ValidationError('Only attendees with a confirmed ticket can leave a review.')
-        if Review.objects.filter(event_id=event_id, user=request.user).exists():
-            raise serializers.ValidationError('You have already reviewed this event.')
+        refusal = review_refusal(event, request.user)
+        if refusal:
+            raise serializers.ValidationError(refusal)
         return attrs
 
 

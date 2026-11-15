@@ -520,14 +520,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description The signed-in user's notification email preferences. */
+        /** @description The signed-in user's notification email preferences and language. */
         get: operations["auth_profile_notifications_retrieve"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** @description The signed-in user's notification email preferences. */
+        /** @description The signed-in user's notification email preferences and language. */
         patch: operations["auth_profile_notifications_partial_update"];
         trace?: never;
     };
@@ -1628,6 +1628,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/unsubscribe/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description One-click unsubscribe from one optional email type (RFC 8058).
+         *
+         *     No sign-in: the signed token in the email identifies the user and the
+         *     type. `GET` only describes the link (link scanners and mail previews
+         *     follow links; nothing changes). `POST` switches that email off; it is
+         *     idempotent. Mail providers POST `List-Unsubscribe=One-Click` as a form
+         *     to the `List-Unsubscribe` URL, which carries the token in the query.
+         */
+        get: operations["notifications_unsubscribe_retrieve"];
+        put?: never;
+        /**
+         * @description One-click unsubscribe from one optional email type (RFC 8058).
+         *
+         *     No sign-in: the signed token in the email identifies the user and the
+         *     type. `GET` only describes the link (link scanners and mail previews
+         *     follow links; nothing changes). `POST` switches that email off; it is
+         *     idempotent. Mail providers POST `List-Unsubscribe=One-Click` as a form
+         *     to the `List-Unsubscribe` URL, which carries the token in the query.
+         */
+        post: operations["notifications_unsubscribe_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/create-checkout/{registration_id}/": {
         parameters: {
             query?: never;
@@ -2012,6 +2046,8 @@ export interface components {
              */
             avatar: string;
         };
+        /** @enum {unknown} */
+        BlankEnum: "";
         Booking: {
             /** Format: uuid */
             readonly id: string;
@@ -2582,6 +2618,13 @@ export interface components {
             /** @description Username or email. */
             identifier: string;
         };
+        /**
+         * @description * `en` - English
+         *     * `ru` - Русский
+         *     * `kk` - Қазақша
+         * @enum {string}
+         */
+        LanguageEnum: "en" | "ru" | "kk";
         /** @description Manual Serializer for login. */
         LoginRequest: {
             username: string;
@@ -2661,9 +2704,10 @@ export interface components {
             readonly created_at: string;
         };
         /**
-         * @description Email preferences per notification type. In-app notifications are
-         *     always on; sign-up codes, password reset and other security emails are
-         *     not listed: they are always sent.
+         * @description Email preferences per notification type and the notification language.
+         *     In-app notifications are always on; sign-up codes, password reset and
+         *     other security emails are not listed: they are always sent. Labels and
+         *     descriptions follow the request's `Accept-Language` (en, ru, kk).
          */
         NotificationPreferences: {
             /**
@@ -2671,6 +2715,14 @@ export interface components {
              * @description Where emails go (empty: none are sent).
              */
             readonly email_address: string;
+            /**
+             * @description Language of in-app notifications and emails; empty means English.
+             *
+             *     * `en` - English
+             *     * `ru` - Русский
+             *     * `kk` - Қазақша
+             */
+            readonly language: components["schemas"]["LanguageEnum"] | components["schemas"]["BlankEnum"];
             readonly types: components["schemas"]["NotificationTypePreference"][];
         };
         /**
@@ -3023,6 +3075,14 @@ export interface components {
             email?: {
                 [key: string]: boolean;
             };
+            /**
+             * @description Language of in-app notifications and emails; empty means English.
+             *
+             *     * `en` - English
+             *     * `ru` - Русский
+             *     * `kk` - Қазақша
+             */
+            language?: components["schemas"]["LanguageEnum"] | components["schemas"]["BlankEnum"];
         };
         PatchedPasskeyRenameRequestRequest: {
             name?: string;
@@ -3567,6 +3627,15 @@ export interface components {
         };
         TokenRefreshRequest: {
             refresh: string;
+        };
+        Unsubscribe: {
+            readonly type: components["schemas"]["NotificationTypeEnum"];
+            /** @description The type label in the `Accept-Language` language. */
+            readonly label: string;
+        };
+        UnsubscribeTokenRequest: {
+            /** @description The token from the email link. May be sent in the query string (`?token=`) instead. */
+            token?: string;
         };
         User: {
             readonly id: number;
@@ -8158,6 +8227,74 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    notifications_unsubscribe_retrieve: {
+        parameters: {
+            query?: {
+                /** @description The signed token from the email (`List-Unsubscribe` URL or footer link). */
+                token?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Unsubscribe"];
+                };
+            };
+            /** @description Missing, malformed or tampered token (one message for every case). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    notifications_unsubscribe_create: {
+        parameters: {
+            query?: {
+                /** @description The signed token from the email (`List-Unsubscribe` URL or footer link). */
+                token?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["UnsubscribeTokenRequest"];
+                "application/json": components["schemas"]["UnsubscribeTokenRequest"];
+                "multipart/form-data": components["schemas"]["UnsubscribeTokenRequest"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Unsubscribe"];
+                };
+            };
+            /** @description Missing, malformed or tampered token (one message for every case). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
         };

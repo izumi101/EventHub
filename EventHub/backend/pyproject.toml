@@ -35,6 +35,8 @@ allowed-confusables = ["—", "–", "’", "×"]
 # Tests use fixed passwords and plain asserts on purpose.
 "**/test*.py" = ["S101", "S105", "S106"]
 "**/ws_testing.py" = ["S101"]
+# Notification tests assert on the Russian and Kazakh copy (Cyrillic).
+"**/notifications/test_*.py" = ["RUF001"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["accounts", "bookings", "common", "eventhub_backend", "events", "featureflags", "jobs", "mfa", "notifications", "payments"]

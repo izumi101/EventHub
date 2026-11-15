@@ -1,7 +1,7 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { TranslocoService } from '@jsverse/transloco';
-import { firstValueFrom } from 'rxjs';
+import { Subject, firstValueFrom } from 'rxjs';
 import { DEFAULT_LANG, LANG_META, LANG_STORAGE_KEY, Lang, isLang, matchLang } from './languages';
 
 /**
@@ -18,6 +18,9 @@ export class LanguageService {
   readonly lang = this._lang.asReadonly();
   /** Locale id for Intl and Angular's `formatDate`. */
   readonly locale = computed(() => LANG_META[this._lang()].locale);
+  private readonly _switched = new Subject<Lang>();
+  /** Emits when the user picks a language (not on the boot-time detection). */
+  readonly switched$ = this._switched.asObservable();
 
   /** Resolves the initial language and loads its translations. Call once at boot. */
   async init(): Promise<void> {
@@ -28,6 +31,7 @@ export class LanguageService {
   async setLang(lang: Lang): Promise<void> {
     await this.apply(lang);
     this.store(lang);
+    this._switched.next(lang);
   }
 
   /** Translates a key in code (toasts, modals); templates use the `transloco` pipe. */

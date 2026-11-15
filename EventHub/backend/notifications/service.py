@@ -7,12 +7,14 @@
 has an email address and has not switched that type off — the `send_email`
 outbox job, both in the caller's transaction. So a notification exists if
 and only if the business change that caused it was committed: a rollback
-leaves neither the row nor the email.
+leaves neither the row nor the email. Both are written in the user's
+language (`NotificationPreference.language`, English by default).
 """
 
 import logging
 
 from django.db import transaction
+from django.utils import translation
 
 from . import types
 from .emails import render_email
@@ -22,17 +24,27 @@ from .models import NotificationPreference
 logger = logging.getLogger(__name__)
 
 
+def _preference(user) -> NotificationPreference | None:
+    try:
+        return user.notification_preference
+    except NotificationPreference.DoesNotExist:
+        return None
+
+
+def user_language(user) -> str:
+    """The language `user` reads notifications in ('en', 'ru' or 'kk')."""
+    preference = _preference(user)
+    return preference.effective_language if preference else NotificationPreference.Language.EN.value
+
+
 def email_enabled(user, type_key: str) -> bool:
     spec = types.get(type_key)
     if not spec.sends_email:
         return False
     if not spec.email_optional:
         return True
-    try:
-        preference = user.notification_preference
-    except NotificationPreference.DoesNotExist:
-        return True
-    return preference.email_enabled(type_key)
+    preference = _preference(user)
+    return True if preference is None else preference.email_enabled(type_key)
 
 
 def notify(user, type_key: str, *, event=None, **data):
@@ -48,7 +60,7 @@ def notify(user, type_key: str, *, event=None, **data):
     from jobs.handlers import enqueue_email
 
     try:
-        with transaction.atomic():
+        with transaction.atomic(), translation.override(user_language(user)):
             message = build_message(type_key, user, event, data)
             notification = Notification.objects.create(
                 user=user,
@@ -59,7 +71,7 @@ def notify(user, type_key: str, *, event=None, **data):
             )
             notification.email_queued = bool(user.email) and email_enabled(user, type_key)
             if notification.email_queued:
-                email = render_email(type_key, message)
+                email = render_email(type_key, message, user=user)
                 enqueue_email(
                     email['subject'],
                     email['body'],

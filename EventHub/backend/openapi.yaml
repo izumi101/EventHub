@@ -1293,7 +1293,7 @@ paths:
   /api/v1/auth/profile/notifications/:
     get:
       operationId: auth_profile_notifications_retrieve
-      description: The signed-in user's notification email preferences.
+      description: The signed-in user's notification email preferences and language.
       tags:
       - auth
       security:
@@ -1313,7 +1313,7 @@ paths:
           description: Missing or invalid access token.
     patch:
       operationId: auth_profile_notifications_partial_update
-      description: The signed-in user's notification email preferences.
+      description: The signed-in user's notification email preferences and language.
       tags:
       - auth
       requestBody:
@@ -4131,6 +4131,84 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: Missing or invalid access token.
+  /api/v1/notifications/unsubscribe/:
+    get:
+      operationId: notifications_unsubscribe_retrieve
+      description: |-
+        One-click unsubscribe from one optional email type (RFC 8058).
+
+        No sign-in: the signed token in the email identifies the user and the
+        type. `GET` only describes the link (link scanners and mail previews
+        follow links; nothing changes). `POST` switches that email off; it is
+        idempotent. Mail providers POST `List-Unsubscribe=One-Click` as a form
+        to the `List-Unsubscribe` URL, which carries the token in the query.
+      parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: The signed token from the email (`List-Unsubscribe` URL or footer
+          link).
+      tags:
+      - notifications
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unsubscribe'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Missing, malformed or tampered token (one message for every
+            case).
+    post:
+      operationId: notifications_unsubscribe_create
+      description: |-
+        One-click unsubscribe from one optional email type (RFC 8058).
+
+        No sign-in: the signed token in the email identifies the user and the
+        type. `GET` only describes the link (link scanners and mail previews
+        follow links; nothing changes). `POST` switches that email off; it is
+        idempotent. Mail providers POST `List-Unsubscribe=One-Click` as a form
+        to the `List-Unsubscribe` URL, which carries the token in the query.
+      parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: The signed token from the email (`List-Unsubscribe` URL or footer
+          link).
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeTokenRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeTokenRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeTokenRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unsubscribe'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Missing, malformed or tampered token (one message for every
+            case).
   /api/v1/payments/create-checkout/{registration_id}/:
     post:
       operationId: payments_create_checkout_create
@@ -5353,6 +5431,9 @@ components:
           description: JPEG, PNG, WebP or GIF, up to 5 MB.
       required:
       - avatar
+    BlankEnum:
+      enum:
+      - ''
     Booking:
       type: object
       properties:
@@ -6730,6 +6811,16 @@ components:
           description: Username or email.
       required:
       - identifier
+    LanguageEnum:
+      enum:
+      - en
+      - ru
+      - kk
+      type: string
+      description: |-
+        * `en` - English
+        * `ru` - Русский
+        * `kk` - Қазақша
     LoginRequest:
       type: object
       description: Manual Serializer for login.
@@ -6927,15 +7018,27 @@ components:
     NotificationPreferences:
       type: object
       description: |-
-        Email preferences per notification type. In-app notifications are
-        always on; sign-up codes, password reset and other security emails are
-        not listed: they are always sent.
+        Email preferences per notification type and the notification language.
+        In-app notifications are always on; sign-up codes, password reset and
+        other security emails are not listed: they are always sent. Labels and
+        descriptions follow the request's `Accept-Language` (en, ru, kk).
       properties:
         email_address:
           type: string
           format: email
           readOnly: true
           description: 'Where emails go (empty: none are sent).'
+        language:
+          readOnly: true
+          description: |-
+            Language of in-app notifications and emails; empty means English.
+
+            * `en` - English
+            * `ru` - Русский
+            * `kk` - Қазақша
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         types:
           type: array
           items:
@@ -6943,6 +7046,7 @@ components:
           readOnly: true
       required:
       - email_address
+      - language
       - types
     NotificationTypeEnum:
       enum:
@@ -7594,6 +7698,16 @@ components:
           description: 'Type key → email on/off, e.g. {"event_reminder": false}. Only
             the types listed with `email_optional: true` can be changed; types not
             mentioned keep their setting.'
+        language:
+          description: |-
+            Language of in-app notifications and emails; empty means English.
+
+            * `en` - English
+            * `ru` - Русский
+            * `kk` - Қазақша
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
     PatchedPasskeyRenameRequestRequest:
       type: object
       properties:
@@ -8878,6 +8992,28 @@ components:
           minLength: 1
       required:
       - refresh
+    Unsubscribe:
+      type: object
+      properties:
+        type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+          description: The type label in the `Accept-Language` language.
+      required:
+      - label
+      - type
+    UnsubscribeTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: The token from the email link. May be sent in the query string
+            (`?token=`) instead.
     User:
       type: object
       properties:

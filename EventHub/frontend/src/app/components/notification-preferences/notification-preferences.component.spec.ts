@@ -13,6 +13,7 @@ const URL = `${environment.apiUrl}/auth/profile/notifications/`;
 function prefs(reminderOn = true): NotificationPreferences {
   return {
     email_address: 'alice@example.com',
+    language: '',
     types: [
       {
         type: 'event_reminder',
