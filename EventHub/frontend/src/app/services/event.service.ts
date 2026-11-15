@@ -158,6 +158,12 @@ export class EventService {
   getFavoriteStatus(eventId: number): Observable<{ favorited: boolean }> {
     return this.http.get<{ favorited: boolean }>(`${this.apiUrl}/favorites/${eventId}/`);
   }
+  /** Every event id the user favourited (cards need it beyond the first page). */
+  getFavoriteIds(): Observable<number[]> {
+    return this.http
+      .get<{ ids: number[] }>(`${this.apiUrl}/favorites/ids/`)
+      .pipe(map((res) => res.ids));
+  }
 
   // ── Reviews ──
   getEventReviews(eventId: number): Observable<Review[]> {

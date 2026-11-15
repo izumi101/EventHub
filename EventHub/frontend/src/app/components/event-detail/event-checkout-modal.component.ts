@@ -438,6 +438,8 @@ export class EventCheckoutModalComponent implements OnInit {
   @Input() currentGaPrice = '0.00';
   /** True while the parent runs the registration / payment flow. */
   @Input() registering = false;
+  /** Tier picked on the event page's panel: the checkout opens with it selected. */
+  @Input() preselectTicketTypeId: number | null = null;
 
   @Output() readonly closed = new EventEmitter<void>();
   /** Emits the ready-to-send registration payload (without affiliate code —
@@ -468,6 +470,11 @@ export class EventCheckoutModalComponent implements OnInit {
   answers: Record<number, unknown> = {};
 
   ngOnInit(): void {
+    if (this.preselectTicketTypeId !== null) {
+      const tier = this.event.ticket_types.find((t) => t.id === this.preselectTicketTypeId);
+      if (tier) this.selectTicketType(tier);
+    }
+
     this.eventService.getEventQuestions(this.event.id).subscribe({
       next: (qs) => {
         this.questions = qs;

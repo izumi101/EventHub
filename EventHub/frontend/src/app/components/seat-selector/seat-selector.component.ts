@@ -78,13 +78,15 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
           <span class="relative flex h-2 w-2">
             @if (wsConnected) {
               <span
-                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[color:var(--pine-500)] opacity-75"
               ></span>
               <span
-                class="relative inline-flex rounded-full h-2 w-2 bg-[color:var(--pine-50)]0"
+                class="relative inline-flex rounded-full h-2 w-2 bg-[color:var(--pine-500)]"
               ></span>
             } @else {
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-300"></span>
+              <span
+                class="relative inline-flex rounded-full h-2 w-2 bg-[color:var(--border-strong)]"
+              ></span>
             }
           </span>
           {{ (wsConnected ? 'seatSelector.live' : 'seatSelector.offline') | transloco }}
@@ -94,19 +96,25 @@ export function summariseZones(seats: readonly Seat[]): ZoneSummary[] {
       <!-- Legend -->
       <div class="flex flex-wrap gap-4 text-xs">
         <div class="flex items-center gap-1.5">
-          <div class="w-4 h-4 rounded border-2 border-emerald-500 bg-[color:var(--pine-50)]"></div>
+          <div
+            class="w-4 h-4 rounded border-2 border-[color:var(--pine-500)] bg-[color:var(--pine-50)]"
+          ></div>
           <span>{{ 'seatSelector.available' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <div class="w-4 h-4 rounded border-2 border-blue-400 bg-blue-50"></div>
+          <div
+            class="w-4 h-4 rounded border-2 border-[color:var(--zone-vip)] bg-[color:var(--zone-vip-50)]"
+          ></div>
           <span>{{ 'seatSelector.vip' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <div class="w-4 h-4 rounded border-2 border-purple-300 bg-purple-50"></div>
+          <div
+            class="w-4 h-4 rounded border-2 border-[color:var(--zone-premium)] bg-[color:var(--zone-premium-50)]"
+          ></div>
           <span>{{ 'seatSelector.premium' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
-          <div class="w-4 h-4 rounded bg-gray-200 border-2 border-gray-300"></div>
+          <div class="w-4 h-4 rounded bg-muted border-2 border-[color:var(--border-strong)]"></div>
           <span>{{ 'seatMap.taken2' | transloco }}</span>
         </div>
         <div class="flex items-center gap-1.5">
@@ -280,8 +288,8 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   zoneTextClass(zone: string): string {
-    if (zone === 'premium') return 'text-purple-600';
-    if (zone === 'vip') return 'text-blue-600';
+    if (zone === 'premium') return 'text-[color:var(--zone-premium)]';
+    if (zone === 'vip') return 'text-[color:var(--zone-vip)]';
     return 'text-[color:var(--pine-600)]';
   }
 
@@ -334,18 +342,18 @@ export class SeatSelectorComponent implements OnInit, OnDestroy, OnChanges {
     const base =
       'w-7 h-7 rounded border-2 flex items-center justify-center transition-all duration-150';
     if (!seat.is_available) {
-      return `${base} bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed`;
+      return `${base} bg-muted border-[color:var(--border-strong)] text-muted-foreground opacity-60 cursor-not-allowed`;
     }
     if (this.selectedSeat?.id === seat.id) {
       return `${base} bg-primary/20 border-primary text-primary font-bold scale-110 shadow-sm`;
     }
     if (seat.price_zone === 'vip') {
-      return `${base} bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100 hover:scale-110 cursor-pointer`;
+      return `${base} border-[color:var(--zone-vip)] bg-[color:var(--zone-vip-50)] text-[color:var(--zone-vip)] hover:scale-110 cursor-pointer`;
     }
     if (seat.price_zone === 'premium') {
-      return `${base} bg-purple-50 border-purple-300 text-purple-700 hover:bg-purple-100 hover:scale-110 cursor-pointer`;
+      return `${base} border-[color:var(--zone-premium)] bg-[color:var(--zone-premium-50)] text-[color:var(--zone-premium)] hover:scale-110 cursor-pointer`;
     }
-    return `${base} bg-[color:var(--pine-50)] border-emerald-400 text-[color:var(--pine-600)] hover:bg-[color:var(--pine-50)] hover:scale-110 cursor-pointer`;
+    return `${base} bg-[color:var(--pine-50)] border-[color:var(--pine-500)] text-[color:var(--pine-600)] hover:scale-110 cursor-pointer`;
   }
 
   selectSeat(seat: Seat): void {

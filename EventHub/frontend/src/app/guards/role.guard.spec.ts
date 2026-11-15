@@ -8,6 +8,7 @@ import {
   provideRouter,
 } from '@angular/router';
 import { roleGuard } from './role.guard';
+import { routes } from '../app.routes';
 
 function run(role: 'admin' | 'organizer', user: object | null): boolean | UrlTree {
   localStorage.clear();
@@ -41,5 +42,30 @@ describe('roleGuard', () => {
   it('keeps admin pages for superusers', () => {
     expect(run('admin', admin)).toBe(true);
     expect(asUrl(run('admin', organizer))).toBe('/');
+  });
+});
+
+describe('/my-events route', () => {
+  const attendee = { is_staff: false, is_superuser: false, profile: { role: 'attendee' } };
+  const organizer = { is_staff: false, is_superuser: false, profile: { role: 'organizer' } };
+
+  function runMyEvents(user: object | null): boolean | UrlTree {
+    localStorage.clear();
+    if (user) {
+      localStorage.setItem('access_token', 't');
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideRouter([]), provideHttpClient()] });
+    const route = routes.find((r) => r.path === 'my-events');
+    const guard = route?.canActivate?.[0] as ReturnType<typeof roleGuard>;
+    return TestBed.runInInjectionContext(() =>
+      guard({} as ActivatedRouteSnapshot, { url: '/my-events' } as RouterStateSnapshot),
+    ) as boolean | UrlTree;
+  }
+
+  it('redirects attendees to Discover and lets organizers in', () => {
+    expect(asUrl(runMyEvents(attendee))).toBe('/');
+    expect(runMyEvents(organizer)).toBe(true);
   });
 });
