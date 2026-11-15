@@ -3,7 +3,7 @@
 import logging
 
 from django.db import transaction
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.http import Http404
 from django.utils import timezone
 from drf_spectacular.types import OpenApiTypes
@@ -171,7 +171,12 @@ class EventViewSet(viewsets.ModelViewSet):
         if category:
             queryset = queryset.filter(category_id=category)
         if is_free == 'true':
-            queryset = queryset.filter(price=0)
+            # Same rule as Event.is_free: with ticket tiers the event is free
+            # only when every tier is free; without tiers, the base price is 0.
+            tiers = TicketType.objects.filter(event=OuterRef('pk'))
+            queryset = queryset.filter(
+                (~Exists(tiers) & Q(price=0)) | (Exists(tiers) & ~Exists(tiers.exclude(kind=TicketType.KIND_FREE)))
+            )
         if is_online == 'true':
             queryset = queryset.filter(is_online=True)
         if location:

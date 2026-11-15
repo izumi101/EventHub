@@ -23,6 +23,7 @@ from .checkin import (
 )
 from .engagement import (
     EventReviewsView,
+    FavoriteIdsView,
     FavoritesListView,
     FavoriteToggleView,
     NotificationMarkAllReadView,
@@ -80,6 +81,7 @@ __all__ = [
     'EventViewSet',
     'EventWaitlistView',
     'EventWebhooksView',
+    'FavoriteIdsView',
     'FavoriteToggleView',
     'FavoritesListView',
     'IsOrganizerOrReadOnly',
