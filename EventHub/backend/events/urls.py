@@ -15,6 +15,7 @@ urlpatterns = [
     path('recommendations/', views.RecommendationsView.as_view(), name='recommendations'),
     # Favorites
     path('favorites/', views.FavoritesListView.as_view(), name='favorites-list'),
+    path('favorites/ids/', views.FavoriteIdsView.as_view(), name='favorite-ids'),
     path('favorites/<int:event_id>/', views.FavoriteToggleView.as_view(), name='favorite-toggle'),
     # Reviews
     path('events/<int:event_id>/reviews/', views.EventReviewsView.as_view(), name='event-reviews'),

@@ -247,6 +247,10 @@ class FavoriteStateSerializer(serializers.Serializer):
     favorited = serializers.BooleanField()
 
 
+class FavoriteIdsSerializer(serializers.Serializer):
+    ids = serializers.ListField(child=serializers.IntegerField(), help_text='Ids of the events the user favourited.')
+
+
 class OkSerializer(serializers.Serializer):
     ok = serializers.BooleanField()
 
