@@ -1293,7 +1293,7 @@ paths:
   /api/v1/auth/profile/notifications/:
     get:
       operationId: auth_profile_notifications_retrieve
-      description: The signed-in user's notification email preferences.
+      description: The signed-in user's notification email preferences and language.
       tags:
       - auth
       security:
@@ -1313,7 +1313,7 @@ paths:
           description: Missing or invalid access token.
     patch:
       operationId: auth_profile_notifications_partial_update
-      description: The signed-in user's notification email preferences.
+      description: The signed-in user's notification email preferences and language.
       tags:
       - auth
       requestBody:
@@ -5353,6 +5353,9 @@ components:
           description: JPEG, PNG, WebP or GIF, up to 5 MB.
       required:
       - avatar
+    BlankEnum:
+      enum:
+      - ''
     Booking:
       type: object
       properties:
@@ -6730,6 +6733,16 @@ components:
           description: Username or email.
       required:
       - identifier
+    LanguageEnum:
+      enum:
+      - en
+      - ru
+      - kk
+      type: string
+      description: |-
+        * `en` - English
+        * `ru` - Русский
+        * `kk` - Қазақша
     LoginRequest:
       type: object
       description: Manual Serializer for login.
@@ -6927,15 +6940,27 @@ components:
     NotificationPreferences:
       type: object
       description: |-
-        Email preferences per notification type. In-app notifications are
-        always on; sign-up codes, password reset and other security emails are
-        not listed: they are always sent.
+        Email preferences per notification type and the notification language.
+        In-app notifications are always on; sign-up codes, password reset and
+        other security emails are not listed: they are always sent. Labels and
+        descriptions follow the request's `Accept-Language` (en, ru, kk).
       properties:
         email_address:
           type: string
           format: email
           readOnly: true
           description: 'Where emails go (empty: none are sent).'
+        language:
+          readOnly: true
+          description: |-
+            Language of in-app notifications and emails; empty means English.
+
+            * `en` - English
+            * `ru` - Русский
+            * `kk` - Қазақша
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
         types:
           type: array
           items:
@@ -6943,6 +6968,7 @@ components:
           readOnly: true
       required:
       - email_address
+      - language
       - types
     NotificationTypeEnum:
       enum:
@@ -7594,6 +7620,16 @@ components:
           description: 'Type key → email on/off, e.g. {"event_reminder": false}. Only
             the types listed with `email_optional: true` can be changed; types not
             mentioned keep their setting.'
+        language:
+          description: |-
+            Language of in-app notifications and emails; empty means English.
+
+            * `en` - English
+            * `ru` - Русский
+            * `kk` - Қазақша
+          oneOf:
+          - $ref: '#/components/schemas/LanguageEnum'
+          - $ref: '#/components/schemas/BlankEnum'
     PatchedPasskeyRenameRequestRequest:
       type: object
       properties:
