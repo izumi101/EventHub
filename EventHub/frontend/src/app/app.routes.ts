@@ -81,6 +81,13 @@ export const routes: Routes = [
     title: 'routeTitles.notificationSettings',
   },
   {
+    // Public: the footer link of optional emails (signed token, no sign-in).
+    path: 'unsubscribe',
+    loadComponent: () =>
+      import('./components/unsubscribe/unsubscribe.component').then((m) => m.UnsubscribeComponent),
+    title: 'routeTitles.unsubscribe',
+  },
+  {
     path: 'favorites',
     loadComponent: () =>
       import('./components/favorites/favorites.component').then((m) => m.FavoritesComponent),

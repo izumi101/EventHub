@@ -1295,6 +1295,7 @@
     "security": "Security",
     "signIn": "Sign In",
     "ticketTypes": "Ticket Types",
+    "unsubscribe": "Unsubscribe",
     "validateTicket": "Validate Ticket",
     "waitlist": "Waitlist"
   },
@@ -1442,6 +1443,20 @@
     "ticketTierCreated": "Ticket tier created.",
     "ticketTypes": "Ticket types",
     "whatSIncludedWith": "What's included with this tier?"
+  },
+  "unsubscribe": {
+    "confirm": "Unsubscribe",
+    "confirmText": "Stop sending “{{ label }}” emails to you?",
+    "done": "Done: you will no longer receive “{{ label }}” emails.",
+    "doneHint": "Changed your mind? Switch them back on in your notification settings.",
+    "failed": "Could not unsubscribe. Please try again.",
+    "inAppStays": "You will still see these notifications under the bell in the app. You can switch the emails back on at any time.",
+    "invalid": "This unsubscribe link is invalid or incomplete. You can change your emails in your notification settings.",
+    "kicker": "Email preferences",
+    "loading": "Checking the link...",
+    "managePreferences": "Notification settings",
+    "saving": "Unsubscribing...",
+    "title": "Unsubscribe"
   },
   "validate": {
     "nextTicket": "Next ticket",
