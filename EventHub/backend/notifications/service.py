@@ -71,7 +71,7 @@ def notify(user, type_key: str, *, event=None, **data):
             )
             notification.email_queued = bool(user.email) and email_enabled(user, type_key)
             if notification.email_queued:
-                email = render_email(type_key, message)
+                email = render_email(type_key, message, user=user)
                 enqueue_email(
                     email['subject'],
                     email['body'],

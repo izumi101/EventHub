@@ -1,5 +1,6 @@
 """Notifications: the service, the email job, the templates, every trigger,
-the 24-hour reminder and the preferences API."""
+the reminders, the review request, the preferences API, one-click
+unsubscribe and the translations."""
 
 import base64
 import io
@@ -108,7 +109,13 @@ class NotifyServiceTests(WorldMixin, TestCase):
         self.assertEqual(payload['subject'], 'Your ticket for Almaty Product Conference')
         self.assertIn('Almaty Product Conference', payload['body'])
         self.assertIn('cid:ticket-qr-0', payload['html_body'])
-        self.assertEqual(payload['headers'], {'List-Unsubscribe': '<http://localhost:4200/profile/notifications>'})
+        self.assertEqual(set(payload['headers']), {'List-Unsubscribe', 'List-Unsubscribe-Post'})
+        self.assertTrue(
+            payload['headers']['List-Unsubscribe'].startswith(
+                '<http://localhost:4200/api/v1/notifications/unsubscribe/?token='
+            )
+        )
+        self.assertEqual(payload['headers']['List-Unsubscribe-Post'], 'List-Unsubscribe=One-Click')
         attachment = payload['attachments'][0]
         self.assertEqual((attachment['mimetype'], attachment['cid']), ('image/png', 'ticket-qr-0'))
         self.assertTrue(base64.b64decode(attachment['content_b64']).startswith(PNG_MAGIC))
@@ -209,12 +216,22 @@ class RenderingTests(WorldMixin, TestCase):
         self.assertIn('Rock <script>alert(1)</script> & Roll', email['body'])
 
     def test_optional_and_mandatory_emails_have_different_footers(self):
-        optional = self.render()
-        self.assertIn('Unsubscribe or change your email preferences', optional['html_body'])
+        message = build_message(types.TICKET_PURCHASED, self.alice, self.event, {'registration': self.registration})
+        optional = render_email(types.TICKET_PURCHASED, message, user=self.alice)
+        for part in (optional['html_body'], optional['body']):
+            self.assertIn('Unsubscribe from these emails', part)
+            self.assertIn('https://tickets.example.com/unsubscribe?token=', part)
+            self.assertIn('https://tickets.example.com/profile/notifications', part)
         mandatory = render_email(
-            types.EVENT_CANCELLED, build_message(types.EVENT_CANCELLED, self.alice, self.event, {'refund': 'failed'})
+            types.EVENT_CANCELLED,
+            build_message(types.EVENT_CANCELLED, self.alice, self.event, {'refund': 'failed'}),
+            user=self.alice,
         )
         self.assertIn('always sent', mandatory['html_body'])
+        self.assertNotIn('Unsubscribe', mandatory['html_body'] + mandatory['body'])
+        self.assertNotIn('/unsubscribe', mandatory['html_body'] + mandatory['body'])
+        self.assertEqual(mandatory['headers'], {})
+        self.assertIn('https://tickets.example.com/profile/notifications', mandatory['html_body'])
         self.assertIn('could not refund your payment automatically', mandatory['body'])
         # No ticket: the only inline image is the brand mark in the header.
         self.assertEqual([a['cid'] for a in mandatory['attachments']], ['eventhub-logo'])
@@ -632,6 +649,7 @@ class PreferencesApiTests(WorldMixin, APITestCase):
         self.assertFalse(rows[types.EVENT_CANCELLED]['email_optional'])
         self.assertTrue(rows[types.EVENT_REMINDER]['email_optional'])
         self.assertNotIn(types.REVIEW_REMINDER, rows)  # in-app only
+        self.assertEqual(response.data['language'], '')
 
     def test_switching_an_email_off_and_on(self):
         self.client.force_authenticate(self.alice)

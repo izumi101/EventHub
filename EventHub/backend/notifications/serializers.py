@@ -54,3 +54,15 @@ class NotificationPreferencesUpdateSerializer(serializers.Serializer):
         if 'email' not in attrs and 'language' not in attrs:
             raise serializers.ValidationError('Send `email`, `language` or both.')
         return attrs
+
+
+class UnsubscribeTokenSerializer(serializers.Serializer):
+    token = serializers.CharField(
+        required=False,
+        help_text='The token from the email link. May be sent in the query string (`?token=`) instead.',
+    )
+
+
+class UnsubscribeSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(choices=types.CHOICES, read_only=True)
+    label = serializers.CharField(read_only=True, help_text='The type label in the `Accept-Language` language.')

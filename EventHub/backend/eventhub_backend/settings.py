@@ -238,6 +238,8 @@ REST_FRAMEWORK = {
         'promo': '10/min',
         'claim': '10/min',
         'affiliate_click': '30/min',
+        # Public one-click unsubscribe (notifications.views.UnsubscribeView).
+        'unsubscribe': '30/min',
     },
 }
 

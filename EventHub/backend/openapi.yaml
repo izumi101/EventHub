@@ -4131,6 +4131,84 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: Missing or invalid access token.
+  /api/v1/notifications/unsubscribe/:
+    get:
+      operationId: notifications_unsubscribe_retrieve
+      description: |-
+        One-click unsubscribe from one optional email type (RFC 8058).
+
+        No sign-in: the signed token in the email identifies the user and the
+        type. `GET` only describes the link (link scanners and mail previews
+        follow links; nothing changes). `POST` switches that email off; it is
+        idempotent. Mail providers POST `List-Unsubscribe=One-Click` as a form
+        to the `List-Unsubscribe` URL, which carries the token in the query.
+      parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: The signed token from the email (`List-Unsubscribe` URL or footer
+          link).
+      tags:
+      - notifications
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unsubscribe'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Missing, malformed or tampered token (one message for every
+            case).
+    post:
+      operationId: notifications_unsubscribe_create
+      description: |-
+        One-click unsubscribe from one optional email type (RFC 8058).
+
+        No sign-in: the signed token in the email identifies the user and the
+        type. `GET` only describes the link (link scanners and mail previews
+        follow links; nothing changes). `POST` switches that email off; it is
+        idempotent. Mail providers POST `List-Unsubscribe=One-Click` as a form
+        to the `List-Unsubscribe` URL, which carries the token in the query.
+      parameters:
+      - in: query
+        name: token
+        schema:
+          type: string
+        description: The signed token from the email (`List-Unsubscribe` URL or footer
+          link).
+      tags:
+      - notifications
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeTokenRequest'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeTokenRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/UnsubscribeTokenRequest'
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unsubscribe'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+          description: Missing, malformed or tampered token (one message for every
+            case).
   /api/v1/payments/create-checkout/{registration_id}/:
     post:
       operationId: payments_create_checkout_create
@@ -8914,6 +8992,28 @@ components:
           minLength: 1
       required:
       - refresh
+    Unsubscribe:
+      type: object
+      properties:
+        type:
+          allOf:
+          - $ref: '#/components/schemas/NotificationTypeEnum'
+          readOnly: true
+        label:
+          type: string
+          readOnly: true
+          description: The type label in the `Accept-Language` language.
+      required:
+      - label
+      - type
+    UnsubscribeTokenRequest:
+      type: object
+      properties:
+        token:
+          type: string
+          minLength: 1
+          description: The token from the email link. May be sent in the query string
+            (`?token=`) instead.
     User:
       type: object
       properties:
