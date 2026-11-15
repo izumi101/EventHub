@@ -402,16 +402,26 @@ def _group_booking_claimed(user, event, data) -> Message:
 
 
 def _event_reminder(user, event, data) -> Message:
-    when = format_datetime(event.date)
-    body = _('%(event)s starts on %(when)s.') % {'event': event.title, 'when': when}
+    """`window` '24h' (default): the day before; '2h': shortly before the start."""
+    if data.get('window') == '2h':
+        context = {'event': event.title, 'time': format_time(event.date)}
+        body = _('%(event)s starts at %(time)s, in less than 2 hours.') % context
+        title = _('⏰ Starting soon: %(event)s at %(time)s') % context
+        subject = _('Starting in 2 hours: %(event)s at %(time)s') % context
+        headline = _('Your event starts in less than 2 hours')
+    else:
+        body = _('%(event)s starts on %(when)s.') % {'event': event.title, 'when': format_datetime(event.date)}
+        title = _('⏰ Coming up: %(event)s') % {'event': event.title}
+        subject = _('Reminder: %(event)s starts soon') % {'event': event.title}
+        headline = _('Your event is coming up')
     paragraphs = [body, _('Have your ticket QR code ready at the entrance.')]
     if event.is_online and event.online_link:
         paragraphs.append(_('Join online: %(link)s') % {'link': event.online_link})
     return Message(
-        title=_('⏰ Coming up: %(event)s') % {'event': event.title},
+        title=title,
         body=body,
-        subject=_('Reminder: %(event)s starts soon') % {'event': event.title},
-        headline=_('Your event is coming up'),
+        subject=subject,
+        headline=headline,
         paragraphs=paragraphs,
         details=event_details(event),
         cta_label=_('Open My Tickets'),
