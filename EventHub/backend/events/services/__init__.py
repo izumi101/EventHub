@@ -8,6 +8,7 @@ internal detail and may change:
 - ``lifecycle``    — event create/update/clone and status transitions
 - ``registration`` — ticket purchase, cancellation, check-in
 - ``refunds``      — refund requests and resolution
+- ``reviews``      — who may review an event
 """
 
 from .holds import (
@@ -38,6 +39,7 @@ from .registration import (
     get_active_registration,
     register_for_event,
 )
+from .reviews import review_refusal, users_who_can_review
 
 __all__ = [
     'SEAT_HOLD_MINUTES',
@@ -58,6 +60,8 @@ __all__ = [
     'release_expired_seat_holds',
     'request_refund',
     'resolve_refund_request',
+    'review_refusal',
     'submit_event',
     'update_event',
+    'users_who_can_review',
 ]

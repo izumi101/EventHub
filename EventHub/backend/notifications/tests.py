@@ -139,7 +139,11 @@ class NotifyServiceTests(WorldMixin, TestCase):
         self.assertFalse(email_jobs().exists())
 
     def test_in_app_only_types_send_no_email(self):
-        notify(self.alice, types.REVIEW_REMINDER, event=self.event)
+        from dataclasses import replace
+
+        in_app_only = replace(types.TYPES[types.REVIEW_REMINDER], sends_email=False)
+        with patch.dict(types.TYPES, {types.REVIEW_REMINDER: in_app_only}):
+            notify(self.alice, types.REVIEW_REMINDER, event=self.event)
         self.assertNotified(self.alice, types.REVIEW_REMINDER, emails=0)
 
     def test_a_rolled_back_transaction_leaves_neither_row_nor_email(self):
@@ -648,7 +652,7 @@ class PreferencesApiTests(WorldMixin, APITestCase):
         self.assertTrue(all(row['email_enabled'] for row in rows.values()))
         self.assertFalse(rows[types.EVENT_CANCELLED]['email_optional'])
         self.assertTrue(rows[types.EVENT_REMINDER]['email_optional'])
-        self.assertNotIn(types.REVIEW_REMINDER, rows)  # in-app only
+        self.assertTrue(rows[types.REVIEW_REMINDER]['email_optional'])
         self.assertEqual(response.data['language'], '')
 
     def test_switching_an_email_off_and_on(self):

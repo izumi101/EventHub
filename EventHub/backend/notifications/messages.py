@@ -435,7 +435,11 @@ def _review_reminder(user, event, data) -> Message:
         body=_('Share your experience and help others discover great events.'),
         subject=_('How was %(event)s?') % {'event': event.title},
         headline=_('How was it?'),
-        paragraphs=[_('Share your experience and help others discover great events.')],
+        paragraphs=[
+            _('Thank you for coming to %(event)s.') % {'event': event.title},
+            _('Share your experience and help others discover great events. It takes less than a minute.'),
+        ],
+        details=event_details(event),
         cta_label=_('Leave a review'),
         cta_url=frontend_url(f'/events/{event.pk}'),
     )

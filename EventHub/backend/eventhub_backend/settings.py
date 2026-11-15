@@ -441,6 +441,9 @@ DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'EventHub <no-reply@ev
 # Time zone of the dates in notification emails (event start, reminders).
 # The app stores UTC; set the zone your events happen in, e.g. Asia/Almaty.
 NOTIFICATION_TIME_ZONE = os.environ.get('NOTIFICATION_TIME_ZONE', '') or TIME_ZONE
+# How long an event without an end time is assumed to last: the review
+# request email goes out a couple of hours after the (assumed) end.
+EVENT_DEFAULT_DURATION_HOURS = int(os.environ.get('EVENT_DEFAULT_DURATION_HOURS', '3'))
 
 # Background jobs (emails, webhooks, search indexing) are executed by
 # `manage.py run_worker`. JOBS_RUN_INLINE=1 runs them right after the request's
