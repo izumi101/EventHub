@@ -7,6 +7,7 @@ from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerSplitView
 
 from mfa.admin_views import admin_verify
+from notifications.views import UnsubscribeView
 
 
 def health_check(request):
@@ -21,6 +22,9 @@ def health_check(request):
 api_patterns = [
     # Before auth/: a separate app, so the accounts URLconf stays untouched.
     path('auth/profile/notifications/', include('notifications.urls')),
+    # Public one-click unsubscribe (signed token, no sign-in); before events'
+    # notifications/ routes.
+    path('notifications/unsubscribe/', UnsubscribeView.as_view(), name='notification_unsubscribe'),
     path('auth/', include('accounts.urls')),
     path('', include('events.urls')),
     path('payments/', include('payments.urls')),

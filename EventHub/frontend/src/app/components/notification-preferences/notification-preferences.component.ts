@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterModule } from '@angular/router';
 import {
   NotificationPreferencesService,
@@ -95,6 +96,7 @@ export class NotificationPreferencesComponent implements OnInit {
   private service = inject(NotificationPreferencesService);
   private toast = inject(ToastService);
   private lang = inject(LanguageService);
+  private destroyRef = inject(DestroyRef);
 
   loading = signal(true);
   loadError = signal('');
@@ -105,6 +107,17 @@ export class NotificationPreferencesComponent implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    // Labels come from the API in the request language: refresh them on a switch.
+    this.lang.switched$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => this.refreshLabels());
+  }
+
+  private refreshLabels(): void {
+    this.service.get().subscribe({
+      next: (prefs) => this.types.set(prefs.types),
+      error: () => undefined,
+    });
   }
 
   load(): void {

@@ -9,7 +9,7 @@ from pathlib import Path
 import segno
 from django.template.loader import render_to_string
 
-from . import types
+from . import types, unsubscribe
 from .messages import Message, frontend_url, ticket_validation_url
 
 PREFERENCES_PATH = '/profile/notifications'
@@ -38,10 +38,25 @@ def ticket_qr_png(ticket_uuid) -> bytes:
     return buffer.getvalue()
 
 
-def render_email(type_key: str, message: Message) -> dict:
-    """{subject, body, html_body, attachments, headers} for `enqueue_email`."""
+def render_email(type_key: str, message: Message, *, user=None) -> dict:
+    """{subject, body, html_body, attachments, headers} for `enqueue_email`.
+
+    Rendered in the active language (`notify()` switches to the recipient's).
+    An optional email to `user` gets a one-click unsubscribe link (RFC 8058:
+    `List-Unsubscribe` + `List-Unsubscribe-Post`) and a footer link to the
+    unsubscribe page; a mandatory one gets neither, only the preferences link.
+    """
     spec = types.get(type_key)
     preferences_url = frontend_url(PREFERENCES_PATH)
+    headers = {}
+    unsubscribe_url = ''
+    if spec.email_optional and user is not None and user.pk is not None:
+        token = unsubscribe.make_token(user, type_key)
+        unsubscribe_url = unsubscribe.page_url(token)
+        headers = {
+            'List-Unsubscribe': f'<{unsubscribe.api_url(token)}>',
+            'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        }
     tickets = []
     attachments = []
     for index, ticket in enumerate(message.tickets[:MAX_INLINE_TICKETS]):
@@ -60,6 +75,7 @@ def render_email(type_key: str, message: Message) -> dict:
         'tickets': tickets,
         'more_tickets': max(len(message.tickets) - MAX_INLINE_TICKETS, 0),
         'preferences_url': preferences_url,
+        'unsubscribe_url': unsubscribe_url,
         'email_optional': spec.email_optional,
         'site_url': frontend_url('/'),
         'logo_cid': LOGO_CID,
@@ -70,5 +86,5 @@ def render_email(type_key: str, message: Message) -> dict:
         'html_body': render_to_string('notifications/email/message.html', context),
         # The logo goes last: the ticket QR codes keep their positions.
         'attachments': [*attachments, logo_attachment()],
-        'headers': {'List-Unsubscribe': f'<{preferences_url}>'},
+        'headers': headers,
     }

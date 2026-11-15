@@ -110,13 +110,12 @@ TYPES: dict[str, NotificationType] = {
         NotificationType(
             EVENT_REMINDER,
             _('Event reminder'),
-            _('A reminder 24 hours before an event you have a ticket for.'),
+            _('Reminders 24 hours and 2 hours before an event you have a ticket for.'),
         ),
         NotificationType(
             REVIEW_REMINDER,
             _('Review reminder'),
-            _('An invitation to review an event you attended.'),
-            sends_email=False,
+            _('An invitation to review an event you attended, sent after it ends.'),
         ),
         NotificationType(
             ORGANIZER_MESSAGE,

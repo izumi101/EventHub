@@ -9,12 +9,13 @@ templates.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
-from django.utils import dateformat, timezone
+from django.utils import timezone
 from django.utils.translation import gettext as _
-from django.utils.translation import ngettext
+from django.utils.translation import ngettext, pgettext_lazy
 
 from . import types
 
@@ -59,12 +60,68 @@ def ticket_validation_url(ticket_uuid) -> str:
     return frontend_url(f'/validate/{ticket_uuid}')
 
 
+# Own msgids (not Django's catalogue) so every language we support has them,
+# with a context: in Russian and Kazakh the month follows the day number.
+WEEKDAYS = (
+    pgettext_lazy('short weekday in a date', 'Mon'),
+    pgettext_lazy('short weekday in a date', 'Tue'),
+    pgettext_lazy('short weekday in a date', 'Wed'),
+    pgettext_lazy('short weekday in a date', 'Thu'),
+    pgettext_lazy('short weekday in a date', 'Fri'),
+    pgettext_lazy('short weekday in a date', 'Sat'),
+    pgettext_lazy('short weekday in a date', 'Sun'),
+)
+MONTHS = (
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Jan'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Feb'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Mar'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Apr'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'May'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Jun'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Jul'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Aug'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Sep'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Oct'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Nov'),
+    pgettext_lazy('month after the day number, e.g. 5 Dec 2026', 'Dec'),
+)
+
+
+def notification_time_zone() -> str:
+    return getattr(settings, 'NOTIFICATION_TIME_ZONE', '') or settings.TIME_ZONE
+
+
+def local_time(value) -> datetime:
+    return timezone.localtime(value, ZoneInfo(notification_time_zone()))
+
+
+def format_time(value) -> str:
+    """`19:00` in the notification time zone."""
+    return local_time(value).strftime('%H:%M') if value is not None else ''
+
+
 def format_datetime(value) -> str:
+    """`Sat, 5 Dec 2026, 18:00 (Asia/Almaty)` in the active language."""
     if value is None:
         return ''
-    tz_name = getattr(settings, 'NOTIFICATION_TIME_ZONE', '') or settings.TIME_ZONE
-    local = timezone.localtime(value, ZoneInfo(tz_name))
-    return f'{dateformat.format(local, "D, j M Y, H:i")} ({tz_name})'
+    local = local_time(value)
+    text = _('%(weekday)s, %(day)d %(month)s %(year)d, %(time)s') % {
+        'weekday': WEEKDAYS[local.weekday()],
+        'day': local.day,
+        'month': MONTHS[local.month - 1],
+        'year': local.year,
+        'time': local.strftime('%H:%M'),
+    }
+    return f'{text} ({notification_time_zone()})'
+
+
+def display_value(value) -> str:
+    """A changed field's value as shown to the user (dates, yes/no, text)."""
+    if isinstance(value, datetime):
+        return format_datetime(value)
+    if isinstance(value, bool):
+        return _('Yes') if value else _('No')
+    return str(value or '')
 
 
 def venue_of(event) -> str:
@@ -234,7 +291,9 @@ def _refund_rejected(user, event, data) -> Message:
 
 
 def _event_updated(user, event, data) -> Message:
-    changes = data.get('changes') or []
+    # (label, old value, new value); the label may be lazy and the values raw
+    # (datetimes, booleans), so both render in the recipient's language.
+    changes = [(str(label), display_value(old), display_value(new)) for label, old, new in data.get('changes') or []]
     body = _('The organizer changed %(fields)s of %(event)s. Please check the new details.') % {
         'fields': ', '.join(label for label, _old, _new in changes) or _('the details'),
         'event': event.title,
@@ -343,16 +402,26 @@ def _group_booking_claimed(user, event, data) -> Message:
 
 
 def _event_reminder(user, event, data) -> Message:
-    when = format_datetime(event.date)
-    body = _('%(event)s starts on %(when)s.') % {'event': event.title, 'when': when}
+    """`window` '24h' (default): the day before; '2h': shortly before the start."""
+    if data.get('window') == '2h':
+        context = {'event': event.title, 'time': format_time(event.date)}
+        body = _('%(event)s starts at %(time)s, in less than 2 hours.') % context
+        title = _('⏰ Starting soon: %(event)s at %(time)s') % context
+        subject = _('Starting in 2 hours: %(event)s at %(time)s') % context
+        headline = _('Your event starts in less than 2 hours')
+    else:
+        body = _('%(event)s starts on %(when)s.') % {'event': event.title, 'when': format_datetime(event.date)}
+        title = _('⏰ Coming up: %(event)s') % {'event': event.title}
+        subject = _('Reminder: %(event)s starts soon') % {'event': event.title}
+        headline = _('Your event is coming up')
     paragraphs = [body, _('Have your ticket QR code ready at the entrance.')]
     if event.is_online and event.online_link:
         paragraphs.append(_('Join online: %(link)s') % {'link': event.online_link})
     return Message(
-        title=_('⏰ Coming up: %(event)s') % {'event': event.title},
+        title=title,
         body=body,
-        subject=_('Reminder: %(event)s starts soon') % {'event': event.title},
-        headline=_('Your event is coming up'),
+        subject=subject,
+        headline=headline,
         paragraphs=paragraphs,
         details=event_details(event),
         cta_label=_('Open My Tickets'),
@@ -366,7 +435,11 @@ def _review_reminder(user, event, data) -> Message:
         body=_('Share your experience and help others discover great events.'),
         subject=_('How was %(event)s?') % {'event': event.title},
         headline=_('How was it?'),
-        paragraphs=[_('Share your experience and help others discover great events.')],
+        paragraphs=[
+            _('Thank you for coming to %(event)s.') % {'event': event.title},
+            _('Share your experience and help others discover great events. It takes less than a minute.'),
+        ],
+        details=event_details(event),
         cta_label=_('Leave a review'),
         cta_url=frontend_url(f'/events/{event.pk}'),
     )
