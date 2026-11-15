@@ -1,7 +1,9 @@
-"""Event reminders, 24 hours and 2 hours before the start.
+"""Event reminders (24 hours and 2 hours before the start) and the review
+request after the event.
 
-`send_due_reminders` runs every minute from `run_maintenance` (the worker)
-and on demand via `manage.py send_event_reminders`. It is idempotent: each notification is recorded in
+`send_due_reminders` and `send_due_review_requests` run every minute from
+`run_maintenance` (the worker) and on demand via `manage.py
+send_event_reminders`. They are idempotent: each notification is recorded in
 `SentReminder` under a unique (user, event, kind, event start) constraint,
 in the same transaction as the notification and its email job, so it is sent
 at most once even when two passes overlap.
@@ -18,7 +20,9 @@ and one bought the day before gets both.
 import logging
 from datetime import timedelta
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from . import types
@@ -32,6 +36,13 @@ REMINDER_WINDOWS = {
     SentReminder.KIND_24H: (timedelta(hours=2), timedelta(hours=24)),
     SentReminder.KIND_2H: (timedelta(0), timedelta(hours=2)),
 }
+
+# The review request goes out between these times after the event ended.
+# The upper bound keeps a new deployment (or a long outage) from mailing
+# everyone who ever attended an event.
+REVIEW_REQUEST_DELAY = timedelta(hours=2)
+REVIEW_REQUEST_MAX_AGE = timedelta(hours=48)
+
 
 def due_events(now=None, kind=SentReminder.KIND_24H):
     """Published events whose start falls in the window of `kind`."""
@@ -87,4 +98,50 @@ def send_due_reminders(now=None) -> int:
                     sent += 1
     if sent:
         logger.info('Sent %s event reminders', sent)
+    return sent
+
+
+def default_event_duration() -> timedelta:
+    return timedelta(hours=getattr(settings, 'EVENT_DEFAULT_DURATION_HOURS', 3))
+
+
+def review_request_events(now=None):
+    """Events that ended between 48 and 2 hours ago (an event without an end
+    time is assumed to last `EVENT_DEFAULT_DURATION_HOURS`), completed or
+    still marked published — never cancelled ones."""
+    from common.choices import EventStatusChoices
+    from events.models import Event
+
+    now = now or timezone.now()
+    earliest, latest = now - REVIEW_REQUEST_MAX_AGE, now - REVIEW_REQUEST_DELAY
+    duration = default_event_duration()
+    ended_in_window = Q(end_date__isnull=False, end_date__gte=earliest, end_date__lte=latest) | Q(
+        end_date__isnull=True, date__gte=earliest - duration, date__lte=latest - duration
+    )
+    return (
+        Event.objects.filter(status__in=[EventStatusChoices.COMPLETED, EventStatusChoices.PUBLISHED])
+        .filter(ended_in_window)
+        .order_by('date', 'pk')
+    )
+
+
+def send_due_review_requests(now=None) -> int:
+    """Invite every attendee who may review a recently ended event, once.
+
+    Who may review is the review API's own rule
+    (`events.services.reviews.users_who_can_review`): a confirmed ticket and
+    no review yet. Returns the number sent."""
+    from events.services.reviews import users_who_can_review
+
+    now = now or timezone.now()
+    sent = 0
+    for event in review_request_events(now):
+        already = _already_sent(event, SentReminder.KIND_REVIEW)
+        for user in users_who_can_review(event, now):
+            if user.pk in already:
+                continue
+            if _send_once(user, event, SentReminder.KIND_REVIEW, types.REVIEW_REMINDER):
+                sent += 1
+    if sent:
+        logger.info('Sent %s review requests', sent)
     return sent

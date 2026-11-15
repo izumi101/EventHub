@@ -115,8 +115,7 @@ TYPES: dict[str, NotificationType] = {
         NotificationType(
             REVIEW_REMINDER,
             _('Review reminder'),
-            _('An invitation to review an event you attended.'),
-            sends_email=False,
+            _('An invitation to review an event you attended, sent after it ends.'),
         ),
         NotificationType(
             ORGANIZER_MESSAGE,
