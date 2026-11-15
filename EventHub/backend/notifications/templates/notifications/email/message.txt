@@ -14,5 +14,8 @@
 {{ message.cta_label }}: {{ message.cta_url }}
 {% endif %}
 --
-{% if email_optional %}{% translate "Unsubscribe or change your email preferences:" %}{% else %}{% translate "This email is about your tickets or payments, so it is always sent. Other email preferences:" %}{% endif %} {{ preferences_url }}
+{% if email_optional %}{% translate "You receive this email because of your EventHub notification settings." %}
+{% if unsubscribe_url %}{% translate "Unsubscribe from these emails:" %} {{ unsubscribe_url }}
+{% endif %}{% translate "Manage email preferences:" %} {{ preferences_url }}{% else %}{% translate "This email is about your tickets or payments, so it is always sent." %}
+{% translate "Manage your other email preferences:" %} {{ preferences_url }}{% endif %}
 {% endautoescape %}

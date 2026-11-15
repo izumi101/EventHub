@@ -47,7 +47,9 @@
     {% endif %}
   </td></tr>
   <tr><td style="padding:18px 28px;background:#f9fafb;font-size:12px;line-height:1.6;color:#6b7280;">
-    {% if email_optional %}{% blocktranslate %}You receive this email because of your EventHub notification settings. <a href="{{ preferences_url }}" style="color:#C94F28;">Unsubscribe or change your email preferences</a>.{% endblocktranslate %}{% else %}{% blocktranslate %}This email is about your tickets or payments, so it is always sent. <a href="{{ preferences_url }}" style="color:#C94F28;">Manage your other email preferences</a>.{% endblocktranslate %}{% endif %}<br>
+    {% if email_optional %}{% translate "You receive this email because of your EventHub notification settings." %}<br>
+    {% if unsubscribe_url %}<a href="{{ unsubscribe_url }}" style="color:#C94F28;">{% translate "Unsubscribe from these emails" %}</a> &middot; {% endif %}<a href="{{ preferences_url }}" style="color:#C94F28;">{% translate "Manage email preferences" %}</a>{% else %}{% translate "This email is about your tickets or payments, so it is always sent." %}<br>
+    <a href="{{ preferences_url }}" style="color:#C94F28;">{% translate "Manage your other email preferences" %}</a>{% endif %}<br>
     <a href="{{ site_url }}" style="color:#6b7280;">EventHub</a>
   </td></tr>
 </table>
