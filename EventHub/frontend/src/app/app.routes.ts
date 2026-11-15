@@ -90,7 +90,9 @@ export const routes: Routes = [
   {
     path: 'my-events',
     component: MyEventsComponent,
-    canActivate: [authGuard],
+    // Lists only events the user organizes; co-organizers reach their events
+    // through the event-scoped pages, which stay on authGuard.
+    canActivate: [roleGuard('organizer')],
     title: 'routeTitles.myEvents',
   },
   {

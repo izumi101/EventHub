@@ -55,7 +55,7 @@ interface WaitlistEntry {
           @if (!loading && entries.length > 0) {
             <div class="flex items-center gap-2 flex-wrap text-sm">
               <span
-                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[color:var(--warning-50)] text-[color:var(--warning-text)] border border-[color:var(--warning-50)]"
               >
                 <lucide-icon [img]="icons.Clock" class="w-3.5 h-3.5" />
                 {{
@@ -65,7 +65,7 @@ interface WaitlistEntry {
               </span>
               @if (countByStatus('offered') > 0) {
                 <span
-                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[color:var(--ember-50)] text-[color:var(--accent-text)] border border-[color:var(--ember-100)]"
                 >
                   <lucide-icon [img]="icons.Ticket" class="w-3.5 h-3.5" />
                   {{
@@ -76,7 +76,7 @@ interface WaitlistEntry {
               }
               @if (countByStatus('converted') > 0) {
                 <span
-                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900"
+                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[color:var(--pine-50)] text-[color:var(--pine-600)] border border-[color:var(--pine-50)]"
                 >
                   <lucide-icon [img]="icons.CircleCheckBig" class="w-3.5 h-3.5" />
                   {{
@@ -165,7 +165,7 @@ interface WaitlistEntry {
                     </td>
                     <td class="px-4 py-3 text-xs text-muted-foreground">
                       @if (entry.offer_expires_at) {
-                        <span [class.text-rose-500]="isExpiringSoon(entry.offer_expires_at)">
+                        <span [class.text-destructive]="isExpiringSoon(entry.offer_expires_at)">
                           {{ entry.offer_expires_at | localDate: 'MMM d · HH:mm' }}
                         </span>
                       } @else {

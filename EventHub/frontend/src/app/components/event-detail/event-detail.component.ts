@@ -13,13 +13,18 @@ import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
 import { SeoService } from '../../services/seo.service';
+import { FavoritesStore } from '../../services/favorites.store';
 import { CheckoutSessionResponse, Event, Registration, ZonePrice } from '../../models/models';
 import { PaymentQrComponent } from '../payment-qr/payment-qr.component';
-import { EventReviewsComponent } from './event-reviews.component';
 import { EventCheckoutModalComponent } from './event-checkout-modal.component';
 import { RefundRequestModalComponent } from './refund-request-modal.component';
+import { EventMediaComponent } from './event-media.component';
+import { EventFactsComponent } from './event-facts.component';
+import { EventTabsComponent } from './event-tabs.component';
+import { OrganizerCardComponent } from './organizer-card.component';
 import {
   LucideAngularModule,
+  Armchair,
   Calendar,
   MapPin,
   Users,
@@ -33,12 +38,12 @@ import {
   Share2,
   ChevronLeft,
   Heart,
+  Ticket,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
 import { supportsWebShare } from '../../utils/browser-support';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
 
 /** The cheapest zone of a seat map, or null without zones (the price a seated event starts "from"). */
@@ -47,12 +52,17 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
   return zones.reduce((min, z) => (Number(z.price) < Number(min.price) ? z : min)).price;
 }
 
-/** Event page: hero, status banners, key info and the booking sidebar.
+/** The one action the mobile purchase bar repeats from the panel. */
+export type PrimaryAction = 'login' | 'ticket' | 'pay' | 'claim' | 'waitlist' | 'buy' | null;
+
+/** Event page (Concept A): photo, facts and tabs, and the sticky "Tickets" panel.
  *
- *  Checkout selections live in EventCheckoutModalComponent, reviews in
- *  EventReviewsComponent, refunds in RefundRequestModalComponent — this
- *  component orchestrates loading, registration/payment/queue flow and
- *  the organizer/admin actions. */
+ *  Presentational pieces live in EventMedia/Facts/Tabs/OrganizerCard. The
+ *  purchase panel stays in this template on purpose: it is the 11-state chain
+ *  bound straight to this component's registration / payment / queue /
+ *  waitlist / refund flow, which is unchanged. Checkout selections live in
+ *  EventCheckoutModalComponent, refunds in RefundRequestModalComponent; both
+ *  and the QR dialog load lazily. */
 @Component({
   selector: 'app-event-detail',
   standalone: true,
@@ -61,12 +71,14 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
     CommonModule,
     RouterModule,
     LucideAngularModule,
-    EventReviewsComponent,
     EventCheckoutModalComponent,
     RefundRequestModalComponent,
     PaymentQrComponent,
+    EventMediaComponent,
+    EventFactsComponent,
+    EventTabsComponent,
+    OrganizerCardComponent,
     TranslocoPipe,
-    LocalDatePipe,
   ],
   template: `
     <!-- Loading -->
@@ -93,26 +105,37 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
     }
 
     @if (!loading && event) {
-      <div class="page-root-white pb-16">
+      <!-- Price as one line, shared by the panel and the mobile bar. -->
+      <ng-template #priceTpl>
+        @if (event.is_free || isZeroPrice(event.price_from)) {
+          {{ 'common.free' | transloco }}
+        } @else if (event.has_ticket_types) {
+          {{
+            'event.priceFrom'
+              | transloco: { price: (event.price_from | money: event.currency : 'short') }
+          }}
+        } @else if (seatPriceFrom) {
+          {{
+            'event.priceFrom'
+              | transloco: { price: (seatPriceFrom | money: event.currency : 'short') }
+          }}
+        } @else if (pricingData && pricingData.multiplier !== 1.0) {
+          {{ pricingData.current_price | money: event.currency : 'short' }}
+        } @else {
+          {{ event.price | money: event.currency : 'short' }}
+        }
+      </ng-template>
+
+      <div class="event-page">
         <!-- ── Pending banner ── -->
         @if (event.status === 'pending') {
-          <div class="bg-[color:var(--warning-50)] border-b border-transparent">
-            <div class="container py-3 flex items-center gap-3">
-              <lucide-icon
-                [img]="icons.Clock"
-                class="w-4 h-4 text-warning flex-shrink-0"
-                aria-hidden="true"
-              />
-              <p class="text-sm text-warning font-medium">
-                {{ 'eventDetail.thisEventIsPending' | transloco }}
-              </p>
+          <div class="event-banner event-banner-warning">
+            <div class="container py-3 flex items-center gap-3 flex-wrap">
+              <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+              <p class="text-sm font-medium">{{ 'eventDetail.thisEventIsPending' | transloco }}</p>
               @if (isAdmin) {
                 <div class="ml-auto flex gap-2">
-                  <button
-                    (click)="approve()"
-                    class="btn btn-sm"
-                    style="background:#15803d;color:#fff;border-color:#15803d"
-                  >
+                  <button (click)="approve()" class="btn btn-sm btn-approve">
                     {{ 'common.approve' | transloco }}
                   </button>
                   <button
@@ -129,11 +152,11 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
 
         <!-- ── Draft banner: owner can send it to review ── -->
         @if (event.status === 'draft' && isOwner) {
-          <div class="bg-muted border-b border-border">
+          <div class="event-banner">
             <div class="container py-3 flex items-center gap-3 flex-wrap">
               <lucide-icon
                 [img]="icons.SquarePen"
-                class="w-4 h-4 text-muted-foreground flex-shrink-0"
+                class="w-4 h-4 flex-shrink-0"
                 aria-hidden="true"
               />
               <p class="text-sm text-foreground font-medium">
@@ -155,85 +178,37 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
 
         <!-- ── Cancelled banner ── -->
         @if (event.status === 'cancelled') {
-          <div class="bg-[color:var(--destructive-50)] border-b border-transparent">
+          <div class="event-banner event-banner-danger">
             <div class="container py-3 flex items-center gap-3">
-              <lucide-icon
-                [img]="icons.CircleX"
-                class="w-4 h-4 text-[color:var(--destructive)] flex-shrink-0"
-                aria-hidden="true"
-              />
-              <p class="text-sm text-[color:var(--destructive)] font-medium">
-                {{ 'eventDetail.thisEventHasBeen' | transloco }}
-              </p>
+              <lucide-icon [img]="icons.CircleX" class="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+              <p class="text-sm font-medium">{{ 'eventDetail.thisEventHasBeen' | transloco }}</p>
             </div>
           </div>
         }
 
-        <!-- ── Editorial hero ── -->
-        <div class="container mt-6">
-          <!-- Breadcrumb -->
-          <nav
-            class="flex items-center gap-1.5 text-sm text-muted-foreground mb-4"
-            [attr.aria-label]="'attendees.breadcrumb' | transloco"
-          >
-            <a
-              routerLink="/"
-              class="hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <lucide-icon [img]="icons.ChevronLeft" class="w-3.5 h-3.5" aria-hidden="true" />
-              {{ 'dashboard.events' | transloco }}
+        <div class="container event-page-body">
+          <!-- Breadcrumb: Discover / category -->
+          <nav class="event-crumbs" [attr.aria-label]="'attendees.breadcrumb' | transloco">
+            <a routerLink="/" class="event-crumb-link focus-ring">
+              <lucide-icon [img]="icons.ChevronLeft" class="w-4 h-4" aria-hidden="true" />
+              {{ 'nav.discover' | transloco }}
             </a>
-            <span>/</span>
-            <span class="text-foreground font-medium truncate max-w-xs">{{ event.title }}</span>
+            @if (event.category.name) {
+              <span aria-hidden="true">/</span>
+              <a
+                routerLink="/"
+                [queryParams]="{ category: event.category.id }"
+                fragment="all-events"
+                class="event-crumb-link focus-ring"
+                >{{ event.category.name }}</a
+              >
+            }
           </nav>
 
-          <div
-            class="relative rounded-2xl overflow-hidden bg-muted border border-border"
-            style="aspect-ratio:16/7;max-height:460px"
-          >
-            @if (event.image && !imageError) {
-              <img
-                [src]="event.image"
-                [alt]="event.title"
-                class="w-full h-full object-cover"
-                (error)="imageError = true"
-              />
-            } @else {
-              <div
-                class="w-full h-full flex items-center justify-center"
-                style="background:linear-gradient(135deg,#F4D9CC,#E8B8A2 55%,#CBB6A6)"
-              >
-                <span class="font-display text-7xl font-semibold text-white/70 select-none">
-                  {{ event.title.charAt(0).toUpperCase() || 'E' }}
-                </span>
-              </div>
-            }
-            <!-- scrim -->
-            <div
-              class="absolute inset-0 pointer-events-none"
-              style="background:linear-gradient(to top, rgba(26,23,20,0.84), rgba(26,23,20,0.18) 48%, transparent 72%)"
-            ></div>
-            <!-- overlay -->
-            <div class="absolute bottom-0 left-0 right-0 p-5 sm:p-8">
-              <p class="kicker mb-2" style="color:rgba(255,255,255,0.82)">
-                {{ event.category.name || ('nav.event' | transloco) }} ·
-                {{ event.date | localDate: 'EEE, MMM d' }}
-              </p>
-              <h1
-                class="font-display font-semibold text-white leading-[1.04] max-w-3xl"
-                style="font-size:clamp(1.9rem,3.8vw,3rem)"
-              >
-                {{ event.title }}
-              </h1>
-            </div>
-          </div>
-        </div>
+          <div class="event-layout">
+            <app-event-media class="event-layout-media" [event]="event" />
 
-        <!-- ── Content ── -->
-        <div class="container mt-8">
-          <div class="flex flex-col lg:flex-row gap-10">
-            <!-- ── Left: main content ── -->
-            <div class="flex-1 min-w-0">
+            <div class="event-layout-main">
               <!-- Organizer actions -->
               @if (isOwner) {
                 <div class="flex gap-2 flex-wrap mb-5">
@@ -260,624 +235,575 @@ export function cheapestZonePrice(zones: readonly ZonePrice[] | null | undefined
                 </div>
               }
 
-              <!-- Meta chips -->
-              <div class="flex flex-wrap gap-2 mb-6">
-                <span class="badge badge-{{ event.status }}">
-                  {{ event.status | titlecase }}
-                </span>
-                @if (event.is_free) {
-                  <span class="badge badge-free">{{ 'common.free' | transloco }}</span>
-                }
+              <p class="event-kicker">
+                {{ event.category.name || ('nav.event' | transloco) }}
                 @if (event.is_online) {
-                  <span class="badge badge-online">{{ 'home.online' | transloco }}</span>
+                  · {{ 'home.online' | transloco }}
                 }
-              </div>
-
-              <!-- Key info grid -->
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-                <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon
-                    [img]="icons.Calendar"
-                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
-                      {{ 'eventDetail.dateTime' | transloco }}
-                    </p>
-                    <p class="text-sm font-semibold text-foreground">
-                      {{ event.date | localDate: 'EEEE, MMM d, y' }}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      {{ event.date | localDate: 'h:mm a' }}
-                      @if (event.end_date) {
-                        – {{ event.end_date | localDate: 'h:mm a' }}
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon
-                    [img]="icons.MapPin"
-                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
-                      {{ 'home.location' | transloco }}
-                    </p>
-                    <p class="text-sm font-semibold text-foreground">{{ event.location }}</p>
-                    @if (event.address) {
-                      <p class="text-xs text-muted-foreground">{{ event.address }}</p>
-                    }
-                  </div>
-                </div>
-
-                <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon
-                    [img]="icons.Users"
-                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
-                      {{ 'dashboard.capacity' | transloco }}
-                    </p>
-                    <p class="text-sm font-semibold text-foreground">
-                      {{
-                        'eventDetail.availablespotsSpotsLeft'
-                          | transloco: { availableSpots: event.available_spots }
-                      }}
-                    </p>
-                    <p class="text-xs text-muted-foreground">
-                      {{
-                        'eventDetail.registeredcountMaxparticipantsRegistered'
-                          | transloco
-                            : {
-                                registeredCount: event.registered_count,
-                                maxParticipants: event.max_participants,
-                              }
-                      }}
-                    </p>
-                  </div>
-                </div>
-
-                <div class="flex items-start gap-3 p-3 rounded-lg border border-border bg-muted/40">
-                  <lucide-icon
-                    [img]="icons.Tag"
-                    class="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0"
-                    aria-hidden="true"
-                  />
-                  <div>
-                    <p class="text-xs text-muted-foreground font-medium mb-0.5">
-                      {{ 'common.category' | transloco }}
-                    </p>
-                    <p class="text-sm font-semibold text-foreground">
-                      {{ event.category.name || '—' }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Online link -->
-              @if (event.is_online && event.online_link) {
-                <div
-                  class="flex items-center gap-2 p-3 rounded-lg border border-border bg-muted/40 mb-6"
-                >
-                  <lucide-icon
-                    [img]="icons.Link"
-                    class="w-4 h-4 text-primary flex-shrink-0"
-                    aria-hidden="true"
-                  />
-                  <a
-                    [href]="event.online_link"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-sm text-primary font-medium hover:underline truncate"
-                    >{{ event.online_link }}</a
-                  >
-                </div>
+              </p>
+              <h1 class="event-title">{{ event.title }}</h1>
+              @if (event.status !== 'published') {
+                <span class="badge badge-{{ event.status }} mt-3">{{
+                  event.status | titlecase
+                }}</span>
               }
 
-              <!-- Organizer -->
-              <div class="mb-8">
-                <h2
-                  class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3"
-                >
-                  {{ 'footer.organizer' | transloco }}
-                </h2>
-                <div class="flex items-center gap-3">
-                  <div
-                    class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-bold text-primary flex-shrink-0"
-                  >
-                    {{ event.organizer.username.charAt(0).toUpperCase() || 'O' }}
-                  </div>
-                  <div>
-                    <p class="text-sm font-semibold text-foreground">
-                      {{ event.organizer.first_name || event.organizer.username }}
-                      {{ event.organizer.last_name }}
-                    </p>
-                    <p class="text-xs text-muted-foreground">@{{ event.organizer.username }}</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Description -->
-              <div class="mb-8">
-                <h2
-                  class="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3"
-                >
-                  {{ 'eventDetail.aboutThisEvent' | transloco }}
-                </h2>
-                <div class="prose-sm text-foreground leading-relaxed whitespace-pre-wrap text-sm">
-                  {{ event.description }}
-                </div>
-              </div>
-
-              <!-- Reviews -->
-              <app-event-reviews [event]="event" [myRegistration]="myRegistration" />
+              <app-event-facts [event]="event" [zones]="seatZones" />
+              <app-event-tabs [event]="event" [myRegistration]="myRegistration" />
+              <app-organizer-card [organizer]="event.organizer" />
             </div>
 
-            <!-- ── Right: booking sidebar ── -->
-            <aside class="w-full lg:w-80 xl:w-96 flex-shrink-0">
-              <div class="sticky top-20 space-y-3">
-                <!-- ── Price card ── -->
-                <div class="rounded-2xl overflow-hidden border border-border shadow-md bg-card">
-                  <!-- Gradient top bar -->
-                  <div class="h-1 w-full" [class]="priceBarClass()"></div>
+            <!-- ── Tickets panel ── -->
+            <aside
+              class="event-layout-panel"
+              id="purchase-panel"
+              aria-labelledby="purchase-panel-title"
+            >
+              <div class="purchase-panel">
+                <h2 id="purchase-panel-title" class="purchase-title">
+                  {{ 'eventDetail.ticketsTitle' | transloco }}
+                </h2>
+                <p class="purchase-subtitle">
+                  @if (seatZones.length) {
+                    {{ 'eventDetail.priceByZone' | transloco }}
+                  } @else if (event.has_ticket_types) {
+                    {{
+                      'eventDetail.ticketTypeslengthTicketTypes'
+                        | transloco: { ticket_typesLength: event.ticket_types.length }
+                    }}
+                  } @else if (!event.is_free) {
+                    {{ 'eventDetail.perTicket' | transloco }}
+                    @if (pricingData && pricingData.base_price !== pricingData.current_price) {
+                      ·
+                      {{
+                        'eventDetail.basePriceBasepriceDemand'
+                          | transloco
+                            : {
+                                basePrice: (pricingData.base_price | money: event.currency),
+                                multiplier: pricingData.multiplier,
+                              }
+                      }}
+                    }
+                  }
+                </p>
 
-                  <div class="p-5">
-                    <!-- Price + demand badge -->
-                    <div class="mb-1">
-                      <p
-                        class="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2"
+                <!-- Price (general admission and summaries) -->
+                <div class="purchase-price-row">
+                  <span class="purchase-price num"
+                    ><ng-container [ngTemplateOutlet]="priceTpl"
+                  /></span>
+                  @if (!event.has_ticket_types && !seatPriceFrom && pricingData && !event.is_free) {
+                    <span
+                      class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                      [class]="demandBadgeClass(pricingData.demand_level)"
+                      >{{
+                        'eventDetail.demandlevelDemand'
+                          | transloco: { demandLevel: pricingData.demand_level }
+                      }}</span
+                    >
+                  }
+                </div>
+
+                <!-- Spots bar -->
+                @if (event.max_participants > 0) {
+                  <div class="mb-5">
+                    <div class="flex justify-between text-xs mb-1.5">
+                      <span class="font-semibold text-foreground">{{
+                        'eventDetail.availablespotsSpotsLeft'
+                          | transloco: { availableSpots: event.available_spots }
+                      }}</span>
+                      <span class="text-muted-foreground"
+                        >{{ event.registered_count }} / {{ event.max_participants }}</span
                       >
-                        {{
-                          (event.has_ticket_types ? 'eventDetail.ticketsFrom' : 'common.price')
-                            | transloco
-                        }}
-                      </p>
-                      <div class="flex items-center gap-3 flex-wrap">
-                        <span
-                          class="text-3xl font-extrabold text-foreground tracking-tight leading-none"
-                        >
-                          @if (event.is_free) {
-                            {{ 'common.free' | transloco }}
-                          } @else if (event.has_ticket_types) {
-                            {{ event.price_from | money: event.currency }}
-                          } @else if (seatPriceFrom) {
-                            <span class="text-base font-semibold text-muted-foreground">{{
-                              'eventDetail.from' | transloco
-                            }}</span>
-                            {{ seatPriceFrom | money: event.currency }}
-                          } @else if (pricingData && pricingData.multiplier !== 1.0) {
-                            {{ pricingData.current_price | money: event.currency }}
-                          } @else {
-                            {{ event.price | money: event.currency }}
-                          }
-                        </span>
-                        @if (
-                          !event.has_ticket_types && !seatPriceFrom && pricingData && !event.is_free
-                        ) {
-                          <span
-                            class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border"
-                            [class]="demandBadgeClass(pricingData.demand_level)"
-                            >{{
-                              'eventDetail.demandlevelDemand'
-                                | transloco: { demandLevel: pricingData.demand_level }
-                            }}</span
-                          >
-                        }
-                      </div>
-                      @if (event.has_ticket_types) {
-                        <p class="text-xs text-muted-foreground mt-1">
-                          {{
-                            'eventDetail.ticketTypeslengthTicketTypes'
-                              | transloco: { ticket_typesLength: event.ticket_types.length }
-                          }}
-                        </p>
-                      } @else if (seatPriceFrom) {
-                        <p class="text-xs text-muted-foreground mt-1">
-                          {{ 'eventDetail.perSeatThePrice' | transloco }}
-                        </p>
-                      } @else if (!event.is_free) {
-                        <p class="text-xs text-muted-foreground mt-1">
-                          {{ 'eventDetail.perTicket' | transloco }}
-                          @if (
-                            pricingData && pricingData.base_price !== pricingData.current_price
-                          ) {
-                            {{
-                              'eventDetail.basePriceBasepriceDemand'
-                                | transloco
-                                  : {
-                                      basePrice: (pricingData.base_price | money: event.currency),
-                                      multiplier: pricingData.multiplier,
-                                    }
-                            }}
-                          }
-                        </p>
-                      }
                     </div>
-
-                    <!-- Divider -->
-                    <div class="border-t border-border my-4"></div>
-
-                    <!-- Spots bar -->
-                    @if (event.max_participants > 0) {
-                      <div class="mb-5">
-                        <div class="flex justify-between text-xs mb-1.5">
-                          <span class="font-semibold text-foreground">{{
-                            'eventDetail.availablespotsSpotsLeft'
-                              | transloco: { availableSpots: event.available_spots }
-                          }}</span>
-                          <span class="text-muted-foreground"
-                            >{{ event.registered_count }} / {{ event.max_participants }}</span
-                          >
-                        </div>
-                        <div class="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div
-                            class="h-full rounded-full transition-all duration-700"
-                            [style.width.%]="spotsPercent"
-                            [class]="
-                              spotsPercent > 80
-                                ? 'bg-red-400'
-                                : spotsPercent > 50
-                                  ? 'bg-amber-400'
-                                  : 'bg-[color:var(--pine-50)]0'
-                            "
-                          ></div>
-                        </div>
-                      </div>
-                    }
-
-                    <!-- CTA area -->
-                    @if (event.status === 'cancelled' || event.status === 'completed') {
-                      <div class="text-center py-3 px-3 rounded-xl bg-muted">
-                        <p class="text-sm text-muted-foreground">
-                          {{
-                            (event.status === 'cancelled'
-                              ? 'eventDetail.thisEventWasCancelled'
-                              : 'eventDetail.thisEventHasEnded'
-                            ) | transloco
-                          }}
-                        </p>
-                      </div>
-                    } @else if (!authService.isLoggedIn) {
-                      <a routerLink="/login" class="btn btn-primary btn-full btn-lg">
-                        {{ 'eventDetail.signInToRegister' | transloco }}
-                      </a>
-                    } @else if (isOwner) {
-                      <div class="text-center py-3 px-3 rounded-xl bg-muted">
-                        <p class="text-sm text-muted-foreground">
-                          {{ 'eventDetail.youReTheOrganizer' | transloco }}
-                        </p>
-                      </div>
-                    } @else if (registrationStatus === 'confirmed') {
-                      <!-- Already registered -->
+                    <div class="h-1.5 bg-muted rounded-full overflow-hidden">
                       <div
-                        class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--pine-50)] mb-4"
-                      >
-                        <lucide-icon
-                          [img]="icons.CircleCheckBig"
-                          class="w-5 h-5 text-[color:var(--pine-600)] flex-shrink-0"
-                          aria-hidden="true"
-                        />
-                        <div>
-                          <p class="text-sm font-semibold text-[color:var(--pine-600)]">
-                            {{ 'eventDetail.youReRegistered' | transloco }}
-                          </p>
-                          <p class="text-xs text-[color:var(--pine-600)]">
-                            {{ 'eventDetail.ticketIsInMy' | transloco }}
-                          </p>
-                        </div>
-                      </div>
-                      <a routerLink="/my-registrations" class="btn btn-primary btn-full mb-2">
-                        {{ 'eventDetail.viewMyTicket' | transloco }}
-                      </a>
-
-                      <!-- Refund logic: confirmed tickets can't be cancelled by
-                           the client — paid ones can only request a refund,
-                           free ones have no exit action. -->
-                      @if (myRegistration?.refund_request?.status === 'pending') {
-                        <div
-                          class="flex items-center gap-2 p-2.5 rounded-lg bg-[color:var(--warning-50)] border border-transparent text-warning text-xs"
-                        >
-                          <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
-                          {{ 'eventDetail.refundRequestedAwaitingOrganizer' | transloco }}
-                        </div>
-                      } @else if (myRegistration?.is_checked_in) {
-                        <!-- Scanned at the door → service delivered, no refund -->
-                        <p class="text-xs text-muted-foreground text-center px-2">
-                          {{ 'eventDetail.ticketWasUsedFor' | transloco }}
-                        </p>
-                      } @else if (!isPaidTicket()) {
-                        <!-- Free ticket → no cancel / refund actions -->
-                      } @else if (event.refundable === false) {
-                        <!-- Paid, non-refundable -->
-                        <p class="text-xs text-muted-foreground text-center px-2">
-                          {{ 'eventDetail.ticketsForThisEvent' | transloco }}
-                        </p>
-                      } @else {
-                        <!-- Paid, refundable → request refund -->
-                        <button
-                          (click)="showRefundModal = true"
-                          class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
-                        >
-                          {{ 'eventDetail.requestARefund' | transloco }}
-                        </button>
-                      }
-                    } @else if (registrationStatus === 'pending') {
-                      <div
-                        class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--warning-50)] mb-4"
-                      >
-                        <lucide-icon
-                          [img]="icons.Clock"
-                          class="w-5 h-5 text-warning flex-shrink-0"
-                          aria-hidden="true"
-                        />
-                        <div>
-                          <p class="text-sm font-semibold text-warning">
-                            {{ 'eventDetail.paymentIncomplete' | transloco }}
-                          </p>
-                          <p class="text-xs text-warning">
-                            {{ 'eventDetail.seatHeldCompletePayment' | transloco }}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        (click)="resumePayment()"
-                        [disabled]="registering"
-                        class="btn btn-primary btn-full mb-2"
-                      >
-                        {{
-                          (registering ? 'checkout.processing' : 'eventDetail.completePayment')
-                            | transloco
-                        }}
-                      </button>
-                      <button
-                        (click)="cancelRegistration()"
-                        [disabled]="cancelling"
-                        class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
-                      >
-                        {{
-                          (cancelling ? 'eventDetail.cancelling' : 'eventDetail.releaseSeat2')
-                            | transloco
-                        }}
-                      </button>
-                    } @else if (registrationStatus === 'rejected') {
-                      <div
-                        class="flex items-center gap-3 p-3.5 rounded-xl bg-[color:var(--destructive-50)] border border-transparent"
-                      >
-                        <lucide-icon
-                          [img]="icons.CircleX"
-                          class="w-5 h-5 text-[color:var(--destructive)] flex-shrink-0"
-                          aria-hidden="true"
-                        />
-                        <div>
-                          @if (myRegistration?.refund_request?.status === 'rejected') {
-                            <p class="text-sm font-bold text-[color:var(--destructive)]">
-                              {{ 'eventDetail.refundRequestDeclined' | transloco }}
-                            </p>
-                            <p class="text-xs text-[color:var(--destructive)]">
-                              {{
-                                myRegistration?.refund_request?.organizer_note ||
-                                  ('eventDetail.theOrganizerDeclinedYour' | transloco)
-                              }}
-                            </p>
-                          } @else {
-                            <p class="text-sm font-bold text-[color:var(--destructive)]">
-                              {{ 'eventDetail.registrationDeclined' | transloco }}
-                            </p>
-                            <p class="text-xs text-[color:var(--destructive)]">
-                              {{ 'eventDetail.contactTheOrganizerFor' | transloco }}
-                            </p>
-                          }
-                        </div>
-                      </div>
-                    } @else if (!canBuy) {
-                      <!-- Organizers/admins manage events, they don't buy tickets -->
-                      <div class="text-center py-3 px-3 rounded-xl bg-muted">
-                        <p class="text-sm text-muted-foreground">
-                          {{ 'eventDetail.onlyAttendeeAccountsCan' | transloco }}
-                        </p>
-                      </div>
-                    } @else if (waitlist?.status === 'offered') {
-                      <!-- Waitlist offer — reserved spot, shown regardless of the public counter -->
-                      <div
-                        class="flex items-center gap-3 p-3 rounded-xl border border-transparent bg-[color:var(--pine-50)] mb-3"
-                      >
-                        <lucide-icon
-                          [img]="icons.CircleCheckBig"
-                          class="w-5 h-5 text-[color:var(--pine-600)] flex-shrink-0"
-                        />
-                        <div>
-                          <p class="text-sm font-bold text-[color:var(--pine-600)]">
-                            {{ 'eventDetail.aSpotOpenedUp' | transloco }}
-                          </p>
-                          <p class="text-xs text-[color:var(--pine-600)]">
-                            {{ 'eventDetail.itSReservedFor' | transloco }}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        (click)="showCheckout = true"
-                        class="btn btn-primary btn-full btn-lg font-bold"
-                      >
-                        {{ 'eventDetail.claimMySpot' | transloco }}
-                      </button>
-                    } @else if (queueInfo && queueInfo.status === 'queued') {
-                      <!-- Virtual waiting room -->
-                      <div
-                        class="flex items-center gap-3 p-3 rounded-xl border border-ember/30 bg-ember/10 mb-3"
-                      >
-                        <span class="spinner spinner-sm flex-shrink-0"></span>
-                        <div>
-                          <p class="text-sm font-bold text-foreground">
-                            {{ 'eventDetail.youReInThe' | transloco }}
-                          </p>
-                          <p class="text-xs text-ember">
-                            {{
-                              'eventDetail.positionPositionOfTotal'
-                                | transloco
-                                  : {
-                                      position: queueInfo.position,
-                                      total: queueInfo.total,
-                                      waitMinutes: queueInfo.wait_minutes,
-                                    }
-                            }}
-                          </p>
-                        </div>
-                      </div>
-                      <button
-                        (click)="leaveQueue()"
-                        class="btn btn-ghost btn-full btn-sm text-muted-foreground"
-                      >
-                        {{ 'eventDetail.leaveQueue' | transloco }}
-                      </button>
-                    } @else if (event.available_spots === 0) {
-                      <!-- Sold out → waitlist -->
-                      @if (waitlist?.status === 'waiting') {
-                        <div
-                          class="flex items-center gap-3 p-3 rounded-xl border border-ember/30 bg-ember/10 mb-3"
-                        >
-                          <lucide-icon
-                            [img]="icons.Clock"
-                            class="w-5 h-5 text-ember flex-shrink-0"
-                          />
-                          <div>
-                            <p class="text-sm font-bold text-foreground">
-                              {{ 'eventDetail.youReOnThe' | transloco }}
-                            </p>
-                            <p class="text-xs text-ember">
-                              {{
-                                'eventDetail.positionPositionWeLl'
-                                  | transloco: { position: waitlist?.position }
-                              }}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          (click)="leaveWaitlist()"
-                          [disabled]="waitlisting"
-                          class="btn btn-ghost btn-full btn-sm text-muted-foreground"
-                        >
-                          {{ 'eventDetail.leaveWaitlist' | transloco }}
-                        </button>
-                      } @else {
-                        <button
-                          disabled
-                          class="btn btn-full btn-lg opacity-50 cursor-not-allowed bg-muted text-muted-foreground mb-2"
-                        >
-                          {{ 'event.soldOut' | transloco }}
-                        </button>
-                        @if (authService.isLoggedIn) {
-                          <button
-                            (click)="joinWaitlist()"
-                            [disabled]="waitlisting"
-                            class="btn btn-secondary btn-full"
-                          >
-                            {{
-                              (waitlisting ? 'eventDetail.joining' : 'eventDetail.joinTheWaitlist')
-                                | transloco
-                            }}
-                          </button>
-                        } @else {
-                          <a routerLink="/login" class="btn btn-secondary btn-full">{{
-                            'eventDetail.signInToJoin' | transloco
-                          }}</a>
-                        }
-                      }
-                    } @else {
-                      <button
-                        (click)="showCheckout = true"
-                        [disabled]="registering"
-                        class="btn btn-primary btn-full btn-lg font-bold shadow-md hover:shadow-primary/30 transition-all"
-                      >
-                        @if (registering) {
-                          <span class="spinner spinner-sm"></span>
-                          {{ 'checkout.processing' | transloco }}
-                        } @else if (event.has_ticket_types) {
-                          {{ 'eventDetail.chooseTickets' | transloco }}
-                        } @else if (seatPriceFrom) {
-                          {{
-                            'eventDetail.chooseSeatFrom'
-                              | transloco: { price: (seatPriceFrom | money: event.currency) }
-                          }}
-                        } @else {
-                          {{
-                            event.is_free
-                              ? ('eventDetail.registerFree' | transloco)
-                              : ('eventDetail.getTicketsPrice'
-                                | transloco: { price: (currentGaPrice | money: event.currency) })
-                          }}
-                        }
-                      </button>
-                      @if (!event.is_free && !event.has_ticket_types) {
-                        <a
-                          [routerLink]="['/events', event.id, 'group']"
-                          class="btn btn-secondary btn-full mt-2 flex items-center justify-center gap-2 text-sm"
-                        >
-                          <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
-                          {{ 'eventDetail.bookSeatsForA' | transloco }}
-                        </a>
-                      }
-                    }
-
-                    <!-- Favorite + Share row -->
-                    <div class="flex gap-2 mt-4 pt-4 border-t border-border">
-                      @if (authService.isLoggedIn) {
-                        <button
-                          (click)="toggleFavorite()"
-                          class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors border"
-                          [class]="
-                            favorited
-                              ? 'border-transparent bg-[color:var(--destructive-50)] text-ember'
-                              : 'border-border hover:bg-muted text-muted-foreground'
-                          "
-                        >
-                          <lucide-icon [img]="icons.Heart" class="w-4 h-4" aria-hidden="true" />
-                          {{ (favorited ? 'eventDetail.saved' : 'common.save') | transloco }}
-                        </button>
-                      }
-                      <button
-                        (click)="shareEvent()"
-                        class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-muted-foreground hover:bg-muted border border-border transition-colors"
-                      >
-                        <lucide-icon [img]="icons.Share2" class="w-4 h-4" aria-hidden="true" />
-                        {{ 'eventDetail.share' | transloco }}
-                      </button>
+                        class="h-full rounded-full transition-all duration-700"
+                        [style.width.%]="spotsPercent"
+                        [style.background]="
+                          spotsPercent > 80
+                            ? 'var(--destructive)'
+                            : spotsPercent > 50
+                              ? 'var(--warning)'
+                              : 'var(--success)'
+                        "
+                      ></div>
                     </div>
                   </div>
+                }
+
+                <!-- CTA area: the same state chain, in the same order, as before. -->
+                @if (event.status === 'cancelled' || event.status === 'completed') {
+                  <div class="purchase-note">
+                    {{
+                      (event.status === 'cancelled'
+                        ? 'eventDetail.thisEventWasCancelled'
+                        : 'eventDetail.thisEventHasEnded'
+                      ) | transloco
+                    }}
+                  </div>
+                } @else if (!authService.isLoggedIn) {
+                  <a
+                    routerLink="/login"
+                    [queryParams]="{ returnUrl: router.url }"
+                    class="btn btn-primary btn-full btn-lg"
+                  >
+                    {{ 'eventDetail.signInToRegister' | transloco }}
+                  </a>
+                } @else if (isOwner) {
+                  <div class="purchase-note">{{ 'eventDetail.youReTheOrganizer' | transloco }}</div>
+                } @else if (registrationStatus === 'confirmed') {
+                  <!-- Already registered -->
+                  <div class="purchase-state purchase-state-success">
+                    <lucide-icon
+                      [img]="icons.CircleCheckBig"
+                      class="w-5 h-5 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <p class="text-sm font-semibold">
+                        {{ 'eventDetail.youReRegistered' | transloco }}
+                      </p>
+                      <p class="text-xs">{{ 'eventDetail.ticketIsInMy' | transloco }}</p>
+                    </div>
+                  </div>
+                  <a routerLink="/my-registrations" class="btn btn-primary btn-full mb-2">
+                    {{ 'eventDetail.viewMyTicket' | transloco }}
+                  </a>
+
+                  <!-- Refund logic: confirmed tickets can't be cancelled by
+                       the client — paid ones can only request a refund,
+                       free ones have no exit action. -->
+                  @if (myRegistration?.refund_request?.status === 'pending') {
+                    <div class="purchase-state purchase-state-warning text-xs">
+                      <lucide-icon [img]="icons.Clock" class="w-4 h-4 flex-shrink-0" />
+                      {{ 'eventDetail.refundRequestedAwaitingOrganizer' | transloco }}
+                    </div>
+                  } @else if (myRegistration?.is_checked_in) {
+                    <!-- Scanned at the door → service delivered, no refund -->
+                    <p class="text-xs text-muted-foreground text-center px-2">
+                      {{ 'eventDetail.ticketWasUsedFor' | transloco }}
+                    </p>
+                  } @else if (!isPaidTicket()) {
+                    <!-- Free ticket → no cancel / refund actions -->
+                  } @else if (event.refundable === false) {
+                    <!-- Paid, non-refundable -->
+                    <p class="text-xs text-muted-foreground text-center px-2">
+                      {{ 'eventDetail.ticketsForThisEvent' | transloco }}
+                    </p>
+                  } @else {
+                    <!-- Paid, refundable → request refund -->
+                    <button
+                      (click)="showRefundModal = true"
+                      class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
+                    >
+                      {{ 'eventDetail.requestARefund' | transloco }}
+                    </button>
+                  }
+                } @else if (registrationStatus === 'pending') {
+                  <div class="purchase-state purchase-state-warning">
+                    <lucide-icon
+                      [img]="icons.Clock"
+                      class="w-5 h-5 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <p class="text-sm font-semibold">
+                        {{ 'eventDetail.paymentIncomplete' | transloco }}
+                      </p>
+                      <p class="text-xs">{{ 'eventDetail.seatHeldCompletePayment' | transloco }}</p>
+                    </div>
+                  </div>
+                  <button
+                    (click)="resumePayment()"
+                    [disabled]="registering"
+                    class="btn btn-primary btn-full mb-2"
+                  >
+                    {{
+                      (registering ? 'checkout.processing' : 'eventDetail.completePayment')
+                        | transloco
+                    }}
+                  </button>
+                  <button
+                    (click)="cancelRegistration()"
+                    [disabled]="cancelling"
+                    class="btn btn-ghost btn-full btn-sm text-muted-foreground hover:text-destructive"
+                  >
+                    {{
+                      (cancelling ? 'eventDetail.cancelling' : 'eventDetail.releaseSeat2')
+                        | transloco
+                    }}
+                  </button>
+                } @else if (registrationStatus === 'rejected') {
+                  <div class="purchase-state purchase-state-danger">
+                    <lucide-icon
+                      [img]="icons.CircleX"
+                      class="w-5 h-5 flex-shrink-0"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      @if (myRegistration?.refund_request?.status === 'rejected') {
+                        <p class="text-sm font-bold">
+                          {{ 'eventDetail.refundRequestDeclined' | transloco }}
+                        </p>
+                        <p class="text-xs">
+                          {{
+                            myRegistration?.refund_request?.organizer_note ||
+                              ('eventDetail.theOrganizerDeclinedYour' | transloco)
+                          }}
+                        </p>
+                      } @else {
+                        <p class="text-sm font-bold">
+                          {{ 'eventDetail.registrationDeclined' | transloco }}
+                        </p>
+                        <p class="text-xs">
+                          {{ 'eventDetail.contactTheOrganizerFor' | transloco }}
+                        </p>
+                      }
+                    </div>
+                  </div>
+                } @else if (!canBuy) {
+                  <!-- Organizers/admins manage events, they don't buy tickets -->
+                  <div class="purchase-note">
+                    {{ 'eventDetail.onlyAttendeeAccountsCan' | transloco }}
+                  </div>
+                } @else if (waitlist?.status === 'offered') {
+                  <!-- Waitlist offer — reserved spot, shown regardless of the public counter -->
+                  <div class="purchase-state purchase-state-success" aria-live="polite">
+                    <lucide-icon [img]="icons.CircleCheckBig" class="w-5 h-5 flex-shrink-0" />
+                    <div>
+                      <p class="text-sm font-bold">{{ 'eventDetail.aSpotOpenedUp' | transloco }}</p>
+                      <p class="text-xs">{{ 'eventDetail.itSReservedFor' | transloco }}</p>
+                    </div>
+                  </div>
+                  <button
+                    (click)="openCheckout()"
+                    class="btn btn-primary btn-full btn-lg font-bold"
+                  >
+                    {{ 'eventDetail.claimMySpot' | transloco }}
+                  </button>
+                } @else if (queueInfo && queueInfo.status === 'queued') {
+                  <!-- Virtual waiting room -->
+                  <div class="purchase-state purchase-state-accent" aria-live="polite">
+                    <span class="spinner spinner-sm flex-shrink-0"></span>
+                    <div>
+                      <p class="text-sm font-bold text-foreground">
+                        {{ 'eventDetail.youReInThe' | transloco }}
+                      </p>
+                      <p class="text-xs text-ember">
+                        {{
+                          'eventDetail.positionPositionOfTotal'
+                            | transloco
+                              : {
+                                  position: queueInfo.position,
+                                  total: queueInfo.total,
+                                  waitMinutes: queueInfo.wait_minutes,
+                                }
+                        }}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    (click)="leaveQueue()"
+                    class="btn btn-ghost btn-full btn-sm text-muted-foreground"
+                  >
+                    {{ 'eventDetail.leaveQueue' | transloco }}
+                  </button>
+                } @else if (event.available_spots === 0) {
+                  <!-- Sold out → waitlist -->
+                  @if (waitlist?.status === 'waiting') {
+                    <div class="purchase-state purchase-state-accent" aria-live="polite">
+                      <lucide-icon [img]="icons.Clock" class="w-5 h-5 text-ember flex-shrink-0" />
+                      <div>
+                        <p class="text-sm font-bold text-foreground">
+                          {{ 'eventDetail.youReOnThe' | transloco }}
+                        </p>
+                        <p class="text-xs text-ember">
+                          {{
+                            'eventDetail.positionPositionWeLl'
+                              | transloco: { position: waitlist?.position }
+                          }}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      (click)="leaveWaitlist()"
+                      [disabled]="waitlisting"
+                      class="btn btn-ghost btn-full btn-sm text-muted-foreground"
+                    >
+                      {{ 'eventDetail.leaveWaitlist' | transloco }}
+                    </button>
+                  } @else {
+                    <button
+                      disabled
+                      class="btn btn-full btn-lg opacity-50 cursor-not-allowed bg-muted text-muted-foreground mb-2"
+                    >
+                      {{ 'event.soldOut' | transloco }}
+                    </button>
+                    <button
+                      (click)="joinWaitlist()"
+                      [disabled]="waitlisting"
+                      class="btn btn-secondary btn-full"
+                    >
+                      {{
+                        (waitlisting ? 'eventDetail.joining' : 'eventDetail.joinTheWaitlist')
+                          | transloco
+                      }}
+                    </button>
+                  }
+                } @else {
+                  <!-- Buy -->
+                  @if (groupAvailable) {
+                    <div
+                      class="purchase-modes"
+                      role="radiogroup"
+                      [attr.aria-label]="'eventDetail.modeLabel' | transloco"
+                    >
+                      <button
+                        type="button"
+                        role="radio"
+                        class="purchase-mode focus-ring"
+                        [attr.aria-checked]="bookingMode === 'ticket'"
+                        (click)="bookingMode = 'ticket'"
+                      >
+                        <lucide-icon [img]="icons.Ticket" class="w-4 h-4" aria-hidden="true" />
+                        {{ 'eventDetail.modeTicket' | transloco }}
+                      </button>
+                      <button
+                        type="button"
+                        role="radio"
+                        class="purchase-mode focus-ring"
+                        [attr.aria-checked]="bookingMode === 'group'"
+                        (click)="bookingMode = 'group'"
+                      >
+                        <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
+                        {{ 'eventDetail.modeGroup' | transloco }}
+                      </button>
+                    </div>
+                  }
+
+                  @if (groupAvailable && bookingMode === 'group') {
+                    <p class="text-sm text-secondary-text mb-4">
+                      {{ 'eventDetail.groupHint' | transloco }}
+                    </p>
+                    <a
+                      [routerLink]="['/events', event.id, 'group']"
+                      class="btn btn-primary btn-full btn-lg flex items-center justify-center gap-2"
+                    >
+                      <lucide-icon [img]="icons.Users" class="w-4 h-4" aria-hidden="true" />
+                      {{ 'eventDetail.bookSeatsForA' | transloco }}
+                    </a>
+                  } @else {
+                    <!-- Ticket tiers (read-only rows; a row opens checkout on it) -->
+                    @if (event.has_ticket_types) {
+                      <ul class="purchase-rows">
+                        @for (tt of event.ticket_types; track tt.id) {
+                          <li>
+                            <button
+                              type="button"
+                              class="purchase-row focus-ring"
+                              [disabled]="tt.sale_state !== 'on_sale'"
+                              (click)="openCheckout(tt.id)"
+                            >
+                              <span class="min-w-0">
+                                <span class="purchase-row-name">{{ tt.name }}</span>
+                                <span class="purchase-row-sub">{{ tierStateLabel(tt) }}</span>
+                              </span>
+                              <span class="purchase-row-price num">
+                                @if (tt.kind === 'donation') {
+                                  <!-- Pay what you want: show the minimum, if any -->
+                                  @if (isZeroPrice(tt.price)) {
+                                    {{ 'checkout.donation' | transloco }}
+                                  } @else {
+                                    {{
+                                      'event.priceFrom'
+                                        | transloco
+                                          : { price: (tt.price | money: event.currency : 'short') }
+                                    }}
+                                  }
+                                } @else if (tt.kind === 'free' || isZeroPrice(tt.price)) {
+                                  {{ 'common.free' | transloco }}
+                                } @else {
+                                  {{ tt.price | money: event.currency : 'short' }}
+                                }
+                              </span>
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+
+                    <!-- Seat-map zones: prices only; the seat is chosen on the map -->
+                    @if (seatZones.length) {
+                      <ul class="purchase-rows">
+                        @for (z of seatZones; track z.zone) {
+                          <li class="purchase-row purchase-row-static">
+                            <span class="purchase-row-name">{{ zoneLabel(z.zone) }}</span>
+                            <span class="purchase-row-price num">{{
+                              z.price | money: event.currency : 'short'
+                            }}</span>
+                          </li>
+                        }
+                      </ul>
+                    }
+
+                    <button
+                      (click)="openCheckout()"
+                      [disabled]="registering"
+                      class="btn btn-primary btn-full btn-lg font-bold"
+                    >
+                      @if (registering) {
+                        <span class="spinner spinner-sm"></span>
+                        {{ 'checkout.processing' | transloco }}
+                      } @else if (event.has_ticket_types) {
+                        {{ 'eventDetail.chooseTickets' | transloco }}
+                      } @else if (seatPriceFrom) {
+                        <lucide-icon [img]="icons.Armchair" class="w-4 h-4" aria-hidden="true" />
+                        {{
+                          'eventDetail.chooseSeatFrom'
+                            | transloco
+                              : { price: (seatPriceFrom | money: event.currency : 'short') }
+                        }}
+                      } @else {
+                        {{
+                          event.is_free
+                            ? ('eventDetail.registerFree' | transloco)
+                            : ('eventDetail.getTicketsPrice'
+                              | transloco
+                                : { price: (currentGaPrice | money: event.currency : 'short') })
+                        }}
+                      }
+                    </button>
+                  }
+                }
+
+                <!-- Favourite + share -->
+                <div class="purchase-footer">
+                  @if (authService.isLoggedIn) {
+                    <button
+                      type="button"
+                      (click)="favorites.toggle(event.id)"
+                      class="purchase-footer-btn focus-ring"
+                      [class.purchase-footer-btn-on]="favorites.has(event.id)"
+                      [attr.aria-pressed]="favorites.has(event.id)"
+                    >
+                      <lucide-icon
+                        [img]="icons.Heart"
+                        class="w-4 h-4"
+                        [class.fill-current]="favorites.has(event.id)"
+                        aria-hidden="true"
+                      />
+                      {{
+                        (favorites.has(event.id) ? 'eventDetail.saved' : 'common.save') | transloco
+                      }}
+                    </button>
+                  }
+                  <button
+                    type="button"
+                    (click)="shareEvent()"
+                    class="purchase-footer-btn focus-ring"
+                  >
+                    <lucide-icon [img]="icons.Share2" class="w-4 h-4" aria-hidden="true" />
+                    {{ 'eventDetail.share' | transloco }}
+                  </button>
                 </div>
+                @if (event.currency === 'KZT' && !event.is_free) {
+                  <p class="purchase-pay-note">{{ 'eventDetail.paymentNoteKzt' | transloco }}</p>
+                }
               </div>
             </aside>
           </div>
         </div>
 
-        <!-- ── Checkout modal ── -->
+        <!-- ── Mobile purchase bar (<768px): price + the panel's primary action ── -->
+        <div class="purchase-bar md:hidden">
+          <div class="min-w-0">
+            <p class="text-[11px] text-muted-foreground">
+              {{ 'eventDetail.ticketsTitle' | transloco }}
+            </p>
+            <p class="purchase-bar-price num"><ng-container [ngTemplateOutlet]="priceTpl" /></p>
+          </div>
+          @switch (primaryAction) {
+            @case ('login') {
+              <a
+                routerLink="/login"
+                [queryParams]="{ returnUrl: router.url }"
+                class="btn btn-primary"
+              >
+                {{ 'nav.signIn' | transloco }}
+              </a>
+            }
+            @case ('ticket') {
+              <a routerLink="/my-registrations" class="btn btn-primary">
+                {{ 'nav.myTickets' | transloco }}
+              </a>
+            }
+            @case ('pay') {
+              <button (click)="resumePayment()" [disabled]="registering" class="btn btn-primary">
+                {{ 'eventDetail.completePayment' | transloco }}
+              </button>
+            }
+            @case ('claim') {
+              <button (click)="openCheckout()" class="btn btn-primary">
+                {{ 'eventDetail.claimMySpot' | transloco }}
+              </button>
+            }
+            @case ('waitlist') {
+              <button (click)="joinWaitlist()" [disabled]="waitlisting" class="btn btn-secondary">
+                {{ 'eventDetail.joinTheWaitlist' | transloco }}
+              </button>
+            }
+            @case ('buy') {
+              @if (groupAvailable && bookingMode === 'group') {
+                <a [routerLink]="['/events', event.id, 'group']" class="btn btn-primary">
+                  {{ 'eventDetail.modeGroup' | transloco }}
+                </a>
+              } @else {
+                <button (click)="openCheckout()" [disabled]="registering" class="btn btn-primary">
+                  {{
+                    (event.is_free ? 'eventDetail.registerFree' : 'home.hero.buyTicket') | transloco
+                  }}
+                </button>
+              }
+            }
+            @default {
+              <a href="#purchase-panel" (click)="scrollToPanel($event)" class="btn btn-secondary">
+                {{ 'home.hero.details' | transloco }}
+              </a>
+            }
+          }
+        </div>
+
+        <!-- ── Dialogs: loaded on first use ── -->
         @if (showCheckout) {
-          <app-event-checkout-modal
-            [event]="event"
-            [currentGaPrice]="currentGaPrice"
-            [registering]="registering"
-            (closed)="showCheckout = false"
-            (confirmed)="registerForEvent($event)"
-          />
+          @defer (on immediate) {
+            <app-event-checkout-modal
+              [event]="event"
+              [currentGaPrice]="currentGaPrice"
+              [registering]="registering"
+              [preselectTicketTypeId]="preselectTicketTypeId"
+              (closed)="showCheckout = false"
+              (confirmed)="registerForEvent($event)"
+            />
+          }
         }
 
         <!-- Pay with a phone: QR code of the provider's payment page (Freedom Pay) -->
         @if (qrCheckout) {
-          <app-payment-qr [checkout]="qrCheckout" (closed)="onQrClosed()" />
+          @defer (on immediate) {
+            <app-payment-qr [checkout]="qrCheckout" (closed)="onQrClosed()" />
+          }
         }
 
         <!-- Refund request modal -->
         @if (showRefundModal) {
-          <app-refund-request-modal
-            [event]="event"
-            (closed)="showRefundModal = false"
-            (submitted)="onRefundSubmitted()"
-          />
+          @defer (on immediate) {
+            <app-refund-request-modal
+              [event]="event"
+              (closed)="showRefundModal = false"
+              (submitted)="onRefundSubmitted()"
+            />
+          }
         }
       </div>
     }
@@ -889,10 +815,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   private paymentService = inject(PaymentService);
   authService = inject(AuthService);
   private route = inject(ActivatedRoute);
-  private router = inject(Router);
+  readonly router = inject(Router);
   private toastService = inject(ToastService);
   private modalService = inject(ModalService);
   private seoService = inject(SeoService);
+  readonly favorites = inject(FavoritesStore);
 
   event: Event | null = null;
   loading = false;
@@ -910,6 +837,13 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   pricingData: DynamicPrice | null = null;
   /** Cheapest seat zone of an event with a seat map: seats are priced by zone, not by demand. */
   seatPriceFrom: string | null = null;
+  /** Every zone of the seat map with its price (read-only rows in the panel). */
+  seatZones: ZonePrice[] = [];
+
+  /** Ticket vs group booking, where group booking exists (flat-priced paid events). */
+  bookingMode: 'ticket' | 'group' = 'ticket';
+  /** Tier the checkout opens on, when a tier row was clicked. */
+  preselectTicketTypeId: number | null = null;
 
   // Virtual waiting queue
   queueInfo: QueueStatus | null = null;
@@ -926,9 +860,6 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   // Affiliate referral captured from ?ref=
   affiliateRef = '';
 
-  // Favorites
-  favorited = false;
-
   get isOwner(): boolean {
     return (
       !!this.authService.currentUser && this.authService.currentUser.id === this.event?.organizer.id
@@ -943,6 +874,11 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   get canBuy(): boolean {
     const u = this.authService.currentUser;
     return !!u && !u.is_staff && !u.is_superuser && u.profile.role !== 'organizer';
+  }
+
+  /** A cheapest ticket of zero (e.g. a free tier beside a donation one) reads as Free, never "0 ₸". */
+  isZeroPrice(price: string | number | null | undefined): boolean {
+    return price !== null && price !== undefined && Number(price) === 0;
   }
 
   get spotsPercent(): number {
@@ -964,6 +900,8 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     Share2,
     ChevronLeft,
     Heart,
+    Armchair,
+    Ticket,
     UsersGroup: Users,
   };
 
@@ -1049,25 +987,17 @@ export class EventDetailComponent implements OnInit, OnDestroy {
             this.eventService.getSeatMap(ev.id).subscribe({
               next: (sm) => {
                 this.seatPriceFrom = cheapestZonePrice(sm.zone_prices);
+                this.seatZones = sm.zone_prices;
               },
               error: () => {
                 // 404: general admission, priced by demand.
                 this.seatPriceFrom = null;
+                this.seatZones = [];
               },
             });
           }
         }
-        // Load favorite status
-        if (this.authService.isLoggedIn) {
-          this.eventService.getFavoriteStatus(ev.id).subscribe({
-            next: (res) => {
-              this.favorited = res.favorited;
-            },
-            error: () => {
-              // The heart just stays empty.
-            },
-          });
-        }
+        // Favourite state comes from FavoritesStore (shared with the Discover cards).
       },
       error: () => {
         if (!quiet) this.loading = false;
@@ -1099,37 +1029,71 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     return this.pricingData?.current_price ?? this.event.price;
   }
 
-  toggleFavorite(): void {
-    if (!this.event) return;
-    this.eventService.toggleFavorite(this.event.id).subscribe({
-      next: (res) => {
-        this.favorited = res.favorited;
-        this.toastService.success(
-          res.favorited
-            ? this.i18n.t('eventDetail.addedToFavorites')
-            : this.i18n.t('eventDetail.removedFromFavorites'),
-        );
-      },
-      error: () => this.toastService.error(this.i18n.t('eventDetail.failedToUpdateFavorites')),
-    });
+  /** Group booking is offered where it is today: flat-priced paid events. */
+  get groupAvailable(): boolean {
+    return !!this.event && !this.event.is_free && !this.event.has_ticket_types;
+  }
+
+  /** Open checkout, optionally on a tier the visitor picked in the panel. */
+  openCheckout(ticketTypeId: number | null = null): void {
+    this.preselectTicketTypeId = ticketTypeId;
+    this.showCheckout = true;
+  }
+
+  /**
+   * The single action the mobile bar repeats, following the panel's state
+   * chain in the same order; null where the panel shows a note instead.
+   */
+  get primaryAction(): PrimaryAction {
+    const e = this.event;
+    if (!e || e.status === 'cancelled' || e.status === 'completed') return null;
+    if (!this.authService.isLoggedIn) return 'login';
+    if (this.isOwner) return null;
+    if (this.registrationStatus === 'confirmed') return 'ticket';
+    if (this.registrationStatus === 'pending') return 'pay';
+    if (this.registrationStatus === 'rejected') return null;
+    if (!this.canBuy) return null;
+    if (this.waitlist?.status === 'offered') return 'claim';
+    if (this.queueInfo?.status === 'queued') return null;
+    if (e.available_spots === 0) return this.waitlist?.status === 'waiting' ? null : 'waitlist';
+    return 'buy';
+  }
+
+  scrollToPanel(event: MouseEvent): void {
+    event.preventDefault();
+    document.getElementById('purchase-panel')?.scrollIntoView({ block: 'start' });
+  }
+
+  zoneLabel(zone: string): string {
+    return this.i18n.tOr('seatSelector.zones.' + zone, zone);
+  }
+
+  /** Same wording as the checkout's tier list. */
+  tierStateLabel(tt: Event['ticket_types'][number]): string {
+    switch (tt.sale_state) {
+      case 'sold_out':
+        return this.i18n.t('event.soldOut');
+      case 'scheduled':
+        return this.i18n.t('checkout.salesNotStartedYet');
+      case 'ended':
+        return this.i18n.t('checkout.salesEnded');
+      case 'inactive':
+        return this.i18n.t('checkout.unavailable');
+      default:
+        if (tt.available !== null && tt.available <= 10)
+          return this.i18n.t('checkout.onlyAvailableLeft', { available: tt.available });
+        return this.i18n.t('checkout.available');
+    }
   }
 
   demandBadgeClass(level: string): string {
     const map: Record<string, string> = {
       low: 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]',
       medium: 'bg-[color:var(--warning-50)] text-warning',
-      high: 'bg-orange-100 text-orange-700',
+      high: 'bg-[color:var(--warning-50)] text-[color:var(--warning-text)]',
       surge: 'bg-[color:var(--destructive-50)] text-[color:var(--destructive)] animate-pulse',
     };
     return map[level] ?? 'bg-muted text-muted-foreground';
-  }
-
-  priceBarClass(): string {
-    if (this.event?.is_free) return 'bg-gradient-to-r from-emerald-400 to-teal-500';
-    const d = this.pricingData?.demand_level;
-    if (d === 'surge') return 'bg-gradient-to-r from-red-500 to-orange-500';
-    if (d === 'high') return 'bg-gradient-to-r from-orange-400 to-amber-400';
-    return 'bg-gradient-to-r from-ember to-pine';
   }
 
   loadWaitlistStatus(): void {

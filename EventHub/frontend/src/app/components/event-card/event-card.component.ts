@@ -1,191 +1,190 @@
-import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, Input, computed, inject, signal } from '@angular/core';
 import { RouterModule } from '@angular/router';
-import { Event } from '../../models/models';
-import { LucideAngularModule, MapPin, Users, ArrowRight } from 'lucide-angular';
-import { MoneyPipe } from '../../pipes/money.pipe';
+import { LucideAngularModule, Heart } from 'lucide-angular';
 import { TranslocoPipe } from '@jsverse/transloco';
+import { Event } from '../../models/models';
+import { MoneyPipe } from '../../pipes/money.pipe';
 import { LocalDatePipe, PluralPipe } from '../../i18n/locale.pipes';
+import { FavoritesStore } from '../../services/favorites.store';
+import { categoryCover } from '../home/category-cover';
 
+/** At or below this many free spots a card says "N spots left" (Q7). */
+export const LOW_STOCK = 20;
+
+/**
+ * Discover card (Concept A): photo or category cover, date pill, favourite
+ * heart, status pills, then kicker / title / venue / price over a dark fade.
+ *
+ * The title is the card's link and stretches over the whole card; the heart
+ * is a sibling button above it, so both stay separately focusable.
+ */
 @Component({
   selector: 'app-event-card',
   standalone: true,
-  imports: [
-    MoneyPipe,
-    CommonModule,
-    RouterModule,
-    LucideAngularModule,
-    TranslocoPipe,
-    LocalDatePipe,
-    PluralPipe,
-  ],
+  imports: [RouterModule, LucideAngularModule, TranslocoPipe, MoneyPipe, LocalDatePipe, PluralPipe],
   template: `
     <article
-      class="card-ticket card-hover flex flex-col cursor-pointer focus-ring h-full"
-      [routerLink]="['/events', event.id]"
-      [attr.aria-label]="'event.viewDetailsFor' | transloco: { title: event.title }"
-      tabindex="0"
-      (keydown.enter)="$event.preventDefault()"
+      class="event-card group"
+      [class.event-card-portrait]="variant === 'portrait'"
+      [class.event-card-fill]="variant === 'fill'"
     >
       <!-- Media -->
-      <div
-        class="relative bg-muted overflow-hidden"
-        [class.aspect-video]="!featured"
-        style="border-radius: 14px 14px 0 0"
-        [style.aspect-ratio]="featured ? '21/9' : null"
-      >
-        @if (event.image && !imageError) {
-          <img
-            [src]="event.image"
-            [alt]="event.title"
-            loading="lazy"
-            (error)="imageError = true"
-            class="w-full h-full object-cover transition-transform duration-500"
-          />
-        } @else {
-          <div
-            class="w-full h-full flex items-center justify-center"
-            style="background:linear-gradient(135deg,#F4D9CC,#E8B8A2 55%,#CBB6A6)"
-          >
-            <span class="font-display text-5xl font-semibold text-white/70 select-none">
-              {{ event.title.charAt(0).toUpperCase() || 'E' }}
-            </span>
-          </div>
-        }
-
-        <!-- Badges -->
-        <div class="absolute top-2.5 left-2.5 flex gap-1.5">
-          @if (event.is_free) {
-            <span class="badge badge-free">{{ 'common.free' | transloco }}</span>
-          }
-          @if (event.is_online) {
-            <span class="badge badge-online">{{ 'home.online' | transloco }}</span>
-          }
-          @if (!event.is_free && event.available_spots > 0 && event.available_spots < 10) {
-            <span class="badge badge-hot">{{ 'event.sellingFast' | transloco }}</span>
-          }
-          @if (event.available_spots === 0) {
-            <span class="badge badge-soldout">{{ 'event.soldOut' | transloco }}</span>
-          }
+      @if (event.image && !imageError()) {
+        <img
+          [src]="event.image"
+          alt=""
+          loading="lazy"
+          (error)="imageError.set(true)"
+          class="event-card-media"
+        />
+      } @else {
+        <div class="event-card-media" [style.background]="cover().background" aria-hidden="true">
+          <lucide-icon [img]="cover().icon" class="event-card-cover-icon" />
         </div>
+      }
+      <div class="event-card-fade" aria-hidden="true"></div>
+
+      <!-- Top row: date + heart -->
+      <div class="event-card-top">
+        <span class="event-card-date">
+          <span class="font-semibold">{{ event.date | localDate: 'd' }}</span>
+          <span class="uppercase opacity-75">{{ event.date | localDate: 'LLL' }}</span>
+        </span>
+        <button
+          type="button"
+          class="event-card-heart focus-ring"
+          [attr.aria-pressed]="favorited()"
+          [attr.aria-label]="
+            (favorited() ? 'event.removeFavorite' : 'event.addFavorite')
+              | transloco: { title: event.title }
+          "
+          (click)="favorites.toggle(event.id)"
+        >
+          <lucide-icon
+            [img]="icons.Heart"
+            class="w-[18px] h-[18px]"
+            [class.fill-current]="favorited()"
+            aria-hidden="true"
+          />
+        </button>
       </div>
 
-      <!-- Perforation -->
-      <div class="ticket-perf"></div>
-
       <!-- Body -->
-      <div class="flex gap-3.5 p-4 flex-1">
-        <!-- Date block -->
-        <div class="date-block">
-          <div class="d num">{{ event.date | localDate: 'd' }}</div>
-          <div class="m">{{ event.date | localDate: 'LLL' }}</div>
-        </div>
-
-        <!-- Content -->
-        <div class="flex flex-col flex-1 min-w-0">
-          <p class="kicker mb-1.5 truncate" [class.kicker-hot]="featured">
-            @if (featured) {
-              {{ 'event.featured' | transloco }} ·
+      <div class="event-card-body">
+        @if (pills().length) {
+          <div class="flex flex-wrap gap-1.5 mb-2">
+            @for (pill of pills(); track pill) {
+              @switch (pill) {
+                @case ('low') {
+                  <span class="card-pill card-pill-hot">{{
+                    'event.spotsLeft' | tPlural: event.available_spots
+                  }}</span>
+                }
+                @case ('soldout') {
+                  <span class="card-pill card-pill-light">{{ 'event.soldOut' | transloco }}</span>
+                }
+                @case ('free') {
+                  <span class="card-pill card-pill-free">{{ 'common.free' | transloco }}</span>
+                }
+                @case ('online') {
+                  <span class="card-pill card-pill-light">{{ 'home.online' | transloco }}</span>
+                }
+              }
             }
-            {{ event.category.name || ('nav.event' | transloco) }}
-          </p>
-          <h3
-            class="font-display font-medium text-foreground leading-snug line-clamp-2"
-            [class]="featured ? 'text-2xl font-semibold' : 'text-[1.0625rem]'"
+          </div>
+        }
+        @if (event.category.name) {
+          <p class="event-card-kicker">{{ event.category.name }}</p>
+        }
+        <h3 class="event-card-title">
+          <a
+            [routerLink]="['/events', event.id]"
+            class="event-card-link"
+            [attr.aria-label]="'event.viewDetailsFor' | transloco: { title: event.title }"
+            >{{ event.title }}</a
           >
-            {{ event.title }}
-          </h3>
-
-          @if (featured && event.description) {
-            <p class="text-sm text-muted-foreground mt-2 line-clamp-2 max-w-xl">
-              {{ event.description }}
-            </p>
+        </h3>
+        <p class="event-card-venue" [title]="event.location">{{ event.location }}</p>
+        <p class="event-card-price num" data-testid="card-price">
+          @if (soldOut()) {
+            {{ 'event.soldOut' | transloco }}
+          } @else if (freeEntry()) {
+            {{ 'common.free' | transloco }}
+          } @else if (event.has_ticket_types) {
+            {{
+              'event.priceFrom'
+                | transloco: { price: (event.price_from | money: event.currency : 'short') }
+            }}
+          } @else {
+            {{ event.price_from | money: event.currency : 'short' }}
           }
-
-          <div
-            class="flex items-center gap-x-4 gap-y-1.5 mt-2.5 text-xs text-muted-foreground flex-wrap"
-          >
-            <div class="flex items-center gap-1.5">
-              <lucide-icon
-                [img]="icons.MapPin"
-                class="w-3.5 h-3.5 flex-shrink-0"
-                aria-hidden="true"
-              />
-              <span class="truncate">{{ event.location }}</span>
-            </div>
-            @if (event.max_participants > 0) {
-              <div class="flex items-center gap-1.5">
-                <lucide-icon
-                  [img]="icons.Users"
-                  class="w-3.5 h-3.5 flex-shrink-0"
-                  aria-hidden="true"
-                />
-                <span>{{ 'event.spotsLeft' | tPlural: event.available_spots }}</span>
-              </div>
-            }
-          </div>
-
-          <!-- Footer -->
-          <div
-            class="flex items-center justify-between gap-3 pt-3.5 mt-auto"
-            [class.border-t]="featured"
-            [class.border-border]="featured"
-          >
-            <span
-              class="font-display text-base font-semibold num min-w-0"
-              [class.text-pine-600]="event.is_free"
-            >
-              {{
-                event.is_free
-                  ? ('common.free' | transloco)
-                  : (event.price | money: event.currency : 'short')
-              }}
-            </span>
-            <span
-              class="text-xs font-semibold text-ember inline-flex items-center gap-1 cta shrink-0 whitespace-nowrap"
-            >
-              {{ (featured ? 'event.getTickets' : 'event.viewEvent') | transloco }}
-              <lucide-icon
-                [img]="icons.ArrowRight"
-                class="w-3.5 h-3.5 cta-arrow transition-transform"
-                aria-hidden="true"
-              />
-            </span>
-          </div>
-        </div>
+        </p>
       </div>
     </article>
   `,
   styles: [
     `
-      /* Fill the wrapper so cards in a rail/grid row share one height
-       (the article inside is h-full with an mt-auto footer). */
       :host {
         display: block;
+        min-width: 0;
         height: 100%;
-      }
-      .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-      .text-pine-600 {
-        color: var(--pine-600);
-      }
-      article:hover img {
-        transform: scale(1.04);
-      }
-      article:hover .cta-arrow {
-        transform: translateX(3px);
       }
     `,
   ],
 })
 export class EventCardComponent {
-  @Input() event!: Event;
-  @Input() featured = false;
-  imageError = false;
+  readonly favorites = inject(FavoritesStore);
 
-  readonly icons = { MapPin, Users, ArrowRight };
+  private readonly eventSig = signal<Event | null>(null);
+  private current!: Event;
+  @Input({ required: true })
+  set event(value: Event) {
+    this.current = value;
+    this.eventSig.set(value);
+    this.imageError.set(false);
+  }
+  get event(): Event {
+    return this.current;
+  }
+
+  /** 'portrait' keeps a 3:4 ratio; 'fill' takes the height its grid cell gives it. */
+  @Input() variant: 'portrait' | 'fill' = 'portrait';
+
+  readonly imageError = signal(false);
+  readonly icons = { Heart };
+
+  readonly cover = computed(() => {
+    const e = this.eventSig();
+    return categoryCover(e?.category.icon, e?.category.id);
+  });
+
+  readonly favorited = computed(() => {
+    const e = this.eventSig();
+    return !!e && this.favorites.has(e.id);
+  });
+
+  /**
+   * Free to get in: the event is free, or its cheapest ticket costs nothing
+   * (a free tier next to a pay-what-you-want one). Never "0 ₸".
+   */
+  readonly freeEntry = computed(() => {
+    const e = this.eventSig();
+    return !!e && (e.is_free || Number(e.price_from) === 0);
+  });
+
+  readonly soldOut = computed(() => {
+    const e = this.eventSig();
+    return !!e && e.max_participants > 0 && e.available_spots === 0;
+  });
+
+  readonly pills = computed(() => {
+    const e = this.eventSig();
+    if (!e) return [];
+    const pills: ('low' | 'soldout' | 'free' | 'online')[] = [];
+    if (this.soldOut()) pills.push('soldout');
+    else if (e.max_participants > 0 && e.available_spots <= LOW_STOCK) pills.push('low');
+    if (this.freeEntry() && !this.soldOut()) pills.push('free');
+    if (e.is_online) pills.push('online');
+    return pills;
+  });
 }

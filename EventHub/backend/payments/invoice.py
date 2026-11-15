@@ -91,9 +91,9 @@ def invoice_html(registration) -> str:
 <html><head><meta charset="utf-8"><title>{inv_no}</title>
 <style>
   * {{ box-sizing:border-box; }}
-  body {{ font-family:'Satoshi',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  body {{ font-family:'Onest',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
          margin:0; background:{PAPER}; color:{INK}; }}
-  .display {{ font-family:'Clash Display','Satoshi',-apple-system,'Segoe UI',sans-serif; }}
+  .display {{ font-family:'Onest',-apple-system,'Segoe UI',sans-serif; }}
   .kicker {{ font-family:'JetBrains Mono',ui-monospace,'SF Mono',Menlo,monospace;
              font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; }}
   .sheet {{ position:relative; max-width:720px; margin:32px auto 48px; background:#fff;

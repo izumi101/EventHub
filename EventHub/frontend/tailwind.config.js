@@ -3,24 +3,28 @@ module.exports = {
   content: ['./src/**/*.{html,ts}'],
   theme: {
     extend: {
-      /* CSS-vars bridge — все цвета берутся из :root */
+      /* CSS-vars bridge — every colour comes from the tokens in styles.css */
       colors: {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
         surface: 'var(--surface)',
         'surface-sunken': 'var(--surface-sunken)',
+        'surface-elevated': 'var(--surface-elevated)',
         card: 'var(--card)',
         'card-foreground': 'var(--card-foreground)',
         popover: 'var(--popover)',
         'popover-foreground': 'var(--popover-foreground)',
         primary: 'var(--primary)',
+        'primary-hover': 'var(--primary-hover)',
         'primary-foreground': 'var(--primary-foreground)',
         secondary: 'var(--secondary)',
         'secondary-foreground': 'var(--secondary-foreground)',
+        'secondary-text': 'var(--text-secondary)',
         muted: 'var(--muted)',
         'muted-foreground': 'var(--muted-foreground)',
         accent: 'var(--accent)',
         'accent-foreground': 'var(--accent-foreground)',
+        'accent-text': 'var(--accent-text)',
         destructive: 'var(--destructive)',
         'destructive-foreground': 'var(--destructive-foreground)',
         success: 'var(--success)',
@@ -35,9 +39,18 @@ module.exports = {
         ring: 'var(--ring)',
       },
 
+      /* Ember as TEXT must pass AA: #E8643A on paper is only 3.1:1, so text-primary /
+         text-ember / text-accent use the darker (light) or lighter (dark) accent-text.
+         Fills (bg-primary, border-ember, ring-ember…) keep the brand orange. */
+      textColor: {
+        primary: 'var(--accent-text)',
+        ember: 'var(--accent-text)',
+        accent: 'var(--accent-text)',
+      },
+
       fontFamily: {
-        sans: ['Satoshi', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Clash Display', 'Satoshi', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Onest', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        display: ['Onest', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
 

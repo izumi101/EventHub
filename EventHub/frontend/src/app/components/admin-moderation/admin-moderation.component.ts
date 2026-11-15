@@ -181,8 +181,7 @@ import { LanguageService } from '../../i18n/language.service';
                     <button
                       (click)="approve(ev)"
                       [disabled]="actingId === ev.id"
-                      class="btn btn-sm flex items-center gap-1"
-                      style="background:#15803d;color:#fff;border-color:#15803d"
+                      class="btn btn-sm flex items-center gap-1 bg-[color:var(--success)] text-[color:var(--success-foreground)] border-[color:var(--success)] hover:opacity-90"
                     >
                       <lucide-icon [img]="icons.Check" class="w-3.5 h-3.5" />
                       {{ 'common.approve' | transloco }}

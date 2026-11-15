@@ -2,42 +2,33 @@ import { Component, HostListener, type Signal, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, isActive as isUrlActive } from '@angular/router';
 import { AuthService } from '../services/auth.service';
-import { ThemeService } from '../services/theme.service';
-import { ModalService } from '../services/modal.service';
 import { LayoutService } from './layout.service';
 import { NAV, NavSection, NavItem, Role, LucideIcon } from './nav.config';
 import { User } from '../models/models';
+import { isAdmin, isOrganizer } from '../utils/roles';
 import {
   LucideAngularModule,
   PanelLeftClose,
   PanelLeftOpen,
-  Sun,
-  Moon,
-  LogOut,
-  User as UserIcon,
   ChevronDown,
   ChevronRight,
 } from 'lucide-angular';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LanguageService } from '../i18n/language.service';
-import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
 
+/**
+ * Sidebar of the organizer/admin workspace only. Consumer pages use the top
+ * nav; profile, theme and sign-out live in the account menu of the topbar.
+ */
 @Component({
   selector: 'app-sidebar',
   standalone: true,
-  imports: [
-    CommonModule,
-    RouterModule,
-    LucideAngularModule,
-    TranslocoPipe,
-    LanguageSwitcherComponent,
-  ],
+  imports: [CommonModule, RouterModule, LucideAngularModule, TranslocoPipe],
   template: `
     <aside
       class="sidebar"
       [class.sidebar-collapsed]="layout.collapsed()"
       [class.sidebar-mobile-open]="layout.mobileOpen()"
-      [attr.aria-label]="'nav.mainNavigation' | transloco"
+      [attr.aria-label]="'nav.workspaceNavigation' | transloco"
     >
       <!-- Header: logo + collapse toggle -->
       <div class="sidebar-header">
@@ -52,6 +43,7 @@ import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
           <a
             routerLink="/"
             class="flex justify-center w-full focus-ring rounded"
+            [attr.aria-label]="'nav.backToDiscover' | transloco"
             (click)="layout.closeMobile()"
           >
             <span class="ember-mark" aria-hidden="true"></span>
@@ -73,7 +65,7 @@ import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
       </div>
 
       <!-- Nav sections -->
-      <nav class="sidebar-nav" role="navigation">
+      <nav class="sidebar-nav">
         @for (section of visibleSections(); track section.id) {
           <!-- Section header -->
           @if (section.titleKey && !layout.collapsed()) {
@@ -135,92 +127,6 @@ import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
       </nav>
 
       <div class="sidebar-spacer"></div>
-
-      <!-- Footer -->
-      <div class="sidebar-footer">
-        <!-- Language switcher: also the way to switch language on mobile -->
-        @if (!layout.collapsed()) {
-          <div class="px-2 py-1 md:hidden">
-            <app-language-switcher />
-          </div>
-        }
-
-        <!-- Theme toggle -->
-        <button
-          (click)="theme.toggle()"
-          class="sidebar-item focus-ring"
-          [title]="(theme.isDark() ? 'nav.switchToLight' : 'nav.switchToDark') | transloco"
-          [attr.aria-label]="
-            (theme.isDark() ? 'nav.switchToLight' : 'nav.switchToDark') | transloco
-          "
-        >
-          <lucide-icon
-            [img]="theme.isDark() ? icons.Sun : icons.Moon"
-            class="sidebar-item-icon"
-            aria-hidden="true"
-          />
-          @if (!layout.collapsed()) {
-            <span class="sidebar-item-label">{{
-              (theme.isDark() ? 'nav.lightMode' : 'nav.darkMode') | transloco
-            }}</span>
-          }
-        </button>
-
-        <!-- Profile / auth buttons -->
-        @if (user) {
-          <div class="relative">
-            <button
-              (click)="profileOpen = !profileOpen; $event.stopPropagation()"
-              class="sidebar-item focus-ring w-full"
-              [title]="layout.collapsed() ? user.username : ''"
-            >
-              <span class="sidebar-avatar flex-shrink-0">{{
-                user.username.charAt(0).toUpperCase()
-              }}</span>
-              @if (!layout.collapsed()) {
-                <span class="sidebar-item-label truncate min-w-0">{{ user.username }}</span>
-                <lucide-icon
-                  [img]="icons.ChevronDown"
-                  class="w-3.5 h-3.5 flex-shrink-0 ml-auto text-muted-foreground"
-                  aria-hidden="true"
-                />
-              }
-            </button>
-
-            @if (profileOpen) {
-              <!-- Clicks inside the menu must not reach the document listener that closes it. -->
-              <div class="profile-dropdown" role="presentation" (click)="$event.stopPropagation()">
-                <a
-                  routerLink="/profile"
-                  (click)="profileOpen = false; layout.closeMobile()"
-                  class="profile-dropdown-item focus-ring"
-                >
-                  <lucide-icon [img]="icons.UserIcon" class="w-4 h-4" aria-hidden="true" />
-                  {{ 'nav.profile' | transloco }}
-                </a>
-                <button
-                  (click)="logout()"
-                  class="profile-dropdown-item profile-dropdown-item-danger focus-ring w-full text-left"
-                >
-                  <lucide-icon [img]="icons.LogOut" class="w-4 h-4" aria-hidden="true" />
-                  {{ 'nav.signOut' | transloco }}
-                </button>
-              </div>
-            }
-          </div>
-        } @else {
-          @if (!layout.collapsed()) {
-            <a
-              routerLink="/login"
-              (click)="layout.closeMobile()"
-              class="sidebar-item focus-ring text-primary"
-            >
-              <lucide-icon [img]="icons.UserIcon" class="sidebar-item-icon" aria-hidden="true" />
-              <span class="sidebar-item-label">{{ 'nav.signIn' | transloco }}</span>
-            </a>
-          }
-        }
-      </div>
     </aside>
   `,
   styles: [
@@ -233,51 +139,30 @@ import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
 })
 export class SidebarComponent {
   layout = inject(LayoutService);
-  theme = inject(ThemeService);
   private authService = inject(AuthService);
-  private modalService = inject(ModalService);
   private router = inject(Router);
-  private i18n = inject(LanguageService);
 
   user: User | null = null;
   isOrganizer = false;
   isAdmin = false;
   isAttendee = false;
-  profileOpen = false;
 
   /** One router-backed signal per nav target, created on first use. */
   private readonly activeRoutes = new Map<string, Signal<boolean>>();
 
-  readonly icons = {
-    PanelLeftClose,
-    PanelLeftOpen,
-    Sun,
-    Moon,
-    LogOut,
-    UserIcon,
-    ChevronDown,
-    ChevronRight,
-  };
+  readonly icons = { PanelLeftClose, PanelLeftOpen, ChevronDown, ChevronRight };
 
   constructor() {
     this.authService.currentUser$.subscribe((user) => {
       this.user = user;
-      // Self-registered organizers carry profile.role === 'organizer';
-      // staff/superuser flags come from Django admin.
-      this.isOrganizer = user?.is_staff || user?.is_superuser || user?.profile.role === 'organizer';
-      this.isAdmin = !!user?.is_superuser;
+      this.isOrganizer = isOrganizer(user);
+      this.isAdmin = isAdmin(user);
       this.isAttendee = !!user && !this.isOrganizer;
     });
   }
 
-  @HostListener('document:click')
-  onDocumentClick(): void {
-    this.profileOpen = false;
-  }
-
   @HostListener('document:keydown.escape')
   onEscape(): void {
-    this.profileOpen = false;
     if (this.layout.mobileOpen()) this.layout.closeMobile();
   }
 
@@ -339,20 +224,5 @@ export class SidebarComponent {
   // Cast helper so template bindings satisfy Angular strict template checks
   asIcon(icon: LucideIcon): LucideIcon {
     return icon;
-  }
-
-  async logout(): Promise<void> {
-    this.profileOpen = false;
-    const confirmed = await this.modalService.open({
-      title: this.i18n.t('nav.signOutTitle'),
-      message: this.i18n.t('nav.signOutMessage'),
-      confirmText: this.i18n.t('nav.signOut'),
-      cancelText: this.i18n.t('common.cancel'),
-      isDestructive: true,
-    });
-    if (confirmed) {
-      this.authService.logout();
-      void this.router.navigate(['/login']);
-    }
   }
 }

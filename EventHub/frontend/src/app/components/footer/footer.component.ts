@@ -1,12 +1,19 @@
-import { Component, inject } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { Component, computed, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { RouterModule } from '@angular/router';
 import { LucideAngularModule, ChevronUp, X } from 'lucide-angular';
+import { catchError, map, of } from 'rxjs';
 import { AuthService } from '../../services/auth.service';
-import { SearchService } from '../../services/search.service';
+import { EventService } from '../../services/event.service';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { GithubIcon, LinkedinIcon, TwitterIcon } from './brand-icons';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { isOrganizer } from '../../utils/roles';
+import type { Category } from '../../models/models';
+
+/** How many categories the footer's Discover column lists. */
+const FOOTER_CATEGORY_COUNT = 4;
 
 @Component({
   selector: 'app-footer',
@@ -16,7 +23,11 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
     <footer class="bg-card border-t border-border mt-auto">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="grid grid-cols-1 md:grid-cols-5 gap-8">
-          <div class="col-span-1 md:col-span-2">
+          <div
+            class="col-span-1"
+            [class.md:col-span-2]="showOrganizer()"
+            [class.md:col-span-3]="!showOrganizer()"
+          >
             <a routerLink="/" class="flex items-center gap-2 mb-4 group w-fit">
               <img
                 src="assets/brand/symbol.svg?v=2"
@@ -36,7 +47,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                 href="https://twitter.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[#1DA1F2] transition-all"
+                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-[color:var(--accent-text)] hover:bg-[color:var(--ember-50)] transition-all"
                 aria-label="Twitter"
               >
                 <lucide-icon [img]="icons.Twitter" class="w-5 h-5" />
@@ -45,7 +56,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                 href="https://linkedin.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[#0A66C2] transition-all"
+                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-[color:var(--accent-text)] hover:bg-[color:var(--ember-50)] transition-all"
                 aria-label="LinkedIn"
               >
                 <lucide-icon [img]="icons.Linkedin" class="w-5 h-5" />
@@ -54,7 +65,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                 href="https://github.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-[#333] transition-all"
+                class="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-muted-foreground hover:text-[color:var(--accent-text)] hover:bg-[color:var(--ember-50)] transition-all"
                 aria-label="GitHub"
               >
                 <lucide-icon [img]="icons.Github" class="w-5 h-5" />
@@ -62,84 +73,62 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
             </div>
           </div>
 
-          <!-- Discover Column -->
+          <!-- Discover Column: the busiest real categories -->
           <div>
             <h3 class="text-foreground font-semibold mb-4">{{ 'footer.discover' | transloco }}</h3>
             <ul class="space-y-3">
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateToCategory('Concert')"
-                  class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'footer.concerts' | transloco }}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateToCategory('Festival')"
-                  class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'footer.festivals' | transloco }}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateToCategory('Conference')"
-                  class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'footer.conferences' | transloco }}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateToCategory('Workshop')"
-                  class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'footer.workshops' | transloco }}
-                </button>
-              </li>
+              @for (cat of topCategories(); track cat.id) {
+                <li>
+                  <a
+                    routerLink="/"
+                    [queryParams]="{ category: cat.id }"
+                    (click)="scrollToTop()"
+                    class="text-muted-foreground hover:text-foreground text-sm transition-colors block w-fit"
+                  >
+                    {{ cat.name }}
+                  </a>
+                </li>
+              }
             </ul>
           </div>
 
-          <!-- Organizer Column -->
-          <div>
-            <h3 class="text-sm font-semibold text-foreground mb-4">
-              {{ 'footer.organizer' | transloco }}
-            </h3>
-            <ul class="space-y-3">
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateAuthenticated('/organizer/dashboard')"
-                  class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'nav.dashboard' | transloco }}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateAuthenticated('/create-event')"
-                  class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'nav.createEvent' | transloco }}
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  (click)="navigateAuthenticated('/my-events')"
-                  class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit cursor-pointer"
-                >
-                  {{ 'nav.myEvents' | transloco }}
-                </button>
-              </li>
-            </ul>
-          </div>
+          <!-- Organizer Column: organizers and admins only -->
+          @if (showOrganizer()) {
+            <div data-testid="footer-organizer">
+              <h3 class="text-sm font-semibold text-foreground mb-4">
+                {{ 'footer.organizer' | transloco }}
+              </h3>
+              <ul class="space-y-3">
+                <li>
+                  <a
+                    routerLink="/organizer/dashboard"
+                    (click)="scrollToTop()"
+                    class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit"
+                  >
+                    {{ 'nav.dashboard' | transloco }}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    routerLink="/create-event"
+                    (click)="scrollToTop()"
+                    class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit"
+                  >
+                    {{ 'nav.createEvent' | transloco }}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    routerLink="/my-events"
+                    (click)="scrollToTop()"
+                    class="text-sm text-muted-foreground hover:text-foreground transition-colors block w-fit"
+                  >
+                    {{ 'nav.myEvents' | transloco }}
+                  </a>
+                </li>
+              </ul>
+            </div>
+          }
 
           <!-- Support Column -->
           <div>
@@ -215,7 +204,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
       @if (showBackToTop) {
         <button
           (click)="scrollToTop()"
-          class="fixed bottom-6 right-6 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 hover:bg-primary/90 transition-all z-40 animate-fade-in"
+          class="fixed bottom-20 md:bottom-6 right-4 md:right-6 w-11 h-11 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 hover:bg-primary-hover transition-all z-40 animate-fade-in"
           [attr.aria-label]="'footer.backToTop' | transloco"
         >
           <lucide-icon [img]="icons.ChevronUp" class="w-5 h-5" />
@@ -335,9 +324,22 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
   ],
 })
 export class FooterComponent {
-  private router = inject(Router);
   private authService = inject(AuthService);
-  private searchService = inject(SearchService);
+  private eventService = inject(EventService);
+
+  private readonly user = toSignal(this.authService.currentUser$, { initialValue: null });
+  readonly showOrganizer = computed(() => isOrganizer(this.user()));
+
+  /** Real categories (busiest first); the column stays empty if the request fails. */
+  readonly topCategories = toSignal(
+    this.eventService.getCategories().pipe(
+      map((cats: Category[]) =>
+        [...cats].sort((a, b) => b.event_count - a.event_count).slice(0, FOOTER_CATEGORY_COUNT),
+      ),
+      catchError(() => of([] as Category[])),
+    ),
+    { initialValue: [] as Category[] },
+  );
 
   readonly icons = {
     Twitter: TwitterIcon,
@@ -363,25 +365,6 @@ export class FooterComponent {
         this.showBackToTop = window.scrollY > 400;
       });
     }
-  }
-
-  /** Navigate to home page and filter by category name via SearchService */
-  navigateToCategory(categoryName: string): void {
-    this.searchService.setSearchQuery(categoryName);
-    this.searchService.setSearchLocation('');
-    void this.router.navigate(['/']).then(() => {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
-  }
-
-  /** Navigate to authenticated route, redirect to login if not logged in */
-  navigateAuthenticated(path: string): void {
-    if (this.authService.isLoggedIn) {
-      void this.router.navigate([path]);
-    } else {
-      void this.router.navigate(['/login']);
-    }
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   /** Open a legal/info modal */
