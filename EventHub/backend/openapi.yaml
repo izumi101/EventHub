@@ -3970,6 +3970,29 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: No such object (or not visible to you).
+  /api/v1/favorites/ids/:
+    get:
+      operationId: favorites_ids_retrieve
+      description: |-
+        All of the user's favourite event ids in one call, so cards can show
+        the right heart without paging through `/favorites/`.
+      tags:
+      - favorites
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FavoriteIds'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
   /api/v1/feature-flags/:
     get:
       operationId: feature_flags_retrieve
@@ -6644,6 +6667,16 @@ components:
       - created_at
       - event
       - id
+    FavoriteIds:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            type: integer
+          description: Ids of the events the user favourited.
+      required:
+      - ids
     FavoriteState:
       type: object
       properties:

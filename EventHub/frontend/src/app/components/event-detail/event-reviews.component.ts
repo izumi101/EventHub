@@ -42,7 +42,9 @@ import { LanguageService } from '../../i18n/language.service';
               <button
                 (click)="reviewRating = star"
                 class="text-2xl transition-transform hover:scale-110"
-                [class]="star <= reviewRating ? 'text-amber-400' : 'text-muted'"
+                [class]="
+                  star <= reviewRating ? 'text-[color:var(--warning)]' : 'text-muted-foreground'
+                "
               >
                 ★
               </button>
@@ -84,7 +86,7 @@ import { LanguageService } from '../../i18n/language.service';
               <div class="flex-1">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-sm font-semibold text-foreground">{{ review.username }}</span>
-                  <span class="text-amber-400 text-sm"
+                  <span class="text-[color:var(--warning)] text-sm"
                     >{{ '★'.repeat(review.rating) }}{{ '☆'.repeat(5 - review.rating) }}</span
                   >
                   <span class="text-xs text-muted-foreground">{{

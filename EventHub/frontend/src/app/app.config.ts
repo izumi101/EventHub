@@ -26,7 +26,8 @@ export const appConfig: ApplicationConfig = {
     provideRouter(
       routes,
       withComponentInputBinding(),
-      withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
+      // Anchors: Discover keeps the filter bar in view when filters change.
+      withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
       withViewTransitions(),
     ),
     // stepUpInterceptor first: its retry goes through the interceptors after it

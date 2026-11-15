@@ -6,6 +6,7 @@ import { EventService } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { PaymentService } from '../../services/payment.service';
 import { Registration } from '../../models/models';
+import { categoryCover } from '../home/category-cover';
 import {
   LucideAngularModule,
   Calendar,
@@ -158,7 +159,7 @@ import { LanguageService } from '../../i18n/language.service';
                         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                       />
                     } @else {
-                      <div class="w-full h-full" [class]="heroBg(reg.event.id)"></div>
+                      <div class="w-full h-full" [style.background]="coverBg(reg)"></div>
                     }
                     <!-- Dark gradient overlay -->
                     <div
@@ -168,7 +169,7 @@ import { LanguageService } from '../../i18n/language.service';
                     <div class="absolute top-3 right-3 flex items-center gap-1.5">
                       @if (reg.ticket_type) {
                         <span
-                          class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/90 text-primary backdrop-blur-sm"
+                          class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-black/55 text-white backdrop-blur-sm"
                         >
                           {{ reg.ticket_type.name }}
                         </span>
@@ -182,9 +183,9 @@ import { LanguageService } from '../../i18n/language.service';
                     @if (reg.is_checked_in) {
                       <div class="absolute top-3 left-3">
                         <span
-                          class="flex items-center gap-1 text-[11px] font-bold text-white bg-pine backdrop-blur-sm px-2.5 py-1 rounded-full"
+                          class="flex items-center gap-1 text-[11px] font-bold text-[color:var(--success-foreground)] bg-pine backdrop-blur-sm px-2.5 py-1 rounded-full"
                         >
-                          <span class="w-1.5 h-1.5 bg-white rounded-full animate-pulse"></span>
+                          <span class="w-1.5 h-1.5 bg-current rounded-full animate-pulse"></span>
                           {{ 'analytics.checkedIn' | transloco }}
                         </span>
                       </div>
@@ -584,33 +585,27 @@ export class MyRegistrationsComponent implements OnInit {
 
   statusStripeClass(status: string): string {
     const map: Record<string, string> = {
-      confirmed: 'bg-[color:var(--pine-50)]0',
-      pending: 'bg-amber-400',
-      rejected: 'bg-red-400',
-      cancelled: 'bg-gray-300',
+      confirmed: 'bg-[color:var(--pine-500)]',
+      pending: 'bg-[color:var(--warning)]',
+      rejected: 'bg-[color:var(--destructive)]',
+      cancelled: 'bg-[color:var(--border-strong)]',
     };
-    return map[status] ?? 'bg-gray-300';
+    return map[status] ?? 'bg-[color:var(--border-strong)]';
   }
 
   statusPillClass(status: string): string {
     const map: Record<string, string> = {
-      confirmed: 'bg-[color:var(--pine-50)]0/90 text-white',
-      pending: 'bg-amber-400/90 text-white',
-      rejected: 'bg-[color:var(--destructive-50)]0/90 text-white',
-      cancelled: 'bg-gray-500/80 text-white',
+      confirmed: 'bg-[color:var(--success)] text-[color:var(--success-foreground)]',
+      pending: 'bg-[color:var(--warning)] text-[color:var(--warning-foreground)]',
+      rejected: 'bg-[color:var(--destructive)] text-[color:var(--destructive-foreground)]',
+      cancelled: 'bg-black/60 text-white',
     };
-    return map[status] ?? 'bg-gray-500/80 text-white';
+    return map[status] ?? 'bg-black/60 text-white';
   }
 
-  heroBg(eventId: number): string {
-    const gradients = [
-      'bg-gradient-to-br from-ember via-orange-600 to-rose-600',
-      'bg-gradient-to-br from-amber-500 via-orange-600 to-ember',
-      'bg-gradient-to-br from-pine via-emerald-700 to-teal-700',
-      'bg-gradient-to-br from-orange-500 via-rose-500 to-pink-600',
-      'bg-gradient-to-br from-rose-600 via-ember to-amber-600',
-    ];
-    return gradients[eventId % gradients.length];
+  /** The same category artwork the Discover card uses when an event has no photo. */
+  coverBg(reg: Registration): string {
+    return categoryCover(reg.event.category.icon, reg.event.category.id).background;
   }
 
   /** The seat zone in the active language ("standard" comes from the API as a code). */
@@ -620,8 +615,8 @@ export class MyRegistrationsComponent implements OnInit {
 
   zoneBadgeClass(zone: string): string {
     const map: Record<string, string> = {
-      vip: 'bg-blue-100 text-blue-700',
-      premium: 'bg-purple-100 text-purple-700',
+      vip: 'bg-[color:var(--zone-vip-50)] text-[color:var(--zone-vip)]',
+      premium: 'bg-[color:var(--zone-premium-50)] text-[color:var(--zone-premium)]',
       standard: 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]',
     };
     return map[zone] ?? 'bg-muted text-muted-foreground';
@@ -707,7 +702,9 @@ export class MyRegistrationsComponent implements OnInit {
         import('jspdf'),
         import('html2canvas'),
       ]);
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
+      // Paint the ticket on its own surface colour, so a dark-theme export stays readable.
+      const backgroundColor = getComputedStyle(el).backgroundColor || 'white';
+      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor });
       if (actions) actions.style.display = 'flex';
 
       const img = canvas.toDataURL('image/png');

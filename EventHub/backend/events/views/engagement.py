@@ -30,6 +30,18 @@ class FavoritesListView(generics.ListAPIView):
         )
 
 
+class FavoriteIdsView(generics.GenericAPIView):
+    """All of the user's favourite event ids in one call, so cards can show
+    the right heart without paging through `/favorites/`."""
+
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses={200: api.FavoriteIdsSerializer, 401: UNAUTHENTICATED})
+    def get(self, request):
+        ids = Favorite.objects.filter(user=request.user).order_by('-id').values_list('event_id', flat=True)
+        return Response({'ids': list(ids)})
+
+
 class FavoriteToggleView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
 

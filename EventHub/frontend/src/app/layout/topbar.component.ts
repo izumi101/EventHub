@@ -1,16 +1,16 @@
-import { Component, HostListener, OnInit, OnDestroy, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
 import { LayoutService } from './layout.service';
 import { AuthService } from '../services/auth.service';
-import { NotificationService } from '../services/notification.service';
 import { User } from '../models/models';
-import { LucideAngularModule, Menu, Bell, ChevronRight } from 'lucide-angular';
+import { LucideAngularModule, Menu, ChevronRight } from 'lucide-angular';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageSwitcherComponent } from '../i18n/language-switcher.component';
-import { LocalDatePipe } from '../i18n/locale.pipes';
+import { NotificationBellComponent } from './notification-bell.component';
+import { AccountMenuComponent } from './account-menu.component';
 
 interface Crumb {
   /** Event titles are data, everything else is a translation key. */
@@ -28,7 +28,8 @@ interface Crumb {
     LucideAngularModule,
     TranslocoPipe,
     LanguageSwitcherComponent,
-    LocalDatePipe,
+    NotificationBellComponent,
+    AccountMenuComponent,
   ],
   template: `
     <header class="topbar">
@@ -84,97 +85,13 @@ interface Crumb {
 
         <div class="topbar-spacer"></div>
 
-        <!-- Right side: ⌘K stub + bell -->
+        <!-- Right side: language, bell, account menu -->
         <div class="topbar-actions">
-          <app-language-switcher />
-
-          <!-- ⌘K search stub (desktop only) -->
-          <button
-            class="hidden md:flex items-center gap-2 text-xs text-muted-foreground border border-border rounded-md px-2.5 py-1.5 hover:bg-muted transition-colors focus-ring"
-            [title]="'nav.quickSearchSoon' | transloco"
-            [attr.aria-label]="'nav.quickSearch' | transloco"
-          >
-            <span>{{ 'nav.search' | transloco }}</span>
-            <kbd class="text-[10px] bg-muted px-1 rounded">⌘K</kbd>
-          </button>
-
-          <!-- Notification bell (authenticated only) -->
+          <div class="hidden sm:block"><app-language-switcher /></div>
           @if (user) {
-            <div class="relative">
-              <button
-                (click)="toggleNotif($event)"
-                class="topbar-icon-btn focus-ring relative"
-                [attr.aria-label]="
-                  notifService.unreadCount() > 0
-                    ? ('nav.notificationsUnread' | transloco: { count: notifService.unreadCount() })
-                    : ('nav.notifications' | transloco)
-                "
-              >
-                <lucide-icon [img]="icons.Bell" class="w-5 h-5" aria-hidden="true" />
-                @if (notifService.unreadCount() > 0) {
-                  <span
-                    class="absolute -top-0.5 -right-0.5 w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none"
-                  >
-                    {{ notifService.unreadCount() > 9 ? '9+' : notifService.unreadCount() }}
-                  </span>
-                }
-              </button>
-
-              @if (notifOpen) {
-                <!-- Clicks inside the panel must not reach the document listener that closes it. -->
-                <div
-                  class="topbar-notif-dropdown"
-                  role="presentation"
-                  (click)="$event.stopPropagation()"
-                >
-                  <div class="flex items-center justify-between px-4 py-3 border-b border-border">
-                    <span class="font-semibold text-foreground text-sm">{{
-                      'nav.notifications' | transloco
-                    }}</span>
-                    @if (notifService.unreadCount() > 0) {
-                      <button
-                        (click)="notifService.markRead(); notifOpen = false"
-                        class="text-xs text-primary hover:underline"
-                      >
-                        {{ 'nav.markAllRead' | transloco }}
-                      </button>
-                    }
-                  </div>
-                  <div class="max-h-80 overflow-y-auto divide-y divide-border">
-                    @if (notifService.notifications().length === 0) {
-                      <div class="px-4 py-8 text-center text-sm text-muted-foreground">
-                        {{ 'nav.noNotifications' | transloco }}
-                      </div>
-                    }
-                    @for (n of notifService.notifications(); track n.id) {
-                      <button
-                        type="button"
-                        class="block w-full text-left px-4 py-3 text-sm cursor-pointer transition-colors"
-                        [class]="
-                          n.is_read ? 'hover:bg-muted/50' : 'bg-primary/5 hover:bg-primary/10'
-                        "
-                        (click)="notifService.markRead(n.id); notifOpen = false"
-                      >
-                        @if (n.title.trim()) {
-                          <span class="block font-medium text-foreground leading-tight">{{
-                            n.title
-                          }}</span>
-                        }
-                        @if (n.body.trim()) {
-                          <span class="block text-muted-foreground mt-0.5 text-xs leading-relaxed">
-                            {{ n.body }}
-                          </span>
-                        }
-                        <span class="block text-muted-foreground text-[10px] mt-1">
-                          {{ n.created_at | localDate: 'MMM d, HH:mm' }}
-                        </span>
-                      </button>
-                    }
-                  </div>
-                </div>
-              }
-            </div>
+            <app-notification-bell />
           }
+          <app-account-menu [compact]="true" />
         </div>
       </div>
     </header>
@@ -190,15 +107,13 @@ interface Crumb {
 export class TopbarComponent implements OnInit, OnDestroy {
   layout = inject(LayoutService);
   private authService = inject(AuthService);
-  notifService = inject(NotificationService);
   private router = inject(Router);
 
   user: User | null = null;
   breadcrumbs: Crumb[] = [];
-  notifOpen = false;
   private sub?: Subscription;
 
-  readonly icons = { Menu, Bell, ChevronRight };
+  readonly icons = { Menu, ChevronRight };
 
   ngOnInit(): void {
     this.authService.currentUser$.subscribe((u) => (this.user = u));
@@ -210,22 +125,6 @@ export class TopbarComponent implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
-  }
-
-  @HostListener('document:click')
-  onDocumentClick(): void {
-    this.notifOpen = false;
-  }
-
-  @HostListener('document:keydown.escape')
-  onEscape(): void {
-    this.notifOpen = false;
-  }
-
-  toggleNotif(event: MouseEvent): void {
-    event.stopPropagation();
-    this.notifOpen = !this.notifOpen;
-    if (this.notifOpen) this.notifService.load();
   }
 
   private buildBreadcrumbs(url: string): void {

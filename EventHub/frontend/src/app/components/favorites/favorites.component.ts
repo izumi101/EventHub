@@ -25,7 +25,7 @@ import { LanguageService } from '../../i18n/language.service';
       <div class="container max-w-4xl py-8">
         <div class="flex items-center gap-3 mb-7">
           <div
-            class="w-9 h-9 rounded-full bg-[color:var(--destructive-50)] dark:bg-rose-900/30 flex items-center justify-center"
+            class="w-9 h-9 rounded-full bg-[color:var(--destructive-50)] flex items-center justify-center"
           >
             <lucide-icon [img]="icons.Heart" class="w-5 h-5 text-ember" aria-hidden="true" />
           </div>
@@ -91,11 +91,11 @@ import { LanguageService } from '../../i18n/language.service';
                   <!-- Unfavorite button -->
                   <button
                     (click)="$event.stopPropagation(); unfavorite(fav)"
-                    class="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-[color:var(--destructive-50)] transition-colors"
+                    class="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center shadow-sm hover:bg-black/65 transition-colors"
                   >
                     <lucide-icon
                       [img]="icons.Heart"
-                      class="w-4 h-4 text-ember"
+                      class="w-4 h-4 text-[color:var(--ember-500)] fill-current"
                       aria-hidden="true"
                     />
                   </button>
