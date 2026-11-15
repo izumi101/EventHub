@@ -19,6 +19,7 @@ import { SeoService } from './services/seo.service';
 import { provideI18n } from './i18n/i18n.providers';
 import { TranslatedTitleStrategy } from './i18n/title.strategy';
 import { acceptLanguageInterceptor } from './i18n/accept-language.interceptor';
+import { LanguageSyncService } from './i18n/language-sync.service';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -41,6 +42,10 @@ export const appConfig: ApplicationConfig = {
     // Eagerly instantiate SeoService so its router subscription starts at boot
     provideAppInitializer(() => {
       inject(SeoService);
+    }),
+    // Saves the UI language as the signed-in user's notification language.
+    provideAppInitializer(() => {
+      inject(LanguageSyncService).start();
     }),
   ],
 };
