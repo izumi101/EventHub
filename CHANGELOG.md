@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.0](https://github.com/izumi101/EventHub/compare/v1.1.0...v1.2.0) (2026-11-15)
+
+
+### Features
+
+* **api:** tier-aware free filter and favourite ids endpoint ([7905c25](https://github.com/izumi101/EventHub/commit/7905c2552ee30d7ca4b47adf23d410a1bfedb1a4))
+* **frontend:** "Concept A" redesign of the shell, Discover and event page ([3caa931](https://github.com/izumi101/EventHub/commit/3caa931491c9f7bb16358dfd49950ba65757951d))
+* **frontend:** public unsubscribe page ([c732412](https://github.com/izumi101/EventHub/commit/c732412ef2b5acc1cef5a03ccf9c8d046f798fdf))
+* **frontend:** redesign the shell, Discover and event page (Concept A) ([cfa15fa](https://github.com/izumi101/EventHub/commit/cfa15fa041273d509eb7f819b1ce5bc40ddaf798))
+* **frontend:** save the ui language as the notification language ([ef5e4d8](https://github.com/izumi101/EventHub/commit/ef5e4d888bedd2337d817b9015f2219f027776a4))
+* **notifications:** add a 2-hour event reminder ([333101e](https://github.com/izumi101/EventHub/commit/333101e3851ce96a7750419292363e272fabb1e9))
+* **notifications:** add russian and kazakh translations ([f2f14fe](https://github.com/izumi101/EventHub/commit/f2f14fe47a8d185d9d98011d2d8a08ad8b1b30db))
+* **notifications:** email a review request after the event ([393cbc6](https://github.com/izumi101/EventHub/commit/393cbc6aa1f1b0e99e86e86259a65808790f440a))
+* **notifications:** one-click unsubscribe for optional emails ([2a80b35](https://github.com/izumi101/EventHub/commit/2a80b3527573c4cb6f5dc04b1981de6a6750185f))
+* **notifications:** ru/kk emails, one-click unsubscribe, 2-hour reminder and review requests ([32b2245](https://github.com/izumi101/EventHub/commit/32b2245dad6ec5b47edcb9bc05ed9e87ce5d90f9))
+* **notifications:** write notifications in the user's language ([e12968c](https://github.com/izumi101/EventHub/commit/e12968c98157982d2d886f7b76c60bcf9a2b8a15))
+
+
+### Documentation
+
+* **notifications:** languages, one-click unsubscribe, 2-hour reminder, review requests ([0615a46](https://github.com/izumi101/EventHub/commit/0615a46819dd5734f336320836c6675b1495ff4e))
+* redesign plan, design tokens and the regression run ([c709eb5](https://github.com/izumi101/EventHub/commit/c709eb53eda49aee51bba9a9c9a340db40009cf7))
+
 ## [1.1.0](https://github.com/izumi101/EventHub/compare/v1.0.0...v1.1.0) (2026-11-12)
 
 
