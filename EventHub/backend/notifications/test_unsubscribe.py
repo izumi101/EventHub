@@ -78,6 +78,10 @@ class UnsubscribeEndpointTests(WorldMixin, APITestCase):
             self.assertEqual(response.data, {'type': types.EVENT_REMINDER, 'label': 'Event reminder'})
         self.assertFalse(NotificationPreference.objects.exists())
 
+    def test_get_label_follows_accept_language(self):
+        response = self.client.get(URL, {'token': self.token}, HTTP_ACCEPT_LANGUAGE='kk')
+        self.assertEqual(response.data['label'], 'Іс-шара туралы еске салу')
+
     def test_one_click_post_switches_the_email_off_idempotently(self):
         # RFC 8058: the provider POSTs this form body to the List-Unsubscribe URL.
         for _ in range(2):

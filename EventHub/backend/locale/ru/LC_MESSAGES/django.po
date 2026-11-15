@@ -1,0 +1,610 @@
+# EventHub notifications: Russian translation.
+# Sources: notifications/ (messages.py, types.py, email templates) and
+# events/services/lifecycle.py. See docs/NOTIFICATIONS.md (Languages).
+msgid ""
+msgstr ""
+"Project-Id-Version: EventHub\n"
+"PO-Revision-Date: 2026-11-15 00:00+0000\n"
+"Last-Translator: EventHub team\n"
+"Language-Team: Russian\n"
+"Language: ru\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=4; plural=(n%10==1 && n%100!=11 ? 0 : n%10>=2 && n%10<=4 && (n%100<12 || n%100>14) ? 1 : n%10==0 || (n%10>=5 && n%10<=9) || (n%100>=11 && n%100<=14)? 2 : 3);\n"
+
+msgid "Date"
+msgstr "Дата"
+
+msgid "End"
+msgstr "Окончание"
+
+msgid "Venue"
+msgstr "Место"
+
+msgid "Address"
+msgstr "Адрес"
+
+msgid "Online"
+msgstr "Онлайн"
+
+msgid "Online link"
+msgstr "Ссылка на трансляцию"
+
+msgctxt "short weekday in a date"
+msgid "Mon"
+msgstr "пн"
+
+msgctxt "short weekday in a date"
+msgid "Tue"
+msgstr "вт"
+
+msgctxt "short weekday in a date"
+msgid "Wed"
+msgstr "ср"
+
+msgctxt "short weekday in a date"
+msgid "Thu"
+msgstr "чт"
+
+msgctxt "short weekday in a date"
+msgid "Fri"
+msgstr "пт"
+
+msgctxt "short weekday in a date"
+msgid "Sat"
+msgstr "сб"
+
+msgctxt "short weekday in a date"
+msgid "Sun"
+msgstr "вс"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Jan"
+msgstr "января"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Feb"
+msgstr "февраля"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Mar"
+msgstr "марта"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Apr"
+msgstr "апреля"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "May"
+msgstr "мая"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Jun"
+msgstr "июня"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Jul"
+msgstr "июля"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Aug"
+msgstr "августа"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Sep"
+msgstr "сентября"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Oct"
+msgstr "октября"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Nov"
+msgstr "ноября"
+
+msgctxt "month after the day number, e.g. 5 Dec 2026"
+msgid "Dec"
+msgstr "декабря"
+
+#, python-format
+msgid "%(weekday)s, %(day)d %(month)s %(year)d, %(time)s"
+msgstr "%(weekday)s, %(day)d %(month)s %(year)d, %(time)s"
+
+msgid "Yes"
+msgstr "Да"
+
+msgid "No"
+msgstr "Нет"
+
+#, python-format
+msgid "Row %(row)s · Seat %(col)s (%(zone)s)"
+msgstr "Ряд %(row)s · Место %(col)s (%(zone)s)"
+
+msgid "Event"
+msgstr "Мероприятие"
+
+msgid "Ends"
+msgstr "Окончание"
+
+msgid "Seat"
+msgstr "Место"
+
+msgid "Ticket type"
+msgstr "Тип билета"
+
+msgid "Name"
+msgstr "Имя"
+
+#, python-format
+msgid "🎫 Ticket confirmed: %(event)s"
+msgstr "🎫 Билет подтверждён: %(event)s"
+
+#, python-format
+msgid "Your ticket for %(event)s is confirmed. Check My Tickets for your QR code."
+msgstr "Ваш билет на «%(event)s» подтверждён. QR-код — в разделе «Мои билеты»."
+
+#, python-format
+msgid "Your ticket for %(event)s"
+msgstr "Ваш билет на «%(event)s»"
+
+msgid "Your ticket is confirmed"
+msgstr "Ваш билет подтверждён"
+
+msgid "Thank you for your purchase. Show the QR code below at the entrance."
+msgstr "Спасибо за покупку. Покажите QR-код ниже на входе."
+
+msgid "Paid"
+msgstr "Оплачено"
+
+msgid "Open My Tickets"
+msgstr "Открыть «Мои билеты»"
+
+#, python-format
+msgid "✅ Registration confirmed: %(event)s"
+msgstr "✅ Регистрация подтверждена: %(event)s"
+
+#, python-format
+msgid "You are registered for %(event)s. Check My Tickets for your QR code."
+msgstr "Вы зарегистрированы на «%(event)s». QR-код — в разделе «Мои билеты»."
+
+#, python-format
+msgid "You are registered for %(event)s"
+msgstr "Вы зарегистрированы на «%(event)s»"
+
+msgid "You are registered"
+msgstr "Вы зарегистрированы"
+
+msgid "Your free ticket is ready. Show the QR code below at the entrance."
+msgstr "Ваш бесплатный билет готов. Покажите QR-код ниже на входе."
+
+msgid "Your payment did not go through. You were not charged."
+msgstr "Платёж не прошёл. Деньги не списаны."
+
+#, python-format
+msgid "⚠️ Payment failed: %(event)s"
+msgstr "⚠️ Платёж не прошёл: %(event)s"
+
+#, python-format
+msgid "Payment failed: %(event)s"
+msgstr "Платёж не прошёл: %(event)s"
+
+msgid "Your payment did not go through"
+msgstr "Ваш платёж не прошёл"
+
+msgid "You can try again from the event page while tickets are available."
+msgstr "Пока билеты есть, можно попробовать ещё раз на странице мероприятия."
+
+msgid "Back to the event"
+msgstr "Вернуться к мероприятию"
+
+#, python-format
+msgid "You were refunded %(amount)s."
+msgstr "Вам вернули %(amount)s."
+
+#, python-format
+msgid "Reason: %(reason)s"
+msgstr "Причина: %(reason)s"
+
+#, python-format
+msgid "💸 Refund issued: %(event)s"
+msgstr "💸 Возврат оформлен: %(event)s"
+
+#, python-format
+msgid "Refund of %(amount)s: %(event)s"
+msgstr "Возврат %(amount)s: %(event)s"
+
+msgid "Your money is on its way back"
+msgstr "Деньги возвращаются к вам"
+
+msgid "It goes back to the card or account you paid with. Banks usually take a few business days."
+msgstr "Деньги поступят на карту или счёт, с которых вы платили. Обычно банку нужно несколько рабочих дней."
+
+msgid "Refunded"
+msgstr "Возвращено"
+
+#, python-format
+msgid "%(attendee)s requested a refund of %(amount)s."
+msgstr "%(attendee)s запросил(а) возврат %(amount)s."
+
+#, python-format
+msgid "💸 Refund requested: %(event)s"
+msgstr "💸 Запрос на возврат: %(event)s"
+
+#, python-format
+msgid "Refund requested: %(event)s"
+msgstr "Запрос на возврат: %(event)s"
+
+msgid "An attendee asked for a refund"
+msgstr "Участник запросил возврат"
+
+msgid "Approve or reject it in the attendee list of the event."
+msgstr "Одобрите или отклоните запрос в списке участников мероприятия."
+
+msgid "Review the request"
+msgstr "Рассмотреть запрос"
+
+#, python-format
+msgid "Note: %(note)s"
+msgstr "Комментарий: %(note)s"
+
+msgid "Your refund has been approved and processed."
+msgstr "Ваш возврат одобрен и проведён."
+
+#, python-format
+msgid "✅ Refund approved: %(event)s"
+msgstr "✅ Возврат одобрен: %(event)s"
+
+#, python-format
+msgid "Refund approved: %(event)s"
+msgstr "Возврат одобрен: %(event)s"
+
+msgid "Your refund was approved"
+msgstr "Ваш возврат одобрен"
+
+msgid "Your ticket for this event is no longer valid."
+msgstr "Ваш билет на это мероприятие больше не действует."
+
+msgid "Your refund request was declined — your ticket remains valid."
+msgstr "Ваш запрос на возврат отклонён — билет остаётся действительным."
+
+#, python-format
+msgid "❌ Refund rejected: %(event)s"
+msgstr "❌ Возврат отклонён: %(event)s"
+
+#, python-format
+msgid "Refund request declined: %(event)s"
+msgstr "Запрос на возврат отклонён: %(event)s"
+
+msgid "Your refund request was declined"
+msgstr "Ваш запрос на возврат отклонён"
+
+#, python-format
+msgid "The organizer changed %(fields)s of %(event)s. Please check the new details."
+msgstr "Организатор изменил у «%(event)s»: %(fields)s. Проверьте новые данные."
+
+msgid "the details"
+msgstr "детали"
+
+#, python-format
+msgid "%(new)s (was %(old)s)"
+msgstr "%(new)s (было: %(old)s)"
+
+#, python-format
+msgid "📝 Event updated: %(event)s"
+msgstr "📝 Мероприятие изменено: %(event)s"
+
+#, python-format
+msgid "Changed: %(event)s"
+msgstr "Изменения: %(event)s"
+
+msgid "Your event has changed"
+msgstr "Ваше мероприятие изменилось"
+
+msgid "Your ticket stays valid."
+msgstr "Ваш билет остаётся действительным."
+
+msgid "View the event"
+msgstr "Открыть мероприятие"
+
+msgid "The organizer has cancelled this event."
+msgstr "Организатор отменил это мероприятие."
+
+msgid "Your payment has been refunded."
+msgstr "Ваш платёж возвращён."
+
+msgid "We could not refund your payment automatically — the organizer will contact you."
+msgstr "Не удалось вернуть платёж автоматически — организатор свяжется с вами."
+
+#, python-format
+msgid "❌ Event cancelled: %(event)s"
+msgstr "❌ Мероприятие отменено: %(event)s"
+
+#, python-format
+msgid "Cancelled: %(event)s"
+msgstr "Отменено: %(event)s"
+
+msgid "This event was cancelled"
+msgstr "Мероприятие отменено"
+
+msgid "Your tickets for it are no longer valid."
+msgstr "Ваши билеты на него больше не действуют."
+
+#, python-format
+msgid "You have %(minutes)d minute to grab your ticket before it passes to the next person."
+msgid_plural "You have %(minutes)d minutes to grab your ticket before it passes to the next person."
+msgstr[0] "У вас есть %(minutes)d минута, чтобы забрать билет, прежде чем он перейдёт следующему."
+msgstr[1] "У вас есть %(minutes)d минуты, чтобы забрать билет, прежде чем он перейдёт следующему."
+msgstr[2] "У вас есть %(minutes)d минут, чтобы забрать билет, прежде чем он перейдёт следующему."
+msgstr[3] "У вас есть %(minutes)d минуты, чтобы забрать билет, прежде чем он перейдёт следующему."
+
+#, python-format
+msgid "🎉 A spot opened up: %(event)s"
+msgstr "🎉 Освободилось место: %(event)s"
+
+#, python-format
+msgid "A spot opened up: %(event)s"
+msgstr "Освободилось место: %(event)s"
+
+msgid "A spot is waiting for you"
+msgstr "Для вас есть место"
+
+msgid "Someone gave up their place and you are next on the waitlist."
+msgstr "Кто-то отказался от места, и вы следующий в листе ожидания."
+
+msgid "Get my ticket"
+msgstr "Получить билет"
+
+#, python-format
+msgid "Your group booking of %(count)d seat is confirmed. Tickets are in My Bookings."
+msgid_plural "Your group booking of %(count)d seats is confirmed. Tickets are in My Bookings."
+msgstr[0] "Ваше групповое бронирование на %(count)d место подтверждено. Билеты — в разделе «Мои бронирования»."
+msgstr[1] "Ваше групповое бронирование на %(count)d места подтверждено. Билеты — в разделе «Мои бронирования»."
+msgstr[2] "Ваше групповое бронирование на %(count)d мест подтверждено. Билеты — в разделе «Мои бронирования»."
+msgstr[3] "Ваше групповое бронирование на %(count)d места подтверждено. Билеты — в разделе «Мои бронирования»."
+
+#, python-format
+msgid "🎫 %(count)d ticket confirmed: %(event)s"
+msgid_plural "🎫 %(count)d tickets confirmed: %(event)s"
+msgstr[0] "🎫 %(count)d билет подтверждён: %(event)s"
+msgstr[1] "🎫 %(count)d билета подтверждены: %(event)s"
+msgstr[2] "🎫 %(count)d билетов подтверждены: %(event)s"
+msgstr[3] "🎫 %(count)d билета подтверждены: %(event)s"
+
+#, python-format
+msgid "Your group booking for %(event)s"
+msgstr "Ваше групповое бронирование на «%(event)s»"
+
+msgid "Your group booking is confirmed"
+msgstr "Групповое бронирование подтверждено"
+
+msgid "Share the booking link with your friends so they can put their names on their seats."
+msgstr "Поделитесь ссылкой на бронирование с друзьями, чтобы они указали свои имена на местах."
+
+msgid "Open My Bookings"
+msgstr "Открыть «Мои бронирования»"
+
+#, python-format
+msgid "You claimed %(seat)s in %(owner)s’s group booking for %(event)s."
+msgstr "Вы заняли место %(seat)s в групповом бронировании %(owner)s на «%(event)s»."
+
+#, python-format
+msgid "💺 Seat claimed: %(event)s"
+msgstr "💺 Место за вами: %(event)s"
+
+#, python-format
+msgid "Your seat for %(event)s"
+msgstr "Ваше место на «%(event)s»"
+
+msgid "Your seat is yours"
+msgstr "Место закреплено за вами"
+
+msgid "Show the QR code below at the entrance."
+msgstr "Покажите QR-код ниже на входе."
+
+#, python-format
+msgid "%(event)s starts at %(time)s, in less than 2 hours."
+msgstr "«%(event)s» начнётся в %(time)s — меньше чем через 2 часа."
+
+#, python-format
+msgid "⏰ Starting soon: %(event)s at %(time)s"
+msgstr "⏰ Скоро начало: %(event)s в %(time)s"
+
+#, python-format
+msgid "Starting in 2 hours: %(event)s at %(time)s"
+msgstr "Начало через 2 часа: %(event)s в %(time)s"
+
+msgid "Your event starts in less than 2 hours"
+msgstr "Ваше мероприятие начнётся меньше чем через 2 часа"
+
+#, python-format
+msgid "%(event)s starts on %(when)s."
+msgstr "«%(event)s» начнётся %(when)s."
+
+#, python-format
+msgid "⏰ Coming up: %(event)s"
+msgstr "⏰ Скоро: %(event)s"
+
+#, python-format
+msgid "Reminder: %(event)s starts soon"
+msgstr "Напоминание: «%(event)s» скоро начнётся"
+
+msgid "Your event is coming up"
+msgstr "Ваше мероприятие уже скоро"
+
+msgid "Have your ticket QR code ready at the entrance."
+msgstr "Подготовьте QR-код билета для входа."
+
+#, python-format
+msgid "Join online: %(link)s"
+msgstr "Подключиться онлайн: %(link)s"
+
+#, python-format
+msgid "⭐ How was %(event)s?"
+msgstr "⭐ Как прошло «%(event)s»?"
+
+msgid "Share your experience and help others discover great events."
+msgstr "Поделитесь впечатлениями и помогите другим найти отличные мероприятия."
+
+#, python-format
+msgid "How was %(event)s?"
+msgstr "Как прошло «%(event)s»?"
+
+msgid "How was it?"
+msgstr "Как всё прошло?"
+
+#, python-format
+msgid "Thank you for coming to %(event)s."
+msgstr "Спасибо, что пришли на «%(event)s»."
+
+msgid "Share your experience and help others discover great events. It takes less than a minute."
+msgstr "Поделитесь впечатлениями и помогите другим найти отличные мероприятия. Это займёт меньше минуты."
+
+msgid "Leave a review"
+msgstr "Оставить отзыв"
+
+msgid "If this was not you, reset your password and contact support right away."
+msgstr "Если это были не вы, сразу смените пароль и обратитесь в поддержку."
+
+msgid "Review security settings"
+msgstr "Проверить настройки безопасности"
+
+msgid "E-ticket"
+msgstr "Электронный билет"
+
+msgid "Ticket"
+msgstr "Билет"
+
+msgid "Ticket QR code"
+msgstr "QR-код билета"
+
+#, python-format
+msgid "%(counter)s more ticket is in your account."
+msgid_plural "%(counter)s more tickets are in your account."
+msgstr[0] "Ещё %(counter)s билет — в вашем аккаунте."
+msgstr[1] "Ещё %(counter)s билета — в вашем аккаунте."
+msgstr[2] "Ещё %(counter)s билетов — в вашем аккаунте."
+msgstr[3] "Ещё %(counter)s билета — в вашем аккаунте."
+
+msgid "You receive this email because of your EventHub notification settings."
+msgstr "Вы получили это письмо согласно настройкам уведомлений EventHub."
+
+msgid "Unsubscribe from these emails"
+msgstr "Отписаться от этих писем"
+
+msgid "Manage email preferences"
+msgstr "Настроить email-уведомления"
+
+msgid "This email is about your tickets or payments, so it is always sent."
+msgstr "Это письмо о ваших билетах или платежах, поэтому оно отправляется всегда."
+
+msgid "Manage your other email preferences"
+msgstr "Настроить остальные email-уведомления"
+
+msgid "The QR code is attached to this email and shown in My Tickets."
+msgstr "QR-код приложен к письму и доступен в разделе «Мои билеты»."
+
+msgid "Unsubscribe from these emails:"
+msgstr "Отписаться от этих писем:"
+
+msgid "Manage email preferences:"
+msgstr "Настроить email-уведомления:"
+
+msgid "Manage your other email preferences:"
+msgstr "Настроить остальные email-уведомления:"
+
+msgid "Ticket purchased"
+msgstr "Покупка билета"
+
+msgid "Your e-ticket with the QR code after a successful payment."
+msgstr "Электронный билет с QR-кодом после успешной оплаты."
+
+msgid "Free registration confirmed"
+msgstr "Бесплатная регистрация подтверждена"
+
+msgid "Your e-ticket after registering for a free event."
+msgstr "Электронный билет после регистрации на бесплатное мероприятие."
+
+msgid "Payment failed"
+msgstr "Платёж не прошёл"
+
+msgid "A payment did not go through or arrived too late."
+msgstr "Платёж не прошёл или поступил слишком поздно."
+
+msgid "Payment refunded"
+msgstr "Возврат платежа"
+
+msgid "Money was returned to you. Always emailed: it is a record of the refund."
+msgstr "Вам вернули деньги. Письмо отправляется всегда: это подтверждение возврата."
+
+msgid "Refund requested"
+msgstr "Запрос на возврат"
+
+msgid "Organizers: an attendee asked for a refund."
+msgstr "Для организаторов: участник запросил возврат."
+
+msgid "Refund request approved"
+msgstr "Запрос на возврат одобрен"
+
+msgid "The organizer approved your refund request."
+msgstr "Организатор одобрил ваш запрос на возврат."
+
+msgid "Refund request rejected"
+msgstr "Запрос на возврат отклонён"
+
+msgid "The organizer declined your refund request."
+msgstr "Организатор отклонил ваш запрос на возврат."
+
+msgid "Event changed"
+msgstr "Изменение мероприятия"
+
+msgid "The date or venue of an event you have a ticket for changed."
+msgstr "Изменились дата или место мероприятия, на которое у вас есть билет."
+
+msgid "Event cancelled"
+msgstr "Отмена мероприятия"
+
+msgid "An event you have a ticket for was cancelled. Always emailed."
+msgstr "Мероприятие, на которое у вас есть билет, отменено. Письмо отправляется всегда."
+
+msgid "Waitlist spot available"
+msgstr "Место из листа ожидания"
+
+msgid "A spot opened up for an event you are waiting for."
+msgstr "Освободилось место на мероприятие, которого вы ждёте."
+
+msgid "Group booking confirmed"
+msgstr "Групповое бронирование подтверждено"
+
+msgid "Your group booking is paid, with the tickets for every seat."
+msgstr "Групповое бронирование оплачено — с билетами на каждое место."
+
+msgid "Group booking seat claimed"
+msgstr "Место в групповом бронировании"
+
+msgid "You claimed a seat in a friend’s group booking."
+msgstr "Вы заняли место в групповом бронировании друга."
+
+msgid "Event reminder"
+msgstr "Напоминание о мероприятии"
+
+msgid "Reminders 24 hours and 2 hours before an event you have a ticket for."
+msgstr "Напоминания за 24 часа и за 2 часа до мероприятия, на которое у вас есть билет."
+
+msgid "Review reminder"
+msgstr "Просьба оставить отзыв"
+
+msgid "An invitation to review an event you attended, sent after it ends."
+msgstr "Приглашение оставить отзыв о посещённом мероприятии — после его окончания."
+
+msgid "Messages from organizers"
+msgstr "Сообщения организаторов"
+
+msgid "Announcements an organizer sends to the attendees of an event."
+msgstr "Объявления, которые организатор рассылает участникам мероприятия."
+
+msgid "Security alert"
+msgstr "Уведомление безопасности"
+
+msgid "A change to your sign-in or two-factor settings. Always emailed."
+msgstr "Изменение настроек входа или двухфакторной аутентификации. Письмо отправляется всегда."
