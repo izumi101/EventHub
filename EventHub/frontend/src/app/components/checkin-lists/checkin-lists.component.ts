@@ -449,7 +449,7 @@ export class CheckinListsComponent implements OnInit {
   showCreateForm = false;
   newName = '';
   newDescription = '';
-  newColor = '#E8552D';
+  newColor = '#E8643A';
 
   editingListId: number | null = null;
   editName = '';
@@ -562,7 +562,7 @@ export class CheckinListsComponent implements OnInit {
           this.showCreateForm = false;
           this.newName = '';
           this.newDescription = '';
-          this.newColor = '#E8552D';
+          this.newColor = '#E8643A';
           this.loadLists();
           this.toastService.success(this.i18n.t('checkin.listCreated'));
         },

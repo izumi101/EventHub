@@ -1,4 +1,4 @@
-import { APIResponse, expect, test } from '@playwright/test';
+import { APIResponse, expect, Page, test } from '@playwright/test';
 import { createAttendee, Schemas, SEEDED_TOTP_SECRET, signIn } from './support/api';
 import { collectErrors, signInWithPassword } from './support/ui';
 
@@ -10,11 +10,15 @@ async function body<T>(response: APIResponse): Promise<T> {
 // Demo data from `seed_data` (DJANGO_SEED_DATA=1 in .env.example).
 const PAID_ONLINE_EVENT = 'Online Django REST Workshop';
 
+/** The event's card link in the All events grid (the hero and rails repeat titles). */
+const cardLink = (page: Page) =>
+  page.locator('#all-events').getByRole('link', { name: PAID_ONLINE_EVENT }).first();
+
 test('home page renders, styled, under the CSP', async ({ page }) => {
   const errors = collectErrors(page);
   const response = await page.goto('/');
   expect(response?.headers()['content-security-policy']).toContain("script-src 'self'");
-  await expect(page.getByText(PAID_ONLINE_EVENT).first()).toBeVisible();
+  await expect(cardLink(page)).toBeVisible();
   // The stylesheet applied (critical-CSS inlining is off for the CSP).
   const background = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(background).not.toBe('rgba(0, 0, 0, 0)');
@@ -28,7 +32,7 @@ test('attendee buys a paid ticket and gets the online link', async ({ page, requ
   await signInWithPassword(page, account.username, account.password);
 
   await page.goto('/');
-  await page.getByText(PAID_ONLINE_EVENT).first().click();
+  await cardLink(page).click();
   await page.getByRole('button', { name: /Get tickets/ }).click();
   await page.getByRole('button', { name: /Proceed to payment/ }).click();
 

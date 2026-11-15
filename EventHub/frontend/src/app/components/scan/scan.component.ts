@@ -62,7 +62,7 @@ type ScanState =
 
         <div class="card overflow-hidden shadow-card">
           <!-- ── Camera viewport ── -->
-          <div class="relative bg-gray-900 aspect-square" [class.hidden]="state === 'result'">
+          <div class="relative bg-black aspect-square" [class.hidden]="state === 'result'">
             <!-- The video stays in the DOM while the camera runs -->
             <video
               #video

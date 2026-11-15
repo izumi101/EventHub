@@ -13,6 +13,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from events.models import (
+    Category,
     CheckInList,
     Event,
     EventStaff,
@@ -148,6 +149,83 @@ class PermissionTests(Base):
         self.client.force_authenticate(self.organizer)
         response = self.client.post(f'/api/v1/events/{self.event.id}/staff/', {'role': 'check_in'})
         self.assertEqual(response.status_code, 400)
+
+    # Redesign phase 0: attendees must not reach organizer or admin features.
+    def create_event_payload(self, title):
+        category = Category.objects.create(name=f'Cat {title}')
+        return {
+            'title': title,
+            'description': 'd',
+            'date': (timezone.now() + timedelta(days=3)).isoformat(),
+            'location': 'Hall',
+            'price': '100.00',
+            'max_participants': 10,
+            'category_id': category.id,
+        }
+
+    def test_attendee_cannot_create_event(self):
+        self.client.force_authenticate(self.attendee)
+        response = self.client.post('/api/v1/events/', self.create_event_payload('Mine'), format='json')
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Event.objects.filter(title='Mine').exists())
+
+    def test_organizer_can_create_event(self):
+        self.client.force_authenticate(self.organizer)
+        response = self.client.post('/api/v1/events/', self.create_event_payload('Ours'), format='json')
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_attendee_cannot_read_event_stats(self):
+        self.client.force_authenticate(self.attendee)
+        self.assertEqual(self.client.get(f'/api/v1/events/{self.event.id}/stats/').status_code, 403)
+
+    def test_attendee_cannot_read_admin_dashboard(self):
+        self.client.force_authenticate(self.attendee)
+        self.assertEqual(self.client.get('/api/v1/admin-dashboard/').status_code, 403)
+
+    def test_attendee_my_events_is_empty(self):
+        self.client.force_authenticate(self.attendee)
+        response = self.client.get('/api/v1/my-events/')
+        self.assertEqual(response.status_code, 200)
+        results = response.data['results'] if isinstance(response.data, dict) else response.data
+        self.assertEqual(list(results), [])
+
+
+class DiscoverApiTests(Base):
+    """Redesign phase 3: the Free filter and the favourite ids behind the card hearts."""
+
+    def ids(self, response):
+        return {e['id'] for e in response.data['results']}
+
+    def test_free_filter_matches_is_free_with_ticket_tiers(self):
+        plain_free = self.make_event(title='Plain free', price=Decimal('0'))
+        paid_tier = self.make_event(title='Paid tier', price=Decimal('0'))
+        TicketType.objects.create(event=paid_tier, name='VIP', kind=TicketType.KIND_PAID, price=5000)
+        free_tiers = self.make_event(title='Free tiers', price=Decimal('100'))
+        TicketType.objects.create(event=free_tiers, name='Entry', kind=TicketType.KIND_FREE, price=0)
+        donation = self.make_event(title='Donation', price=Decimal('0'))
+        TicketType.objects.create(event=donation, name='Entry', kind=TicketType.KIND_FREE, price=0)
+        TicketType.objects.create(event=donation, name='Support', kind=TicketType.KIND_DONATION, price=0)
+
+        response = self.client.get('/api/v1/events/', {'is_free': 'true'})
+        self.assertEqual(self.ids(response), {plain_free.id, free_tiers.id})
+        for event in response.data['results']:
+            self.assertTrue(event['is_free'], event['title'])
+
+    def test_favorite_ids_are_the_users_own(self):
+        second = self.make_event(title='Second')
+        self.client.force_authenticate(self.attendee)
+        self.client.post(f'/api/v1/favorites/{self.event.id}/')
+        self.client.post(f'/api/v1/favorites/{second.id}/')
+        self.client.force_authenticate(self.other)
+        self.client.post(f'/api/v1/favorites/{self.event.id}/')
+
+        self.client.force_authenticate(self.attendee)
+        response = self.client.get('/api/v1/favorites/ids/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(sorted(response.data['ids']), sorted([self.event.id, second.id]))
+
+    def test_favorite_ids_need_a_session(self):
+        self.assertEqual(self.client.get('/api/v1/favorites/ids/').status_code, 401)
 
 
 class MoneyTests(Base):

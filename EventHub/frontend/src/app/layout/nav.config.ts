@@ -1,7 +1,6 @@
 import {
-  Search,
+  ArrowLeft,
   Ticket,
-  Heart,
   LayoutDashboard,
   CalendarDays,
   Plus,
@@ -16,7 +15,6 @@ import {
   ChevronLeft,
   Clock,
   ChartColumn,
-  Armchair,
   type LucideIconData,
 } from 'lucide-angular';
 
@@ -48,16 +46,23 @@ export interface NavSection {
   items: NavItem[];
 }
 
+/**
+ * Sidebar of the organizer/admin workspace. Consumer destinations (Discover,
+ * My Tickets, Favorites, account pages) live in the top nav and account menu;
+ * the workspace keeps one way back to them.
+ */
 export const NAV: NavSection[] = [
   {
     id: 'main',
     roles: ['public'],
     items: [
-      { labelKey: 'nav.discover', icon: Search, route: '/', exact: true, roles: ['public'] },
-      // Anyone signed in can buy tickets for other people's events.
-      { labelKey: 'nav.myTickets', icon: Ticket, route: '/my-registrations', roles: ['auth'] },
-      { labelKey: 'nav.myBookings', icon: Armchair, route: '/my-bookings', roles: ['auth'] },
-      { labelKey: 'nav.favorites', icon: Heart, route: '/favorites', roles: ['auth'] },
+      {
+        labelKey: 'nav.backToDiscover',
+        icon: ArrowLeft,
+        route: '/',
+        exact: true,
+        roles: ['public'],
+      },
     ],
   },
   {

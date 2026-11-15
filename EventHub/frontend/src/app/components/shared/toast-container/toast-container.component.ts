@@ -53,12 +53,12 @@ export class ToastContainerComponent {
 
   toastClass(type: string): string {
     const map: Record<string, string> = {
-      success: 'bg-white border-transparent text-[color:var(--pine-600)]',
-      error: 'bg-white border-transparent text-[color:var(--destructive)]',
-      warning: 'bg-white border-transparent text-warning',
-      info: 'bg-white border-blue-200 text-blue-700',
+      success: 'bg-popover border-transparent text-[color:var(--pine-600)]',
+      error: 'bg-popover border-transparent text-[color:var(--destructive)]',
+      warning: 'bg-popover border-transparent text-warning',
+      info: 'bg-popover border-border text-[color:var(--info)]',
     };
-    return map[type] ?? 'bg-white border-border text-foreground';
+    return map[type] ?? 'bg-popover border-border text-foreground';
   }
 
   getIcon(type: string): LucideIconData {

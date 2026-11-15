@@ -32,6 +32,18 @@ const CELL = SEAT + GAP;
 const PAD = 24; // padding around grid
 const STAGE_H = 46;
 
+/** Seat colours come from the theme tokens in styles.css, so both themes stay readable. */
+const ZONE_FILL: Record<string, string> = {
+  vip: 'var(--zone-vip-50)',
+  premium: 'var(--zone-premium-50)',
+  standard: 'var(--pine-50)',
+};
+const ZONE_STROKE: Record<string, string> = {
+  vip: 'var(--zone-vip)',
+  premium: 'var(--zone-premium)',
+  standard: 'var(--pine-500)',
+};
+
 @Component({
   selector: 'app-seat-map-svg',
   standalone: true,
@@ -47,13 +59,15 @@ const STAGE_H = 46;
           <span class="relative flex h-2 w-2">
             @if (wsConnected) {
               <span
-                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"
+                class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[color:var(--pine-500)] opacity-75"
               ></span>
               <span
-                class="relative inline-flex rounded-full h-2 w-2 bg-[color:var(--pine-50)]0"
+                class="relative inline-flex rounded-full h-2 w-2 bg-[color:var(--pine-500)]"
               ></span>
             } @else {
-              <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-300"></span>
+              <span
+                class="relative inline-flex rounded-full h-2 w-2 bg-[color:var(--border-strong)]"
+              ></span>
             }
           </span>
           {{ (wsConnected ? 'seatMap.liveAvailability' : 'seatMap.connecting') | transloco }}
@@ -140,8 +154,8 @@ const STAGE_H = 46;
                 [attr.width]="SEAT"
                 [attr.height]="SEAT"
                 rx="5"
-                [attr.fill]="seatFill(s)"
-                [attr.stroke]="seatStroke(s)"
+                [style.fill]="seatFill(s)"
+                [style.stroke]="seatStroke(s)"
                 stroke-width="1.5"
                 [class.seat-selected]="isSelected(s)"
               />
@@ -150,7 +164,7 @@ const STAGE_H = 46;
                 [attr.y]="seatY(s) + SEAT / 2 + 3.5"
                 text-anchor="middle"
                 font-size="9"
-                [attr.fill]="seatTextColor(s)"
+                [style.fill]="seatTextColor(s)"
                 pointer-events="none"
               >
                 {{ s.col }}
@@ -217,7 +231,9 @@ const STAGE_H = 46;
           </div>
         }
         <div class="flex items-center gap-1.5">
-          <span class="w-3.5 h-3.5 rounded bg-gray-300 border-2 border-gray-400"></span>
+          <span
+            class="w-3.5 h-3.5 rounded bg-muted border-2 border-[color:var(--border-strong)]"
+          ></span>
           <span class="text-muted-foreground">{{ 'seatMap.taken2' | transloco }}</span>
         </div>
       </div>
@@ -242,7 +258,7 @@ const STAGE_H = 46;
         color: var(--foreground);
       }
       .seat-selected {
-        filter: drop-shadow(0 1px 3px rgba(79, 70, 229, 0.5));
+        filter: drop-shadow(0 1px 3px color-mix(in srgb, var(--ember-500) 50%, transparent));
       }
       svg rect[rx='5'] {
         transition:
@@ -253,7 +269,7 @@ const STAGE_H = 46;
         outline: none;
       }
       .seat:focus-visible rect {
-        stroke: var(--ring, #2563eb);
+        stroke: var(--ring);
         stroke-width: 3;
       }
     `,
@@ -354,25 +370,25 @@ export class SeatMapSvgComponent implements OnInit, OnDestroy, OnChanges {
 
   // ───────── colors ─────────
   zoneFill(zone: string): string {
-    return { vip: '#dbeafe', premium: '#ede9fe', standard: '#d1fae5' }[zone] ?? '#d1fae5';
+    return ZONE_FILL[zone] ?? ZONE_FILL['standard'];
   }
   zoneStroke(zone: string): string {
-    return { vip: '#60a5fa', premium: '#a78bfa', standard: '#34d399' }[zone] ?? '#34d399';
+    return ZONE_STROKE[zone] ?? ZONE_STROKE['standard'];
   }
   seatFill(s: Seat): string {
-    if (!s.is_available) return '#d1d5db';
-    if (this.isSelected(s)) return '#E8552D';
+    if (!s.is_available) return 'var(--muted)';
+    if (this.isSelected(s)) return 'var(--ember-500)';
     return this.zoneFill(s.price_zone);
   }
   seatStroke(s: Seat): string {
-    if (!s.is_available) return '#9ca3af';
-    if (this.isSelected(s)) return '#C2410C';
+    if (!s.is_available) return 'var(--border-strong)';
+    if (this.isSelected(s)) return 'var(--ember-600)';
     return this.zoneStroke(s.price_zone);
   }
   seatTextColor(s: Seat): string {
-    if (this.isSelected(s)) return '#ffffff';
-    if (!s.is_available) return '#6b7280';
-    return '#374151';
+    if (this.isSelected(s)) return 'var(--accent-foreground)';
+    if (!s.is_available) return 'var(--muted-foreground)';
+    return 'var(--foreground)';
   }
 
   // ───────── selection ─────────

@@ -12,7 +12,7 @@ const CASES = [
     button: 'Русский',
     short: 'РУС',
     lang: 'ru',
-    discover: 'Обзор',
+    discover: 'Афиша',
     title: 'Находите события, которые важны',
   },
   {
@@ -31,7 +31,8 @@ const CASES = [
   },
 ] as const;
 
-const nav = (page: Page) => page.getByRole('complementary', { name: /./ }).first();
+/** The main navigation inside the page header (consumer top nav). */
+const nav = (page: Page) => page.getByRole('banner').getByRole('navigation', { name: /./ }).first();
 
 /** The next request to our API, with the language header the SPA set. */
 function nextApiRequest(page: Page): Promise<Request> {

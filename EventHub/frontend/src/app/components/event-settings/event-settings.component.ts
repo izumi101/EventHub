@@ -122,7 +122,7 @@ import { PluralPipe } from '../../i18n/locale.pipes';
             {{ 'eventSettings.refunds' | transloco }}
             @if (pendingRefunds > 0) {
               <span
-                class="bg-[color:var(--destructive)] text-white text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center"
+                class="bg-[color:var(--destructive)] text-[color:var(--destructive-foreground)] text-[10px] font-bold rounded-full px-1.5 min-w-[18px] text-center"
                 >{{ pendingRefunds }}</span
               >
             }

@@ -20,6 +20,8 @@ export class LayoutService {
   /** Sidebar groups the visitor toggled; untouched groups are absent. */
   groupOpen = signal<Partial<Record<string, boolean>>>({});
   eventContext = signal<EventContext | null>(null);
+  /** True while the Discover hero sits under the top nav: the nav turns transparent. */
+  navOverHero = signal(false);
 
   private cachedEventId: string | null = null;
 

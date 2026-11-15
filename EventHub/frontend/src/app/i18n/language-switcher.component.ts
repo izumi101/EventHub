@@ -10,14 +10,14 @@ import { LANG_META, Lang, SUPPORTED_LANGS } from './languages';
   imports: [TranslocoPipe],
   template: `
     <div
-      class="inline-flex items-center rounded-md border border-border p-0.5 text-[11px] font-semibold"
+      class="lang-switch inline-flex items-center gap-0.5 rounded-full border border-border p-0.5 text-[11px] font-semibold"
       role="group"
       [attr.aria-label]="'common.language' | transloco"
     >
       @for (code of langs; track code) {
         <button
           type="button"
-          class="px-2 py-1 rounded transition-colors focus-ring"
+          class="h-8 min-w-[2.5rem] px-2.5 rounded-full transition-colors focus-ring"
           [class]="
             language.lang() === code
               ? 'bg-primary text-primary-foreground'
