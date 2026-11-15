@@ -124,6 +124,28 @@ The 2 skipped backend tests (`payments.test_freedompay_emulator`) need an emulat
 
 No browser test is quarantined and none needed a retry locally (CI keeps `retries: 1`).
 
+### 5.1 Redesign regression run (2026-11-15)
+
+After the "Concept A" redesign (`REDESIGN_PLAN.md` phases 0–5) on `integration/phase-2-4`, again on a fresh `ehqa` stack.
+
+| Suite | Result |
+|---|---|
+| Backend `manage.py test --noinput` | **582 tests, OK, 5 skipped** (51 s). Run with `-e MFA_STEP_UP_MAX_AGE_SECONDS=600 -e FRONTEND_URL=http://localhost:4200`: the QA stack sets 45 s and port 24200 for the browser specs, and 12 unit tests assert the defaults (step-up window, `List-Unsubscribe` URL). Without the override those 12 fail; that is the environment, not the code |
+| Frontend unit | **32 files, 265 tests passed** (adds the Discover, event card, event page, footer, shell navigation and design-token specs) |
+| Frontend lint / format / build | clean; initial bundle **838 kB** raw / 207 kB transfer (budget warning at 900 kB) |
+| Browser e2e, run 1 / run 2 | **23 / 23** (4.0 min) and **23 / 23** (3.8 min) |
+| Browser e2e, run 3 (after the focus-ring fix, frontend rebuilt) | **23 / 23** (3.8 min) |
+| DB checks (`scripts/qa-db-checks.sh`) | schemas OK, **82 / 82** role probes, app role cannot run DDL, **30 SQL checks, 0 CRITICAL**; 1 WARNING `stale_holds` row, left by the "declined card keeps the spot held" spec |
+
+Manual matrix (dev stack, same-origin frames so every width really applies its media queries): Discover, the event page (seat-map event and free event), the checkout dialog with the seat picker, My Tickets and the QR dialog × light / dark × 1440 / 1024 / 390 px × kk / ru / en = 108 page states. Each one asserts: the theme and `<html lang>` applied, no horizontal overflow, no untranslated `key.path` text, the dialog opens and fits the width. **All passed.** (One kk run first reported "dialog not opened"; it was a second, timed-out run of the script overlapping the first. A clean rerun opened every dialog in about 200 ms.)
+
+Also checked:
+
+- **Keyboard:** the skip link comes first, then nav, language, search, bell, account, hero thumbnails, filter bar, rails. **Found and fixed:** the global `button { outline: none }` reset hid the focus ring on the filter chips and other buttons without their own style; there is now one `:focus-visible` ring in `@layer base`, and the filter fields draw it around the whole pill. Dialogs use `appDialog` (`role="dialog"`, `aria-modal`, focus trap, Escape, focus return).
+- **Reduced motion:** a global `prefers-reduced-motion` rule shortens every animation and transition; the rails' scroll buttons switch to instant scrolling; nothing auto-plays.
+- **Contrast:** `design-tokens.spec.ts` checks every text token on every surface (AA) in both themes, now including the seat-zone colours. A script also compared every visible text node with its nearest opaque background on Discover, a free event page and My Tickets, in both themes: no failures. It flagged two false positives, text over photo layers (the transparent nav over the hero, ticket titles over covers), which it cannot measure.
+- **Not checked:** Safari / WebKit (no Safari in this environment; the logo uses an SVG mask and the nav is `position: sticky`, so check those on a Mac before the demo); a screen reader pass.
+
 ## 6. Bugs found and fixed
 
 Every fix is its own `fix:` commit with a regression test.
