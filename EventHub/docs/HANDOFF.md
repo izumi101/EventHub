@@ -7,6 +7,7 @@ Read this first when continuing the production-readiness work in a new session.
 - **Principle agreed with the owner:** everything at production level — no "minimal" variants.
 - **Cross-team tests (2026-11-14):** 23 Playwright browser tests over every feature, an isolated test stack (`docker-compose.qa.yml`), database checks (`scripts/qa-db-checks.sh`) and the report with results, bugs and gaps: [`TEST_REPORT.md`](TEST_REPORT.md).
 - **Redesign "Concept A" (2026-11-15, on `integration/phase-2-4`):** new top nav / tab bar, Discover (hero, filter bar, rails, 3:4 cards), event page, Onest font, light + dark themes from one token set. Plan and per-phase notes: [`REDESIGN_PLAN.md`](REDESIGN_PLAN.md); colour rules: [`DESIGN_TOKENS.md`](DESIGN_TOKENS.md). Backend additions: tier-aware `is_free` filter, `GET /favorites/ids/`.
+- **Production deployment (2026-11-17, branch `deploy/production`):** one Azure VM with Docker Compose behind Caddy (automatic HTTPS, sslip.io first), demo payments through the emulator, Gmail SMTP, nightly backups. Runbook: [`DEPLOY.md`](DEPLOY.md). Note its data-residency warning (VM in India, KZ law wants KZ data in KZ).
 - **i18n (phase 2):** the UI is translated into kk / ru / en with Transloco; see [`I18N.md`](I18N.md). Login, profile, auth service and 2FA files are still English-only (follow-up).
 
 ## Working rules
