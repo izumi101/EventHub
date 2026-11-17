@@ -7,7 +7,9 @@ moderation so the admin review flow can be shown. No registrations are
 created: the audience sees an empty, clean catalogue and buys live.
 
 Idempotent: an event that already exists (same title and organizer) is left
-as it is. Refuses to run unless DJANGO_DEBUG=1, like the other seed commands.
+as it is. Refuses to run unless DJANGO_DEBUG=1, like the other seed commands;
+a public demo deployment (DJANGO_DEBUG=0) opts in with --i-know-this-is-a-demo
+and then gets only the events it can sell (common/demo_seed.py).
 """
 
 from dataclasses import dataclass, field
@@ -22,6 +24,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from accounts.models import UserProfile
+from common import demo_seed
 from common.choices import EventStatusChoices, RoleChoices
 from events.models import Category, Event, EventSeat, SeatMap, TicketType
 
@@ -348,14 +351,17 @@ def create_seat_map(event, rows, cols, premium_rows, vip_rows):
 
 
 class Command(BaseCommand):
-    help = 'Create 18 hand-picked demo events in Almaty and Astana for the demo organizer (DJANGO_DEBUG=1 only).'
+    help = (
+        'Create 18 hand-picked demo events in Almaty and Astana for the demo organizer '
+        '(DJANGO_DEBUG=1, or --i-know-this-is-a-demo).'
+    )
 
     def add_arguments(self, parser):
         parser.add_argument('--organizer', default='organizer', help='Username that owns the events.')
+        demo_seed.add_demo_flag(parser)
 
     def handle(self, *args, **options):
-        if not settings.DEBUG:
-            raise CommandError('seed_showcase creates demo content; run it only with DJANGO_DEBUG=1.')
+        demo_seed.check_allowed('seed_showcase', options)
         try:
             organizer = User.objects.get(username=options['organizer'])
         except User.DoesNotExist:
@@ -370,11 +376,25 @@ class Command(BaseCommand):
                 name: Category.objects.update_or_create(name=name, defaults={'description': desc, 'icon': icon})[0]
                 for name, desc, icon in CATEGORIES
             }
-            created = sum(self.create_event(spec, organizer, categories) for spec in EVENTS)
+            specs = [spec for spec in EVENTS if self.payable(spec)]
+            created = sum(self.create_event(spec, organizer, categories) for spec in specs)
 
         self.stdout.write(
-            self.style.SUCCESS(f'seed_showcase: {created} events created, {len(EVENTS) - created} already present.')
+            self.style.SUCCESS(f'seed_showcase: {created} events created, {len(specs) - created} already present.')
         )
+        if skipped := len(EVENTS) - len(specs):
+            self.stdout.write(
+                f'Skipped {skipped} paid events in other currencies: Stripe is not enabled here '
+                '(PAYMENT_PROVIDERS_ENABLED), so their tickets could not be bought.'
+            )
+
+    @staticmethod
+    def payable(spec: Spec) -> bool:
+        """Development (DEBUG) pays every currency (Stripe or its mock); a
+        DEBUG=0 demo deployment without Stripe can only sell KZT tickets."""
+        if settings.DEBUG or spec.currency == 'KZT' or 'stripe' in settings.PAYMENT_PROVIDERS_ENABLED:
+            return True
+        return Decimal(spec.price) == 0 and all(Decimal(tier.price) == 0 for tier in spec.tiers)
 
     def create_event(self, spec: Spec, organizer, categories) -> bool:
         if Event.objects.filter(title=spec.title, organizer=organizer).exists():
