@@ -1,4 +1,8 @@
+import os
+import tempfile
+import time
 from datetime import timedelta
+from pathlib import Path
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
@@ -119,3 +123,11 @@ class WebhookJobTests(TestCase):
         enqueue_email('Hi', 'body', 'a@example.com')
         call_command('run_worker', '--once')
         self.assertEqual(len(mail.outbox), 1)
+
+    def test_worker_refreshes_its_heartbeat_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            heartbeat = Path(tmp) / 'worker.heartbeat'
+            with patch.dict(os.environ, {'WORKER_HEARTBEAT_FILE': str(heartbeat)}):
+                call_command('run_worker', '--once')
+            self.assertTrue(heartbeat.exists())
+            self.assertLess(time.time() - heartbeat.stat().st_mtime, 60)
