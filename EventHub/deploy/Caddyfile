@@ -1,0 +1,116 @@
+# EventHub edge proxy (docker-compose.prod.yml, docs/DEPLOY.md).
+#
+# Caddy is the only container that publishes ports (80, 443, 443/udp). It
+# gets and renews the TLS certificates and forwards:
+#   {$SITE_DOMAIN}  -> frontend:80      (nginx: Angular SPA, /api, /ws, /media, /static)
+#   {$PAY_DOMAIN}   -> fpay-emulator:8080 (the hosted payment page only)
+#
+# Environment (set by docker-compose.prod.yml from .env):
+#   SITE_DOMAIN, PAY_DOMAIN       bare host names, e.g. 172-198-71-209.sslip.io
+#   CADDY_EMAIL_OPTION            "email you@example.com" or empty (ACME account contact)
+#   CADDY_LOCAL_CERTS_OPTION      "local_certs" for local tests (Caddy's internal CA), empty in production
+#   CADDY_MAX_BODY                request body limit of the site; nginx enforces the same 10m on /api/
+#
+# {$VAR} placeholders are replaced before the file is parsed, so an empty
+# option line simply disappears.
+{
+	{$CADDY_EMAIL_OPTION}
+	{$CADDY_LOCAL_CERTS_OPTION}
+	# Never touch the container's trust store (only matters with local_certs).
+	skip_install_trust
+	# The admin API listens on localhost inside the container only (health check).
+	admin localhost:2019
+
+	servers {
+		# Slow-client protection. No write timeout: it would cut large media
+		# downloads to slow phones; WebSockets are hijacked connections and
+		# are not affected by these deadlines.
+		timeouts {
+			read_header 10s
+			read_body 2m
+			idle 5m
+		}
+		# Larger than any legitimate header set, small enough to stop abuse.
+		max_header_size 32KB
+	}
+}
+
+# Shared by both sites.
+(common) {
+	encode zstd gzip
+
+	header {
+		# Browsers remember to use HTTPS for a year. No `preload` and no
+		# includeSubDomains yet: a shared parent such as sslip.io must not be
+		# pinned, and preload is hard to undo (docs/DEPLOY.md, "Real domain").
+		Strict-Transport-Security "max-age=31536000"
+		# Defaults only where the upstream sets none (nginx sends its own
+		# set, including the CSP, for the site; the emulator sends none).
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?X-Frame-Options "DENY"
+		# Hide implementation details.
+		-Server
+		-Via
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+{$SITE_DOMAIN} {
+	import common
+
+	request_body {
+		max_size {$CADDY_MAX_BODY:10MB}
+	}
+
+	reverse_proxy frontend:80 {
+		# The Host header passes through unchanged. Caddy replaces
+		# client-supplied X-Forwarded-For/-Proto/-Host with its own values (no
+		# trusted_proxies); nginx trusts them from this hop only
+		# (deploy/nginx-behind-proxy.conf).
+		transport http {
+			dial_timeout 5s
+			# The backend's own timeout is 60 s (gunicorn, nginx proxy_read_timeout).
+			response_header_timeout 75s
+		}
+		# WebSockets (/ws/) are proxied transparently; on a config reload
+		# keep them open for a while instead of cutting them at once.
+		stream_close_delay 5m
+	}
+}
+
+# The Freedom Pay emulator's hosted payment page (FPAY_PUBLIC_URL). Only what
+# a payer's browser needs is public: the merchant API (init_payment,
+# get_status3, refunds) is called by the backend inside the compose network,
+# and the /_emulator control API is never exposed.
+{$PAY_DOMAIN} {
+	import common
+
+	request_body {
+		max_size 64KB
+	}
+
+	@public path /pay.html /pay/* /static/* /status/healthcheck
+	handle @public {
+		reverse_proxy fpay-emulator:8080 {
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 30s
+			}
+		}
+	}
+	handle {
+		respond "Not found" 404
+	}
+}
+
+# Anything else (the bare IP, unknown Host headers): no certificate, no content.
+:80 {
+	respond 404 {
+		close
+	}
+}

@@ -1,0 +1,261 @@
+# Production overlay for one VM (docs/DEPLOY.md):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --wait
+#
+# (scripts/prod-deploy.sh runs exactly that; .env comes from scripts/prod-env.sh,
+# every variable is documented in deploy/env.production.example.)
+#
+# What it changes on top of docker-compose.yml:
+#  - Caddy is the only service with host ports (80, 443, 443/udp): automatic
+#    HTTPS for SITE_DOMAIN (-> frontend nginx -> backend) and PAY_DOMAIN (->
+#    the Freedom Pay emulator's payment page). Every other port is removed.
+#  - DEBUG off, no mock payments, no seed data at start, least-privilege DB
+#    roles mandatory, SMTP mandatory, hosts/origins derived from SITE_DOMAIN.
+#  - Health checks, memory limits, restart policy and log rotation on every
+#    service; named volumes for everything that must survive a rebuild.
+#
+# Memory budget (7.7 GiB VM, 2 GiB swap; limits are ceilings, measured idle
+# usage in docs/DEPLOY.md):
+#   db 1536M + backend 2048M + worker 1024M + redis 256M + frontend 128M
+#   + fpay-emulator 192M + caddy 256M                          = 5440M
+#   optional `flags` profile: unleash 512M + unleash-db 256M   = +768M
+#   leaves >= 1.7 GiB for the kernel, page cache, dockerd and ssh.
+#
+# `ports: !reset []` and `volumes: !override` need Docker Compose >= 2.24.
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+    compress: "true"
+
+# Production environment of the backend and the worker. Merged into the
+# base file's environment; values here win.
+x-backend-prod-env: &backend-prod-env
+  DJANGO_DEBUG: "0"
+  # localhost: the container health check; backend: the emulator's result
+  # callbacks (FREEDOMPAY_RESULT_URL below).
+  DJANGO_ALLOWED_HOSTS: ${SITE_DOMAIN:?Set SITE_DOMAIN in .env (deploy/env.production.example)},localhost,backend
+  DJANGO_CORS_ALLOWED_ORIGINS: https://${SITE_DOMAIN}${PUBLIC_URL_PORT:-}
+  DJANGO_CSRF_TRUSTED_ORIGINS: https://${SITE_DOMAIN}${PUBLIC_URL_PORT:-}
+  DJANGO_CORS_ALLOW_ALL_ORIGINS: "0"
+  # Secure session/CSRF cookies are the DEBUG=0 default; stated for clarity.
+  DJANGO_SESSION_COOKIE_SECURE: "1"
+  DJANGO_CSRF_COOKIE_SECURE: "1"
+  # Caddy redirects HTTP to HTTPS; Django must not (internal health checks
+  # and the emulator's callbacks are plain HTTP inside the compose network).
+  DJANGO_SECURE_SSL_REDIRECT: "0"
+  # One trusted proxy hop in front of Django: nginx, which forwards the client
+  # address Caddy saw (deploy/nginx-behind-proxy.conf).
+  DJANGO_NUM_PROXIES: "1"
+  FRONTEND_URL: https://${SITE_DOMAIN}${PUBLIC_URL_PORT:-}
+  WEBAUTHN_RP_ID: ${SITE_DOMAIN}
+  WEBAUTHN_ORIGINS: https://${SITE_DOMAIN}${PUBLIC_URL_PORT:-}
+  # Static files are part of the image (collectstatic at build time).
+  DJANGO_COLLECTSTATIC: "0"
+  # Demo data is never created at start; scripts/prod-deploy.sh --seed-demo.
+  DJANGO_SEED_DATA: "0"
+  DJANGO_SEED_MFA_TOTP_SECRET: ""
+  MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set MFA_ENCRYPTION_KEY in .env (scripts/prod-env.sh generates it)}
+  # The least-privilege roles are mandatory here (docs/DATABASE_ROLES.md).
+  POSTGRES_APP_PASSWORD: ${POSTGRES_APP_PASSWORD:?Set POSTGRES_APP_PASSWORD in .env}
+  POSTGRES_READONLY_PASSWORD: ${POSTGRES_READONLY_PASSWORD:?Set POSTGRES_READONLY_PASSWORD in .env}
+  # Payments: no simulated payments with DEBUG off. Demo mode = the Freedom
+  # Pay emulator (KZT) with FREEDOMPAY_DEMO_MODE=1; Stripe is off until it
+  # has real keys.
+  PAYMENTS_MOCK_MODE: "0"
+  STRIPE_MOCK_MODE: "0"
+  PAYMENT_PROVIDERS_ENABLED: ${PAYMENT_PROVIDERS_ENABLED:-freedompay}
+  FREEDOMPAY_API_URL: ${FREEDOMPAY_API_URL:-http://fpay-emulator:8080}
+  # Gateway -> backend inside the compose network (never through the internet).
+  FREEDOMPAY_RESULT_URL: ${FREEDOMPAY_RESULT_URL:-http://backend:8000/api/v1/payments/callback/freedompay/}
+  FREEDOMPAY_DEMO_MODE: ${FREEDOMPAY_DEMO_MODE:-1}
+  FREEDOMPAY_TESTING_MODE: ${FREEDOMPAY_TESTING_MODE:-1}
+  # SMTP is required with DEBUG off (sign-up / reset codes, e-tickets).
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:?Set EMAIL_HOST_USER in .env (SMTP login, e.g. a Gmail address)}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:?Set EMAIL_HOST_PASSWORD in .env (e.g. a Gmail app password)}
+  NOTIFICATION_TIME_ZONE: ${NOTIFICATION_TIME_ZONE:-Asia/Almaty}
+  # 2 vCPU: one async uvicorn worker per core.
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+  UNLEASH_ENVIRONMENT: ${UNLEASH_ENVIRONMENT:-production}
+
+services:
+  # ---- Edge: TLS, HTTP/2 + HTTP/3, the only published ports ---- #
+  caddy:
+    # 2.11.7, pinned by the digest of its multi-arch index.
+    image: caddy:2.11.7-alpine@sha256:e70b164da81ef698b3ad19af799ea6086ce6d9e48ed4079eb9fe26f6fbf14ee5
+    container_name: eventhub_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN in .env}
+      PAY_DOMAIN: ${PAY_DOMAIN:?Set PAY_DOMAIN in .env (e.g. pay.<SITE_DOMAIN>)}
+      # "email <address>" when ACME_EMAIL is set (expiry/problem notices).
+      CADDY_EMAIL_OPTION: ${ACME_EMAIL:+email ${ACME_EMAIL}}
+      # Local testing only: CADDY_LOCAL_CERTS=1 issues certificates from
+      # Caddy's internal CA instead of Let's Encrypt. Leave empty on a server.
+      CADDY_LOCAL_CERTS_OPTION: ${CADDY_LOCAL_CERTS:+local_certs}
+      CADDY_MAX_BODY: 10MB
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates and the ACME account: losing them means re-issuing
+      # (Let's Encrypt rate limits), so they live in named volumes.
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_healthy
+      fpay-emulator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:2019/reverse_proxy/upstreams"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *logging
+
+  db:
+    ports: !reset []
+    # Sized for a 7.7 GiB VM shared with the app (memory limit below).
+    command:
+      - postgres
+      - -c
+      - shared_buffers=384MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+      - -c
+      - max_connections=100
+      - -c
+      - log_min_duration_statement=1000
+    shm_size: 256mb
+    stop_grace_period: 60s
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 1536M
+    logging: *logging
+
+  redis:
+    ports: !reset []
+    # Channel layer, throttling counters and caches only: no persistence.
+    # noeviction: a full Redis refuses writes (visible errors) rather than
+    # silently dropping WebSocket groups or rate-limit counters.
+    command: ["redis-server", "--maxmemory", "200mb", "--maxmemory-policy", "noeviction", "--save", "", "--appendonly", "no"]
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *logging
+
+  backend:
+    ports: !reset []
+    environment: *backend-prod-env
+    # gunicorn graceful_timeout is 30 s.
+    stop_grace_period: 40s
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 2048M
+    logging: *logging
+
+  worker:
+    environment:
+      <<: *backend-prod-env
+      WORKER_HEARTBEAT_FILE: /tmp/eventhub-worker.heartbeat
+    healthcheck:
+      # run_worker touches the file after every pass (every few seconds; a
+      # maintenance pass runs once a minute). Stale for 2 minutes = hung.
+      test: ["CMD", "python", "-c", "import os, sys, time; sys.exit(0 if time.time() - os.path.getmtime('/tmp/eventhub-worker.heartbeat') < 120 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    stop_grace_period: 30s
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+    logging: *logging
+
+  frontend:
+    ports: !reset []
+    volumes: !override
+      - backend_media:/usr/share/nginx/media:ro
+      # Plain HTTP behind Caddy: no certificate, real client address and
+      # scheme from Caddy (the image's own 443 server is not used).
+      - ./deploy/nginx-behind-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging: *logging
+
+  fpay-emulator:
+    ports: !reset []
+    environment:
+      # What the payer's browser (and the QR code) opens.
+      FPAY_PUBLIC_URL: https://${PAY_DOMAIN:?Set PAY_DOMAIN in .env}${PUBLIC_URL_PORT:-}
+      # The control API is also blocked at Caddy; the token is a second lock.
+      FPAY_CONTROL_TOKEN: ${FPAY_CONTROL_TOKEN:?Set FPAY_CONTROL_TOKEN in .env (scripts/prod-env.sh generates it)}
+      # Only Caddy and the backend reach it (compose network).
+      FPAY_FORWARDED_ALLOW_IPS: "*"
+    volumes:
+      # Payments, the callback retry schedule and the virtual clock.
+      - fpay_data:/data
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+    logging: *logging
+
+  # Optional `flags` profile (docs/FEATURE_FLAGS.md). Admin UI: SSH tunnel,
+  # see docs/DEPLOY.md ("Feature flags").
+  unleash-db:
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    logging: *logging
+
+  unleash:
+    ports: !reset []
+    environment:
+      UNLEASH_URL: ${UNLEASH_PUBLIC_URL:-http://localhost:4242}
+    security_opt: ["no-new-privileges:true"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    logging: *logging
+
+volumes:
+  caddy_data:
+  caddy_config:
+  fpay_data:
