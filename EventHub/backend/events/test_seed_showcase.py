@@ -5,6 +5,7 @@ from django.core.management import CommandError, call_command
 from django.test import TestCase, override_settings
 
 from events.management.commands.seed_showcase import EVENTS
+from events.management.commands.seed_showcase import Command as SeedShowcaseCommand
 from events.models import Event, EventSeat, TicketType
 
 
@@ -41,3 +42,13 @@ class SeedShowcaseTests(TestCase):
     def test_refuses_without_debug(self):
         with self.assertRaises(CommandError):
             self.run_command()
+
+    @override_settings(DEBUG=False, PAYMENT_PROVIDERS_ENABLED=['freedompay'])
+    def test_demo_deployment_without_stripe_gets_only_sellable_events(self):
+        out = StringIO()
+        call_command('seed_showcase', '--i-know-this-is-a-demo', stdout=out)
+        unpayable = [spec for spec in EVENTS if not SeedShowcaseCommand.payable(spec)]
+        self.assertTrue(unpayable)
+        self.assertIn(f'Skipped {len(unpayable)} paid events', out.getvalue())
+        self.assertEqual(Event.objects.count(), len(EVENTS) - len(unpayable))
+        self.assertFalse(Event.objects.exclude(currency='KZT').exclude(price=0).exists())
