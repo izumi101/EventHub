@@ -19,6 +19,8 @@ from django.db.models import Q, Value
 from common.choices import PaymentCallbackKind, PaymentProviderChoices, PaymentStatusChoices
 from events.models import Registration
 
+from .state import PAID_STATUSES, mark_paid
+
 MONEY = {'max_digits': 12, 'decimal_places': 2}
 
 
@@ -69,6 +71,12 @@ class Payment(models.Model):
     refunded_at = models.DateTimeField(null=True, blank=True)
     refund_reason = models.CharField(max_length=255, blank=True)
 
+    # When the money first arrived: set once, on the first move to completed
+    # (or to refunded / disputed for a payment that arrived and went straight
+    # back), by `payments.state.mark_paid` and never overwritten. The day an
+    # organizer's revenue is counted on. `created_at` is only the checkout start.
+    paid_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -88,14 +96,28 @@ class Payment(models.Model):
                 condition=~Q(provider_session_id=''),
                 name='uniq_payment_provider_session',
             ),
+            # No CHECK that a paid status has `paid_at` yet: a code-only rollback
+            # must keep working. Readers fall back to `created_at`; the CHECK is
+            # the contract step of a later release (docs/ORGANIZER_DASHBOARD_PHASE2.md).
         ]
         indexes = [
             # Reconciliation scans payments that stay pending too long.
             models.Index(fields=['status', 'created_at'], name='payment_status_created_idx'),
+            # The organizer sales chart groups paid money by day.
+            models.Index(fields=['paid_at'], name='payment_paid_at_idx'),
         ]
 
     def __str__(self):
         return f'Payment {self.id} - {self.status} - ${self.amount}'
+
+    def save(self, *args, **kwargs):
+        # Safety net for code that sets `status` directly: a payment that is
+        # (or was) paid always carries `paid_at`.
+        if self.status in PAID_STATUSES and self.paid_at is None:
+            mark_paid(self)
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = {*kwargs['update_fields'], 'paid_at'}
+        super().save(*args, **kwargs)
 
     @property
     def net_amount(self):

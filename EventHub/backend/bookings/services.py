@@ -221,11 +221,12 @@ def confirm_booking(booking, *, payment_intent_id='', amount_paid=None):
         return booking
 
     booking.status = Booking.Status.CONFIRMED
+    booking.confirmed_at = timezone.now()
     booking.hold_expires_at = None
     booking.stripe_payment_intent_id = payment_intent_id or booking.stripe_payment_intent_id
     if amount_paid is not None:
         booking.amount_paid = amount_paid
-    booking.save(update_fields=['status', 'hold_expires_at', 'stripe_payment_intent_id', 'amount_paid'])
+    booking.save(update_fields=['status', 'confirmed_at', 'hold_expires_at', 'stripe_payment_intent_id', 'amount_paid'])
     logger.info('Booking %s confirmed', booking.id)
 
     from events.billing import event_currency

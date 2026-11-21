@@ -12,6 +12,7 @@ from common.choices import EventStatusChoices, PaymentStatusChoices, Registratio
 from events.models import Registration
 
 from .models import Payment
+from .state import mark_paid
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +114,8 @@ def create_mock_checkout_session(*, registration):
     payment.amount = amount
     payment.currency = _currency_of(registration).lower()
     payment.status = PaymentStatusChoices.COMPLETED
-    payment.save(update_fields=['stripe_checkout_session_id', 'amount', 'currency', 'status'])
+    mark_paid(payment)
+    payment.save(update_fields=['stripe_checkout_session_id', 'amount', 'currency', 'status', 'paid_at'])
 
     _confirm_paid_registration(registration, payment)
     logger.info('[MOCK] Payment auto-confirmed for registration %s', registration.id)
@@ -271,6 +273,7 @@ def confirm_stripe_checkout_session(session):
         )
         _refund_payment_intent(intent, key=f'late-refund-{session_id}')
         payment.status = PaymentStatusChoices.REFUNDED
+        mark_paid(payment)  # the money did arrive, then went straight back
         payment.stripe_payment_intent_id = intent
         payment.stripe_checkout_session_id = session_id
         payment.refunded_amount = payment.amount
@@ -279,6 +282,7 @@ def confirm_stripe_checkout_session(session):
         payment.save(
             update_fields=[
                 'status',
+                'paid_at',
                 'stripe_payment_intent_id',
                 'stripe_checkout_session_id',
                 'refunded_amount',
@@ -301,9 +305,10 @@ def confirm_stripe_checkout_session(session):
         return payment
 
     payment.status = PaymentStatusChoices.COMPLETED
+    mark_paid(payment)
     payment.stripe_payment_intent_id = intent
     payment.stripe_checkout_session_id = session_id
-    payment.save(update_fields=['status', 'stripe_payment_intent_id', 'stripe_checkout_session_id'])
+    payment.save(update_fields=['status', 'paid_at', 'stripe_payment_intent_id', 'stripe_checkout_session_id'])
     _confirm_paid_registration(registration, payment)
     logger.info('Payment completed for registration %s', registration.id)
     return payment
@@ -429,6 +434,7 @@ def mark_offline_paid(*, registration, amount=None):
     payment.currency = currency
     payment.method = Payment.METHOD_OFFLINE
     payment.status = PaymentStatusChoices.COMPLETED
+    mark_paid(payment)
     payment.save()
 
     _confirm_paid_registration(registration, payment)

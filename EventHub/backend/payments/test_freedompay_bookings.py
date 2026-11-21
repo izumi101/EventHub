@@ -191,6 +191,8 @@ class FreedomPayBookingTests(BookingFixtures, APITestCase):
         payment, pid = self.paid()
         self.assertEqual(self.gateway.scripts(), ['init_payment.php', 'get_status3.php'])
         self.assertEqual((payment.status, payment.provider_payment_id), ('completed', pid))
+        self.assertIsNotNone(payment.paid_at)
+        self.assertIsNotNone(self.booking.confirmed_at)
         self.assertEqual(self.booking.amount_paid, Decimal('10000.00'))
         self.assertIsNone(self.booking.hold_expires_at)
         self.assertEqual(self.booking.stripe_payment_intent_id, '')

@@ -680,6 +680,7 @@ class FreedomPayFlowTests(FixturesMixin, APITestCase):
         payment.refresh_from_db()
         self.registration.refresh_from_db()
         self.assertEqual((payment.status, payment.provider_payment_id), ('completed', pid))
+        self.assertIsNotNone(payment.paid_at)  # stamped by the callback's transition
         self.assertEqual(self.registration.status, 'confirmed')
         self.assertIsNone(self.registration.seat_held_until)
         event = PaymentEvent.objects.get()
@@ -727,6 +728,7 @@ class FreedomPayFlowTests(FixturesMixin, APITestCase):
         self.assertEqual(reply['pg_status'], 'ok')
         payment.refresh_from_db()
         self.assertEqual(payment.status, 'completed')
+        self.assertIsNotNone(payment.paid_at)
 
     def test_a_wrong_amount_is_not_confirmed_and_refunded(self):
         payment, pid = self.opened()
@@ -961,7 +963,7 @@ class CancelRaceTests(FixturesMixin, APITestCase):
         stale = Registration.objects.select_related('payment').get(pk=self.registration.pk)
         self.assertEqual(stale.payment.status, 'pending')
         # The confirmation commits between attendee_cancel's checks and the lock.
-        Payment.objects.filter(pk=self.payment.pk).update(status=PaymentStatusChoices.COMPLETED)
+        Payment.objects.filter(pk=self.payment.pk).update(status=PaymentStatusChoices.COMPLETED, paid_at=timezone.now())
         with (
             patch('events.services.registration.get_active_registration', return_value=stale),
             self.assertRaisesMessage(ValueError, 'already paid'),
@@ -1004,7 +1006,7 @@ class CancelConfirmConcurrencyTests(FixturesMixin, TransactionTestCase):
                     Registration.objects.select_for_update().get(pk=self.registration.pk)
                     locked.set()
                     release.wait(5)
-                    Payment.objects.filter(pk=payment.pk).update(status='completed')
+                    Payment.objects.filter(pk=payment.pk).update(status='completed', paid_at=timezone.now())
                     Registration.objects.filter(pk=self.registration.pk).update(status='confirmed')
             except Exception as exc:  # pragma: no cover - reported below
                 errors.append(exc)

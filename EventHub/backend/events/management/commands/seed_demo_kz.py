@@ -61,6 +61,7 @@ from events.models import (
 )
 from events.seat_pricing import seat_price
 from payments.models import Payment, Refund
+from payments.state import PAID_STATUSES, mark_paid
 
 SEED = 20261112
 # Kazakhstan has one time zone, UTC+5, since 1 March 2024.
@@ -595,6 +596,9 @@ class EventSeeder:
             'refunded': 'refunded',
         }[kind]
         payment.status = status
+        if status in PAID_STATUSES:
+            # bulk_create below skips Payment.save(), so stamp the arrival here.
+            mark_paid(payment, started + timedelta(minutes=2))
         if kind == 'failed':
             payment.provider_payload = {'failure': 'card_declined'}
         if kind in ('partial', 'refunded'):
@@ -725,13 +729,15 @@ class EventSeeder:
             )
             if status in ('confirmed', 'refunded'):
                 booking.amount_paid = amount
+                booking.confirmed_at = created + timedelta(minutes=2)
+                mark_paid(payment, booking.confirmed_at)
             if status == 'refunded':
                 booking.refunded_at = min(created + timedelta(days=2), self.now - timedelta(hours=1))
                 booking.refund_reason = 'Group could not attend'
                 payment.refunded_amount = amount
                 payment.refunded_at = booking.refunded_at
                 payment.refund_reason = booking.refund_reason
-            booking.save(update_fields=['amount_paid', 'refunded_at', 'refund_reason'])
+            booking.save(update_fields=['amount_paid', 'confirmed_at', 'refunded_at', 'refund_reason'])
             payment.save()
             Payment.objects.filter(pk=payment.pk).update(created_at=created + timedelta(minutes=1))
             if status == 'refunded':
