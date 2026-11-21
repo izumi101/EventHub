@@ -146,6 +146,18 @@ Also checked:
 - **Contrast:** `design-tokens.spec.ts` checks every text token on every surface (AA) in both themes, now including the seat-zone colours. A script also compared every visible text node with its nearest opaque background on Discover, a free event page and My Tickets, in both themes: no failures. It flagged two false positives, text over photo layers (the transparent nav over the hero, ticket titles over covers), which it cannot measure.
 - **Not checked:** Safari / WebKit (no Safari in this environment; the logo uses an SVG mask and the nav is `position: sticky`, so check those on a Mac before the demo); a screen reader pass.
 
+### 5.2 Organizer dashboard run (2026-11-21)
+
+Branch `feat/organizer-dashboard-fixes`, fresh `ehqa` stack (`down -v`, images built from the branch).
+
+| Suite | Result |
+|---|---|
+| Backend `manage.py test --noinput` (CI-like: PostgreSQL 16 + Redis) | **700 tests, OK, 2 skipped**; ruff, `makemigrations --check` and the OpenAPI diff clean |
+| Frontend unit | **48 files, 482 tests passed**; lint, format and production build clean |
+| Browser e2e, run 1 | 25 / 27: the new `dashboard.e2e.ts` published 22 events on the next 22 days, which pushed the demo "Online Django REST Workshop" off Discover's 12 soonest, so two `purchase.e2e.ts` specs could not find it. **Fixed in the spec**: one event stays in the next 7 days (for the "soon" callout), the rest are two years out |
+| Browser e2e, run 2 | **27 / 27** (4.0 min) |
+| DB checks (`scripts/qa-db-checks.sh`) | **30 SQL checks, 0 CRITICAL**; 1 WARNING `stale_holds` row from the seed data (known, section 7) |
+
 ## 6. Bugs found and fixed
 
 Every fix is its own `fix:` commit with a regression test.
