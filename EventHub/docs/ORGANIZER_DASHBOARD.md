@@ -15,7 +15,7 @@ The first version loaded `GET /my-events/` (first page only, 12 events) and then
 nearest ones were invisible, and one failed stats call emptied the whole list.
 The "Duplicate" action, the activity feed and the trend badges were placeholders
 (a success toast that did nothing, items timestamped with the event's creation date,
-a hard-coded "+0"). The dashboard now reads three server-side endpoints that page,
+a hard-coded "+0"). The dashboard now reads server-side endpoints that page,
 filter, sort and aggregate in the database.
 
 ## Who can use it
@@ -140,6 +140,64 @@ check-in (3), seat check-in (4), refund (5). The cursor is urlsafe base64 JSON o
 item's (time, rank, pk); the next page holds exactly the items after it, so no item is skipped
 or repeated even when many share one timestamp (a group check-in stamps every seat at once).
 A malformed or tampered `cursor`, and a bad `limit`, is a `400` field error.
+
+### `GET organizer/sales/?range=7d|30d|90d`
+
+Tickets and net revenue per day over all managed events (default `30d`; a bad `range` is a `400`
+field error). Days are business-time-zone days (`NOTIFICATION_TIME_ZONE`, falling back to
+`TIME_ZONE`; production sets `Asia/Almaty`); `end` is today in that zone and every day of
+`[start, end]` is present, zero-filled. Bucketing is done in the database, with a fixed number of
+queries however many events there are (tested).
+
+```json
+{"time_zone": "Asia/Almaty", "start": "2026-10-23", "end": "2026-11-21",
+ "days": [{"date": "2026-11-21", "tickets": 4}],
+ "revenue": [{"currency": "KZT", "days": [{"date": "2026-11-21", "net_revenue": "60000.00"}]}],
+ "markers": []}
+```
+
+| Series | Definition |
+|---|---|
+| `days[].tickets` | confirmed registrations at `registered_at` plus the seats of confirmed group bookings at the booking's `created_at` (the `tickets_sold` definition) |
+| `revenue[].days[].net_revenue` | payments (completed or refunded) on the day of `Payment.paid_at`, minus succeeded `Refund`s of ticket payments on `processed_at`, plus group-booking amounts on `Booking.confirmed_at`, minus refunded bookings on `refunded_at` |
+| `markers` | `[{date, event_id, title, kind: "published"}]`, events published in the range. Always `[]` until `Event.published_at` exists (moderation batch); never guessed from `updated_at` |
+
+"The day the money arrived" is `Payment.paid_at` (set once, by `payments.state.mark_paid`, when a
+payment first becomes completed, or refunded / disputed; refunds and disputes keep it) and
+`Booking.confirmed_at` (set once when the hold is paid, `confirm_booking`). `created_at` is only
+the start of checkout or of the 10-minute hold: an offline payment is marked paid days later and
+a checkout can span midnight. Every path that takes money goes through `mark_paid` or
+`transition()`; `Payment.save()` is the safety net for direct status assignments. There is no
+DB CHECK yet (a later release adds `payment_paid_at_when_paid`, see the phase-2 doc): a paid row
+without the timestamp is dated by `created_at`. Tickets stay on `registered_at` / the booking's `created_at`. A currency appears when it had a money
+movement in the range, sorted by code, and is never summed with another; the currency is the
+event's (`event_currency`). For an event whose whole life is inside the range the totals equal
+`tickets_sold` and `net_revenue` of `GET /events/{id}/analytics/` (tested). The analytics
+`timeline` money uses the same two timestamps.
+
+### `GET organizer/today/`
+
+Managed events with status `published` or `pending` that are in progress (`date` <= now <= end,
+the end being `end_date`, else `date`) or start within the next 7 days, by start (ties by id), at
+most 10 plus `more` (the count beyond them). Each item: `id`, `title`, `date`, `end_date`,
+`location`, `status`, `is_owner`, `in_progress` and `stats` `{tickets_sold, checked_in,
+capacity}` from `bulk_event_stats`. Constant query count (tested).
+
+### `GET organizer/reviews/`
+
+Reviews of managed events: `count`, `average` (two decimals, `null` when `count` is 0),
+`distribution` (keys `"1"`..`"5"`, always all present) and `recent` (the 5 latest by `created_at`),
+each `{event_id, event_title, rating, comment, created_at, author}`. `author` follows the
+display rule of the activity feed, so it is never an email address.
+
+### Per-event analytics (`GET events/{id}/analytics/`)
+
+The `timeline` is now bucketed with the same helper as `organizer/sales/` (business time zone,
+the last 30 days up to today, zero-filled); sales older than the window are outside it instead of
+being piled onto its first day. Each `by_ticket_type` row gains `quantity` (tier capacity, `null` =
+unlimited) and `remaining` (`quantity` less the tier's active registrations, never negative,
+`null` = unlimited). The "General" and "Group booking" rows have `null` for both. Tiers are one row
+each, even when two share a name.
 
 ### Clone: `POST events/{id}/clone/`
 

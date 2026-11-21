@@ -11,7 +11,7 @@ from rest_framework.response import Response
 
 from common.schema import FORBIDDEN, UNAUTHENTICATED, VALIDATION_ERROR
 
-from .. import dashboard
+from .. import dashboard, sales_chart
 from ..models import Event
 from ..organizer_serializers import (
     ActivityFeedSerializer,
@@ -19,6 +19,10 @@ from ..organizer_serializers import (
     DashboardSummarySerializer,
     OrganizerEventSerializer,
     OrganizerEventsQuerySerializer,
+    ReviewsSummarySerializer,
+    SalesQuerySerializer,
+    SalesSerializer,
+    TodaySerializer,
 )
 
 DASHBOARD_FORBIDDEN = OpenApiResponse(
@@ -125,3 +129,59 @@ class OrganizerActivityView(generics.GenericAPIView):
             cursor=params.validated_data.get('cursor'),
         )
         return Response(feed)
+
+
+class OrganizerSalesView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, CanUseOrganizerDashboard]
+    serializer_class = SalesSerializer
+    pagination_class = None
+
+    @extend_schema(
+        parameters=[SalesQuerySerializer],
+        responses={
+            200: SalesSerializer,
+            400: VALIDATION_ERROR,
+            401: UNAUTHENTICATED,
+            403: DASHBOARD_FORBIDDEN,
+        },
+        description=(
+            'Tickets sold and net revenue per day over all managed events, in the business time zone, '
+            'zero-filled. Revenue is one series per currency. The totals of a range equal `net_revenue` '
+            'and `tickets_sold` of `GET /events/{id}/analytics/` for events whose whole life is inside it.'
+        ),
+    )
+    def get(self, request):
+        params = SalesQuerySerializer(data=request.query_params)
+        params.is_valid(raise_exception=True)
+        # Through the response serializer: the payload is exactly the documented schema.
+        payload = sales_chart.sales_series(request.user, params.validated_data['range'])
+        return Response(self.get_serializer(payload).data)
+
+
+class OrganizerTodayView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, CanUseOrganizerDashboard]
+    serializer_class = TodaySerializer
+    pagination_class = None
+
+    @extend_schema(
+        responses={200: TodaySerializer, 401: UNAUTHENTICATED, 403: DASHBOARD_FORBIDDEN},
+        description=(
+            'Published or pending managed events that are in progress or start within the next 7 days, '
+            'by start, at most 10, with `more` counting the rest.'
+        ),
+    )
+    def get(self, request):
+        return Response(self.get_serializer(dashboard.today_events(request.user)).data)
+
+
+class OrganizerReviewsView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated, CanUseOrganizerDashboard]
+    serializer_class = ReviewsSummarySerializer
+    pagination_class = None
+
+    @extend_schema(
+        responses={200: ReviewsSummarySerializer, 401: UNAUTHENTICATED, 403: DASHBOARD_FORBIDDEN},
+        description='Count, average, star distribution and the 5 latest reviews of all managed events.',
+    )
+    def get(self, request):
+        return Response(self.get_serializer(dashboard.reviews_summary(request.user)).data)

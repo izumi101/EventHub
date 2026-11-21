@@ -13,7 +13,7 @@
 - **Production-grade, no shortcuts.** Every feature has a contract, backend + SPA tests, en/ru/kk, a11y, an e2e path, and docs.
 - **No misleading numbers.** We do not show a figure the data cannot back. Example: a "payouts" screen without the ledger of roadmap phase 1Б would invent fees and payout dates, so it waits for 1Б.
 - **One definition per metric.** New aggregates reuse `events/dashboard.py`, and their numbers must equal the per-event analytics page (tested, as today).
-- **Time zone.** Day buckets and "today" use the platform's business time zone `NOTIFICATION_TIME_ZONE` (Asia/Almaty by default), not UTC.
+- **Time zone.** Day buckets and "today" use the platform's business time zone `NOTIFICATION_TIME_ZONE` (falls back to `TIME_ZONE`; production and `.env.example` set `Asia/Almaty`), not UTC.
 - **Flags for operational risk.** Live check-in, segment messaging and the iCal feed ship behind Unleash flags (`dashboard.*`, see `FEATURE_FLAGS.md`), default off until verified on prod. Read-only views ship without flags.
 
 ## Inventory: what exists, what is missing (2026-11-21)
@@ -73,7 +73,8 @@ All endpoints are under `/api/v1/`, with the same permission as the rest of the 
 ```
 
 - **`days`:** every date in `[start, end]` is present (zero-filled), in the business time zone. A ticket counts on the day it was confirmed: a registration at `registered_at`, a group booking at `created_at` with its seat count. Same definition as `tickets_sold`.
-- **`revenue`:** one series per currency, never summed across currencies. A day's revenue is payments completed that day minus refunds processed that day, so the series sums to `net_revenue` over the range.
+- **`revenue`:** one series per currency (the event's currency) that had a money movement in the range, never summed across currencies. A day's revenue is payments of the day minus refunds processed that day, so the series sums to `net_revenue` over the range. "Of the day" is the day the money arrived: `Payment.paid_at` for tickets (set once, on the first move to completed, by `payments.state.mark_paid`; refunds and disputes keep it) and `Booking.confirmed_at` for group bookings (set once in `confirm_booking`). `created_at` is only the start of checkout or of the 10-minute hold: an offline payment is marked paid days later and a checkout can span midnight. A paid payment or confirmed booking that lacks the timestamp (written by the previous release after a rollback) is dated by `Coalesce(paid_at, created_at)` / `Coalesce(confirmed_at, created_at)`, never dropped. A succeeded `Refund` counts on `processed_at`, a refunded booking on `refunded_at`. Tickets (seats, registrations) stay on `registered_at` / the booking's `created_at`.
+- **Migrations (expand / contract):** Release N (batch A) adds and fills the columns (`payments/0008`: column, index, backfill; `bookings/0004`: column, backfill); code writes them. Release N+1, once N is deployed and no rollback below N is possible: re-run the backfill, then add CHECK `payment_paid_at_when_paid` (and the booking equivalent). The CHECK is deliberately not in N: a code-only rollback must keep working.
 - **`markers`:** events published in the range (needs batch B's `published_at`; empty until then).
 - **Tests:** the SQL query count is constant in the number of events. Day boundaries are checked at 23:59 / 00:00 Almaty. The range totals equal the per-event analytics for an event whose whole life is inside the range.
 - **Timeline bug fix:** `events/analytics.py` uses the same bucketing helper. Sales before the window are no longer piled onto its first day.

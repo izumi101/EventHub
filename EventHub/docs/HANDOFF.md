@@ -109,6 +109,8 @@ Contract and behaviour: [`ORGANIZER_DASHBOARD.md`](ORGANIZER_DASHBOARD.md). Foun
 
 Open: phase 2 of the dashboard (features list in the owner's notes): sales chart, payouts view, day-of-event live check-in, calendar view, attendee messaging by segment.
 
+Dashboard batch A migration note (branch `feat/dashboard-batch-a`): `payments/0008_payment_paid_at` adds `Payment.paid_at` (index `payment_paid_at_idx`) and backfills completed / refunded / disputed payments (earliest processed `paid` `PaymentEvent`, else `created_at`); `bookings/0004_booking_confirmed_at` adds `Booking.confirmed_at` and backfills it (the booking payment's `paid_at`, else `created_at`). Both reverse cleanly (the data steps are no-ops). Release N (batch A) adds and fills the columns; code writes them. Release N+1, once N is deployed and no rollback below N is possible: re-run the backfill, then add CHECK `payment_paid_at_when_paid` (and the booking equivalent). There is no CHECK in N, and readers fall back to `created_at` for a paid row without the timestamp, so a code-only rollback to the previous release is safe. `organizer/sales` counts revenue on these timestamps.
+
 ## Next phases (summary of PLAN.md)
 
 1. Payments: `PaymentProvider` layer (move Stripe into it), Freedom Pay provider + protocol-compatible **emulator** (CI/demo), method selection by currency, reconciliation job, missing Stripe events. Freedom Pay test credentials are pending (owner wrote to them). `freedompay.kz` is blocked by the cloud session's network policy.

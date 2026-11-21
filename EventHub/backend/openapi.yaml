@@ -4402,6 +4402,117 @@ paths:
               schema:
                 $ref: '#/components/schemas/Detail'
           description: The user neither is an organizer nor co-organizes an event.
+  /api/v1/organizer/reviews/:
+    get:
+      operationId: organizer_reviews_retrieve
+      description: Count, average, star distribution and the 5 latest reviews of all
+        managed events.
+      tags:
+      - organizer
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewsSummary'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The user neither is an organizer nor co-organizes an event.
+  /api/v1/organizer/sales/:
+    get:
+      operationId: organizer_sales_retrieve
+      description: Tickets sold and net revenue per day over all managed events, in
+        the business time zone, zero-filled. Revenue is one series per currency. The
+        totals of a range equal `net_revenue` and `tickets_sold` of `GET /events/{id}/analytics/`
+        for events whose whole life is inside it.
+      parameters:
+      - in: query
+        name: range
+        schema:
+          enum:
+          - 7d
+          - 30d
+          - 90d
+          type: string
+          default: 30d
+          minLength: 1
+        description: |-
+          Window ending today (business time zone): the last 7, 30 or 90 days, today included.
+
+          * `7d` - 7d
+          * `30d` - 30d
+          * `90d` - 90d
+      tags:
+      - organizer
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Sales'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: 'Validation failed: field name → list of messages (`non_field_errors`
+            for the request as a whole).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The user neither is an organizer nor co-organizes an event.
+  /api/v1/organizer/today/:
+    get:
+      operationId: organizer_today_retrieve
+      description: Published or pending managed events that are in progress or start
+        within the next 7 days, by start, at most 10, with `more` counting the rest.
+      tags:
+      - organizer
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Today'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The user neither is an organizer nor co-organizes an event.
   /api/v1/payments/create-checkout/{registration_id}/:
     post:
       operationId: payments_create_checkout_create
@@ -5544,6 +5655,32 @@ components:
       - refunded
       - sold_through_pct
       - tickets_sold
+    AnalyticsTicketType:
+      type: object
+      properties:
+        name:
+          type: string
+        count:
+          type: integer
+        revenue:
+          type: number
+          format: double
+        quantity:
+          type: integer
+          nullable: true
+          description: Capacity of the tier; null = unlimited (and for the "General"
+            and group rows).
+        remaining:
+          type: integer
+          nullable: true
+          description: Quantity less the active registrations of the tier, never negative;
+            null = unlimited.
+      required:
+      - count
+      - name
+      - quantity
+      - remaining
+      - revenue
     AnswerSummary:
       type: object
       properties:
@@ -6521,11 +6658,12 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/AnalyticsDay'
-          description: Last 30 days.
+          description: The last 30 days up to today, in the business time zone (`NOTIFICATION_TIME_ZONE`),
+            zero-filled.
         by_ticket_type:
           type: array
           items:
-            $ref: '#/components/schemas/AnalyticsBreakdown'
+            $ref: '#/components/schemas/AnalyticsTicketType'
         by_affiliate:
           type: array
           items:
@@ -8741,6 +8879,32 @@ components:
         * `3` - 3
         * `4` - 4
         * `5` - 5
+    RecentReview:
+      type: object
+      properties:
+        event_id:
+          type: integer
+        event_title:
+          type: string
+        rating:
+          type: integer
+          maximum: 5
+          minimum: 1
+        comment:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        author:
+          type: string
+          description: Name of the reviewer; never an email address.
+      required:
+      - author
+      - comment
+      - created_at
+      - event_id
+      - event_title
+      - rating
     RecoveryCodes:
       type: object
       properties:
@@ -9172,6 +9336,48 @@ components:
           type: string
       required:
       - rating
+    ReviewDistribution:
+      type: object
+      description: Reviews per star rating; all five keys are always present.
+      properties:
+        '1':
+          type: integer
+        '2':
+          type: integer
+        '3':
+          type: integer
+        '4':
+          type: integer
+        '5':
+          type: integer
+      required:
+      - '1'
+      - '2'
+      - '3'
+      - '4'
+      - '5'
+    ReviewsSummary:
+      type: object
+      properties:
+        count:
+          type: integer
+        average:
+          type: number
+          format: double
+          nullable: true
+          description: Two decimals; null when there are no reviews.
+        distribution:
+          $ref: '#/components/schemas/ReviewDistribution'
+        recent:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecentReview'
+          description: The 5 latest reviews.
+      required:
+      - average
+      - count
+      - distribution
+      - recent
     SaleStateEnum:
       enum:
       - inactive
@@ -9180,6 +9386,110 @@ components:
       - sold_out
       - on_sale
       type: string
+    Sales:
+      type: object
+      properties:
+        time_zone:
+          type: string
+          description: IANA name of the zone the days are bucketed in.
+        start:
+          type: string
+          format: date
+          description: First day of the range.
+        end:
+          type: string
+          format: date
+          description: 'Last day of the range: today in `time_zone`.'
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesDay'
+          description: Every day of [start, end], zero-filled.
+        revenue:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesRevenueSeries'
+          description: One series per currency with money movement in the range; never
+            summed across currencies.
+        markers:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesMarker'
+          description: Events published in the range. Empty until `Event.published_at`
+            exists (moderation batch).
+      required:
+      - days
+      - end
+      - markers
+      - revenue
+      - start
+      - time_zone
+    SalesDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        tickets:
+          type: integer
+          description: Confirmed registrations plus seats of confirmed group bookings,
+            on the day they were made.
+      required:
+      - date
+      - tickets
+    SalesMarker:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: Business-time-zone day the event was published.
+        event_id:
+          type: integer
+        title:
+          type: string
+        kind:
+          $ref: '#/components/schemas/SalesMarkerKindEnum'
+      required:
+      - date
+      - event_id
+      - kind
+      - title
+    SalesMarkerKindEnum:
+      enum:
+      - published
+      type: string
+      description: '* `published` - published'
+    SalesRevenueDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        net_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          description: Payments of the day minus refunds of the day; negative when
+            refunds exceed sales.
+      required:
+      - date
+      - net_revenue
+    SalesRevenueSeries:
+      type: object
+      properties:
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/SalesRevenueDay'
+          description: Every day of the range, zero-filled.
+      required:
+      - currency
+      - days
     SeatMap:
       type: object
       properties:
@@ -9507,6 +9817,68 @@ components:
           minimum: 0
       required:
       - name
+    Today:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/TodayEvent'
+          description: At most 10, by start.
+        more:
+          type: integer
+          description: How many further events there are beyond `results`.
+      required:
+      - more
+      - results
+    TodayEvent:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+        status:
+          $ref: '#/components/schemas/EventStatusEnum'
+        is_owner:
+          type: boolean
+        in_progress:
+          type: boolean
+          description: Started and not yet over (the end is `end_date`, else `date`).
+        stats:
+          $ref: '#/components/schemas/TodayStats'
+      required:
+      - date
+      - end_date
+      - id
+      - in_progress
+      - is_owner
+      - location
+      - stats
+      - status
+      - title
+    TodayStats:
+      type: object
+      properties:
+        tickets_sold:
+          type: integer
+        checked_in:
+          type: integer
+        capacity:
+          type: integer
+      required:
+      - capacity
+      - checked_in
+      - tickets_sold
     TokenPair:
       type: object
       properties:

@@ -53,6 +53,9 @@ urlpatterns = [
     path('organizer/dashboard/', views.OrganizerDashboardView.as_view(), name='organizer-dashboard'),
     path('organizer/events/', views.OrganizerEventsView.as_view(), name='organizer-events'),
     path('organizer/activity/', views.OrganizerActivityView.as_view(), name='organizer-activity'),
+    path('organizer/sales/', views.OrganizerSalesView.as_view(), name='organizer-sales'),
+    path('organizer/today/', views.OrganizerTodayView.as_view(), name='organizer-today'),
+    path('organizer/reviews/', views.OrganizerReviewsView.as_view(), name='organizer-reviews'),
     # Admin dashboard
     path('admin-dashboard/', views.AdminDashboardView.as_view(), name='admin-dashboard'),
     # Check-in lists & logs
