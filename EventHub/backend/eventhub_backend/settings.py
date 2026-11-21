@@ -175,7 +175,13 @@ DATABASES = {
         'PASSWORD': DB_APP_PASSWORD if DB_USES_APP_ROLE else DB_OWNER_PASSWORD,
         'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
         'PORT': os.environ.get('POSTGRES_PORT', '5432'),
-        'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+        # 0 = close the connection at the end of each request. The backend is
+        # ASGI (gunicorn + uvicorn workers): Django runs each request's sync
+        # code in a thread of its own, so persistent connections are never
+        # reused or closed and pile up until PostgreSQL runs out of slots
+        # (prod, 2026-11-21: 96 of 97 slots idle, sign-in failing with 500).
+        # Django's docs say to disable persistent connections under ASGI.
+        'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '0')),
         # One schema per domain; the search path keeps unqualified table
         # names working (docs/DATABASE_SCHEMAS.md).
         'OPTIONS': {'options': db_schema_connection_options()},
