@@ -1,7 +1,9 @@
 # gitleaks findings reviewed and confirmed NOT to be secrets, one exact fingerprint each
 # (commit:file:rule:line). A fingerprint matches only that commit, so the same value
 # added anywhere else is still reported. Never list a real secret here; rotate it.
+# Rewriting history (filter-repo, rebase) changes commit ids: update the fingerprints
+# here with the new ids from the rewrite's commit-map, or the secret scan fails.
 
 # Made-up Freedom Pay key in the production start-up guard test: it must look like a
 # real key, because the guard refuses demo-looking values. Not a credential of any account.
-8b5fc7dda16641579f46db6e5f17afd341672b8f:EventHub/backend/payments/test_freedompay.py:generic-api-key:478
+15be964f4221a027dac829aee5ce591eb6a0fe89:EventHub/backend/payments/test_freedompay.py:generic-api-key:478
