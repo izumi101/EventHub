@@ -10,7 +10,7 @@ import {
 } from '../../services/auth.service';
 import { FactorAdded, MfaService } from '../../services/mfa.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { MfaVerifier, MfaVerifyComponent } from '../mfa/mfa-verify.component';
 import { MfaEnrollComponent } from '../mfa/mfa-enroll.component';
 import { RecoveryCodesComponent } from '../mfa/recovery-codes.component';
@@ -297,7 +297,11 @@ export class LoginComponent {
         }
       },
       error: (err) => {
-        this.error = apiErrorMessage(err, this.lang.t('login.invalidCredentials'), 'detail');
+        this.error = errorMessage(err, this.lang, {
+          fallback: this.lang.t('login.invalidCredentials'),
+          unauthorized: this.lang.t('login.invalidCredentials'),
+          fields: ['detail'],
+        });
         this.submitting = false;
       },
     });

@@ -6,7 +6,7 @@ import { EventService, EventQuestion, QuestionType } from '../../services/event.
 import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, MessageSquare, Plus, Trash2, GripVertical } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -252,7 +252,10 @@ export class EventQuestionsComponent implements OnInit {
       error: (err) => {
         this.saving = false;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('questions.couldNotAddQuestion'), 'options'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('questions.couldNotAddQuestion'),
+            fields: ['options'],
+          }),
         );
       },
     });

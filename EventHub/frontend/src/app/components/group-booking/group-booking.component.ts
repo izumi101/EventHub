@@ -22,7 +22,7 @@ import {
   Clock,
   Ticket,
 } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -331,7 +331,10 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.holding = false;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('groupBooking.couldNotHoldSeats'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('groupBooking.couldNotHoldSeats'),
+            fields: ['error'],
+          }),
         );
         // refresh map
         this.eventService.getSeatMap(this.eventId).subscribe((sm) => {
@@ -349,7 +352,10 @@ export class GroupBookingComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.paying = false;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('groupBooking.paymentCouldNotBe'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('groupBooking.paymentCouldNotBe'),
+            fields: ['error'],
+          }),
         );
       },
     });

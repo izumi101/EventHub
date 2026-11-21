@@ -4,7 +4,8 @@ import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
-import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
+import { apiErrorBody } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -401,7 +402,10 @@ export class RegisterComponent {
         error: (err) => {
           this.submitting = false;
           this.errors.push(
-            apiErrorMessage(err, this.i18n.t('register.failedToSendVerification'), 'error'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('register.failedToSendVerification'),
+              fields: ['error'],
+            }),
           );
         },
       });
@@ -422,7 +426,10 @@ export class RegisterComponent {
         error: (err) => {
           this.submitting = false;
           this.errors.push(
-            apiErrorMessage(err, this.i18n.t('forgotPassword.invalidOrExpiredCode'), 'error'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('forgotPassword.invalidOrExpiredCode'),
+              fields: ['error'],
+            }),
           );
         },
       });

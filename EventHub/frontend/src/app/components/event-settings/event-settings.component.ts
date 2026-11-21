@@ -28,7 +28,7 @@ import {
   TriangleAlert,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -769,7 +769,10 @@ export class EventSettingsComponent implements OnInit {
         error: (err) => {
           this.creatingSeatMap = false;
           this.toast.error(
-            apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCreateThe'), 'error'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('eventSettings.couldNotCreateThe'),
+              fields: ['error'],
+            }),
           );
         },
       });
@@ -801,7 +804,10 @@ export class EventSettingsComponent implements OnInit {
       error: (err) => {
         this.cancellingEvent = false;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCancelThe'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventSettings.couldNotCancelThe'),
+            fields: ['error'],
+          }),
         );
       },
     });
@@ -825,7 +831,10 @@ export class EventSettingsComponent implements OnInit {
       error: (err) => {
         this.resolvingId = null;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('eventSettings.couldNotResolve'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventSettings.couldNotResolve'),
+            fields: ['error'],
+          }),
         );
       },
     });
@@ -856,12 +865,10 @@ export class EventSettingsComponent implements OnInit {
       error: (err) => {
         this.savingStaff = false;
         this.toast.error(
-          apiErrorMessage(
-            err,
-            this.i18n.t('eventSettings.couldNotAddMember'),
-            'invite_username',
-            'detail',
-          ),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventSettings.couldNotAddMember'),
+            fields: ['invite_username', 'detail'],
+          }),
         );
       },
     });
@@ -898,7 +905,10 @@ export class EventSettingsComponent implements OnInit {
         error: (err) => {
           this.savingAff = false;
           this.toast.error(
-            apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCreateDuplicate'), 'code'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('eventSettings.couldNotCreateDuplicate'),
+              fields: ['code'],
+            }),
           );
         },
       });
@@ -952,7 +962,10 @@ export class EventSettingsComponent implements OnInit {
         error: (err) => {
           this.savingHook = false;
           this.toast.error(
-            apiErrorMessage(err, this.i18n.t('eventSettings.couldNotCreateWebhook'), 'url'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('eventSettings.couldNotCreateWebhook'),
+              fields: ['url'],
+            }),
           );
         },
       });

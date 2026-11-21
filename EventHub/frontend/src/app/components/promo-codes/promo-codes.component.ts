@@ -21,7 +21,7 @@ import {
   DollarSign,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -376,7 +376,10 @@ export class PromoCodesComponent implements OnInit {
       error: (err) => {
         this.saving = false;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('promo.couldNotCreateCode'), 'code', 'detail'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('promo.couldNotCreateCode'),
+            fields: ['code', 'detail'],
+          }),
         );
       },
     });

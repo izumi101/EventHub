@@ -6,7 +6,7 @@ import {
   type NotificationTypePreference,
 } from '../../services/notification-preferences.service';
 import { ToastService } from '../../services/toast.service';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -131,7 +131,10 @@ export class NotificationPreferencesComponent implements OnInit {
       },
       error: (err) => {
         this.loadError.set(
-          apiErrorMessage(err, this.lang.t('notificationPrefs.loadFailed'), 'detail'),
+          errorMessage(err, this.lang, {
+            fallback: this.lang.t('notificationPrefs.loadFailed'),
+            fields: ['detail'],
+          }),
         );
         this.loading.set(false);
       },
@@ -157,7 +160,10 @@ export class NotificationPreferencesComponent implements OnInit {
         input.checked = !enabled;
         this.saving.set(null);
         this.toast.error(
-          apiErrorMessage(err, this.lang.t('notificationPrefs.saveFailed'), 'email', 'detail'),
+          errorMessage(err, this.lang, {
+            fallback: this.lang.t('notificationPrefs.saveFailed'),
+            fields: ['email', 'detail'],
+          }),
         );
       },
     });

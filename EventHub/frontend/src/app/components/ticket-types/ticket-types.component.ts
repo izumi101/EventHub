@@ -12,7 +12,7 @@ import { ToastService } from '../../services/toast.service';
 import { Event as EventModel } from '../../models/models';
 import { LucideAngularModule, Ticket, Plus, Trash2, Check, X } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -372,7 +372,10 @@ export class TicketTypesComponent implements OnInit {
       error: (err) => {
         this.saving = false;
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('ticketTypes.couldNotCreateTier'), 'price', 'detail'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('ticketTypes.couldNotCreateTier'),
+            fields: ['price', 'detail'],
+          }),
         );
       },
     });

@@ -13,7 +13,8 @@ import { Event, Seat, SeatMap } from '../../models/models';
 import { SeatSelectorComponent } from '../seat-selector/seat-selector.component';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
-import { apiErrorMessage, apiErrorStatus } from '../../api/api-error';
+import { apiErrorStatus } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -565,7 +566,10 @@ export class EventCheckoutModalComponent implements OnInit {
         this.checkingPromo = false;
       },
       error: (err) => {
-        this.promoError = apiErrorMessage(err, this.i18n.t('checkout.invalidPromoCode'), 'error');
+        this.promoError = errorMessage(err, this.i18n, {
+          fallback: this.i18n.t('checkout.invalidPromoCode'),
+          fields: ['error'],
+        });
         this.promoQuote = null;
         this.checkingPromo = false;
       },

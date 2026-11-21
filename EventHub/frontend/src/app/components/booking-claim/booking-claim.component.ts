@@ -8,7 +8,7 @@ import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Users, Check, Armchair } from 'lucide-angular';
 import * as QRCode from 'qrcode';
 import { DialogDirective } from '../../directives/dialog.directive';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -331,7 +331,10 @@ export class BookingClaimComponent implements OnInit {
       },
       error: (err) =>
         this.toast.error(
-          apiErrorMessage(err, this.i18n.t('bookingClaim.couldNotClaimSeat'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('bookingClaim.couldNotClaimSeat'),
+            fields: ['error'],
+          }),
         ),
     });
   }

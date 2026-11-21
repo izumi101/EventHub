@@ -143,7 +143,9 @@ describe('GroupBookingComponent payment flow', () => {
     s.cmp.pay();
 
     expect(s.cmp.paying).toBe(false);
-    expect(s.toasts().map((t) => t.message)).toContain('Payment could not be started.');
+    expect(s.toasts().map((t) => t.message)).toContain(
+      'The service is temporarily unavailable. Try again in a minute.',
+    );
     expect(loc.href).toBe('http://localhost/group');
     s.cmp.ngOnDestroy();
   });

@@ -23,7 +23,7 @@ import {
   RefreshCw,
   ChevronLeft,
 } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -385,11 +385,10 @@ export class ScanComponent implements AfterViewInit, OnDestroy {
       error: (err) => {
         this.result = null;
         this.resultStatus = 'error';
-        this.errorMessage = apiErrorMessage(
-          err,
-          this.i18n.t('scan.invalidTicketOrInsufficient'),
-          'error',
-        );
+        this.errorMessage = errorMessage(err, this.i18n, {
+          fallback: this.i18n.t('scan.invalidTicketOrInsufficient'),
+          fields: ['error'],
+        });
         this.vibrate([200]);
         this.state = 'result';
       },

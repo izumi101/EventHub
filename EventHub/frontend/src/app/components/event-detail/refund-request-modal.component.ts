@@ -5,7 +5,7 @@ import { EventService } from '../../services/event.service';
 import { ToastService } from '../../services/toast.service';
 import { Event } from '../../models/models';
 import { DialogDirective } from '../../directives/dialog.directive';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -83,7 +83,10 @@ export class RefundRequestModalComponent {
       error: (err) => {
         this.submitting = false;
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('refundRequest.couldNotSubmitRefund'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('refundRequest.couldNotSubmitRefund'),
+            fields: ['error'],
+          }),
         );
       },
     });

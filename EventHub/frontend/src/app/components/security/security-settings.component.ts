@@ -2,7 +2,7 @@ import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { Observable } from 'rxjs';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { isStepUpRequired } from '../../interceptors/step-up.interceptor';
 import { FactorAdded, MfaService, MfaStatus, Passkey } from '../../services/mfa.service';
 import { ModalService } from '../../services/modal.service';
@@ -386,7 +386,12 @@ export class SecuritySettingsComponent implements OnInit {
       },
       error: (err: unknown) => {
         this.loading.set(false);
-        this.loadError.set(apiErrorMessage(err, this.lang.t('security.loadFailed'), 'error'));
+        this.loadError.set(
+          errorMessage(err, this.lang, {
+            fallback: this.lang.t('security.loadFailed'),
+            fields: ['error'],
+          }),
+        );
       },
     });
   }
@@ -505,6 +510,8 @@ export class SecuritySettingsComponent implements OnInit {
     this.busy.set(false);
     // A cancelled step-up dialog is the user's choice, not an error to report.
     if (isStepUpRequired(err)) return;
-    this.toast.error(apiErrorMessage(err, fallback, 'error', 'detail'));
+    this.toast.error(
+      errorMessage(err, this.lang, { fallback: fallback, fields: ['error', 'detail'] }),
+    );
   }
 }

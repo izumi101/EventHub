@@ -4,7 +4,7 @@ import { RouterModule, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { LucideAngularModule, Eye, EyeOff } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -297,11 +297,10 @@ export class ForgotPasswordComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = apiErrorMessage(
-          err,
-          this.i18n.t('forgotPassword.requestFailedPleaseTry'),
-          'detail',
-        );
+        this.error = errorMessage(err, this.i18n, {
+          fallback: this.i18n.t('forgotPassword.requestFailedPleaseTry'),
+          fields: ['detail'],
+        });
       },
     });
   }
@@ -321,11 +320,10 @@ export class ForgotPasswordComponent {
       },
       error: (err) => {
         this.loading = false;
-        this.error = apiErrorMessage(
-          err,
-          this.i18n.t('forgotPassword.invalidOrExpiredCode'),
-          'detail',
-        );
+        this.error = errorMessage(err, this.i18n, {
+          fallback: this.i18n.t('forgotPassword.invalidOrExpiredCode'),
+          fields: ['detail'],
+        });
       },
     });
   }
@@ -353,7 +351,10 @@ export class ForgotPasswordComponent {
         },
         error: (err) => {
           this.loading = false;
-          this.error = apiErrorMessage(err, this.i18n.t('forgotPassword.failedToSetNew'), 'detail');
+          this.error = errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('forgotPassword.failedToSetNew'),
+            fields: ['detail'],
+          });
         },
       });
   }

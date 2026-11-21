@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import * as QRCode from 'qrcode';
 import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import {
   FactorAdded,
   MfaService,
@@ -350,7 +351,10 @@ export class MfaEnrollComponent implements OnInit {
       this.busy.set(false);
       this.error.set(
         isApiError(err)
-          ? apiErrorMessage(err, this.lang.t('mfa.enroll.passkeyStartFailed'), 'error')
+          ? errorMessage(err, this.lang, {
+              fallback: this.lang.t('mfa.enroll.passkeyStartFailed'),
+              fields: ['error'],
+            })
           : this.passkeys.errorMessage(err),
       );
       return;
@@ -388,7 +392,13 @@ export class MfaEnrollComponent implements OnInit {
     this.busy.set(false);
     this.code = '';
     const wait = mfaRetryAfter(err);
-    if (wait && mfaErrorCode(err) === 'mfa_email_throttled') this.countdown.start(wait);
-    this.error.set(apiErrorMessage(err, fallback, 'error', 'code', 'detail'));
+    const throttled = mfaErrorCode(err) === 'mfa_email_throttled';
+    if (wait && throttled) this.countdown.start(wait);
+    // The app's own throttle answer explains itself; everything else is mapped by status.
+    this.error.set(
+      throttled
+        ? apiErrorMessage(err, fallback, 'error')
+        : errorMessage(err, this.lang, { fallback, fields: ['error', 'code', 'detail'] }),
+    );
   }
 }

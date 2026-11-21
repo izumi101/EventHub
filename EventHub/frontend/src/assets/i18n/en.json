@@ -75,6 +75,13 @@
     "subject": "Subject",
     "writeYourMessageTo": "Write your message to attendees…"
   },
+  "httpError": {
+    "generic": "Something went wrong. Please try again.",
+    "noConnection": "No connection to the server. Check your internet and try again.",
+    "tooManyAttempts": "Too many attempts. Please wait a moment and try again.",
+    "tooManyAttemptsWait": "Too many attempts. Try again in {{ seconds }} s.",
+    "unavailable": "The service is temporarily unavailable. Try again in a minute."
+  },
   "bookingClaim": {
     "attendeenameShowAtThe": "{{ attendeeName }} — show at the entrance",
     "beforeClaimingToGet": "before claiming to get your own QR ticket.",
