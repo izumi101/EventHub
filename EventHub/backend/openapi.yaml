@@ -4380,7 +4380,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedOrganizerEventPageList'
+                $ref: '#/components/schemas/PaginatedOrganizerEventList'
           description: ''
         '400':
           content:
@@ -7659,28 +7659,6 @@ components:
       - tax_percent
       - ticket_types
       - title
-    OrganizerEventPage:
-      type: object
-      properties:
-        count:
-          type: integer
-        next:
-          type: string
-          format: uri
-          nullable: true
-        previous:
-          type: string
-          format: uri
-          nullable: true
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/OrganizerEvent'
-      required:
-      - count
-      - next
-      - previous
-      - results
     OrganizerEventStats:
       type: object
       properties:
@@ -7877,7 +7855,7 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Notification'
-    PaginatedOrganizerEventPageList:
+    PaginatedOrganizerEventList:
       type: object
       required:
       - count
@@ -7899,7 +7877,7 @@ components:
         results:
           type: array
           items:
-            $ref: '#/components/schemas/OrganizerEventPage'
+            $ref: '#/components/schemas/OrganizerEvent'
     PaginatedPromoCodeList:
       type: object
       required:

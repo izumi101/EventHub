@@ -2960,14 +2960,6 @@ export interface components {
             readonly is_owner: boolean;
             readonly stats: components["schemas"]["OrganizerEventStats"];
         };
-        OrganizerEventPage: {
-            count: number;
-            /** Format: uri */
-            next: string | null;
-            /** Format: uri */
-            previous: string | null;
-            results: components["schemas"]["OrganizerEvent"][];
-        };
         OrganizerEventStats: {
             tickets_sold: number;
             checked_in: number;
@@ -3081,7 +3073,7 @@ export interface components {
             previous?: string | null;
             results: components["schemas"]["Notification"][];
         };
-        PaginatedOrganizerEventPageList: {
+        PaginatedOrganizerEventList: {
             /** @example 123 */
             count: number;
             /**
@@ -3094,7 +3086,7 @@ export interface components {
              * @example http://api.example.org/accounts/?page=2
              */
             previous?: string | null;
-            results: components["schemas"]["OrganizerEventPage"][];
+            results: components["schemas"]["OrganizerEvent"][];
         };
         PaginatedPromoCodeList: {
             /** @example 123 */
@@ -8661,7 +8653,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PaginatedOrganizerEventPageList"];
+                    "application/json": components["schemas"]["PaginatedOrganizerEventList"];
                 };
             };
             /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */

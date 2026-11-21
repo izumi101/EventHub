@@ -107,13 +107,6 @@ class OrganizerEventSerializer(EventListSerializer):
         return self.context['stats'][obj.pk]
 
 
-class OrganizerEventPageSerializer(serializers.Serializer):
-    count = serializers.IntegerField()
-    next = serializers.URLField(allow_null=True)
-    previous = serializers.URLField(allow_null=True)
-    results = OrganizerEventSerializer(many=True)
-
-
 class ActivityItemSerializer(serializers.Serializer):
     id = serializers.CharField(help_text='Stable id, e.g. `registration:812`.')
     type = serializers.ChoiceField(choices=ACTIVITY_TYPES)

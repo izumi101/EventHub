@@ -17,7 +17,6 @@ from ..organizer_serializers import (
     ActivityFeedSerializer,
     ActivityQuerySerializer,
     DashboardSummarySerializer,
-    OrganizerEventPageSerializer,
     OrganizerEventSerializer,
     OrganizerEventsQuerySerializer,
 )
@@ -84,7 +83,9 @@ class OrganizerEventsView(generics.ListAPIView):
     @extend_schema(
         parameters=[OrganizerEventsQuerySerializer],
         responses={
-            200: OrganizerEventPageSerializer,
+            # A list view: drf-spectacular wraps this in the paginator's page
+            # (`PaginatedOrganizerEventList`), so declare the items only.
+            200: OrganizerEventSerializer(many=True),
             400: VALIDATION_ERROR,
             401: UNAUTHENTICATED,
             403: DASHBOARD_FORBIDDEN,
