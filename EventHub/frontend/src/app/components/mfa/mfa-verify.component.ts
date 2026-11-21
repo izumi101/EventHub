@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Observable, firstValueFrom } from 'rxjs';
+import { errorMessage } from '../../api/error-message';
 import { apiErrorMessage } from '../../api/api-error';
 import {
   EmailCodeSent,
@@ -231,7 +232,15 @@ export class MfaVerifyComponent {
           this.sending.set(false);
           const wait = mfaRetryAfter(err);
           if (wait) this.countdown.start(wait);
-          this.error.set(apiErrorMessage(err, this.lang.t('mfa.verifyForm.sendFailed'), 'error'));
+          // The app's own throttle answer explains itself and drives the countdown.
+          this.error.set(
+            mfaErrorCode(err) === 'mfa_email_throttled'
+              ? apiErrorMessage(err, this.lang.t('mfa.verifyForm.sendFailed'), 'error')
+              : errorMessage(err, this.lang, {
+                  fallback: this.lang.t('mfa.verifyForm.sendFailed'),
+                  fields: ['error'],
+                }),
+          );
         },
       });
   }
@@ -255,7 +264,10 @@ export class MfaVerifyComponent {
       this.busy.set(false);
       this.error.set(
         isApiError(err)
-          ? apiErrorMessage(err, this.lang.t('mfa.verifyForm.passkeyStartFailed'), 'error')
+          ? errorMessage(err, this.lang, {
+              fallback: this.lang.t('mfa.verifyForm.passkeyStartFailed'),
+              fields: ['error'],
+            })
           : this.passkeys.errorMessage(err),
       );
       return;
@@ -283,9 +295,10 @@ export class MfaVerifyComponent {
   }
 
   private messageFor(err: unknown): string {
-    if (mfaErrorCode(err) === 'mfa_token_invalid') {
-      return apiErrorMessage(err, this.lang.t('mfa.verifyForm.tokenExpired'), 'error');
-    }
-    return apiErrorMessage(err, this.lang.t('mfa.verifyForm.failed'), 'error');
+    const expired = mfaErrorCode(err) === 'mfa_token_invalid';
+    return errorMessage(err, this.lang, {
+      fallback: this.lang.t(expired ? 'mfa.verifyForm.tokenExpired' : 'mfa.verifyForm.failed'),
+      fields: ['error'],
+    });
   }
 }

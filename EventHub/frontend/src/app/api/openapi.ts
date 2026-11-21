@@ -1216,7 +1216,12 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Duplicate an event (organizer only). Copies seat map + promo codes. */
+        /**
+         * @description Duplicate an event as a draft (organizer only).
+         *
+         *     Copies the seat map, ticket types, questions, promo codes and check-in
+         *     lists. The optional `title` names the copy.
+         */
         post: operations["events_clone_create"];
         delete?: never;
         options?: never;
@@ -1662,6 +1667,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizer/activity/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Registrations, group bookings, check-ins and refunds of the last 30 days on managed events, newest first. */
+        get: operations["organizer_activity_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizer/dashboard/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Totals over all events the user organizes or co-organizes, independent of tabs and paging. */
+        get: operations["organizer_dashboard_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizer/events/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Events the user organizes or co-organizes, one tab at a time, with sales numbers computed like `GET /events/{id}/analytics/` `kpis`. Every event is in exactly one tab. */
+        get: operations["organizer_events_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/create-checkout/{registration_id}/": {
         parameters: {
             query?: never;
@@ -1928,6 +1984,39 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        ActivityFeed: {
+            results: components["schemas"]["ActivityItem"][];
+            /** @description Pass as `cursor` to load the next page; null when there is nothing older. */
+            next_cursor: string | null;
+        };
+        ActivityItem: {
+            /** @description Stable id, e.g. `registration:812`. */
+            id: string;
+            type: components["schemas"]["ActivityItemTypeEnum"];
+            /** Format: date-time */
+            occurred_at: string;
+            event_id: number;
+            event_title: string;
+            /** @description Never an email address. */
+            attendee_name: string;
+            /** @description Seats for a group booking, otherwise 1. */
+            quantity: number;
+            /**
+             * Format: decimal
+             * @description Refunds only.
+             */
+            amount: string | null;
+            /** @description Refunds only. */
+            currency: string | null;
+        };
+        /**
+         * @description * `registration` - registration
+         *     * `group_booking` - group_booking
+         *     * `check_in` - check_in
+         *     * `refund` - refund
+         * @enum {string}
+         */
+        ActivityItemTypeEnum: "registration" | "group_booking" | "check_in" | "refund";
         AdminDashboard: {
             total_users: number;
             total_events: number;
@@ -2300,8 +2389,44 @@ export interface components {
             seat_id: number;
             name: string;
         };
+        CloneEventRequestRequest: {
+            /** @description Title of the copy (trimmed). Default: the original title plus " (Copy)". */
+            title?: string;
+        };
         CodeRequestRequest: {
             code: string;
+        };
+        DashboardRevenue: {
+            currency: string;
+            /** Format: decimal */
+            net_revenue: string;
+        };
+        DashboardSummary: {
+            /** @description Number of managed events in each tab. */
+            tabs: components["schemas"]["DashboardTabs"];
+            /** @description Events waiting for admin review that can still be published. */
+            pending_approval: number;
+            /** @description Upcoming-tab events that start within 7 days. */
+            upcoming_next_7_days: number;
+            tickets_sold: number;
+            checked_in: number;
+            /**
+             * Format: double
+             * @description Percent, one decimal; 0 when nothing is sold.
+             */
+            checkin_rate_pct: number;
+            /** @description Net revenue per currency, never summed across currencies. */
+            revenue: components["schemas"]["DashboardRevenue"][];
+            /** @description Tickets confirmed in [now-7d, now). */
+            sales_last_7_days: number;
+            /** @description Tickets confirmed in [now-14d, now-7d). */
+            sales_previous_7_days: number;
+        };
+        DashboardTabs: {
+            upcoming: number;
+            past: number;
+            drafts: number;
+            inactive: number;
         };
         /**
          * @description * `free` - free
@@ -2781,6 +2906,76 @@ export interface components {
             last_name?: string;
             phone?: string;
         };
+        /**
+         * @description An event of the dashboard list: the public list payload plus the
+         *     caller's relation to it and its sales numbers (`context['stats']` maps
+         *     event id to `dashboard.bulk_event_stats`).
+         */
+        OrganizerEvent: {
+            readonly id: number;
+            title: string;
+            description: string;
+            readonly organizer: components["schemas"]["OrganizerMini"];
+            readonly category: components["schemas"]["CategoryMini"];
+            /** Format: date-time */
+            date: string;
+            /** Format: date-time */
+            end_date: string | null;
+            location: string;
+            address: string;
+            /** Format: uri */
+            image: string | null;
+            /** Format: decimal */
+            price: string;
+            max_participants: number;
+            status: components["schemas"]["EventStatusEnum"];
+            is_online: boolean;
+            readonly online_link: string;
+            readonly available_spots: number;
+            readonly is_free: boolean;
+            readonly has_ticket_types: boolean;
+            /** Format: decimal */
+            readonly price_from: string;
+            readonly ticket_types: components["schemas"]["TicketType"][];
+            /**
+             * Format: decimal
+             * @description e.g. 12 for 12% VAT
+             */
+            tax_percent: string;
+            /**
+             * Format: decimal
+             * @description Platform/booking fee as a %
+             */
+            service_fee_percent: string;
+            fees_passed_to_buyer: boolean;
+            currency: string;
+            refundable: boolean;
+            readonly registered_count: number;
+            /** Format: date-time */
+            readonly created_at: string;
+            /** @description Custom <title> / og:title (falls back to event title) */
+            seo_title: string;
+            /** @description Custom meta description / og:description */
+            seo_description: string;
+            readonly is_owner: boolean;
+            readonly stats: components["schemas"]["OrganizerEventStats"];
+        };
+        OrganizerEventStats: {
+            tickets_sold: number;
+            checked_in: number;
+            /** Format: double */
+            checkin_rate_pct: number;
+            capacity: number;
+            /**
+             * Format: double
+             * @description Not clamped: an overbooked event is above 100.
+             */
+            sold_through_pct: number;
+            pending: number;
+            /** Format: decimal */
+            net_revenue: string;
+            currency: string;
+        };
         OrganizerMini: {
             readonly id: number;
             /** @description Required. 150 characters or fewer. Letters, digits and @/./+/-/_ only. */
@@ -2877,6 +3072,21 @@ export interface components {
              */
             previous?: string | null;
             results: components["schemas"]["Notification"][];
+        };
+        PaginatedOrganizerEventList: {
+            /** @example 123 */
+            count: number;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=4
+             */
+            next?: string | null;
+            /**
+             * Format: uri
+             * @example http://api.example.org/accounts/?page=2
+             */
+            previous?: string | null;
+            results: components["schemas"]["OrganizerEvent"][];
         };
         PaginatedPromoCodeList: {
             /** @example 123 */
@@ -7145,7 +7355,13 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CloneEventRequestRequest"];
+                "application/x-www-form-urlencoded": components["schemas"]["CloneEventRequestRequest"];
+                "multipart/form-data": components["schemas"]["CloneEventRequestRequest"];
+            };
+        };
         responses: {
             201: {
                 headers: {
@@ -7153,6 +7369,17 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EventList"];
+                };
+            };
+            /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Missing or invalid access token. */
@@ -8295,6 +8522,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    organizer_activity_retrieve: {
+        parameters: {
+            query?: {
+                /** @description Opaque `next_cursor` of the previous page; returns the items after it. Treat it as a black box. */
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityFeed"];
+                };
+            };
+            /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The user neither is an organizer nor co-organizes an event. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    organizer_dashboard_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummary"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The user neither is an organizer nor co-organizes an event. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    organizer_events_list: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Default depends on the tab: `date` for upcoming, `-date` for the others.
+                 *
+                 *     * `date` - date
+                 *     * `-date` - -date
+                 *     * `-tickets_sold` - -tickets_sold
+                 *     * `-checkin_rate` - -checkin_rate
+                 *     * `-sold_through` - -sold_through
+                 */
+                ordering?: "date" | "-date" | "-tickets_sold" | "-checkin_rate" | "-sold_through";
+                /** @description A page number within the paginated result set. */
+                page?: number;
+                /** @description Number of results to return per page. */
+                page_size?: number;
+                /** @description Case-insensitive match on title or location. */
+                search?: string;
+                /**
+                 * @description * `upcoming` - upcoming
+                 *     * `past` - past
+                 *     * `drafts` - drafts
+                 *     * `inactive` - inactive
+                 */
+                tab?: "upcoming" | "past" | "drafts" | "inactive";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaginatedOrganizerEventList"];
+                };
+            };
+            /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The user neither is an organizer nor co-organizes an event. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
                 };
             };
         };

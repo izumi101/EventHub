@@ -19,7 +19,7 @@ import {
   Mail,
 } from 'lucide-angular';
 import { DialogDirective } from '../../directives/dialog.directive';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -779,7 +779,10 @@ export class AttendeeListComponent implements OnInit {
         error: (err) => {
           this.refunding = false;
           this.toastService.error(
-            apiErrorMessage(err, this.i18n.t('attendees.refundFailed'), 'error'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('attendees.refundFailed'),
+              fields: ['error'],
+            }),
           );
         },
       });
@@ -808,7 +811,10 @@ export class AttendeeListComponent implements OnInit {
       error: (err) => {
         this.refundingBookingId = null;
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('attendees.refundFailed'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('attendees.refundFailed'),
+            fields: ['error'],
+          }),
         );
       },
     });
@@ -839,7 +845,10 @@ export class AttendeeListComponent implements OnInit {
         error: (err) => {
           this.sending = false;
           this.toastService.error(
-            apiErrorMessage(err, this.i18n.t('attendees.couldNotSendMessage'), 'error'),
+            errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('attendees.couldNotSendMessage'),
+              fields: ['error'],
+            }),
           );
         },
       });

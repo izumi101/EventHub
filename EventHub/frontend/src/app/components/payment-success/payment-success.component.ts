@@ -14,7 +14,7 @@ import {
 import { BookingStatus, PaymentStatus } from '../../models/models';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { LucideAngularModule, CircleCheckBig, CircleAlert, Smartphone } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -334,12 +334,10 @@ export class PaymentSuccessComponent implements OnInit {
           },
           error: (err) => {
             // Never claim success we couldn't verify.
-            this.error = apiErrorMessage(
-              err,
-              this.i18n.t('paymentSuccess.weCouldNotVerify'),
-              'error',
-              'detail',
-            );
+            this.error = errorMessage(err, this.i18n, {
+              fallback: this.i18n.t('paymentSuccess.weCouldNotVerify'),
+              fields: ['error', 'detail'],
+            });
             this.loading = false;
           },
         });
@@ -377,12 +375,10 @@ export class PaymentSuccessComponent implements OnInit {
         this.loading = false;
       },
       error: (err) => {
-        this.error = apiErrorMessage(
-          err,
-          this.i18n.t('paymentSuccess.verificationFailed2'),
-          'error',
-          'detail',
-        );
+        this.error = errorMessage(err, this.i18n, {
+          fallback: this.i18n.t('paymentSuccess.verificationFailed2'),
+          fields: ['error', 'detail'],
+        });
         this.loading = false;
       },
     });

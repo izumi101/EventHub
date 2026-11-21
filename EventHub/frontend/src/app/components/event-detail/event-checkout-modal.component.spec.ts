@@ -151,6 +151,26 @@ describe('EventCheckoutModalComponent price breakdown', () => {
     expect(cmp.checkingPromo).toBe(false);
   });
 
+  it('says the service is unavailable, not "invalid code", when the promo check hits a 500', () => {
+    const { cmp, eventService } = setup(eventWith());
+    eventService.validatePromo.mockReturnValue(
+      throwError(() => ({ status: 500, error: { error: 'Traceback (most recent call last)' } })),
+    );
+    cmp.promoInput = 'SAVE10';
+    cmp.applyPromo();
+    expect(cmp.promoError).toBe('The service is temporarily unavailable. Try again in a minute.');
+    expect(cmp.promoQuote).toBeNull();
+    expect(cmp.checkingPromo).toBe(false);
+  });
+
+  it('says there is no connection when the promo check never reached the server', () => {
+    const { cmp, eventService } = setup(eventWith());
+    eventService.validatePromo.mockReturnValue(throwError(() => ({ status: 0 })));
+    cmp.promoInput = 'SAVE10';
+    cmp.applyPromo();
+    expect(cmp.promoError).toBe('No connection to the server. Check your internet and try again.');
+  });
+
   it('quotes the promo against the selected seat', () => {
     const { cmp, eventService } = setup(eventWith());
     eventService.validatePromo.mockReturnValue(

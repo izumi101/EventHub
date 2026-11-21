@@ -29,7 +29,7 @@ from rest_framework.response import Response
 from common.choices import EventStatusChoices, RegistrationStatusChoices
 from common.exceptions import error_response
 from common.permissions import can_manage_event
-from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED, MessageSerializer
+from common.schema import ERROR, NOT_FOUND, UNAUTHENTICATED, VALIDATION_ERROR, MessageSerializer
 from mfa.stepup import require_recent_mfa
 
 from .. import schema as api
@@ -37,6 +37,7 @@ from ..analytics import event_analytics, net_revenue
 from ..exports import attendees_csv_response
 from ..messaging import broadcast_to_attendees
 from ..models import Category, Event, EventSeat, SeatMap, TicketType
+from ..organizer_serializers import CloneEventRequestSerializer
 from ..pricing import get_dynamic_price
 from ..promo import PromoError, quote
 from ..queue import get_queue_status, is_queue_active, join_queue
@@ -278,7 +279,9 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
 
         total_regs = event.registrations.filter(status=RegistrationStatusChoices.CONFIRMED).count()
-        checked_in = event.registrations.filter(is_checked_in=True).count()
+        # Same population as total_regs: a checked-in ticket that is no longer
+        # confirmed (e.g. refunded afterwards) must not push the rate past 100%.
+        checked_in = event.registrations.filter(status=RegistrationStatusChoices.CONFIRMED, is_checked_in=True).count()
 
         return Response(
             {
@@ -594,14 +597,28 @@ class EventViewSet(viewsets.ModelViewSet):
         except PromoError as exc:
             return Response({'error': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-    @extend_schema(request=None, responses={201: EventListSerializer, 403: ERROR, 401: UNAUTHENTICATED, 404: NOT_FOUND})
+    @extend_schema(
+        request=CloneEventRequestSerializer,
+        responses={
+            201: EventListSerializer,
+            400: VALIDATION_ERROR,
+            403: ERROR,
+            401: UNAUTHENTICATED,
+            404: NOT_FOUND,
+        },
+    )
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def clone(self, request, pk=None):
-        """Duplicate an event (organizer only). Copies seat map + promo codes."""
+        """Duplicate an event as a draft (organizer only).
+
+        Copies the seat map, ticket types, questions, promo codes and check-in
+        lists. The optional `title` names the copy."""
         event = self.get_object()
         if not can_manage_event(event, request.user):
             return Response({'error': 'Unauthorized'}, status=status.HTTP_403_FORBIDDEN)
-        new_event = clone_event(event=event, actor=request.user)
+        payload = CloneEventRequestSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        new_event = clone_event(event=event, actor=request.user, title=payload.validated_data.get('title'))
         return Response(
             EventListSerializer(new_event, context={'request': request}).data,
             status=status.HTTP_201_CREATED,

@@ -312,6 +312,9 @@ CORS_ALLOWED_ORIGINS = env_list(
 )
 CORS_ALLOW_ALL_ORIGINS = env_bool('DJANGO_CORS_ALLOW_ALL_ORIGINS', DEBUG)
 CORS_ALLOW_CREDENTIALS = True
+# Browsers hide every response header but the safelisted ones from cross-origin
+# scripts. The SPA reads Retry-After to show how long a throttled caller waits.
+CORS_EXPOSE_HEADERS = ['Retry-After']
 CSRF_TRUSTED_ORIGINS = env_list(
     'DJANGO_CSRF_TRUSTED_ORIGINS',
     ['http://localhost:4200', 'http://127.0.0.1:4200'],

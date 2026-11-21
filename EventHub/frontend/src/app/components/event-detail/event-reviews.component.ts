@@ -5,7 +5,7 @@ import { EventService, type Review } from '../../services/event.service';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { Event, Registration } from '../../models/models';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe, LocalNumberPipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -171,7 +171,10 @@ export class EventReviewsComponent implements OnInit {
       },
       error: (err) => {
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('reviews.failedToPostReview'), 'non_field_errors'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('reviews.failedToPostReview'),
+            fields: ['non_field_errors'],
+          }),
         );
         this.submittingReview = false;
       },

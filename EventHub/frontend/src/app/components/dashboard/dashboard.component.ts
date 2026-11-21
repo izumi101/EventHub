@@ -1,818 +1,741 @@
-import { Component, OnInit, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
-import { FormsModule } from '@angular/forms';
-import { EventService } from '../../services/event.service';
-import { AuthService } from '../../services/auth.service';
-import { ModalService } from '../../services/modal.service';
-import { ToastService } from '../../services/toast.service';
-import { Event, EventStatsResponse } from '../../models/models';
-import { forkJoin } from 'rxjs';
 import {
-  LucideAngularModule,
-  Plus,
-  Calendar,
-  MapPin,
-  Users,
-  CircleCheckBig,
-  ChartNoAxesColumn,
-  ScanLine,
-  Search,
-  PenLine,
-  Copy,
-  Trash2,
-  Ellipsis,
-  TrendingUp,
-  DollarSign,
-} from 'lucide-angular';
-import { MoneyPipe } from '../../pipes/money.pipe';
+  Component,
+  DestroyRef,
+  Injector,
+  afterNextRender,
+  inject,
+  signal,
+  viewChildren,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, ParamMap, Params, Router, RouterModule } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LocalDatePipe, LocalNumberPipe } from '../../i18n/locale.pipes';
+import {
+  Subject,
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  filter,
+  map,
+  of,
+  switchMap,
+} from 'rxjs';
+import { ChartNoAxesColumn, LucideAngularModule, Plus, ScanLine } from 'lucide-angular';
+import { errorMessage } from '../../api/error-message';
 import { LanguageService } from '../../i18n/language.service';
+import { AuthService } from '../../services/auth.service';
+import { EventService } from '../../services/event.service';
+import { ModalService } from '../../services/modal.service';
+import {
+  DASHBOARD_ORDERINGS,
+  DASHBOARD_PAGE_SIZE,
+  DASHBOARD_TABS,
+  DEFAULT_ORDERING,
+  OrganizerDashboardService,
+  SEARCH_MAX_LENGTH,
+  type DashboardOrdering,
+  type DashboardSummary,
+  type DashboardTab,
+  type OrganizerEvent,
+  type OrganizerEventPage,
+} from '../../services/organizer-dashboard.service';
+import { ToastService } from '../../services/toast.service';
+import { isAdmin } from '../../utils/roles';
+import { DashboardActivityComponent } from './dashboard-activity.component';
+import { DashboardEventCardComponent } from './dashboard-event-card.component';
+import { DashboardModerationQueueComponent } from './dashboard-moderation-queue.component';
+import { DashboardSummaryComponent, type SectionStatus } from './dashboard-summary.component';
+import {
+  DASHBOARD_PANEL_ID,
+  DashboardToolbarComponent,
+  TAB_LABEL,
+  dashboardTabId,
+} from './dashboard-toolbar.component';
 
-type EventTab = 'upcoming' | 'past' | 'drafts';
-type SortKey = 'date' | 'registrations' | 'checkin' | 'capacity';
+/** The event title column of the backend is 200 characters wide. */
+export const EVENT_TITLE_MAX_LENGTH = 200;
 
-interface ActivityItem {
-  id: string;
-  messageKey: string;
-  params: Record<string, unknown>;
-  timestamp: Date;
-  type: 'registration' | 'approval' | 'change';
+/** What the list shows. It lives in the URL, so reload and back navigation restore it. */
+export interface ListQuery {
+  tab: DashboardTab;
+  search: string;
+  ordering: DashboardOrdering;
 }
 
-interface EventWithStats extends Event {
-  stats?: EventStatsResponse;
-  revenue?: number;
-  capacityPercent?: number;
+interface ListRequest {
+  query: ListQuery;
+  page: number;
+  /** How many pages in a row were asked because the one before brought nothing new. */
+  attempt: number;
 }
 
+/** Bound on those follow-up requests. */
+const MAX_EMPTY_PAGES = 3;
+
+type ListResult =
+  { request: ListRequest; page: OrganizerEventPage } | { request: ListRequest; message: string };
+
+const sameQuery = (a: ListQuery, b: ListQuery): boolean =>
+  a.tab === b.tab && a.search === b.search && a.ordering === b.ordering;
+
+/** Query params to state; anything missing or unknown falls back to the defaults. */
+export function parseQuery(params: ParamMap): ListQuery {
+  const tab = DASHBOARD_TABS.find((t) => t === params.get('tab')) ?? 'upcoming';
+  const ordering = DASHBOARD_ORDERINGS.find((o) => o === params.get('ordering'));
+  return {
+    tab,
+    search: (params.get('search') ?? '').trim().slice(0, SEARCH_MAX_LENGTH),
+    ordering: ordering ?? DEFAULT_ORDERING[tab],
+  };
+}
+
+/** State to query params; defaults are left out of the URL. */
+export function toQueryParams(query: ListQuery): Params {
+  const params: Params = {};
+  if (query.tab !== 'upcoming') params['tab'] = query.tab;
+  if (query.search) params['search'] = query.search;
+  if (query.ordering !== DEFAULT_ORDERING[query.tab]) params['ordering'] = query.ordering;
+  return params;
+}
+
+const EMPTY_KEYS: Record<DashboardTab, { title: string; text: string }> = {
+  upcoming: { title: 'dashboard.noUpcomingEvents', text: 'dashboard.createYourFirstEvent' },
+  past: { title: 'dashboard.noPastEvents', text: 'dashboard.yourCompletedEventsWill' },
+  drafts: { title: 'dashboard.noDrafts', text: 'dashboard.saveEventDraftsBefore' },
+  inactive: { title: 'dashboard.noInactiveEvents', text: 'dashboard.inactiveHint' },
+};
+
+/**
+ * The organizer dashboard: global totals, the organizer's events (one tab at a
+ * time, paged, searchable, sortable) and the activity feed. The three sections
+ * load and fail independently. A superuser sees the moderation queue instead.
+ */
 @Component({
   selector: 'app-dashboard',
   standalone: true,
   imports: [
-    CommonModule,
     RouterModule,
-    FormsModule,
     LucideAngularModule,
-    MoneyPipe,
     TranslocoPipe,
-    LocalDatePipe,
-    LocalNumberPipe,
+    DashboardSummaryComponent,
+    DashboardToolbarComponent,
+    DashboardEventCardComponent,
+    DashboardActivityComponent,
+    DashboardModerationQueueComponent,
   ],
   template: `
     <div class="page-root">
       <div class="container max-w-6xl py-8">
-        <!-- Header -->
-        <div class="mb-8">
-          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <p class="kicker mb-2">
-                {{ (isAdmin ? 'dashboard.admin' : 'dashboard.workspace') | transloco }}
-              </p>
-              <h1 class="text-3xl font-semibold text-foreground">
-                {{
-                  (isAdmin ? 'dashboard.adminPanel' : 'dashboard.organizerDashboard') | transloco
-                }}
-              </h1>
-              <p class="text-sm text-muted-foreground mt-1.5">
-                {{
-                  (isAdmin ? 'dashboard.reviewAndApproveEvents' : 'dashboard.manageYourEventsAnd')
-                    | transloco
-                }}
-              </p>
+        <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <p class="kicker mb-2">
+              {{ (admin ? 'dashboard.admin' : 'dashboard.workspace') | transloco }}
+            </p>
+            <h1 class="text-3xl font-semibold text-foreground">
+              {{ (admin ? 'dashboard.adminPanel' : 'dashboard.organizerDashboard') | transloco }}
+            </h1>
+            <p class="text-sm text-muted-foreground mt-1.5">
+              {{
+                (admin ? 'dashboard.reviewAndApproveEvents' : 'dashboard.manageYourEventsAnd')
+                  | transloco
+              }}
+            </p>
+          </div>
+          @if (!admin) {
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <a routerLink="/scan" class="btn btn-secondary flex items-center gap-1.5">
+                <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true" />
+                {{ 'dashboard.scan' | transloco }}
+              </a>
+              <a routerLink="/create-event" class="btn btn-primary flex items-center gap-1.5">
+                <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true" />
+                {{ 'dashboard.newEvent' | transloco }}
+              </a>
             </div>
-            @if (!isAdmin) {
-              <div class="flex items-center gap-2 flex-shrink-0">
-                <a routerLink="/scan" class="btn btn-secondary flex items-center gap-1.5">
-                  <lucide-icon [img]="icons.ScanLine" class="w-4 h-4" aria-hidden="true" />
-                  {{ 'dashboard.scan' | transloco }}
-                </a>
-                <a routerLink="/create-event" class="btn btn-primary flex items-center gap-1.5">
-                  <lucide-icon [img]="icons.Plus" class="w-4 h-4" aria-hidden="true" />
-                  {{ 'dashboard.newEvent' | transloco }}
-                </a>
-              </div>
-            }
+          }
+        </header>
+
+        @if (admin) {
+          <app-dashboard-moderation-queue />
+        } @else {
+          <div class="mb-6">
+            <app-dashboard-summary
+              [summary]="summary()"
+              [status]="summaryStatus()"
+              (retry)="loadSummary()"
+            />
           </div>
 
-          <!-- Stats row -->
-          @if (!isAdmin && events.length > 0) {
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">
-                  {{ 'dashboard.events' | transloco }}
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div class="lg:col-span-2 min-w-0 space-y-4">
+              <app-dashboard-toolbar
+                [tab]="query().tab"
+                [counts]="summary()?.tabs ?? null"
+                [searchText]="searchText()"
+                [ordering]="query().ordering"
+                (tabChange)="setTab($event)"
+                (searchInput)="onSearchInput($event)"
+                (orderingChange)="setOrdering($event)"
+              />
+
+              <div
+                [id]="panelId"
+                role="tabpanel"
+                [attr.aria-labelledby]="tabId(query().tab)"
+                [attr.aria-busy]="listStatus() === 'loading'"
+                class="space-y-4"
+              >
+                <h2 class="sr-only">{{ 'dashboard.events' | transloco }}</h2>
+                <p class="sr-only" role="status" aria-live="polite" data-testid="live-region">
+                  {{ announcement() }}
                 </p>
-                <div class="flex items-baseline gap-2">
-                  <p class="text-2xl font-bold text-foreground num">{{ filteredEvents.length }}</p>
-                  @if (eventsTrend) {
-                    <span class="text-xs text-[color:var(--pine-600)] flex items-center gap-0.5">
-                      <lucide-icon [img]="icons.TrendingUp" class="w-3 h-3" aria-hidden="true" />
-                      {{ eventsTrend }}
-                    </span>
+
+                @switch (listStatus()) {
+                  @case ('loading') {
+                    <div
+                      class="space-y-4"
+                      role="status"
+                      [attr.aria-label]="'common.loading' | transloco"
+                      data-testid="list-loading"
+                    >
+                      @for (n of placeholders; track n) {
+                        <div class="card p-5" aria-hidden="true">
+                          <div class="h-5 w-24 rounded bg-muted animate-pulse mb-3"></div>
+                          <div class="h-5 w-2/3 rounded bg-muted animate-pulse mb-3"></div>
+                          <div class="h-3 w-1/2 rounded bg-muted animate-pulse mb-5"></div>
+                          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div class="h-10 rounded bg-muted animate-pulse"></div>
+                            <div class="h-10 rounded bg-muted animate-pulse"></div>
+                            <div class="h-10 rounded bg-muted animate-pulse"></div>
+                            <div class="h-10 rounded bg-muted animate-pulse"></div>
+                          </div>
+                        </div>
+                      }
+                    </div>
                   }
-                </div>
-              </div>
-              <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">
-                  {{ 'dashboard.registrations' | transloco }}
-                </p>
-                <div class="flex items-baseline gap-2">
-                  <p class="text-2xl font-bold text-foreground num">{{ totalRegistrations }}</p>
-                  @if (regTrend) {
-                    <span class="text-xs text-[color:var(--pine-600)] flex items-center gap-0.5">
-                      <lucide-icon [img]="icons.TrendingUp" class="w-3 h-3" aria-hidden="true" />
-                      {{ regTrend }}
-                    </span>
+                  @case ('error') {
+                    <div class="note note-error" role="alert" data-testid="list-error">
+                      <span class="flex-1">{{ listError() }}</span>
+                      <button type="button" class="btn btn-sm btn-secondary" (click)="retryList()">
+                        {{ 'common.retry' | transloco }}
+                      </button>
+                    </div>
                   }
-                </div>
-              </div>
-              <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">
-                  {{ 'dashboard.checkInRate' | transloco }}
-                </p>
-                <p class="text-2xl font-bold text-foreground num">{{ totalCheckinRate }}%</p>
-              </div>
-              <div class="card p-4">
-                <p class="text-xs text-muted-foreground font-medium mb-1">
-                  {{ 'dashboard.revenue' | transloco }}
-                </p>
-                @for (r of revenueByCurrency; track r.currency) {
-                  <p class="text-2xl font-bold text-foreground num">
-                    {{ r.amount | money: r.currency }}
-                  </p>
-                } @empty {
-                  <p class="text-2xl font-bold text-foreground num">—</p>
+                  @default {
+                    @if (events().length === 0) {
+                      <div
+                        class="card p-12 flex flex-col items-center text-center"
+                        data-testid="list-empty"
+                      >
+                        <div
+                          class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4"
+                        >
+                          <lucide-icon
+                            [img]="icons.ChartNoAxesColumn"
+                            class="w-5 h-5 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                        </div>
+                        @if (query().search) {
+                          <h3 class="text-base font-semibold text-foreground mb-1">
+                            {{ 'dashboard.noSearchResults' | transloco: { query: query().search } }}
+                          </h3>
+                          <p class="text-sm text-muted-foreground mb-5 max-w-xs">
+                            {{ 'dashboard.noSearchResultsHint' | transloco }}
+                          </p>
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm"
+                            (click)="clearSearch()"
+                            data-testid="clear-search"
+                          >
+                            {{ 'dashboard.clearSearch' | transloco }}
+                          </button>
+                        } @else {
+                          <h3 class="text-base font-semibold text-foreground mb-1">
+                            {{ emptyKeys[query().tab].title | transloco }}
+                          </h3>
+                          <p class="text-sm text-muted-foreground mb-5 max-w-xs">
+                            {{ emptyKeys[query().tab].text | transloco }}
+                          </p>
+                          @if (query().tab === 'drafts') {
+                            <a
+                              routerLink="/create-event"
+                              class="btn btn-primary btn-sm flex items-center gap-1.5"
+                              data-testid="empty-create"
+                            >
+                              <lucide-icon
+                                [img]="icons.Plus"
+                                class="w-3.5 h-3.5"
+                                aria-hidden="true"
+                              />
+                              {{ 'dashboard.createEvent' | transloco }}
+                            </a>
+                          }
+                        }
+                      </div>
+                    } @else {
+                      <div class="space-y-4" data-testid="event-list">
+                        @for (ev of events(); track ev.id) {
+                          <app-dashboard-event-card
+                            [event]="ev"
+                            [menuOpen]="openMenuId() === ev.id"
+                            [duplicating]="duplicatingId() === ev.id"
+                            (menuOpenChange)="setMenu(ev.id, $event)"
+                            (duplicate)="duplicate(ev)"
+                            (remove)="remove(ev)"
+                          />
+                        }
+                      </div>
+                      <div class="flex flex-col items-center gap-2 pt-1">
+                        <p class="text-xs text-muted-foreground" data-testid="list-counter">
+                          {{
+                            'dashboard.countOfTotal'
+                              | transloco: { shown: events().length, total: total() }
+                          }}
+                        </p>
+                        @if (moreError(); as message) {
+                          <div class="note note-error w-full" role="alert" data-testid="more-error">
+                            {{ message }}
+                          </div>
+                        }
+                        @if (events().length < total()) {
+                          <button
+                            type="button"
+                            class="btn btn-secondary btn-sm flex items-center gap-2"
+                            [disabled]="loadingMore()"
+                            (click)="showMore()"
+                            data-testid="show-more"
+                          >
+                            @if (loadingMore()) {
+                              <span class="spinner spinner-sm" aria-hidden="true"></span>
+                            }
+                            {{ 'dashboard.showMore' | transloco }}
+                          </button>
+                        }
+                      </div>
+                    }
+                  }
                 }
               </div>
             </div>
-          }
-        </div>
 
-        <!-- Controls: Search, Filter, Sort, View toggle -->
-        @if (!isAdmin) {
-          <div class="mb-6 space-y-3">
-            <!-- Search + Sort -->
-            <div class="flex flex-col sm:flex-row gap-3">
-              <label
-                class="flex items-center gap-2 flex-1 border border-border rounded-md px-3 h-10 bg-background focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-shadow"
-              >
-                <lucide-icon
-                  [img]="icons.Search"
-                  class="w-4 h-4 text-muted-foreground flex-shrink-0"
-                  aria-hidden="true"
-                />
-                <input
-                  type="search"
-                  [(ngModel)]="searchQuery"
-                  (input)="applyFilters()"
-                  [placeholder]="'dashboard.searchEvents' | transloco"
-                  class="flex-1 bg-transparent outline-none text-sm text-foreground placeholder:text-muted-foreground"
-                  [attr.aria-label]="'home.searchEvents' | transloco"
-                />
-              </label>
-              <select
-                [(ngModel)]="sortBy"
-                (change)="applyFilters()"
-                class="input h-10 sm:w-40"
-                [attr.aria-label]="'dashboard.sortEvents' | transloco"
-              >
-                <option value="date">{{ 'dashboard.dateNewest' | transloco }}</option>
-                <option value="registrations">
-                  {{ 'dashboard.mostRegistrations' | transloco }}
-                </option>
-                <option value="checkin">{{ 'dashboard.checkInRate2' | transloco }}</option>
-                <option value="capacity">{{ 'dashboard.capacityFilled' | transloco }}</option>
-              </select>
-            </div>
-
-            <!-- Tabs: Upcoming / Past / Drafts -->
-            <div class="flex items-center gap-2 border-b border-border">
-              <button
-                (click)="setTab('upcoming')"
-                [class]="
-                  currentTab === 'upcoming'
-                    ? 'px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary -mb-px'
-                    : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground'
-                "
-              >
-                {{
-                  'dashboard.upcomingUpcomingcount' | transloco: { upcomingCount: upcomingCount }
-                }}
-              </button>
-              <button
-                (click)="setTab('past')"
-                [class]="
-                  currentTab === 'past'
-                    ? 'px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary -mb-px'
-                    : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground'
-                "
-              >
-                {{ 'dashboard.pastPastcount' | transloco: { pastCount: pastCount } }}
-              </button>
-              <button
-                (click)="setTab('drafts')"
-                [class]="
-                  currentTab === 'drafts'
-                    ? 'px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary -mb-px'
-                    : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground'
-                "
-              >
-                {{ 'dashboard.draftsDraftcount' | transloco: { draftCount: draftCount } }}
-              </button>
-              <div class="flex-1"></div>
-              <!-- View toggle: List / Calendar -->
-              <div class="flex items-center gap-1 border-l border-border pl-2">
-                <button
-                  (click)="viewMode = 'list'"
-                  [class]="
-                    viewMode === 'list'
-                      ? 'px-2 py-2 text-primary'
-                      : 'px-2 py-2 text-muted-foreground hover:text-foreground'
-                  "
-                  [title]="'dashboard.listView' | transloco"
-                  [attr.aria-label]="'dashboard.listView' | transloco"
-                >
-                  ≡
-                </button>
-                <button
-                  (click)="viewMode = 'calendar'"
-                  [class]="
-                    viewMode === 'calendar'
-                      ? 'px-2 py-2 text-primary'
-                      : 'px-2 py-2 text-muted-foreground hover:text-foreground'
-                  "
-                  [title]="'dashboard.calendarView' | transloco"
-                  [attr.aria-label]="'dashboard.calendarView' | transloco"
-                >
-                  <lucide-icon [img]="icons.Calendar" class="w-4 h-4" aria-hidden="true" />
-                </button>
-              </div>
-            </div>
+            <aside class="lg:col-span-1 min-w-0">
+              <app-dashboard-activity [refreshToken]="activityRefresh()" />
+            </aside>
           </div>
-        }
-
-        <!-- Loading / Empty state -->
-        @if (loading) {
-          <div class="flex items-center justify-center py-20 gap-3 text-muted-foreground">
-            <span class="spinner"></span>
-            <span class="text-sm">{{ 'dashboard.loadingDashboard' | transloco }}</span>
-          </div>
-        } @else if (filteredEvents.length === 0) {
-          <div class="card p-12 flex flex-col items-center text-center">
-            <div class="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-4">
-              <lucide-icon
-                [img]="icons.ChartNoAxesColumn"
-                class="w-5 h-5 text-muted-foreground"
-                aria-hidden="true"
-              />
-            </div>
-            <h3 class="text-base font-semibold text-foreground mb-1">
-              {{ isAdmin ? ('dashboard.noPendingEvents' | transloco) : tabEmptyLabel }}
-            </h3>
-            <p class="text-sm text-muted-foreground mb-5 max-w-xs">
-              {{ tabEmptyMessage }}
-            </p>
-            @if (!isAdmin && currentTab === 'drafts') {
-              <a
-                routerLink="/create-event"
-                class="btn btn-primary btn-sm flex items-center gap-1.5"
-              >
-                <lucide-icon [img]="icons.Plus" class="w-3.5 h-3.5" aria-hidden="true" />
-                {{ 'dashboard.createEvent' | transloco }}
-              </a>
-            }
-          </div>
-        } @else {
-          <!-- LIST VIEW -->
-          @if (viewMode === 'list') {
-            <div class="space-y-4">
-              @for (event of filteredEvents; track event.id) {
-                <div class="card p-5 hover:border-primary/30 transition-colors">
-                  <!-- Event header -->
-                  <div class="flex flex-col sm:flex-row sm:items-start gap-4 mb-4">
-                    <!-- Left: title + meta -->
-                    <div class="flex-1 min-w-0">
-                      <div class="flex items-center gap-2 mb-2">
-                        <span class="badge {{ statusBadgeClass(event.status) }}">{{
-                          event.status
-                        }}</span>
-                        <!-- Status timeline mini -->
-                        <span class="text-xs text-muted-foreground">
-                          {{ statusTimeline(event) }}
-                        </span>
-                      </div>
-                      <p class="text-base font-semibold text-foreground truncate">
-                        {{ event.title }}
-                      </p>
-                      <div
-                        class="flex flex-wrap items-center gap-3 mt-2 text-xs text-muted-foreground"
-                      >
-                        <span class="flex items-center gap-1">
-                          <lucide-icon
-                            [img]="icons.Calendar"
-                            class="w-3.5 h-3.5"
-                            aria-hidden="true"
-                          />
-                          {{ event.date | localDate: 'MMM d, y · HH:mm' }}
-                        </span>
-                        <span class="flex items-center gap-1 truncate">
-                          <lucide-icon
-                            [img]="icons.MapPin"
-                            class="w-3.5 h-3.5"
-                            aria-hidden="true"
-                          />
-                          {{ event.location }}
-                        </span>
-                      </div>
-                    </div>
-
-                    <!-- Right: quick actions menu -->
-                    @if (!isAdmin) {
-                      <div class="flex items-start gap-2 flex-shrink-0">
-                        <a
-                          [routerLink]="['/organizer/events', event.id, 'attendees']"
-                          class="btn btn-sm btn-secondary flex items-center gap-1"
-                        >
-                          <lucide-icon [img]="icons.Users" class="w-3.5 h-3.5" aria-hidden="true" />
-                          {{ 'nav.attendees' | transloco }}
-                        </a>
-                        <!-- Quick actions menu (·××) -->
-                        <div class="relative" [@.disabled]="true">
-                          <button
-                            (click)="toggleMenu(event.id)"
-                            class="btn btn-sm btn-ghost p-2"
-                            [attr.aria-label]="
-                              'dashboard.menuFor' | transloco: { title: event.title }
-                            "
-                          >
-                            <lucide-icon
-                              [img]="icons.Ellipsis"
-                              class="w-4 h-4"
-                              aria-hidden="true"
-                            />
-                          </button>
-                          @if (openMenuId === event.id) {
-                            <div
-                              class="absolute right-0 mt-1 bg-background border border-border rounded-md shadow-lg z-10 min-w-40 animate-fade-in"
-                            >
-                              <a
-                                [routerLink]="['/edit-event', event.id]"
-                                (click)="openMenuId = null"
-                                class="flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                              >
-                                <lucide-icon
-                                  [img]="icons.PenLine"
-                                  class="w-4 h-4"
-                                  aria-hidden="true"
-                                />
-                                {{ 'dashboard.editEvent' | transloco }}
-                              </a>
-                              <button
-                                (click)="duplicateEvent(event.id)"
-                                class="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-foreground hover:bg-muted transition-colors"
-                              >
-                                <lucide-icon
-                                  [img]="icons.Copy"
-                                  class="w-4 h-4"
-                                  aria-hidden="true"
-                                />
-                                {{ 'dashboard.duplicate' | transloco }}
-                              </button>
-                              <button
-                                (click)="deleteEvent(event.id)"
-                                class="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-destructive hover:bg-[color:var(--destructive-50)] transition-colors"
-                              >
-                                <lucide-icon
-                                  [img]="icons.Trash2"
-                                  class="w-4 h-4"
-                                  aria-hidden="true"
-                                />
-                                {{ 'common.delete' | transloco }}
-                              </button>
-                            </div>
-                          }
-                        </div>
-                      </div>
-                    }
-                  </div>
-
-                  <!-- Metrics row: capacity + registration + checkin + revenue -->
-                  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                    <!-- Capacity -->
-                    <div>
-                      <div class="flex justify-between text-xs text-muted-foreground mb-1">
-                        <span>{{ 'dashboard.capacity' | transloco }}</span>
-                        <span class="font-semibold text-foreground"
-                          >{{ event.stats?.total_registrations }}/{{ event.max_participants }}</span
-                        >
-                      </div>
-                      <div class="h-2 bg-muted rounded-full overflow-hidden">
-                        <div
-                          class="h-full bg-primary rounded-full"
-                          [style.width.%]="event.capacityPercent || 0"
-                        ></div>
-                      </div>
-                      <p class="text-xs text-muted-foreground mt-1">
-                        {{
-                          'dashboard.capacitypercentFilled'
-                            | transloco: { capacityPercent: event.capacityPercent || 0 }
-                        }}
-                      </p>
-                    </div>
-
-                    <!-- Registrations -->
-                    <div>
-                      <p class="text-xs text-muted-foreground mb-1">
-                        {{ 'dashboard.registrations' | transloco }}
-                      </p>
-                      <p class="text-lg font-bold text-foreground">
-                        {{ event.stats?.total_registrations || 0 }}
-                      </p>
-                      <p class="text-xs text-muted-foreground mt-1">
-                        {{
-                          (event.stats?.total_registrations || 0) > 0
-                            ? ('dashboard.percentCheckedIn'
-                              | transloco
-                                : {
-                                    percent:
-                                      (((event.stats?.checked_in || 0) /
-                                        (event.stats?.total_registrations || 1)) *
-                                        100 | localNumber: '1.0-0'),
-                                  })
-                            : ('dashboard.noRegistrations' | transloco)
-                        }}
-                      </p>
-                    </div>
-
-                    <!-- Check-in -->
-                    <div>
-                      <p class="text-xs text-muted-foreground mb-1">
-                        {{ 'dashboard.checkInRate' | transloco }}
-                      </p>
-                      <p class="text-lg font-bold text-foreground">
-                        {{ event.stats?.check_in_rate || 0 }}%
-                      </p>
-                      <p class="text-xs text-muted-foreground mt-1">
-                        {{
-                          'dashboard.checkedinCheckedIn'
-                            | transloco: { checkedIn: event.stats?.checked_in || 0 }
-                        }}
-                      </p>
-                    </div>
-
-                    <!-- Revenue (if paid) -->
-                    @if (!event.is_free && event.revenue !== null) {
-                      <div>
-                        <div class="flex items-center gap-1 text-xs text-muted-foreground mb-1">
-                          <lucide-icon
-                            [img]="icons.DollarSign"
-                            class="w-3 h-3"
-                            aria-hidden="true"
-                          />
-                          <span>{{ 'dashboard.revenue' | transloco }}</span>
-                        </div>
-                        <p class="text-lg font-bold text-foreground">
-                          {{ event.revenue | money: event.currency }}
-                        </p>
-                        <p class="text-xs text-muted-foreground mt-1">
-                          {{ 'dashboard.netOfRefunds' | transloco }}
-                        </p>
-                      </div>
-                    }
-                  </div>
-
-                  <!-- Bottom: Preview link -->
-                  <a
-                    [routerLink]="['/events', event.id]"
-                    class="text-xs text-primary hover:underline flex items-center gap-1"
-                  >
-                    {{ 'dashboard.viewEvent' | transloco }}
-                  </a>
-                </div>
-              }
-            </div>
-
-            <!-- Activity feed (bottom) -->
-            @if (activityFeed.length > 0) {
-              <div class="mt-8">
-                <h2 class="text-sm font-semibold text-foreground mb-4">
-                  {{ 'dashboard.recentActivity' | transloco }}
-                </h2>
-                <div class="space-y-2">
-                  @for (item of activityFeed.slice(0, 5); track item.id) {
-                    <div class="flex gap-3 text-sm text-muted-foreground">
-                      <span class="text-xs text-muted-foreground flex-shrink-0">
-                        {{ item.timestamp | localDate: 'short' }}
-                      </span>
-                      <p>{{ item.messageKey | transloco: item.params }}</p>
-                    </div>
-                  }
-                </div>
-              </div>
-            }
-          }
-
-          <!-- CALENDAR VIEW (placeholder) -->
-          @if (viewMode === 'calendar') {
-            <div class="card p-8 text-center text-muted-foreground">
-              <p class="text-sm">{{ 'dashboard.calendarViewComingSoon' | transloco }}</p>
-            </div>
-          }
         }
       </div>
     </div>
   `,
 })
-export class DashboardComponent implements OnInit {
-  private i18n = inject(LanguageService);
-  private eventService = inject(EventService);
-  private authService = inject(AuthService);
-  private modalService = inject(ModalService);
-  private toastService = inject(ToastService);
+export class DashboardComponent {
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
+  private readonly service = inject(OrganizerDashboardService);
+  private readonly eventService = inject(EventService);
+  private readonly modal = inject(ModalService);
+  private readonly toast = inject(ToastService);
+  private readonly language = inject(LanguageService);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
-  events: EventWithStats[] = [];
-  filteredEvents: EventWithStats[] = [];
-  activityFeed: ActivityItem[] = [];
+  /** A superuser's dashboard is the moderation queue (UX only; the API enforces roles). */
+  readonly admin = isAdmin(inject(AuthService).currentUser);
 
-  // Filter state
-  searchQuery = '';
-  sortBy: SortKey = 'date';
-  currentTab: EventTab = 'upcoming';
-  viewMode: 'list' | 'calendar' = 'list';
-  openMenuId: number | null = null;
+  readonly icons = { Plus, ScanLine, ChartNoAxesColumn };
+  readonly panelId = DASHBOARD_PANEL_ID;
+  readonly tabId = dashboardTabId;
+  readonly emptyKeys = EMPTY_KEYS;
+  readonly placeholders = [1, 2, 3];
 
-  // UI state
-  isAdmin = false;
-  loading = true;
+  // Summary (independent section).
+  readonly summary = signal<DashboardSummary | null>(null);
+  readonly summaryStatus = signal<SectionStatus>('loading');
 
-  // Counters
-  upcomingCount = 0;
-  pastCount = 0;
-  draftCount = 0;
+  // List state. `query` mirrors the URL.
+  readonly query = signal<ListQuery>({
+    tab: 'upcoming',
+    search: '',
+    ordering: DEFAULT_ORDERING.upcoming,
+  });
+  readonly searchText = signal('');
+  readonly events = signal<OrganizerEvent[]>([]);
+  readonly total = signal(0);
+  readonly listStatus = signal<SectionStatus>('loading');
+  readonly listError = signal('');
+  readonly loadingMore = signal(false);
+  readonly moreError = signal<string | null>(null);
+  readonly announcement = signal('');
+  readonly openMenuId = signal<number | null>(null);
+  readonly duplicatingId = signal<number | null>(null);
+  /** Bumped after a delete or a copy: the activity feed reloads. */
+  readonly activityRefresh = signal(0);
+  private readonly cards = viewChildren(DashboardEventCardComponent);
 
-  // Stats
-  totalRegistrations = 0;
-  totalCheckinRate = 0;
-  /** Revenue totals, one per currency — amounts in different currencies don't add up. */
-  revenueByCurrency: { currency: string; amount: number }[] = [];
-  eventsTrend = '+0';
-  regTrend = '+0';
+  /** The search the URL already carries (or is about to), to tell typing from back navigation. */
+  private committedSearch = '';
+  /** The query this component last navigated to, to tell its own URL changes from back navigation. */
+  private expectedQuery: ListQuery | null = null;
+  /** Events deleted since this list (tab, search, sort) was opened. */
+  private readonly deletedIds = new Set<number>();
+  /** The lowest page "Show more" may ask for next (after a page that brought nothing new). */
+  private pageFloor = 1;
+  private destroyed = false;
+  private readonly listRequests$ = new Subject<ListRequest>();
+  private readonly summaryRequests$ = new Subject<{ quiet: boolean }>();
+  private readonly searchInput$ = new Subject<string>();
 
-  readonly icons = {
-    Plus,
-    Calendar,
-    MapPin,
-    Users,
-    CircleCheckBig,
-    ChartNoAxesColumn,
-    ScanLine,
-    Search,
-    PenLine,
-    Copy,
-    Trash2,
-    Ellipsis,
-    TrendingUp,
-    DollarSign,
-  };
+  constructor() {
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+    });
+    if (this.admin) return;
 
-  ngOnInit(): void {
-    this.authService.getProfile().subscribe({
-      next: (user) => {
-        this.isAdmin = user.is_superuser;
-        if (this.isAdmin) this.loadPendingEvents();
-        else this.loadMyEvents();
-      },
-      error: () => {
-        this.isAdmin = !!this.authService.currentUser?.is_superuser;
-        this.loading = false;
-      },
+    // A newer request cancels the one in flight, so a slow old answer never
+    // overwrites a newer one.
+    this.listRequests$
+      .pipe(
+        switchMap((request) =>
+          this.service
+            .getEvents({
+              tab: request.query.tab,
+              search: request.query.search,
+              // The server's default for the tab is not sent.
+              ordering:
+                request.query.ordering === DEFAULT_ORDERING[request.query.tab]
+                  ? undefined
+                  : request.query.ordering,
+              page: request.page,
+              pageSize: DASHBOARD_PAGE_SIZE,
+            })
+            .pipe(
+              map((page): ListResult => ({ request, page })),
+              catchError((err: unknown) =>
+                of<ListResult>({
+                  request,
+                  message: errorMessage(err, this.language, {
+                    fallback: this.language.t('dashboard.loadFailed'),
+                  }),
+                }),
+              ),
+            ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((result) => {
+        this.applyList(result);
+      });
+
+    this.summaryRequests$
+      .pipe(
+        switchMap(({ quiet }) =>
+          this.service.getSummary().pipe(
+            map((summary) => ({ summary, quiet })),
+            catchError(() => of({ summary: null, quiet })),
+          ),
+        ),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(({ summary, quiet }) => {
+        if (summary) {
+          this.summary.set(summary);
+          this.summaryStatus.set('ready');
+        } else if (!quiet) {
+          this.summaryStatus.set('error');
+        }
+      });
+
+    this.searchInput$
+      .pipe(
+        debounceTime(300),
+        map((value) => value.trim().slice(0, SEARCH_MAX_LENGTH)),
+        filter((value) => value !== this.committedSearch),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((search) => {
+        this.committedSearch = search;
+        this.navigate({ ...this.query(), search });
+      });
+
+    this.route.queryParamMap
+      .pipe(map(parseQuery), distinctUntilChanged(sameQuery), takeUntilDestroyed(this.destroyRef))
+      .subscribe((query) => {
+        const own = this.expectedQuery !== null && sameQuery(query, this.expectedQuery);
+        this.expectedQuery = null;
+        if (!own) {
+          // The URL changed on its own (back/forward navigation, a link): it wins
+          // over the search box, even when its search equals the committed one
+          // and only the tab or sort differs. A keystroke still waiting for its
+          // debounce (the box differs from what is committed) would otherwise
+          // override this URL a moment later; replacing it with the URL's own
+          // search makes the debounce drop it.
+          const typing = this.searchText().trim() !== this.committedSearch;
+          this.committedSearch = query.search;
+          this.searchText.set(query.search);
+          if (typing) this.searchInput$.next(query.search);
+        }
+        this.query.set(query);
+        this.deletedIds.clear();
+        this.openMenuId.set(null);
+        this.requestList(1);
+      });
+
+    this.loadSummary();
+  }
+
+  // ── Summary ──
+
+  loadSummary(): void {
+    this.summaryStatus.set('loading');
+    this.summaryRequests$.next({ quiet: false });
+  }
+
+  // ── Toolbar → URL ──
+
+  setTab(tab: DashboardTab): void {
+    if (tab === this.query().tab) return;
+    // Each tab sorts its own way by default, so the sort goes back to it.
+    this.navigate({ tab, search: this.query().search, ordering: DEFAULT_ORDERING[tab] });
+  }
+
+  setOrdering(ordering: DashboardOrdering): void {
+    if (ordering === this.query().ordering) return;
+    this.navigate({ ...this.query(), ordering });
+  }
+
+  onSearchInput(value: string): void {
+    this.searchText.set(value);
+    this.searchInput$.next(value);
+  }
+
+  clearSearch(): void {
+    this.searchText.set('');
+    this.committedSearch = '';
+    this.navigate({ ...this.query(), search: '' });
+  }
+
+  private navigate(query: ListQuery): void {
+    this.expectedQuery = query;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: toQueryParams(query),
+      replaceUrl: true,
     });
   }
 
-  private loadPendingEvents(): void {
-    this.eventService.getEvents({ status: 'pending' }).subscribe({
-      next: (res) => {
-        this.events = res.results;
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-      },
-    });
+  // ── List ──
+
+  /** Page 1 resets the list; later pages append to it. */
+  private requestList(page: number, attempt = 0): void {
+    if (page === 1) {
+      this.events.set([]);
+      this.total.set(0);
+      this.listStatus.set('loading');
+      this.loadingMore.set(false);
+      this.pageFloor = 1;
+      // Cleared now so the same text, announced again after the reload, is a change.
+      this.announcement.set('');
+    } else {
+      this.loadingMore.set(true);
+    }
+    this.moreError.set(null);
+    this.listRequests$.next({ query: this.query(), page, attempt });
   }
 
-  private loadMyEvents(): void {
-    this.eventService.getMyEvents().subscribe({
-      next: (res) => {
-        this.events = res.results;
-        this.loadStats();
-      },
-      error: () => {
-        this.loading = false;
-      },
-    });
+  retryList(): void {
+    this.requestList(1);
   }
 
-  private loadStats(): void {
-    if (!this.events.length) {
-      this.loading = false;
-      this.applyFilters();
+  /**
+   * The next page is derived from what is loaded, not from a counter: after a
+   * delete the server's pages shift, and this way no event is skipped. After a
+   * page that brought nothing new it moves on instead of asking for it again.
+   */
+  private nextPage(): number {
+    return Math.max(Math.floor(this.events().length / DASHBOARD_PAGE_SIZE) + 1, this.pageFloor);
+  }
+
+  showMore(): void {
+    if (this.loadingMore() || this.events().length >= this.total()) return;
+    this.requestList(this.nextPage());
+  }
+
+  private applyList(result: ListResult): void {
+    const { request } = result;
+    const first = request.page === 1;
+    if ('message' in result) {
+      if (first) {
+        this.listError.set(result.message);
+        this.listStatus.set('error');
+      } else {
+        this.moreError.set(result.message);
+        this.loadingMore.set(false);
+      }
       return;
     }
-    forkJoin(this.events.map((e) => this.eventService.getEventStats(e.id))).subscribe({
-      next: (statsList) => {
-        statsList.forEach((s, i) => {
-          this.events[i].stats = s;
-          this.events[i].capacityPercent = Math.round(
-            ((s.total_registrations || 0) / this.events[i].max_participants) * 100,
+    // Events deleted in this session must not come back from a stale page. The
+    // server's count still includes them when its answer was computed before the delete.
+    const incoming = result.page.results.filter((e) => !this.deletedIds.has(e.id));
+    const count = Math.max(0, result.page.count - (result.page.results.length - incoming.length));
+    if (first) {
+      this.events.set(incoming);
+      this.total.set(count);
+    } else {
+      const seen = new Set(this.events().map((e) => e.id));
+      const fresh = incoming.filter((e) => !seen.has(e.id));
+      this.events.update((current) => [...current, ...fresh]);
+      if (fresh.length) {
+        this.pageFloor = 1;
+        this.total.set(count);
+      } else {
+        // Nothing new (the pages shifted under us), though the server counts
+        // more: its count stays the truth and the next page is tried, a few
+        // times at most, so "Show more" never repeats the same empty page.
+        this.pageFloor = request.page + 1;
+        if (result.page.next && request.attempt < MAX_EMPTY_PAGES) {
+          this.requestList(request.page + 1, request.attempt + 1);
+          return;
+        }
+        // No page left to ask for: only then is the count not believed.
+        this.total.set(result.page.next ? count : this.events().length);
+      }
+    }
+    this.loadingMore.set(false);
+    this.listStatus.set('ready');
+    this.announce();
+  }
+
+  /** "Upcoming: showing 20 of 23 events" in the live region. */
+  private announce(): void {
+    const message = this.language.t('dashboard.tabShowingOfTotal', {
+      tab: this.language.t(TAB_LABEL[this.query().tab]),
+      shown: this.events().length,
+      total: this.total(),
+    });
+    // The same text is not announced twice: empty the region, and fill it
+    // again once that has been rendered.
+    this.announcement.set('');
+    afterNextRender(
+      () => {
+        this.announcement.set(message);
+      },
+      { injector: this.injector },
+    );
+  }
+
+  // ── Card actions ──
+
+  /** Only one menu is open at a time; a card closing itself must not close another's. */
+  setMenu(id: number, open: boolean): void {
+    if (open) this.openMenuId.set(id);
+    else if (this.openMenuId() === id) this.openMenuId.set(null);
+  }
+
+  duplicate(event: OrganizerEvent): void {
+    if (this.duplicatingId() !== null) return;
+    this.duplicatingId.set(event.id);
+    this.eventService
+      .cloneEvent(event.id, this.copyTitle(event.title))
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (copy) => {
+          this.duplicatingId.set(null);
+          this.openMenuId.set(null);
+          this.activityRefresh.update((n) => n + 1);
+          this.toast.success(this.language.t('dashboard.eventDuplicated'));
+          void this.router.navigate(['/edit-event', copy.id]);
+        },
+        error: (err: unknown) => {
+          this.duplicatingId.set(null);
+          this.toast.error(
+            errorMessage(err, this.language, {
+              fallback: this.language.t('dashboard.failedToDuplicate'),
+              fields: ['error'],
+            }),
           );
-          this.events[i].revenue = Number(s.net_revenue) || 0;
-        });
-        this.applyFilters();
-        this.buildActivityFeed();
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-      },
-    });
+          // The disabled item had the focus: close the menu and give it back to the button.
+          this.openMenuId.set(null);
+          this.focusTrigger(event.id);
+        },
+      });
   }
 
-  setTab(tab: EventTab): void {
-    this.currentTab = tab;
-    this.applyFilters();
+  /** "<title> (copy)" in the UI language, never longer than the title column. */
+  private copyTitle(title: string): string {
+    const full = this.language.t('dashboard.copyTitle', { title }).trim();
+    if (full.length <= EVENT_TITLE_MAX_LENGTH) return full;
+    const frame = this.language.t('dashboard.copyTitle', { title: '' }).length;
+    const room = EVENT_TITLE_MAX_LENGTH - frame;
+    return this.language
+      .t('dashboard.copyTitle', { title: title.slice(0, Math.max(1, room)).trimEnd() })
+      .trim();
   }
 
-  applyFilters(): void {
-    const now = new Date();
-
-    // Split by date
-    const upcoming = this.events.filter((e) => new Date(e.date) > now);
-    const past = this.events.filter((e) => new Date(e.date) <= now);
-    const drafts = this.events.filter((e) => e.status === 'draft');
-
-    // Count tabs
-    this.upcomingCount = upcoming.length;
-    this.pastCount = past.length;
-    this.draftCount = drafts.length;
-
-    // Get current tab events
-    let tabEvents: EventWithStats[];
-    if (this.currentTab === 'upcoming') tabEvents = upcoming;
-    else if (this.currentTab === 'past') tabEvents = past;
-    else tabEvents = drafts;
-
-    // Apply search
-    if (this.searchQuery.trim()) {
-      tabEvents = tabEvents.filter((e) =>
-        e.title.toLowerCase().includes(this.searchQuery.toLowerCase()),
-      );
-    }
-
-    // Apply sort
-    tabEvents = this.sortEvents(tabEvents);
-
-    this.filteredEvents = tabEvents;
-    this.updateStats();
-  }
-
-  private sortEvents(events: EventWithStats[]): EventWithStats[] {
-    const sorted = [...events];
-    switch (this.sortBy) {
-      case 'registrations':
-        return sorted.sort(
-          (a, b) => (b.stats?.total_registrations || 0) - (a.stats?.total_registrations || 0),
-        );
-      case 'checkin':
-        return sorted.sort((a, b) => (b.stats?.check_in_rate || 0) - (a.stats?.check_in_rate || 0));
-      case 'capacity':
-        return sorted.sort((a, b) => (b.capacityPercent || 0) - (a.capacityPercent || 0));
-      case 'date':
-      default:
-        return sorted.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
-  }
-
-  private updateStats(): void {
-    this.totalRegistrations = this.filteredEvents.reduce(
-      (sum, e) => sum + (e.stats?.total_registrations || 0),
-      0,
-    );
-    const totalCheckins = this.filteredEvents.reduce(
-      (sum, e) => sum + (e.stats?.checked_in || 0),
-      0,
-    );
-    this.totalCheckinRate =
-      this.totalRegistrations > 0 ? Math.round((totalCheckins / this.totalRegistrations) * 100) : 0;
-    const totals = new Map<string, number>();
-    for (const e of this.filteredEvents) {
-      if (!e.revenue) continue;
-      const currency = e.stats?.currency || e.currency || 'USD';
-      totals.set(currency, (totals.get(currency) || 0) + e.revenue);
-    }
-    this.revenueByCurrency = [...totals].map(([currency, amount]) => ({ currency, amount }));
-  }
-
-  private buildActivityFeed(): void {
-    const feed: ActivityItem[] = [];
-    this.events.forEach((e) => {
-      if (e.stats?.total_registrations) {
-        feed.push({
-          id: `reg-${e.id}`,
-          messageKey: 'dashboard.activityRegistered',
-          params: { count: e.stats.total_registrations, title: e.title },
-          timestamp: new Date(e.created_at),
-          type: 'registration',
-        });
-      }
-      if (e.status === 'published') {
-        feed.push({
-          id: `pub-${e.id}`,
-          messageKey: 'dashboard.activityPublished',
-          params: { title: e.title },
-          timestamp: new Date(e.created_at),
-          type: 'approval',
-        });
-      }
-    });
-    this.activityFeed = feed.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
-
-  statusBadgeClass(status: string): string {
-    const map: Record<string, string> = {
-      published: 'badge-published',
-      pending: 'badge-pending',
-      draft: 'badge-pending',
-      rejected: 'badge-rejected',
-      cancelled: 'badge-rejected',
-      completed: 'badge-completed',
-    };
-    return map[status] ?? 'badge-pending';
-  }
-
-  statusTimeline(event: Event): string {
-    const statusMap: Record<string, string> = {
-      draft: this.i18n.t('dashboard.draft'),
-      pending: this.i18n.t('dashboard.pendingApproval'),
-      published: this.i18n.t('dashboard.published'),
-      completed: this.i18n.t('dashboard.completed'),
-      rejected: this.i18n.t('common.rejected'),
-      cancelled: this.i18n.t('common.cancelled'),
-    };
-    return statusMap[event.status] ?? event.status;
-  }
-
-  get tabEmptyLabel(): string {
-    const map = {
-      upcoming: this.i18n.t('dashboard.noUpcomingEvents'),
-      past: this.i18n.t('dashboard.noPastEvents'),
-      drafts: this.i18n.t('dashboard.noDrafts'),
-    };
-    return map[this.currentTab];
-  }
-
-  get tabEmptyMessage(): string {
-    const map = {
-      upcoming: this.i18n.t('dashboard.createYourFirstEvent'),
-      past: this.i18n.t('dashboard.yourCompletedEventsWill'),
-      drafts: this.i18n.t('dashboard.saveEventDraftsBefore'),
-    };
-    return map[this.currentTab];
-  }
-
-  toggleMenu(eventId: number): void {
-    this.openMenuId = this.openMenuId === eventId ? null : eventId;
-  }
-
-  duplicateEvent(id: number): void {
-    const event = this.events.find((e) => e.id === id);
-    if (!event) return;
-    this.toastService.success(
-      this.i18n.t('dashboard.eventTitleDuplicatedFeature', { title: event.title }),
-    );
-    this.openMenuId = null;
-  }
-
-  async deleteEvent(id: number): Promise<void> {
-    const event = this.events.find((e) => e.id === id);
-    if (!event) return;
-    const ok = await this.modalService.open({
-      title: this.i18n.t('dashboard.deleteEvent'),
-      message: this.i18n.t('dashboard.deleteTitleThisCannot', { title: event.title }),
-      confirmText: this.i18n.t('common.delete'),
-      cancelText: this.i18n.t('common.cancel'),
+  async remove(event: OrganizerEvent): Promise<void> {
+    this.openMenuId.set(null);
+    // The tab the event is counted in, whatever the user does while the dialog is open.
+    const tab = this.query().tab;
+    const ok = await this.modal.open({
+      title: this.language.t('dashboard.deleteEvent'),
+      message: this.language.t('dashboard.deleteTitleThisCannot', { title: event.title }),
+      confirmText: this.language.t('common.delete'),
+      cancelText: this.language.t('common.cancel'),
       isDestructive: true,
     });
-    if (!ok) return;
-    this.eventService.deleteEvent(id).subscribe({
-      next: () => {
-        this.events = this.events.filter((e) => e.id !== id);
-        this.applyFilters();
-        this.toastService.success(this.i18n.t('dashboard.eventDeleted'));
-      },
-      error: () => this.toastService.error(this.i18n.t('dashboard.failedToDeleteEvent')),
-    });
-    this.openMenuId = null;
+    // The page may have been left while the dialog was open.
+    if (!ok || this.destroyed) return;
+    this.eventService
+      .deleteEvent(event.id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.applyDeleted(event.id, tab);
+        },
+        error: (err: unknown) => {
+          // 409: the event has sales and must be cancelled instead; the server says so.
+          this.toast.error(
+            errorMessage(err, this.language, {
+              fallback: this.language.t('dashboard.failedToDeleteEvent'),
+              fields: ['error', 'detail'],
+            }),
+          );
+          // The menu closed when Delete was chosen and its item is gone: focus
+          // would fall to the page, so it goes back to the card's button.
+          this.focusTrigger(event.id);
+        },
+      });
+  }
+
+  private applyDeleted(id: number, tab: DashboardTab): void {
+    // A page that was requested before the delete may still bring the event
+    // back: remember it for as long as this list lives.
+    this.deletedIds.add(id);
+    this.pageFloor = 1;
+    if (this.events().some((e) => e.id === id)) {
+      this.events.update((list) => list.filter((e) => e.id !== id));
+      this.total.update((n) => Math.max(0, n - 1));
+    }
+    this.summary.update((s) =>
+      s ? { ...s, tabs: { ...s.tabs, [tab]: Math.max(0, s.tabs[tab] - 1) } } : s,
+    );
+    this.toast.success(this.language.t('dashboard.eventDeleted'));
+    this.announce();
+    // The server's totals are the truth: sales, revenue and counts all changed.
+    this.summaryRequests$.next({ quiet: true });
+    this.activityRefresh.update((n) => n + 1);
+    if (this.events().length === 0 && this.total() > 0) {
+      this.requestList(1);
+    } else if (this.loadingMore()) {
+      // "Show more" is in flight and was asked before the delete: its page and
+      // count are stale. Asking again cancels it (switchMap).
+      this.requestList(this.nextPage());
+    }
+  }
+
+  private focusTrigger(id: number): void {
+    this.cards()
+      .find((card) => card.event().id === id)
+      ?.focusTrigger();
   }
 }

@@ -54,6 +54,11 @@ from .organizer import (
     TicketTypeDetailView,
     WebhookDetailView,
 )
+from .organizer_dashboard import (
+    OrganizerActivityView,
+    OrganizerDashboardView,
+    OrganizerEventsView,
+)
 from .registrations import (
     MyRegistrationsView,
     RegistrationViewSet,
@@ -90,6 +95,9 @@ __all__ = [
     'NotificationMarkAllReadView',
     'NotificationMarkReadView',
     'NotificationsListView',
+    'OrganizerActivityView',
+    'OrganizerDashboardView',
+    'OrganizerEventsView',
     'PromoCodeDetailView',
     'RecommendationsView',
     'RegistrationViewSet',

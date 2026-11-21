@@ -480,6 +480,60 @@
           }
         },
         {
+          "name": "Organizer Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{organizerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/organizer/dashboard/"
+          },
+          "description": "Totals over all events the user organizes or co-organizes."
+        },
+        {
+          "name": "Organizer Events",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{organizerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/organizer/events/?tab=upcoming&ordering=-tickets_sold&search=&page_size=20"
+          },
+          "description": "tab: upcoming|past|drafts|inactive; ordering: date, -date, -tickets_sold, -checkin_rate, -sold_through; page_size 1-50."
+        },
+        {
+          "name": "Organizer Activity",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{organizerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/organizer/activity/?limit=20"
+          },
+          "description": "Last 30 days; pass `cursor` (next_cursor of the previous page) to load older items."
+        },
+        {
           "name": "My Registrations",
           "request": {
             "method": "GET",

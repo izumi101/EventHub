@@ -21,7 +21,7 @@ import {
   Check,
   X,
 } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -634,7 +634,12 @@ export class CheckinListsComponent implements OnInit {
       },
       error: (err) => {
         this.scanning = false;
-        this.toastService.error(apiErrorMessage(err, this.i18n.t('checkin.scanFailed'), 'error'));
+        this.toastService.error(
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('checkin.scanFailed'),
+            fields: ['error'],
+          }),
+        );
       },
     });
   }
@@ -650,7 +655,10 @@ export class CheckinListsComponent implements OnInit {
       },
       error: (err) =>
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('checkin.checkInFailed'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('checkin.checkInFailed'),
+            fields: ['error'],
+          }),
         ),
     });
   }
@@ -665,7 +673,12 @@ export class CheckinListsComponent implements OnInit {
         this.loadLists();
       },
       error: (err) =>
-        this.toastService.error(apiErrorMessage(err, this.i18n.t('checkin.undoFailed'), 'error')),
+        this.toastService.error(
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('checkin.undoFailed'),
+            fields: ['error'],
+          }),
+        ),
     });
   }
 }

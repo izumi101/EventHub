@@ -10,7 +10,7 @@ import {
   CircleX,
   RefreshCw,
 } from 'lucide-angular';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
@@ -182,11 +182,10 @@ export class ValidateTicketComponent implements OnInit {
       },
       error: (err) => {
         this.status = 'error';
-        this.errorMessage = apiErrorMessage(
-          err,
-          this.i18n.t('validate.validationFailed2'),
-          'error',
-        );
+        this.errorMessage = errorMessage(err, this.i18n, {
+          fallback: this.i18n.t('validate.validationFailed2'),
+          fields: ['error'],
+        });
         this.loading = false;
       },
     });

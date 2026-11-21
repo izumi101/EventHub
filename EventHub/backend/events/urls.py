@@ -49,6 +49,10 @@ urlpatterns = [
     path('events/<int:event_id>/affiliates/', views.EventAffiliatesView.as_view(), name='event-affiliates'),
     path('affiliates/<int:pk>/', views.AffiliateDetailView.as_view(), name='affiliate-detail'),
     path('events/<int:event_id>/affiliate-click/', views.AffiliateClickView.as_view(), name='affiliate-click'),
+    # Organizer dashboard
+    path('organizer/dashboard/', views.OrganizerDashboardView.as_view(), name='organizer-dashboard'),
+    path('organizer/events/', views.OrganizerEventsView.as_view(), name='organizer-events'),
+    path('organizer/activity/', views.OrganizerActivityView.as_view(), name='organizer-activity'),
     # Admin dashboard
     path('admin-dashboard/', views.AdminDashboardView.as_view(), name='admin-dashboard'),
     # Check-in lists & logs

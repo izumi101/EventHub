@@ -6,6 +6,7 @@ import { LoginComponent } from './login.component';
 import { authInterceptor } from '../../interceptors/auth.interceptor';
 import { PasskeyClient } from '../../utils/passkey-client';
 import { I18nTestingModule } from '../../i18n/testing';
+import { LanguageService } from '../../i18n/language.service';
 import { environment } from '../../../environments/environment';
 
 const API = environment.apiUrl;
@@ -226,5 +227,109 @@ describe('LoginComponent (sign-in state machine)', () => {
     const send = t.http.expectOne(`${API}/auth/mfa/email/send/`);
     expect(send.request.headers.get('Authorization')).toBe('Bearer enr-3');
     send.flush({ sent: true, expires_in: 600, resend_in: 60 });
+  });
+
+  describe('password step failures', () => {
+    const fail = (
+      body: object | null,
+      status: number,
+      headers: Record<string, string> = {},
+    ): ReturnType<typeof setup> => {
+      const t = setup();
+      t.component.username = 'organizer';
+      t.component.password = 'secret-123';
+      t.component.onSubmit();
+      t.http.expectOne(`${API}/auth/login/`).flush(body, { status, statusText: 'Error', headers });
+      t.render();
+      return t;
+    };
+    const alert = (t: ReturnType<typeof setup>) =>
+      t.el.querySelector('[role="alert"]')!.textContent.trim();
+
+    it('401 shows the wrong-password message', () => {
+      const t = fail({ error: 'Invalid credentials' }, 401);
+      expect(alert(t)).toBe('Invalid username or password.');
+      expect(t.component.step()).toBe('password');
+    });
+
+    it('429 shows too many attempts with the wait from Retry-After', () => {
+      const t = fail({ detail: 'Request was throttled.' }, 429, { 'Retry-After': '42' });
+      expect(alert(t)).toBe('Too many attempts. Try again in 42 s.');
+    });
+
+    it('429 without Retry-After shows too many attempts without a number', () => {
+      const t = fail({ detail: 'Request was throttled.' }, 429);
+      expect(alert(t)).toBe('Too many attempts. Please wait a moment and try again.');
+    });
+
+    it('500 says the service is unavailable, not a wrong password, and hides server text', () => {
+      const t = fail({ detail: 'FATAL: too many connections' }, 500);
+      expect(alert(t)).toBe('The service is temporarily unavailable. Try again in a minute.');
+      expect(t.el.textContent).not.toContain('FATAL');
+    });
+
+    it('a network failure (status 0) says there is no connection', () => {
+      const t = fail(null, 0);
+      expect(alert(t)).toBe('No connection to the server. Check your internet and try again.');
+    });
+
+    it('is shown in the active language (Kazakh)', async () => {
+      const t = setup();
+      await TestBed.inject(LanguageService).setLang('kk');
+      t.component.username = 'organizer';
+      t.component.password = 'secret-123';
+      t.component.onSubmit();
+      t.http
+        .expectOne(`${API}/auth/login/`)
+        .flush(null, { status: 503, statusText: 'Unavailable' });
+      t.render();
+      expect(alert(t)).toBe('Қызмет уақытша қолжетімсіз. Бір минуттан кейін қайталап көріңіз.');
+    });
+  });
+
+  describe('second step failures', () => {
+    const alertText = (el: HTMLElement) => el.querySelector('[role="alert"]')!.textContent.trim();
+
+    it('verify: a 500 is reported as an outage, not a wrong code', async () => {
+      const t = setup();
+      t.signIn({ mfa_required: true, challenge_token: 'c', methods: ['totp'], expires_in: 300 });
+      await t.type('input[name="code"]', '123456');
+      t.submit();
+      t.http
+        .expectOne(`${API}/auth/mfa/login/verify/`)
+        .flush({ detail: 'db down' }, { status: 500, statusText: 'Server Error' });
+      t.render();
+      expect(alertText(t.el)).toBe(
+        'The service is temporarily unavailable. Try again in a minute.',
+      );
+      expect(t.component.step()).toBe('mfa');
+    });
+
+    it('send code: a 429 with Retry-After shows the wait', () => {
+      const t = setup();
+      t.signIn({ mfa_required: true, challenge_token: 'c', methods: ['email'], expires_in: 300 });
+      t.click('Send code');
+      t.http
+        .expectOne(`${API}/auth/mfa/login/email/send/`)
+        .flush(
+          { detail: 'throttled' },
+          { status: 429, statusText: 'Too Many', headers: { 'Retry-After': '30' } },
+        );
+      t.render();
+      expect(alertText(t.el)).toBe('Too many attempts. Try again in 30 s.');
+    });
+
+    it('enroll: a network failure while starting setup shows no connection', () => {
+      const t = setup();
+      t.signIn({ mfa_enrollment_required: true, enrollment_token: 'enr', expires_in: 900 });
+      t.click('Authenticator app');
+      t.http
+        .expectOne(`${API}/auth/mfa/totp/setup/`)
+        .error(new ProgressEvent('error'), { status: 0 });
+      t.render();
+      expect(alertText(t.el)).toBe(
+        'No connection to the server. Check your internet and try again.',
+      );
+    });
   });
 });

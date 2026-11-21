@@ -11,6 +11,9 @@ from ..models import INACTIVE_REGISTRATION_STATUSES, Event
 
 logger = logging.getLogger(__name__)
 
+COPY_SUFFIX = ' (Copy)'
+TITLE_MAX_LENGTH = Event._meta.get_field('title').max_length
+
 
 def create_event(*, organizer, validated_data):
     return Event.objects.create(organizer=organizer, **validated_data)
@@ -50,16 +53,19 @@ def update_event(*, event: Event, validated_data):
 
 
 @transaction.atomic
-def clone_event(*, event: Event, actor):
+def clone_event(*, event: Event, actor, title: str | None = None):
     """Duplicate an event as a fresh draft owned by `actor`.
 
-    Copies core fields, the seat map (all seats reset to available) and any
-    promo codes (usage counters reset). Registrations/payments are NOT copied.
+    Copies core fields, the seat map (all seats reset to available), ticket
+    types, custom questions, check-in lists and any
+    promo codes (usage counters reset). Registrations, payments, staff,
+    affiliates and webhooks are NOT copied. `title` names the copy (default:
+    the original title plus " (Copy)", cut to fit the title column).
     """
     from ..models import EventSeat, PromoCode, SeatMap
 
     clone = Event.objects.create(
-        title=f'{event.title} (Copy)',
+        title=title or f'{event.title[: TITLE_MAX_LENGTH - len(COPY_SUFFIX)]}{COPY_SUFFIX}',
         description=event.description,
         organizer=actor,
         category=event.category,
@@ -153,6 +159,29 @@ def clone_event(*, event: Event, actor):
             for q in event.questions.all()
         ]
     )
+
+    # Check-in lists (gates). They hold no ticket-type relation, so the copies
+    # are plain; scan logs belong to registrations and stay with the original.
+    from ..models import CheckInList
+
+    CheckInList.objects.bulk_create(
+        [
+            CheckInList(
+                event=clone,
+                name=c.name,
+                description=c.description,
+                color=c.color,
+                is_default=c.is_default,
+            )
+            for c in event.checkin_lists.all()
+        ]
+    )
+
+    # Like a newly created event: queue the semantic-search embedding. The job
+    # row is written in this transaction, so a failed clone leaves none behind.
+    from ..search import index_event_async
+
+    index_event_async(clone)
 
     return clone
 

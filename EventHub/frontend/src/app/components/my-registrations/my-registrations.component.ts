@@ -20,7 +20,7 @@ import {
 import * as QRCode from 'qrcode';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { DialogDirective } from '../../directives/dialog.directive';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { canShareFiles, supportsWebShare } from '../../utils/browser-support';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
@@ -681,7 +681,10 @@ export class MyRegistrationsComponent implements OnInit {
       error: (err) => {
         this.submittingRefund = false;
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('myRegistrations.couldNotSubmitRequest'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('myRegistrations.couldNotSubmitRequest'),
+            fields: ['error'],
+          }),
         );
       },
     });

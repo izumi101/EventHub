@@ -85,10 +85,21 @@ describe('PaymentSuccessComponent', () => {
       { booking_id: 'b1', session_id: 'cs_2' },
       {},
       {
-        verify: () => throwError(() => ({ error: { error: 'Booking not found' } })),
+        verify: () => throwError(() => ({ status: 404, error: { error: 'Booking not found' } })),
       },
     );
     expect(text).toContain('Booking not found');
+    expect(text).not.toContain('Payment confirmed');
+  });
+
+  it('says the service is unavailable, not a verification failure, on a 500', () => {
+    const text = render(
+      { booking_id: 'b1', session_id: 'cs_2' },
+      {},
+      { verify: () => throwError(() => ({ status: 500, error: { error: 'db down' } })) },
+    );
+    expect(text).toContain('temporarily unavailable');
+    expect(text).not.toContain('db down');
     expect(text).not.toContain('Payment confirmed');
   });
 });

@@ -41,7 +41,8 @@ import {
   Ticket,
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
-import { apiErrorBody, apiErrorMessage } from '../../api/api-error';
+import { apiErrorBody } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { supportsWebShare } from '../../utils/browser-support';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
@@ -1195,12 +1196,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
           return;
         }
         this.toastService.error(
-          apiErrorMessage(
-            err,
-            this.i18n.t('eventDetail.registrationFailedPleaseTry'),
-            'detail',
-            'error',
-          ),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventDetail.registrationFailedPleaseTry'),
+            fields: ['detail', 'error'],
+          }),
         );
       },
     });
@@ -1285,7 +1284,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.registering = false;
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('eventDetail.registrationFailedPleaseTry2'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventDetail.registrationFailedPleaseTry2'),
+            fields: ['error'],
+          }),
         );
         this.loadEvent(true);
       },
@@ -1311,7 +1313,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.submittingForReview = false;
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('eventDetail.couldNotSubmitFor'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventDetail.couldNotSubmitFor'),
+            fields: ['error'],
+          }),
         );
       },
     });
@@ -1369,7 +1374,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.cancelling = false;
         this.toastService.error(
-          apiErrorMessage(err, this.i18n.t('eventDetail.failedToReleaseThe'), 'error'),
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('eventDetail.failedToReleaseThe'),
+            fields: ['error'],
+          }),
         );
       },
     });

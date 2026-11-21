@@ -95,6 +95,20 @@ Design: `docs/adr/0002-two-factor-authentication.md` (with Amendment 1, email co
 
 Open: production should set `MFA_EMAIL_ALLOWED_FOR_REQUIRED_ROLES=0` and a real `MFA_ENCRYPTION_KEY`; session/device management and new-device alerts (PLAN 4.1 next item); passkeys were tested by unit tests only (no WebAuthn authenticator in the automated runs). Demo steps: `docs/DEMO.md` section 6.
 
+## Organizer dashboard rebuild (branch `feat/organizer-dashboard-fixes`, 2026-11-21)
+
+Contract and behaviour: [`ORGANIZER_DASHBOARD.md`](ORGANIZER_DASHBOARD.md). Found on prod: an organizer with 16 events saw 12, a 500 at sign-in read as "wrong password", and "Duplicate", the activity feed and the trend were placeholders.
+
+| Step | Status |
+|---|---|
+| Prod: Postgres connections leaked under ASGI (`CONN_MAX_AGE=60`); default is now 0 | done, deployed (PR #11) |
+| SPA: one `errorMessage` helper picks the text by HTTP status (offline / 429 with Retry-After / 5xx / domain 4xx) in every form | done |
+| API: `organizer/dashboard`, `organizer/events` (tabs, search, SQL sort, paging), `organizer/activity` (keyset cursor); clone copies check-in lists and indexes; `stats` check-in rate fixed; CORS exposes `Retry-After` | done |
+| SPA: dashboard rebuilt (summary with a real trend, tabs in the URL, "Show more", real duplicate, activity feed, accessible menu, moderation queue paged); My Events and admin moderation paged; one event-status module | done |
+| Tests: backend 700, frontend 482, browser e2e 27 / 27 including `dashboard.e2e.ts` | done |
+
+Open: phase 2 of the dashboard (features list in the owner's notes): sales chart, payouts view, day-of-event live check-in, calendar view, attendee messaging by segment.
+
 ## Next phases (summary of PLAN.md)
 
 1. Payments: `PaymentProvider` layer (move Stripe into it), Freedom Pay provider + protocol-compatible **emulator** (CI/demo), method selection by currency, reconciliation job, missing Stripe events. Freedom Pay test credentials are pending (owner wrote to them). `freedompay.kz` is blocked by the cloud session's network policy.

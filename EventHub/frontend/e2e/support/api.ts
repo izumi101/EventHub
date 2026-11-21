@@ -216,9 +216,11 @@ export interface EventOptions {
   /** Generate a seat map of rows × cols (all standard zone). */
   seats?: { rows: number; cols: number };
   daysAhead?: number;
+  /** false: leave the event waiting for admin approval (status `pending`). Default true. */
+  publish?: boolean;
 }
 
-/** A published event owned by `organizer` (created, then approved by the admin). */
+/** A published event owned by `organizer` (created, then approved by the admin unless `publish: false`). */
 export async function createEvent(
   request: APIRequestContext,
   organizer: Session,
@@ -245,12 +247,14 @@ export async function createEvent(
       'create event',
     ),
   );
-  await ok(
-    await request.post(`/api/v1/events/${created.id}/approve/`, {
-      headers: bearer(await admin(request)),
-    }),
-    'approve event',
-  );
+  if (options.publish !== false) {
+    await ok(
+      await request.post(`/api/v1/events/${created.id}/approve/`, {
+        headers: bearer(await admin(request)),
+      }),
+      'approve event',
+    );
+  }
   if (options.seats) {
     await ok(
       await request.post(`/api/v1/events/${created.id}/seat-map/create/`, {
@@ -260,6 +264,8 @@ export async function createEvent(
       'create seat map',
     );
   }
+  // An unapproved event is not public yet: the create answer is all there is to read.
+  if (options.publish === false) return created;
   return json<Schemas['EventList']>(await request.get(`/api/v1/events/${created.id}/`));
 }
 

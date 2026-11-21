@@ -1,9 +1,11 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { EventService, type AdminDashboard } from '../../services/event.service';
 import { apiErrorBody } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { ModalService } from '../../services/modal.service';
@@ -127,24 +129,31 @@ import { LanguageService } from '../../i18n/language.service';
           <!-- Pending queue -->
           <h2 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
             <lucide-icon [img]="icons.Clock" class="w-4 h-4 text-warning" />
-            {{
-              'moderation.awaitingApprovalPendinglength'
-                | transloco: { pendingLength: pending.length }
-            }}
+            {{ 'moderation.awaitingApprovalPendinglength' | transloco: { pendingLength: total() } }}
           </h2>
+          <p class="sr-only" role="status" aria-live="polite" data-testid="live-region">
+            {{ announcement() }}
+          </p>
 
-          @if (loading) {
+          @if (status() === 'loading') {
             <div class="flex justify-center py-12"><span class="spinner"></span></div>
-          } @else if (pending.length === 0) {
-            <div class="card p-8 text-center mb-8">
+          } @else if (status() === 'error') {
+            <div class="note note-error mb-8" role="alert" data-testid="pending-error">
+              <span class="flex-1">{{ loadError() }}</span>
+              <button type="button" class="btn btn-sm btn-secondary" (click)="reload()">
+                {{ 'common.retry' | transloco }}
+              </button>
+            </div>
+          } @else if (pending().length === 0 && total() === 0) {
+            <div class="card p-8 text-center mb-8" data-testid="pending-empty">
               <p class="text-sm text-muted-foreground">
                 {{ 'moderation.nothingToReviewThe' | transloco }}
               </p>
             </div>
           } @else {
-            <div class="space-y-3 mb-8">
-              @for (ev of pending; track ev.id) {
-                <div class="card p-4 flex items-start gap-4 flex-wrap">
+            <div class="space-y-3 mb-4">
+              @for (ev of pending(); track ev.id) {
+                <div class="card p-4 flex items-start gap-4 flex-wrap" data-testid="pending-item">
                   <div class="flex-1 min-w-0">
                     <a
                       [routerLink]="['/events', ev.id]"
@@ -180,7 +189,8 @@ import { LanguageService } from '../../i18n/language.service';
                   <div class="flex gap-2 flex-shrink-0">
                     <button
                       (click)="approve(ev)"
-                      [disabled]="actingId === ev.id"
+                      [disabled]="actingId() === ev.id"
+                      data-testid="approve"
                       class="btn btn-sm flex items-center gap-1 bg-[color:var(--success)] text-[color:var(--success-foreground)] border-[color:var(--success)] hover:opacity-90"
                     >
                       <lucide-icon [img]="icons.Check" class="w-3.5 h-3.5" />
@@ -188,7 +198,8 @@ import { LanguageService } from '../../i18n/language.service';
                     </button>
                     <button
                       (click)="reject(ev)"
-                      [disabled]="actingId === ev.id"
+                      [disabled]="actingId() === ev.id"
+                      data-testid="reject"
                       class="btn btn-sm btn-danger flex items-center gap-1"
                     >
                       <lucide-icon [img]="icons.X" class="w-3.5 h-3.5" />
@@ -196,6 +207,32 @@ import { LanguageService } from '../../i18n/language.service';
                     </button>
                   </div>
                 </div>
+              }
+            </div>
+            <div class="mb-8 flex flex-col items-center gap-2">
+              <p class="text-xs text-muted-foreground" data-testid="pending-counter">
+                {{
+                  'dashboard.countOfTotal' | transloco: { shown: pending().length, total: total() }
+                }}
+              </p>
+              @if (moreError(); as message) {
+                <div class="note note-error w-full" role="alert" data-testid="pending-more-error">
+                  {{ message }}
+                </div>
+              }
+              @if (pending().length < total()) {
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm flex items-center gap-2"
+                  [disabled]="loadingMore()"
+                  (click)="showMore()"
+                  data-testid="pending-more"
+                >
+                  @if (loadingMore()) {
+                    <span class="spinner spinner-sm" aria-hidden="true"></span>
+                  }
+                  {{ 'dashboard.showMore' | transloco }}
+                </button>
               }
             </div>
           }
@@ -331,10 +368,22 @@ export class AdminModerationComponent implements OnInit {
   private toast = inject(ToastService);
   private modal = inject(ModalService);
 
-  pending: EventModel[] = [];
+  private destroyRef = inject(DestroyRef);
+
+  readonly pending = signal<EventModel[]>([]);
+  /** How many events wait for review in all (the queue loads page by page). */
+  readonly total = signal(0);
+  readonly status = signal<'loading' | 'ready' | 'error'>('loading');
+  readonly loadError = signal('');
+  readonly moreError = signal<string | null>(null);
+  readonly loadingMore = signal(false);
+  readonly announcement = signal('');
+  readonly actingId = signal<number | null>(null);
   stats: AdminDashboard | null = null;
-  loading = false;
-  actingId: number | null = null;
+  /** Events per page, as the server answered the first one. */
+  private pageSize = 0;
+  /** Bumped by every reload, so an answer to an abandoned request is ignored. */
+  private generation = 0;
 
   orgForm = { username: '', email: '', password: '', first_name: '', last_name: '' };
   creatingOrganizer = false;
@@ -359,17 +408,84 @@ export class AdminModerationComponent implements OnInit {
   }
 
   loadPending(): void {
-    this.loading = true;
-    this.eventService.getEvents({ status: 'pending' }).subscribe({
-      next: (res) => {
-        this.pending = res.results;
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-        this.toast.error(this.i18n.t('moderation.failedToLoadThe'));
-      },
-    });
+    this.reload();
+  }
+
+  reload(): void {
+    const generation = ++this.generation;
+    this.status.set('loading');
+    this.loadingMore.set(false);
+    this.moreError.set(null);
+    this.eventService
+      .getEvents({ status: 'pending', page: 1 })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          if (generation !== this.generation) return;
+          this.pending.set(res.results);
+          this.total.set(res.count);
+          this.pageSize = res.results.length;
+          this.status.set('ready');
+          this.announce();
+        },
+        error: (err: unknown) => {
+          if (generation !== this.generation) return;
+          this.loadError.set(
+            errorMessage(err, this.i18n, { fallback: this.i18n.t('moderation.failedToLoadThe') }),
+          );
+          this.status.set('error');
+        },
+      });
+  }
+
+  /**
+   * Appends the next page. It is derived from what is loaded, so an approve or
+   * reject shifting the server's pages skips nothing; duplicates are dropped.
+   */
+  showMore(): void {
+    if (this.loadingMore() || this.pending().length >= this.total() || this.pageSize === 0) return;
+    const generation = this.generation;
+    this.loadingMore.set(true);
+    this.moreError.set(null);
+    const page = Math.floor(this.pending().length / this.pageSize) + 1;
+    this.eventService
+      .getEvents({ status: 'pending', page })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (res) => {
+          if (generation !== this.generation) return;
+          const seen = new Set(this.pending().map((e) => e.id));
+          const fresh = res.results.filter((e) => !seen.has(e.id));
+          this.pending.update((current) => [...current, ...fresh]);
+          // Nothing new although the server counts more: stop offering "show more".
+          this.total.set(fresh.length ? res.count : this.pending().length);
+          this.loadingMore.set(false);
+          this.announce();
+        },
+        error: (err: unknown) => {
+          if (generation !== this.generation) return;
+          this.moreError.set(
+            errorMessage(err, this.i18n, { fallback: this.i18n.t('moderation.failedToLoadThe') }),
+          );
+          this.loadingMore.set(false);
+        },
+      });
+  }
+
+  private announce(): void {
+    this.announcement.set(
+      this.i18n.t('dashboard.showingOfTotal', {
+        shown: this.pending().length,
+        total: this.total(),
+      }),
+    );
+  }
+
+  /** The event is no longer waiting: drop it and the total, so the next page stays exact. */
+  private remove(id: number): void {
+    this.pending.update((list) => list.filter((e) => e.id !== id));
+    this.total.update((n) => Math.max(0, n - 1));
+    this.announce();
   }
 
   async approve(ev: EventModel): Promise<void> {
@@ -380,15 +496,15 @@ export class AdminModerationComponent implements OnInit {
       cancelText: this.i18n.t('common.cancel'),
     });
     if (!ok) return;
-    this.actingId = ev.id;
+    this.actingId.set(ev.id);
     this.eventService.approveEvent(ev.id).subscribe({
       next: () => {
-        this.actingId = null;
-        this.pending = this.pending.filter((e) => e.id !== ev.id);
+        this.actingId.set(null);
+        this.remove(ev.id);
         this.toast.success(this.i18n.t('moderation.titlePublished', { title: ev.title }));
       },
       error: () => {
-        this.actingId = null;
+        this.actingId.set(null);
         this.toast.error(this.i18n.t('moderation.approveFailed'));
       },
     });
@@ -437,15 +553,15 @@ export class AdminModerationComponent implements OnInit {
       isDestructive: true,
     });
     if (!ok) return;
-    this.actingId = ev.id;
+    this.actingId.set(ev.id);
     this.eventService.rejectEvent(ev.id).subscribe({
       next: () => {
-        this.actingId = null;
-        this.pending = this.pending.filter((e) => e.id !== ev.id);
+        this.actingId.set(null);
+        this.remove(ev.id);
         this.toast.success(this.i18n.t('moderation.titleRejected', { title: ev.title }));
       },
       error: () => {
-        this.actingId = null;
+        this.actingId.set(null);
         this.toast.error(this.i18n.t('moderation.rejectFailed'));
       },
     });

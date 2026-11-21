@@ -3184,7 +3184,11 @@ paths:
   /api/v1/events/{id}/clone/:
     post:
       operationId: events_clone_create
-      description: Duplicate an event (organizer only). Copies seat map + promo codes.
+      description: |-
+        Duplicate an event as a draft (organizer only).
+
+        Copies the seat map, ticket types, questions, promo codes and check-in
+        lists. The optional `title` names the copy.
       parameters:
       - in: path
         name: id
@@ -3194,6 +3198,17 @@ paths:
         required: true
       tags:
       - events
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CloneEventRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CloneEventRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CloneEventRequestRequest'
       security:
       - jwtAuth: []
       responses:
@@ -3203,6 +3218,14 @@ paths:
               schema:
                 $ref: '#/components/schemas/EventList'
           description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: 'Validation failed: field name → list of messages (`non_field_errors`
+            for the request as a whole).'
         '403':
           content:
             application/json:
@@ -4209,6 +4232,176 @@ paths:
                 $ref: '#/components/schemas/Error'
           description: Missing, malformed or tampered token (one message for every
             case).
+  /api/v1/organizer/activity/:
+    get:
+      operationId: organizer_activity_retrieve
+      description: Registrations, group bookings, check-ins and refunds of the last
+        30 days on managed events, newest first.
+      parameters:
+      - in: query
+        name: cursor
+        schema:
+          type: string
+          minLength: 1
+        description: Opaque `next_cursor` of the previous page; returns the items
+          after it. Treat it as a black box.
+      - in: query
+        name: limit
+        schema:
+          type: integer
+          maximum: 50
+          minimum: 1
+          default: 20
+      tags:
+      - organizer
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivityFeed'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: 'Validation failed: field name → list of messages (`non_field_errors`
+            for the request as a whole).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The user neither is an organizer nor co-organizes an event.
+  /api/v1/organizer/dashboard/:
+    get:
+      operationId: organizer_dashboard_retrieve
+      description: Totals over all events the user organizes or co-organizes, independent
+        of tabs and paging.
+      tags:
+      - organizer
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummary'
+          description: ''
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The user neither is an organizer nor co-organizes an event.
+  /api/v1/organizer/events/:
+    get:
+      operationId: organizer_events_list
+      description: Events the user organizes or co-organizes, one tab at a time, with
+        sales numbers computed like `GET /events/{id}/analytics/` `kpis`. Every event
+        is in exactly one tab.
+      parameters:
+      - in: query
+        name: ordering
+        schema:
+          enum:
+          - date
+          - -date
+          - -tickets_sold
+          - -checkin_rate
+          - -sold_through
+          type: string
+          minLength: 1
+        description: |-
+          Default depends on the tab: `date` for upcoming, `-date` for the others.
+
+          * `date` - date
+          * `-date` - -date
+          * `-tickets_sold` - -tickets_sold
+          * `-checkin_rate` - -checkin_rate
+          * `-sold_through` - -sold_through
+      - name: page
+        required: false
+        in: query
+        description: A page number within the paginated result set.
+        schema:
+          type: integer
+      - name: page_size
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - in: query
+        name: search
+        schema:
+          type: string
+          maxLength: 100
+        description: Case-insensitive match on title or location.
+      - in: query
+        name: tab
+        schema:
+          enum:
+          - upcoming
+          - past
+          - drafts
+          - inactive
+          type: string
+          default: upcoming
+          minLength: 1
+        description: |-
+          * `upcoming` - upcoming
+          * `past` - past
+          * `drafts` - drafts
+          * `inactive` - inactive
+      tags:
+      - organizer
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedOrganizerEventList'
+          description: ''
+        '400':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+          description: 'Validation failed: field name → list of messages (`non_field_errors`
+            for the request as a whole).'
+        '401':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: Missing or invalid access token.
+        '403':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Detail'
+          description: The user neither is an organizer nor co-organizes an event.
   /api/v1/payments/create-checkout/{registration_id}/:
     post:
       operationId: payments_create_checkout_create
@@ -5110,6 +5303,74 @@ paths:
           description: No response body
 components:
   schemas:
+    ActivityFeed:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivityItem'
+        next_cursor:
+          type: string
+          nullable: true
+          description: Pass as `cursor` to load the next page; null when there is
+            nothing older.
+      required:
+      - next_cursor
+      - results
+    ActivityItem:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Stable id, e.g. `registration:812`.
+        type:
+          $ref: '#/components/schemas/ActivityItemTypeEnum'
+        occurred_at:
+          type: string
+          format: date-time
+        event_id:
+          type: integer
+        event_title:
+          type: string
+        attendee_name:
+          type: string
+          description: Never an email address.
+        quantity:
+          type: integer
+          description: Seats for a group booking, otherwise 1.
+        amount:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+          description: Refunds only.
+        currency:
+          type: string
+          nullable: true
+          description: Refunds only.
+      required:
+      - amount
+      - attendee_name
+      - currency
+      - event_id
+      - event_title
+      - id
+      - occurred_at
+      - quantity
+      - type
+    ActivityItemTypeEnum:
+      enum:
+      - registration
+      - group_booking
+      - check_in
+      - refund
+      type: string
+      description: |-
+        * `registration` - registration
+        * `group_booking` - group_booking
+        * `check_in` - check_in
+        * `refund` - refund
     AdminDashboard:
       type: object
       properties:
@@ -6035,6 +6296,15 @@ components:
       required:
       - name
       - seat_id
+    CloneEventRequestRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          description: 'Title of the copy (trimmed). Default: the original title plus
+            " (Copy)".'
+          maxLength: 200
     CodeRequestRequest:
       type: object
       properties:
@@ -6044,6 +6314,78 @@ components:
           maxLength: 16
       required:
       - code
+    DashboardRevenue:
+      type: object
+      properties:
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+        net_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+      required:
+      - currency
+      - net_revenue
+    DashboardSummary:
+      type: object
+      properties:
+        tabs:
+          allOf:
+          - $ref: '#/components/schemas/DashboardTabs'
+          description: Number of managed events in each tab.
+        pending_approval:
+          type: integer
+          description: Events waiting for admin review that can still be published.
+        upcoming_next_7_days:
+          type: integer
+          description: Upcoming-tab events that start within 7 days.
+        tickets_sold:
+          type: integer
+        checked_in:
+          type: integer
+        checkin_rate_pct:
+          type: number
+          format: double
+          description: Percent, one decimal; 0 when nothing is sold.
+        revenue:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardRevenue'
+          description: Net revenue per currency, never summed across currencies.
+        sales_last_7_days:
+          type: integer
+          description: Tickets confirmed in [now-7d, now).
+        sales_previous_7_days:
+          type: integer
+          description: Tickets confirmed in [now-14d, now-7d).
+      required:
+      - checked_in
+      - checkin_rate_pct
+      - pending_approval
+      - revenue
+      - sales_last_7_days
+      - sales_previous_7_days
+      - tabs
+      - tickets_sold
+      - upcoming_next_7_days
+    DashboardTabs:
+      type: object
+      properties:
+        upcoming:
+          type: integer
+        past:
+          type: integer
+        drafts:
+          type: integer
+        inactive:
+          type: integer
+      required:
+      - drafts
+      - inactive
+      - past
+      - upcoming
     DemandLevelEnum:
       enum:
       - free
@@ -7173,6 +7515,185 @@ components:
       - email
       - password
       - username
+    OrganizerEvent:
+      type: object
+      description: |-
+        An event of the dashboard list: the public list payload plus the
+        caller's relation to it and its sales numbers (`context['stats']` maps
+        event id to `dashboard.bulk_event_stats`).
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        title:
+          type: string
+          maxLength: 200
+        description:
+          type: string
+        organizer:
+          allOf:
+          - $ref: '#/components/schemas/OrganizerMini'
+          readOnly: true
+        category:
+          allOf:
+          - $ref: '#/components/schemas/CategoryMini'
+          readOnly: true
+        date:
+          type: string
+          format: date-time
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+        location:
+          type: string
+          maxLength: 300
+        address:
+          type: string
+        image:
+          type: string
+          format: uri
+          nullable: true
+        price:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        max_participants:
+          type: integer
+          maximum: 2147483647
+          minimum: 0
+        status:
+          $ref: '#/components/schemas/EventStatusEnum'
+        is_online:
+          type: boolean
+        online_link:
+          type: string
+          readOnly: true
+        available_spots:
+          type: integer
+          readOnly: true
+        is_free:
+          type: boolean
+          readOnly: true
+        has_ticket_types:
+          type: boolean
+          readOnly: true
+        price_from:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          readOnly: true
+        ticket_types:
+          type: array
+          items:
+            $ref: '#/components/schemas/TicketType'
+          readOnly: true
+        tax_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          description: e.g. 12 for 12% VAT
+        service_fee_percent:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+          description: Platform/booking fee as a %
+        fees_passed_to_buyer:
+          type: boolean
+        currency:
+          type: string
+          maxLength: 3
+        refundable:
+          type: boolean
+        registered_count:
+          type: integer
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        seo_title:
+          type: string
+          description: Custom <title> / og:title (falls back to event title)
+          maxLength: 200
+        seo_description:
+          type: string
+          description: Custom meta description / og:description
+          maxLength: 500
+        is_owner:
+          type: boolean
+          readOnly: true
+        stats:
+          allOf:
+          - $ref: '#/components/schemas/OrganizerEventStats'
+          readOnly: true
+      required:
+      - address
+      - available_spots
+      - category
+      - created_at
+      - currency
+      - date
+      - description
+      - end_date
+      - fees_passed_to_buyer
+      - has_ticket_types
+      - id
+      - image
+      - is_free
+      - is_online
+      - is_owner
+      - location
+      - max_participants
+      - online_link
+      - organizer
+      - price
+      - price_from
+      - refundable
+      - registered_count
+      - seo_description
+      - seo_title
+      - service_fee_percent
+      - stats
+      - status
+      - tax_percent
+      - ticket_types
+      - title
+    OrganizerEventStats:
+      type: object
+      properties:
+        tickets_sold:
+          type: integer
+        checked_in:
+          type: integer
+        checkin_rate_pct:
+          type: number
+          format: double
+        capacity:
+          type: integer
+        sold_through_pct:
+          type: number
+          format: double
+          description: 'Not clamped: an overbooked event is above 100.'
+        pending:
+          type: integer
+        net_revenue:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+      required:
+      - capacity
+      - checked_in
+      - checkin_rate_pct
+      - currency
+      - net_revenue
+      - pending
+      - sold_through_pct
+      - tickets_sold
     OrganizerMini:
       type: object
       properties:
@@ -7334,6 +7855,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Notification'
+    PaginatedOrganizerEventList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizerEvent'
     PaginatedPromoCodeList:
       type: object
       required:

@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { ToastService } from '../../services/toast.service';
 import { User } from '../../models/models';
-import { apiErrorMessage } from '../../api/api-error';
+import { errorMessage } from '../../api/error-message';
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LanguageService } from '../../i18n/language.service';
 
@@ -414,7 +414,10 @@ export class ProfileComponent implements OnInit {
         }, 3000);
       },
       error: (err) => {
-        this.error = apiErrorMessage(err, this.lang.t('profile.updateFailed'), 'detail');
+        this.error = errorMessage(err, this.lang, {
+          fallback: this.lang.t('profile.updateFailed'),
+          fields: ['detail'],
+        });
         this.submitting = false;
       },
     });
@@ -439,7 +442,10 @@ export class ProfileComponent implements OnInit {
       error: (err) => {
         this.uploadingAvatar = false;
         this.toastService.error(
-          apiErrorMessage(err, this.lang.t('profile.avatarUploadFailed'), 'error'),
+          errorMessage(err, this.lang, {
+            fallback: this.lang.t('profile.avatarUploadFailed'),
+            fields: ['error'],
+          }),
         );
       },
     });
@@ -479,7 +485,10 @@ export class ProfileComponent implements OnInit {
       },
       error: (err) => {
         this.changingPw = false;
-        this.pwError = apiErrorMessage(err, this.lang.t('profile.passwordChangeFailed'), 'error');
+        this.pwError = errorMessage(err, this.lang, {
+          fallback: this.lang.t('profile.passwordChangeFailed'),
+          fields: ['error'],
+        });
       },
     });
   }
