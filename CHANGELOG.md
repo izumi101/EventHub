@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.0](https://github.com/izumi101/EventHub/compare/v1.2.0...v1.3.0) (2026-11-21)
+
+
+### Features
+
+* **backend:** opt-in demo seeding for a DEBUG=0 demo deployment ([86b572a](https://github.com/izumi101/EventHub/commit/86b572a42b6d8dc174bd3d96d580511a6d3894ec))
+* **jobs:** worker heartbeat file for container health checks ([f70d565](https://github.com/izumi101/EventHub/commit/f70d5651efbda66fd30a43bce42e4b8bc69e3644))
+
+
+### Bug Fixes
+
+* **backend:** close database connections after each request under ASGI ([9dbc541](https://github.com/izumi101/EventHub/commit/9dbc541ed7b0aed9f0d2f11db987c922d1ead701))
+* **backend:** close database connections after each request under ASGI ([876b673](https://github.com/izumi101/EventHub/commit/876b673333f6cad73132e6e09c9880ae11c8db64))
+* **backend:** close database connections after each request under ASGI ([40b78fd](https://github.com/izumi101/EventHub/commit/40b78fda033590811b466e5dec17cd02ac00d63c))
+
+
+### Documentation
+
+* **deploy:** production deployment runbook ([1af9270](https://github.com/izumi101/EventHub/commit/1af92706791f90a6e57d63078890562727d1b27e))
+
 ## [1.2.0](https://github.com/izumi101/EventHub/compare/v1.1.0...v1.2.0) (2026-11-15)
 
 
