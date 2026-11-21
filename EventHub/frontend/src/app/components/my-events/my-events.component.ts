@@ -19,6 +19,11 @@ import {
 import { TranslocoPipe } from '@jsverse/transloco';
 import { LocalDatePipe } from '../../i18n/locale.pipes';
 import { LanguageService } from '../../i18n/language.service';
+import { errorMessage } from '../../api/error-message';
+import { eventStatusBadge, eventStatusLabel } from '../../utils/event-status';
+
+/** Pages in a row that may bring nothing new before "Show more" stops looking further. */
+const MAX_EMPTY_PAGES = 3;
 
 @Component({
   selector: 'app-my-events',
@@ -94,9 +99,11 @@ import { LanguageService } from '../../i18n/language.service';
                 <!-- Info -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2 mb-0.5">
-                    <span class="badge {{ statusBadgeClass(event.status) }} text-2xs">{{
-                      event.status
-                    }}</span>
+                    <span
+                      class="badge {{ statusBadgeClass(event.status) }} text-2xs"
+                      data-testid="status-badge"
+                      >{{ statusLabel(event.status) | transloco }}</span
+                    >
                   </div>
                   <p class="text-sm font-semibold text-foreground truncate">{{ event.title }}</p>
                   <div class="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
@@ -162,6 +169,26 @@ import { LanguageService } from '../../i18n/language.service';
               </div>
             }
           </div>
+
+          <div class="flex flex-col items-center gap-2 mt-4">
+            <p class="text-xs text-muted-foreground" data-testid="events-counter">
+              {{ 'dashboard.countOfTotal' | transloco: { shown: events.length, total: total } }}
+            </p>
+            @if (events.length < total) {
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm flex items-center gap-2"
+                [disabled]="loadingMore"
+                (click)="showMore()"
+                data-testid="events-more"
+              >
+                @if (loadingMore) {
+                  <span class="spinner spinner-sm" aria-hidden="true"></span>
+                }
+                {{ 'dashboard.showMore' | transloco }}
+              </button>
+            }
+          </div>
         }
       </div>
     </div>
@@ -174,8 +201,15 @@ export class MyEventsComponent implements OnInit {
   private toastService = inject(ToastService);
 
   events: Event[] = [];
+  /** How many events the user has in all (the list below loads page by page). */
+  total = 0;
   loading = false;
+  loadingMore = false;
   cloningId: number | null = null;
+  /** Events per page, as the server answered the first one. */
+  private pageSize = 0;
+  /** The lowest page "Show more" may ask for (after pages that brought nothing new). */
+  private pageFloor = 1;
 
   readonly icons = { Plus, Calendar, MapPin, SquarePen, Trash2, Users, Eye, Copy };
 
@@ -185,14 +219,55 @@ export class MyEventsComponent implements OnInit {
 
   loadEvents(): void {
     this.loading = true;
-    this.eventService.getMyEvents().subscribe({
+    this.eventService.getMyEvents({ page: 1 }).subscribe({
       next: (res) => {
         this.events = res.results;
+        this.total = res.count;
+        this.pageSize = res.results.length;
+        this.pageFloor = 1;
         this.loading = false;
       },
-      error: () => {
-        this.toastService.error(this.i18n.t('myEvents.failedToLoadEvents'));
+      error: (err: unknown) => {
+        this.toastService.error(
+          errorMessage(err, this.i18n, { fallback: this.i18n.t('myEvents.failedToLoadEvents') }),
+        );
         this.loading = false;
+      },
+    });
+  }
+
+  /** Appends the next page. It is derived from what is loaded, so a delete shifting the pages skips nothing. */
+  showMore(): void {
+    if (this.loadingMore || this.events.length >= this.total || this.pageSize === 0) return;
+    this.loadingMore = true;
+    const derived = Math.floor(this.events.length / this.pageSize) + 1;
+    this.fetchMore(Math.max(derived, this.pageFloor), 0);
+  }
+
+  /**
+   * A page can bring only events already shown (an event created elsewhere
+   * shifted the order). The server's count stays the truth: while it says
+   * there is a next page, ask for it, a bounded number of times.
+   */
+  private fetchMore(page: number, attempt: number): void {
+    this.eventService.getMyEvents({ page }).subscribe({
+      next: (res) => {
+        const seen = new Set(this.events.map((e) => e.id));
+        const fresh = res.results.filter((e) => !seen.has(e.id));
+        this.events = [...this.events, ...fresh];
+        this.total = res.count;
+        this.pageFloor = fresh.length ? 1 : page + 1;
+        if (!fresh.length && res.next && attempt < MAX_EMPTY_PAGES) {
+          this.fetchMore(page + 1, attempt + 1);
+          return;
+        }
+        this.loadingMore = false;
+      },
+      error: (err: unknown) => {
+        this.toastService.error(
+          errorMessage(err, this.i18n, { fallback: this.i18n.t('myEvents.failedToLoadEvents') }),
+        );
+        this.loadingMore = false;
       },
     });
   }
@@ -205,22 +280,25 @@ export class MyEventsComponent implements OnInit {
         this.toastService.success(this.i18n.t('myEvents.eventDuplicatedAsA'));
         this.loadEvents();
       },
-      error: () => {
+      error: (err: unknown) => {
         this.cloningId = null;
-        this.toastService.error(this.i18n.t('myEvents.couldNotDuplicateEvent'));
+        this.toastService.error(
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('myEvents.couldNotDuplicateEvent'),
+            fields: ['error'],
+          }),
+        );
       },
     });
   }
 
   statusBadgeClass(status: string): string {
-    const map: Record<string, string> = {
-      published: 'badge-published',
-      pending: 'badge-pending',
-      rejected: 'badge-rejected',
-      cancelled: 'badge-rejected',
-      completed: 'badge-completed',
-    };
-    return map[status] ?? 'badge-pending';
+    return eventStatusBadge(status);
+  }
+
+  /** Translation key of the status; one this client does not know shows as the server sent it. */
+  statusLabel(status: string): string {
+    return eventStatusLabel(status);
   }
 
   async deleteEvent(id: number, title: string): Promise<void> {
@@ -235,9 +313,16 @@ export class MyEventsComponent implements OnInit {
     this.eventService.deleteEvent(id).subscribe({
       next: () => {
         this.events = this.events.filter((e) => e.id !== id);
+        this.total = Math.max(0, this.total - 1);
         this.toastService.success(this.i18n.t('dashboard.eventDeleted'));
       },
-      error: () => this.toastService.error(this.i18n.t('dashboard.failedToDeleteEvent')),
+      error: (err: unknown) =>
+        this.toastService.error(
+          errorMessage(err, this.i18n, {
+            fallback: this.i18n.t('dashboard.failedToDeleteEvent'),
+            fields: ['error', 'detail'],
+          }),
+        ),
     });
   }
 }
