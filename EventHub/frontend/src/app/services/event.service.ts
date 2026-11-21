@@ -100,8 +100,12 @@ export class EventService {
     return this.http.post<EventActionResponse>(`${this.apiUrl}/events/${eventId}/cancel/`, {});
   }
 
-  getMyEvents(): Observable<PaginatedResponse<Event>> {
-    return this.http.get<PaginatedResponse<Event>>(`${this.apiUrl}/my-events/`);
+  getMyEvents(params?: { page?: number }): Observable<PaginatedResponse<Event>> {
+    let httpParams = new HttpParams();
+    if (params?.page) httpParams = httpParams.set('page', params.page.toString());
+    return this.http.get<PaginatedResponse<Event>>(`${this.apiUrl}/my-events/`, {
+      params: httpParams,
+    });
   }
 
   getMyRegistrations(params?: { event?: number }): Observable<PaginatedResponse<Registration>> {
@@ -225,8 +229,12 @@ export class EventService {
   }
 
   // ── Event clone / lifecycle ──
-  cloneEvent(eventId: number): Observable<Event> {
-    return this.http.post<Event>(`${this.apiUrl}/events/${eventId}/clone/`, {});
+  /**
+   * Copies an event as a draft. Without `title` the server appends its own
+   * " (Copy)"; with it (1–200 characters) the copy gets exactly that title.
+   */
+  cloneEvent(eventId: number, title?: string): Observable<Event> {
+    return this.http.post<Event>(`${this.apiUrl}/events/${eventId}/clone/`, title ? { title } : {});
   }
   submitEvent(eventId: number): Observable<EventActionResponse> {
     return this.http.post<EventActionResponse>(`${this.apiUrl}/events/${eventId}/submit/`, {});
