@@ -9,20 +9,30 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
 from accounts.models import UserProfile
+from common import demo_seed
 from events.models import Category, Event, Registration
 from payments.models import Payment
 
 
 class Command(BaseCommand):
-    help = 'Seed EventHub with reproducible development data.'
+    help = 'Seed EventHub with reproducible development data (DJANGO_DEBUG=1, or --i-know-this-is-a-demo).'
 
     def add_arguments(self, parser):
         parser.add_argument('--noinput', action='store_true', help='Run without prompts.')
+        parser.add_argument(
+            '--accounts-only',
+            action='store_true',
+            help='Create only the admin, organizer and attendee accounts (no sample events or payments).',
+        )
+        demo_seed.add_demo_flag(parser)
 
     def handle(self, *args, **options):
-        # Demo accounts have publicly known passwords — never on a real deployment.
-        if not settings.DEBUG:
-            raise CommandError('seed_data creates demo accounts; run it only with DJANGO_DEBUG=1.')
+        # Demo accounts have publicly known passwords in development; a public
+        # demo deployment must opt in and set its own (common/demo_seed.py).
+        demo_seed.check_allowed('seed_data', options)
+        self.demo_password = demo_seed.demo_password('seed_data', options)
+        if not settings.DEBUG and os.environ.get('DJANGO_SEED_MFA_TOTP_SECRET', '').strip():
+            raise CommandError('DJANGO_SEED_MFA_TOTP_SECRET is publicly known (browser tests); DJANGO_DEBUG=1 only.')
 
         # The superuser never gets a hard-coded password: take it from the
         # environment or generate one and print it once.
@@ -32,16 +42,22 @@ class Command(BaseCommand):
 
         users = self.seed_users()
         self.seed_test_totp(users)
-        categories = self.seed_categories()
-        events = self.seed_events(users, categories)
-        self.seed_registrations(users, events)
+        if options['accounts_only']:
+            categories, events = [], []
+        else:
+            categories = self.seed_categories()
+            events = self.seed_events(users, categories)
+            self.seed_registrations(users, events)
 
         self.stdout.write(
             self.style.SUCCESS(
                 f'Seed data ready: {len(users)} users, {len(categories)} categories, {len(events)} events.'
             )
         )
-        self.stdout.write('Demo logins: organizer/password123, attendee/password123')
+        if settings.DEBUG:
+            self.stdout.write(f'Demo logins: organizer/{self.demo_password}, attendee/{self.demo_password}')
+        else:
+            self.stdout.write(f'Demo logins: organizer, attendee / the password in {demo_seed.PASSWORD_ENV}')
         # A generated password exists nowhere else, so it is shown once; a
         # configured one is a secret from .env and never goes to the log.
         if self.admin_created and self.admin_password_generated:
@@ -65,7 +81,7 @@ class Command(BaseCommand):
             {
                 'username': 'organizer',
                 'email': 'organizer@eventhub.local',
-                'password': 'password123',
+                'password': self.demo_password,
                 'first_name': 'Aruzhan',
                 'last_name': 'Organizer',
                 'profile': {
@@ -78,7 +94,7 @@ class Command(BaseCommand):
             {
                 'username': 'attendee',
                 'email': 'attendee@eventhub.local',
-                'password': 'password123',
+                'password': self.demo_password,
                 'first_name': 'Dias',
                 'last_name': 'Attendee',
                 'profile': {'bio': 'Likes discovering local events.', 'phone': '+7 777 300 4000', 'location': 'Astana'},

@@ -19,6 +19,7 @@ Event management platform — Django REST backend + Angular frontend. Users crea
 | API collection | `EventHub/postman_collection.json` |
 | Docs | `EventHub/docs/` |
 | Roadmap status / handoff | `EventHub/docs/HANDOFF.md` |
+| Production deploy (VM, Caddy) | `EventHub/docs/DEPLOY.md` |
 
 ## Agent Entry
 

@@ -3,10 +3,16 @@ every few seconds and the periodic maintenance every minute.
 
     python manage.py run_worker                  # forever
     python manage.py run_worker --once           # one pass of both, then exit
+
+With WORKER_HEARTBEAT_FILE set, the file's modification time is refreshed
+after every pass, so a container health check can tell a hung worker from a
+working one (docker-compose.prod.yml).
 """
 
 import logging
+import os
 import time
+from pathlib import Path
 
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
@@ -26,6 +32,7 @@ class Command(BaseCommand):
         parser.add_argument('--maintenance-every', type=float, default=60.0, help='Seconds between maintenance passes.')
 
     def handle(self, *args, **options):
+        heartbeat = os.environ.get('WORKER_HEARTBEAT_FILE', '').strip()
         last_maintenance = 0.0
         while True:
             try:
@@ -38,8 +45,18 @@ class Command(BaseCommand):
                 # Keep the worker alive; the next pass retries.
                 logger.exception('Worker pass failed')
                 ran = 0
+            if heartbeat:
+                touch(heartbeat)
             if options['once']:
                 return
             close_old_connections()
             if not ran:
                 time.sleep(options['poll'])
+
+
+def touch(path: str) -> None:
+    """Best effort: a missing heartbeat only makes the health check fail."""
+    try:
+        Path(path).touch()
+    except OSError as exc:
+        logger.debug('Cannot update the heartbeat file %s: %s', path, exc)
