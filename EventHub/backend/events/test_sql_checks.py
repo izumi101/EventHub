@@ -7,11 +7,9 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from bookings.models import Booking, BookingSeat
 from common.sql_check_defects import DEFECTS, inject_all
 from common.sql_checks import SEVERITIES, DjangoConnectionExecutor, load_checks, run_checks
-from events.models import CheckInLog, Event, Registration, Review, WaitlistEntry
-from payments.models import Payment, Refund
+from events.models import Event
 
 
 class CheckDefinitionTests(SimpleTestCase):
@@ -89,50 +87,8 @@ class RunSqlChecksCommandTests(TestCase):
 
 
 class SeedDemoKzTests(TestCase):
+    """The seed's content and consistency are tested in events/test_seed_demo_kz.py."""
+
     def test_refuses_without_debug(self):
         with self.assertRaises(CommandError):
             call_command('seed_demo_kz', stdout=StringIO())
-
-    @override_settings(DEBUG=True)
-    def test_seed_is_realistic_clean_and_idempotent(self):
-        call_command('seed_demo_kz', stdout=StringIO())
-        counts = self.counts()
-
-        self.assertEqual(Event.objects.filter(currency='KZT', title='Almaty Jazz Festival 2026').count(), 1)
-        self.assertGreaterEqual(counts['events'], 20)
-        self.assertGreaterEqual(counts['registrations'], 2000)
-        self.assertEqual(
-            set(Registration.objects.values_list('status', flat=True).distinct()), {'pending', 'confirmed', 'cancelled'}
-        )
-        self.assertTrue(Registration.objects.filter(status='pending', seat_held_until__isnull=False).exists())
-        self.assertTrue(
-            {'completed', 'pending', 'failed', 'expired', 'refunded'}
-            <= set(Payment.objects.values_list('status', flat=True).distinct())
-        )
-        self.assertTrue(Payment.objects.filter(status='completed', refunded_amount__gt=0).exists())  # partial
-        self.assertEqual(
-            set(Booking.objects.values_list('status', flat=True).distinct()),
-            {'confirmed', 'holding', 'expired', 'refunded'},
-        )
-        self.assertTrue(CheckInLog.objects.exists())
-        self.assertTrue(Review.objects.exists())
-        self.assertTrue(WaitlistEntry.objects.filter(status='waiting').exists())
-        self.assertTrue(Refund.objects.filter(kind='event_cancelled').exists())
-
-        results = run_checks(load_checks(), DjangoConnectionExecutor())
-        findings = {r.check.name: (r.error or r.rows[:3]) for r in results if r.rows or r.error}
-        self.assertEqual(findings, {})
-
-        call_command('seed_demo_kz', stdout=StringIO())
-        self.assertEqual(self.counts(), counts)
-
-    def counts(self):
-        return {
-            'events': Event.objects.count(),
-            'registrations': Registration.objects.count(),
-            'payments': Payment.objects.count(),
-            'refunds': Refund.objects.count(),
-            'bookings': Booking.objects.count(),
-            'booking_seats': BookingSeat.objects.count(),
-            'reviews': Review.objects.count(),
-        }

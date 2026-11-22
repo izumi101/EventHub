@@ -16,6 +16,7 @@ from events.models import Event
 from payments.models import Payment
 from payments.state import (
     DROP_STATUS_TRIGGER_SQL,
+    PAID_STATUSES,
     TRANSITIONS,
     TRIGGER_NAME,
     IllegalPaymentTransition,
@@ -115,7 +116,7 @@ class TransitionFunctionTests(StateBase):
 
     def test_a_stale_object_cannot_overwrite_a_concurrent_change(self):
         payment = self.payment('pending')
-        Payment.objects.filter(pk=payment.pk).update(status='completed')  # another worker
+        Payment.objects.filter(pk=payment.pk).update(status='completed', paid_at=timezone.now())  # another worker
         with self.assertRaises(IllegalPaymentTransition) as raised:
             transition(payment, 'expired')  # allowed from what this object believes
         self.assertIn('stored status is completed', str(raised.exception))
@@ -133,8 +134,10 @@ class StatusTriggerTests(StateBase):
             cursor.execute(status_trigger_sql())
 
     def update(self, payment, status):
+        # The CHECK on `paid_at` is independent of the trigger under test.
+        extra = {'paid_at': timezone.now()} if status in PAID_STATUSES else {}
         with transaction.atomic():
-            Payment.objects.filter(pk=payment.pk).update(status=status)
+            Payment.objects.filter(pk=payment.pk).update(status=status, **extra)
 
     def test_the_trigger_enforces_the_same_table(self):
         for source, target in ALL_PAIRS:

@@ -534,6 +534,60 @@
           "description": "Last 30 days; pass `cursor` (next_cursor of the previous page) to load older items."
         },
         {
+          "name": "Organizer Sales",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{organizerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/organizer/sales/?range=30d"
+          },
+          "description": "Tickets and net revenue per day (business time zone, zero-filled; revenue per currency). range: 7d|30d|90d."
+        },
+        {
+          "name": "Organizer Today",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{organizerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/organizer/today/"
+          },
+          "description": "Published or pending events in progress or starting within 7 days; at most 10, plus `more`."
+        },
+        {
+          "name": "Organizer Reviews",
+          "request": {
+            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{organizerAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/organizer/reviews/"
+          },
+          "description": "Review count, average, 1-5 distribution and the 5 latest reviews of managed events."
+        },
+        {
           "name": "My Registrations",
           "request": {
             "method": "GET",

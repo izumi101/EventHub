@@ -12,7 +12,7 @@ import json
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.db.models import (
     Case,
@@ -33,7 +33,7 @@ from django.utils import timezone
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 
 from .billing import event_currency, quote_breakdown
-from .models import Event, EventStaff, Registration
+from .models import Event, EventStaff, Registration, Review
 
 TAB_UPCOMING = 'upcoming'
 TAB_PAST = 'past'
@@ -51,6 +51,9 @@ DEFAULT_ORDERING = {
 
 SEARCH_MAX_LENGTH = 100
 ACTIVITY_WINDOW = timedelta(days=30)
+TODAY_HORIZON = timedelta(days=7)
+TODAY_LIMIT = 10
+RECENT_REVIEWS = 5
 TWO_PLACES = Decimal('0.01')
 
 
@@ -523,3 +526,75 @@ def _item(item_id, kind, occurred_at, event_id, attendee_name, *, quantity=1, am
         'amount': amount,
         'currency': currency,
     }
+
+
+# ── Today and the next 7 days ──
+def today_events(user, now=None) -> dict:
+    """Published or pending managed events that are in progress (`date` <= now
+    <= end, the end being `end_date` or else `date`) or start within the next
+    7 days, by start; the first `TODAY_LIMIT` with their numbers, and how many
+    more there are."""
+    now = now or timezone.now()
+    S = EventStatusChoices
+    queryset = (
+        with_end(managed_events(user))
+        .filter(status__in=[S.PUBLISHED, S.PENDING], ds_end__gte=now, date__lte=now + TODAY_HORIZON)
+        .order_by('date', 'id')
+    )
+    total = queryset.count()
+    events = list(queryset[:TODAY_LIMIT])
+    stats = bulk_event_stats(events)
+    return {
+        'results': [
+            {
+                'id': event.pk,
+                'title': event.title,
+                'date': event.date,
+                'end_date': event.end_date,
+                'location': event.location,
+                'status': event.status,
+                'is_owner': event.organizer_id == user.id,
+                'in_progress': event.date <= now <= event.ds_end,
+                'stats': {key: stats[event.pk][key] for key in ('tickets_sold', 'checked_in', 'capacity')},
+            }
+            for event in events
+        ],
+        'more': max(total - TODAY_LIMIT, 0),
+    }
+
+
+# ── Reviews of managed events ──
+def reviews_summary(user) -> dict:
+    """Count, average (2 decimals, null without reviews), the 1-5 star
+    distribution (all five keys always) and the latest reviews."""
+    reviews = Review.objects.filter(event_id__in=managed_events(user).values('pk'))
+    distribution = {str(stars): 0 for stars in range(1, 6)}
+    for row in reviews.order_by().values('rating').annotate(n=Count('pk')):
+        distribution[str(row['rating'])] = row['n']
+    count = sum(distribution.values())
+    average = None
+    if count:
+        total = sum(int(stars) * n for stars, n in distribution.items())
+        average = float((Decimal(total) / count).quantize(TWO_PLACES, rounding=ROUND_HALF_UP))
+
+    recent = [
+        {
+            'event_id': row['event_id'],
+            'event_title': row['event__title'],
+            'rating': row['rating'],
+            'comment': row['comment'],
+            'created_at': row['created_at'],
+            'author': _name(row, 'user__'),
+        }
+        for row in reviews.order_by('-created_at', '-pk').values(
+            'event_id',
+            'event__title',
+            'rating',
+            'comment',
+            'created_at',
+            'user__first_name',
+            'user__last_name',
+            'user__username',
+        )[:RECENT_REVIEWS]
+    ]
+    return {'count': count, 'average': average, 'distribution': distribution, 'recent': recent}

@@ -34,6 +34,11 @@ class Booking(models.Model):
     refunded_at = models.DateTimeField(null=True, blank=True)
     refund_reason = models.CharField(max_length=255, blank=True)
 
+    # A booking is created `holding` and confirmed when the payment arrives,
+    # up to HOLD_MINUTES later (bookings/services.py: `confirm_booking`).
+    # Set once, when it first becomes confirmed; revenue is counted on this day.
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -42,6 +47,15 @@ class Booking(models.Model):
 
     def __str__(self):
         return f'Booking {self.id} · {self.event.title} · {self.status}'
+
+    def save(self, *args, **kwargs):
+        # Safety net for code that sets `status` directly: a booking that is
+        # (or was) paid always carries `confirmed_at`.
+        if self.status in (self.Status.CONFIRMED, self.Status.REFUNDED) and self.confirmed_at is None:
+            self.confirmed_at = timezone.now()
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = {*kwargs['update_fields'], 'confirmed_at'}
+        super().save(*args, **kwargs)
 
     @property
     def is_expired(self) -> bool:

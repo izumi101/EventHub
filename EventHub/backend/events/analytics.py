@@ -6,13 +6,16 @@ ticket tier and promoter. All money comes from the Payment rows so refunds are
 reflected (net of refunds) automatically.
 """
 
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
-from django.utils import timezone
-
 from common.choices import PaymentStatusChoices, RegistrationStatusChoices
+
+from .business_time import business_tz, days_between, local_date, local_today
+
+TIMELINE_DAYS = 30
+PAID_STATUSES = (PaymentStatusChoices.COMPLETED, PaymentStatusChoices.REFUNDED)
 
 
 def _active_regs(event):
@@ -81,50 +84,87 @@ def event_analytics(event) -> dict:
     tickets_sold = len(confirmed) + group_seats
     avg_order = (net / paid_count) if paid_count else Decimal('0')
 
-    # ── Daily timeline (last 30 days up to event or today) ──
-    today = timezone.now().date()
-    start = today - timedelta(days=29)
+    # ── Daily timeline: the last 30 business-time-zone days up to today ──
+    # A sale older than the window is outside it (it is not piled onto the
+    # first day); `organizer/sales/` shares the bucketing.
+    tz = business_tz()
+    end = local_today(tz=tz)
+    start = end - timedelta(days=TIMELINE_DAYS - 1)
     by_day_count = defaultdict(int)
     by_day_revenue = defaultdict(Decimal)
+
+    # A ticket counts on the day it was made; its money on the day the money
+    # arrived (`Payment.paid_at`, `Booking.confirmed_at`), which can differ
+    # (an offline payment is marked paid later).
+    def in_window(moment):
+        return start <= local_date(moment, tz) <= end
+
     for r in confirmed:
-        d = r.registered_at.date()
-        if d < start:
-            d = start
-        by_day_count[d] += 1
+        if in_window(r.registered_at):
+            by_day_count[local_date(r.registered_at, tz)] += 1
         pay = getattr(r, 'payment', None)
-        if pay:
-            by_day_revenue[d] += pay.net_amount
+        if pay and pay.status in PAID_STATUSES:
+            # `created_at` only for a paid row written by code that predates `paid_at`.
+            paid_on = pay.paid_at or pay.created_at
+            if in_window(paid_on):
+                by_day_revenue[local_date(paid_on, tz)] += pay.net_amount
 
     for booking, amount, seats in group_confirmed:
-        d = max(booking.created_at.date(), start)
-        by_day_count[d] += seats
-        by_day_revenue[d] += amount
+        if in_window(booking.created_at):
+            by_day_count[local_date(booking.created_at, tz)] += seats
+        confirmed_on = booking.confirmed_at or booking.created_at
+        if in_window(confirmed_on):
+            by_day_revenue[local_date(confirmed_on, tz)] += amount
 
-    timeline = []
-    for i in range(30):
-        d = start + timedelta(days=i)
-        timeline.append(
-            {
-                'date': d.isoformat(),
-                'tickets': by_day_count.get(d, 0),
-                'revenue': float(by_day_revenue.get(d, Decimal('0'))),
-            }
-        )
+    timeline = [
+        {
+            'date': d.isoformat(),
+            'tickets': by_day_count.get(d, 0),
+            'revenue': float(by_day_revenue.get(d, Decimal('0'))),
+        }
+        for d in days_between(start, end)
+    ]
 
     # ── Breakdown by ticket type ──
+    # One row per tier (two tiers may share a name), plus "General" for
+    # tickets without a tier and the group-booking pseudo row. `remaining`
+    # is `TicketType.available`: the tier's quantity less its active
+    # (not cancelled / rejected) registrations, never negative.
+    active_per_type = Counter(r.ticket_type_id for r in regs if r.ticket_type_id)
+    group_key = 'group'
+    tier_name = {}
+    tier_limits = {}  # key -> (quantity, remaining); null = unlimited
     tier_count = defaultdict(int)
     tier_revenue = defaultdict(Decimal)
     for r in confirmed:
-        name = r.ticket_type.name if r.ticket_type_id else 'General'
-        tier_count[name] += 1
+        key = r.ticket_type_id
+        if key is None:
+            tier_name[key] = 'General'
+            tier_limits[key] = (None, None)
+        else:
+            quantity = r.ticket_type.quantity
+            tier_name[key] = r.ticket_type.name
+            tier_limits[key] = (
+                quantity,
+                None if quantity is None else max(quantity - active_per_type[key], 0),
+            )
+        tier_count[key] += 1
         pay = getattr(r, 'payment', None)
         if pay:
-            tier_revenue[name] += pay.net_amount
+            tier_revenue[key] += pay.net_amount
     if group_confirmed:
-        tier_count['Group booking'] += group_seats
-        tier_revenue['Group booking'] += sum((amount for _, amount, _ in group_confirmed), Decimal('0'))
+        tier_name[group_key] = 'Group booking'
+        tier_limits[group_key] = (None, None)
+        tier_count[group_key] += group_seats
+        tier_revenue[group_key] += sum((amount for _, amount, _ in group_confirmed), Decimal('0'))
     by_ticket_type = [
-        {'name': k, 'count': tier_count[k], 'revenue': float(tier_revenue[k])}
+        {
+            'name': tier_name[k],
+            'count': tier_count[k],
+            'revenue': float(tier_revenue[k]),
+            'quantity': tier_limits[k][0],
+            'remaining': tier_limits[k][1],
+        }
         for k in sorted(tier_count, key=lambda x: -tier_revenue[x])
     ]
 

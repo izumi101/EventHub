@@ -71,7 +71,7 @@ Event management platform — Django REST backend + Angular frontend. Users crea
 | DB roles: create / prove | `manage.py setup_db_roles` (runs on start) / `manage.py verify_db_roles` — `EventHub/docs/DATABASE_ROLES.md` |
 | DB schemas: status / check | `docker compose exec backend python manage.py db_schemas [--check]` (one schema per domain, moved on `migrate`) — `EventHub/docs/DATABASE_SCHEMAS.md` |
 | Data checks | `docker compose exec backend python manage.py run_sql_checks` (`backend/sql/checks`) |
-| KZ demo data | `docker compose exec backend python manage.py seed_demo_kz` (DJANGO_DEBUG=1) |
+| KZ demo data | `docker compose exec backend python manage.py seed_demo_kz` (DJANGO_DEBUG=1). Public demo (DJANGO_DEBUG=0): add `--i-know-this-is-a-demo --credentials-file PATH [--organizer USER]` (random per-account passwords go only to that new 0600 file); undo with `--remove [--dry-run]`; see `EventHub/docs/DEMO_DATA.md` |
 
 ## Compact Instructions
 

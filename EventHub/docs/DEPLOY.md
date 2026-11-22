@@ -78,7 +78,7 @@ Tip: `alias dc='docker compose -f docker-compose.yml -f docker-compose.prod.yml'
 - `seed_showcase --i-know-this-is-a-demo`: the showcase events, without the paid USD ones (Stripe is not enabled, they could not be sold);
 - `index_events`: search embeddings.
 
-All three are idempotent. `seed_demo_kz` stays development-only on purpose: 600 accounts with a shared password on undeliverable `*.eventhub.local` addresses would make the worker send reminders through the Gmail account (500 emails/day limit).
+All three are idempotent. For a year of realistic activity (60 events, ~760 attendees, sales, refunds, reviews) there is a fourth command, `seed_demo_kz --i-know-this-is-a-demo --credentials-file PATH [--organizer USERNAME]`: every account gets its own random password, written only to that new file, and `--remove` deletes it all again. It is a separate, deliberate step with a backup before it; read [DEMO_DATA.md](DEMO_DATA.md) first. Its accounts use the undeliverable domain `demo.eventhub.local`: the worker keeps their in-app notifications but never queues an email for them, so no Gmail quota is used. Run `index_events` afterwards so the new events are searchable.
 
 ## Switching from sslip.io to a real domain
 

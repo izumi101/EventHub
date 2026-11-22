@@ -17,11 +17,26 @@ inside a test transaction to prove it matches the table.
 
 import logging
 
+from django.db.models import Value
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from common.choices import PaymentStatusChoices as Status
 
 logger = logging.getLogger(__name__)
+
+PAID_STATUSES = frozenset({Status.COMPLETED, Status.REFUNDED, Status.DISPUTED})
+
+
+def mark_paid(payment, now=None):
+    """Stamp `payment.paid_at` (in memory) with the moment the money first
+    arrived. The one place that sets it: a value already there is never
+    overwritten, so refunds and disputes keep the original time. Callers
+    persist it with their own save (`transition()` does so itself)."""
+    if payment.paid_at is None:
+        payment.paid_at = now or timezone.now()
+    return payment
+
 
 TRANSITIONS: dict[str, frozenset[str]] = {
     Status.PENDING: frozenset({Status.COMPLETED, Status.FAILED, Status.EXPIRED}),
@@ -72,7 +87,13 @@ def transition(payment, to: str, *, reason: str = ''):
     from .models import Payment
 
     now = timezone.now()
-    updated = Payment.objects.filter(pk=payment.pk, status=current).update(status=to, updated_at=now)
+    fields = {'status': to, 'updated_at': now}
+    if to in PAID_STATUSES:
+        # Money arrived (or arrived and went straight back): stamp `paid_at`
+        # once. Coalesce keeps a value another worker already wrote.
+        mark_paid(payment, now)
+        fields['paid_at'] = Coalesce('paid_at', Value(payment.paid_at))
+    updated = Payment.objects.filter(pk=payment.pk, status=current).update(**fields)
     if updated != 1:
         actual = Payment.objects.filter(pk=payment.pk).values_list('status', flat=True).first()
         raise IllegalPaymentTransition(payment.pk, current, to, f'the stored status is {actual}')

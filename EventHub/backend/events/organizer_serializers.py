@@ -3,7 +3,10 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
+from common.choices import EventStatusChoices
+
 from .dashboard import ORDERINGS, SEARCH_MAX_LENGTH, TAB_UPCOMING, TABS, decode_cursor
+from .sales_chart import DEFAULT_RANGE, RANGES
 from .serializers import EventListSerializer
 
 MONEY = {'max_digits': 12, 'decimal_places': 2}
@@ -133,3 +136,103 @@ class CloneEventRequestSerializer(serializers.Serializer):
         max_length=200,
         help_text='Title of the copy (trimmed). Default: the original title plus " (Copy)".',
     )
+
+
+class SalesQuerySerializer(serializers.Serializer):
+    range = serializers.ChoiceField(
+        choices=list(RANGES),
+        default=DEFAULT_RANGE,
+        help_text='Window ending today (business time zone): the last 7, 30 or 90 days, today included.',
+    )
+
+
+class SalesDaySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    tickets = serializers.IntegerField(
+        help_text='Confirmed registrations plus seats of confirmed group bookings, on the day they were made.'
+    )
+
+
+class SalesRevenueDaySerializer(serializers.Serializer):
+    date = serializers.DateField()
+    net_revenue = serializers.DecimalField(
+        **MONEY, help_text='Payments of the day minus refunds of the day; negative when refunds exceed sales.'
+    )
+
+
+class SalesRevenueSeriesSerializer(serializers.Serializer):
+    currency = serializers.CharField(min_length=3, max_length=3)
+    days = SalesRevenueDaySerializer(many=True, help_text='Every day of the range, zero-filled.')
+
+
+class SalesMarkerSerializer(serializers.Serializer):
+    date = serializers.DateField(help_text='Business-time-zone day the event was published.')
+    event_id = serializers.IntegerField()
+    title = serializers.CharField()
+    kind = serializers.ChoiceField(choices=['published'])
+
+
+class SalesSerializer(serializers.Serializer):
+    time_zone = serializers.CharField(help_text='IANA name of the zone the days are bucketed in.')
+    start = serializers.DateField(help_text='First day of the range.')
+    end = serializers.DateField(help_text='Last day of the range: today in `time_zone`.')
+    days = SalesDaySerializer(many=True, help_text='Every day of [start, end], zero-filled.')
+    revenue = SalesRevenueSeriesSerializer(
+        many=True,
+        help_text='One series per currency with money movement in the range; never summed across currencies.',
+    )
+    markers = SalesMarkerSerializer(
+        many=True,
+        help_text='Events published in the range. Empty until `Event.published_at` exists (moderation batch).',
+    )
+
+
+class TodayStatsSerializer(serializers.Serializer):
+    tickets_sold = serializers.IntegerField()
+    checked_in = serializers.IntegerField()
+    capacity = serializers.IntegerField()
+
+
+class TodayEventSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    title = serializers.CharField()
+    date = serializers.DateTimeField()
+    end_date = serializers.DateTimeField(allow_null=True)
+    location = serializers.CharField()
+    status = serializers.ChoiceField(choices=EventStatusChoices.choices)
+    is_owner = serializers.BooleanField()
+    in_progress = serializers.BooleanField(help_text='Started and not yet over (the end is `end_date`, else `date`).')
+    stats = TodayStatsSerializer()
+
+
+class TodaySerializer(serializers.Serializer):
+    results = TodayEventSerializer(many=True, help_text='At most 10, by start.')
+    more = serializers.IntegerField(help_text='How many further events there are beyond `results`.')
+
+
+# Reviews per star rating. The keys are the digits 1-5, which are not valid
+# attribute names, so the class is built from them.
+ReviewDistributionSerializer = type(
+    'ReviewDistributionSerializer',
+    (serializers.Serializer,),
+    {
+        '__doc__': 'Reviews per star rating; all five keys are always present.',
+        **{stars: serializers.IntegerField() for stars in '12345'},
+    },
+)
+
+
+class RecentReviewSerializer(serializers.Serializer):
+    event_id = serializers.IntegerField()
+    event_title = serializers.CharField()
+    rating = serializers.IntegerField(min_value=1, max_value=5)
+    comment = serializers.CharField(allow_blank=True)
+    created_at = serializers.DateTimeField()
+    author = serializers.CharField(help_text='Name of the reviewer; never an email address.')
+
+
+class ReviewsSummarySerializer(serializers.Serializer):
+    count = serializers.IntegerField()
+    average = serializers.FloatField(allow_null=True, help_text='Two decimals; null when there are no reviews.')
+    distribution = ReviewDistributionSerializer()
+    recent = RecentReviewSerializer(many=True, help_text='The 5 latest reviews.')

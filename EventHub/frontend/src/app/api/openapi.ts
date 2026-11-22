@@ -1718,6 +1718,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/organizer/reviews/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Count, average, star distribution and the 5 latest reviews of all managed events. */
+        get: operations["organizer_reviews_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizer/sales/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Tickets sold and net revenue per day over all managed events, in the business time zone, zero-filled. Revenue is one series per currency. The totals of a range equal `net_revenue` and `tickets_sold` of `GET /events/{id}/analytics/` for events whose whole life is inside it. */
+        get: operations["organizer_sales_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/organizer/today/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Published or pending managed events that are in progress or start within the next 7 days, by start, at most 10, with `more` counting the rest. */
+        get: operations["organizer_today_retrieve"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/payments/create-checkout/{registration_id}/": {
         parameters: {
             query?: never;
@@ -2083,6 +2134,16 @@ export interface components {
             pending: number;
             group_bookings: number;
             group_seats: number;
+        };
+        AnalyticsTicketType: {
+            name: string;
+            count: number;
+            /** Format: double */
+            revenue: number;
+            /** @description Capacity of the tier; null = unlimited (and for the "General" and group rows). */
+            quantity: number | null;
+            /** @description Quantity less the active registrations of the tier, never negative; null = unlimited. */
+            remaining: number | null;
         };
         AnswerSummary: {
             label: string;
@@ -2497,9 +2558,9 @@ export interface components {
         EventAnalytics: {
             currency: string;
             kpis: components["schemas"]["AnalyticsKpis"];
-            /** @description Last 30 days. */
+            /** @description The last 30 days up to today, in the business time zone (`NOTIFICATION_TIME_ZONE`), zero-filled. */
             timeline: components["schemas"]["AnalyticsDay"][];
-            by_ticket_type: components["schemas"]["AnalyticsBreakdown"][];
+            by_ticket_type: components["schemas"]["AnalyticsTicketType"][];
             by_affiliate: components["schemas"]["AnalyticsBreakdown"][];
         };
         EventCancelResult: {
@@ -3527,6 +3588,16 @@ export interface components {
          * @enum {integer}
          */
         RatingEnum: 1 | 2 | 3 | 4 | 5;
+        RecentReview: {
+            event_id: number;
+            event_title: string;
+            rating: number;
+            comment: string;
+            /** Format: date-time */
+            created_at: string;
+            /** @description Name of the reviewer; never an email address. */
+            author: string;
+        };
         RecoveryCodes: {
             recovery_codes: string[];
         };
@@ -3688,8 +3759,82 @@ export interface components {
             rating: components["schemas"]["RatingEnum"];
             comment?: string;
         };
+        /** @description Reviews per star rating; all five keys are always present. */
+        ReviewDistribution: {
+            1: number;
+            2: number;
+            3: number;
+            4: number;
+            5: number;
+        };
+        ReviewsSummary: {
+            count: number;
+            /**
+             * Format: double
+             * @description Two decimals; null when there are no reviews.
+             */
+            average: number | null;
+            distribution: components["schemas"]["ReviewDistribution"];
+            /** @description The 5 latest reviews. */
+            recent: components["schemas"]["RecentReview"][];
+        };
         /** @enum {string} */
         SaleStateEnum: "inactive" | "scheduled" | "ended" | "sold_out" | "on_sale";
+        Sales: {
+            /** @description IANA name of the zone the days are bucketed in. */
+            time_zone: string;
+            /**
+             * Format: date
+             * @description First day of the range.
+             */
+            start: string;
+            /**
+             * Format: date
+             * @description Last day of the range: today in `time_zone`.
+             */
+            end: string;
+            /** @description Every day of [start, end], zero-filled. */
+            days: components["schemas"]["SalesDay"][];
+            /** @description One series per currency with money movement in the range; never summed across currencies. */
+            revenue: components["schemas"]["SalesRevenueSeries"][];
+            /** @description Events published in the range. Empty until `Event.published_at` exists (moderation batch). */
+            markers: components["schemas"]["SalesMarker"][];
+        };
+        SalesDay: {
+            /** Format: date */
+            date: string;
+            /** @description Confirmed registrations plus seats of confirmed group bookings, on the day they were made. */
+            tickets: number;
+        };
+        SalesMarker: {
+            /**
+             * Format: date
+             * @description Business-time-zone day the event was published.
+             */
+            date: string;
+            event_id: number;
+            title: string;
+            kind: components["schemas"]["SalesMarkerKindEnum"];
+        };
+        /**
+         * @description * `published` - published
+         * @enum {string}
+         */
+        SalesMarkerKindEnum: "published";
+        SalesRevenueDay: {
+            /** Format: date */
+            date: string;
+            /**
+             * Format: decimal
+             * @description Payments of the day minus refunds of the day; negative when refunds exceed sales.
+             */
+            net_revenue: string;
+        };
+        SalesRevenueSeries: {
+            currency: string;
+            /** @description Every day of the range, zero-filled. */
+            days: components["schemas"]["SalesRevenueDay"][];
+        };
         SeatMap: {
             readonly id: number;
             rows: number;
@@ -3826,6 +3971,31 @@ export interface components {
             sale_end?: string | null;
             is_active?: boolean;
             order?: number;
+        };
+        Today: {
+            /** @description At most 10, by start. */
+            results: components["schemas"]["TodayEvent"][];
+            /** @description How many further events there are beyond `results`. */
+            more: number;
+        };
+        TodayEvent: {
+            id: number;
+            title: string;
+            /** Format: date-time */
+            date: string;
+            /** Format: date-time */
+            end_date: string | null;
+            location: string;
+            status: components["schemas"]["EventStatusEnum"];
+            is_owner: boolean;
+            /** @description Started and not yet over (the end is `end_date`, else `date`). */
+            in_progress: boolean;
+            stats: components["schemas"]["TodayStats"];
+        };
+        TodayStats: {
+            tickets_sold: number;
+            checked_in: number;
+            capacity: number;
         };
         TokenPair: {
             access: string;
@@ -8665,6 +8835,137 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The user neither is an organizer nor co-organizes an event. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    organizer_reviews_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReviewsSummary"];
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The user neither is an organizer nor co-organizes an event. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    organizer_sales_retrieve: {
+        parameters: {
+            query?: {
+                /**
+                 * @description Window ending today (business time zone): the last 7, 30 or 90 days, today included.
+                 *
+                 *     * `7d` - 7d
+                 *     * `30d` - 30d
+                 *     * `90d` - 90d
+                 */
+                range?: "7d" | "30d" | "90d";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Sales"];
+                };
+            };
+            /** @description Validation failed: field name → list of messages (`non_field_errors` for the request as a whole). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Missing or invalid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+            /** @description The user neither is an organizer nor co-organizes an event. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Detail"];
+                };
+            };
+        };
+    };
+    organizer_today_retrieve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Today"];
                 };
             };
             /** @description Missing or invalid access token. */

@@ -58,6 +58,9 @@ from .organizer_dashboard import (
     OrganizerActivityView,
     OrganizerDashboardView,
     OrganizerEventsView,
+    OrganizerReviewsView,
+    OrganizerSalesView,
+    OrganizerTodayView,
 )
 from .registrations import (
     MyRegistrationsView,
@@ -98,6 +101,9 @@ __all__ = [
     'OrganizerActivityView',
     'OrganizerDashboardView',
     'OrganizerEventsView',
+    'OrganizerReviewsView',
+    'OrganizerSalesView',
+    'OrganizerTodayView',
     'PromoCodeDetailView',
     'RecommendationsView',
     'RegistrationViewSet',

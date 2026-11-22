@@ -57,11 +57,24 @@ class AnalyticsBreakdownSerializer(serializers.Serializer):
     revenue = serializers.FloatField()
 
 
+class AnalyticsTicketTypeSerializer(AnalyticsBreakdownSerializer):
+    quantity = serializers.IntegerField(
+        allow_null=True, help_text='Capacity of the tier; null = unlimited (and for the "General" and group rows).'
+    )
+    remaining = serializers.IntegerField(
+        allow_null=True,
+        help_text='Quantity less the active registrations of the tier, never negative; null = unlimited.',
+    )
+
+
 class EventAnalyticsSerializer(serializers.Serializer):
     currency = serializers.CharField(min_length=3, max_length=3)
     kpis = AnalyticsKpisSerializer()
-    timeline = AnalyticsDaySerializer(many=True, help_text='Last 30 days.')
-    by_ticket_type = AnalyticsBreakdownSerializer(many=True)
+    timeline = AnalyticsDaySerializer(
+        many=True,
+        help_text='The last 30 days up to today, in the business time zone (`NOTIFICATION_TIME_ZONE`), zero-filled.',
+    )
+    by_ticket_type = AnalyticsTicketTypeSerializer(many=True)
     by_affiliate = AnalyticsBreakdownSerializer(many=True)
 
 

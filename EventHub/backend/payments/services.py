@@ -1,5 +1,6 @@
 import logging
 import time
+import uuid
 from datetime import timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -11,13 +12,19 @@ from django.utils import timezone
 from common.choices import EventStatusChoices, PaymentStatusChoices, RegistrationStatusChoices
 from events.models import Registration
 
-from .models import Payment
+from .models import Payment, Refund
+from .state import mark_paid, transition
 
 logger = logging.getLogger(__name__)
 
 # Stripe refuses Checkout Sessions that expire sooner than 30 minutes after
 # creation; the seat hold is stretched to cover the session's lifetime.
 CHECKOUT_SESSION_MINUTES = 31
+
+# Payments whose money no gateway holds: demo (mock) payments, offline ones.
+# Refunding one never calls Stripe or Freedom Pay, whatever ids the row carries,
+# whether or not the mock payments mode is on: only the books change.
+LOCAL_REFUND_PROVIDERS = frozenset({'mock', 'offline'})
 
 
 def stripe_to_dict(obj) -> dict:
@@ -113,7 +120,8 @@ def create_mock_checkout_session(*, registration):
     payment.amount = amount
     payment.currency = _currency_of(registration).lower()
     payment.status = PaymentStatusChoices.COMPLETED
-    payment.save(update_fields=['stripe_checkout_session_id', 'amount', 'currency', 'status'])
+    mark_paid(payment)
+    payment.save(update_fields=['stripe_checkout_session_id', 'amount', 'currency', 'status', 'paid_at'])
 
     _confirm_paid_registration(registration, payment)
     logger.info('[MOCK] Payment auto-confirmed for registration %s', registration.id)
@@ -271,6 +279,7 @@ def confirm_stripe_checkout_session(session):
         )
         _refund_payment_intent(intent, key=f'late-refund-{session_id}')
         payment.status = PaymentStatusChoices.REFUNDED
+        mark_paid(payment)  # the money did arrive, then went straight back
         payment.stripe_payment_intent_id = intent
         payment.stripe_checkout_session_id = session_id
         payment.refunded_amount = payment.amount
@@ -279,6 +288,7 @@ def confirm_stripe_checkout_session(session):
         payment.save(
             update_fields=[
                 'status',
+                'paid_at',
                 'stripe_payment_intent_id',
                 'stripe_checkout_session_id',
                 'refunded_amount',
@@ -301,12 +311,49 @@ def confirm_stripe_checkout_session(session):
         return payment
 
     payment.status = PaymentStatusChoices.COMPLETED
+    mark_paid(payment)
     payment.stripe_payment_intent_id = intent
     payment.stripe_checkout_session_id = session_id
-    payment.save(update_fields=['status', 'stripe_payment_intent_id', 'stripe_checkout_session_id'])
+    payment.save(update_fields=['status', 'paid_at', 'stripe_payment_intent_id', 'stripe_checkout_session_id'])
     _confirm_paid_registration(registration, payment)
     logger.info('Payment completed for registration %s', registration.id)
     return payment
+
+
+def record_local_refund(payment, amount, reason, *, currency=None, kind=Refund.Kind.ORGANIZER):
+    """Write the ledger row of a refund no gateway took part in (the caller
+    updates the payment's own refund columns)."""
+    refund_id = uuid.uuid4()
+    return Refund.objects.create(
+        id=refund_id,
+        payment=payment,
+        amount=amount,
+        currency=(currency or payment.currency or 'KZT').upper(),
+        kind=kind,
+        status=Refund.Status.SUCCEEDED,
+        reason=(reason or '')[:255],
+        provider=payment.provider,
+        provider_payment_id=payment.provider_payment_id,
+        provider_refund_id=f'local_re_{refund_id.hex[:16]}',
+        attempts=1,
+        processed_at=timezone.now(),
+    )
+
+
+def refund_remaining_locally(payment, reason, *, kind=Refund.Kind.ORGANIZER):
+    """Return everything not yet refunded of a locked, completed demo (mock)
+    payment and record it (-> `refunded`). Used for group bookings, which are
+    only ever refunded in full. Returns the amount."""
+    remaining = payment.amount - payment.refunded_amount
+    if remaining <= 0:
+        return Decimal('0.00')
+    record_local_refund(payment, remaining, reason, kind=kind)
+    payment.refunded_amount = payment.amount
+    payment.refunded_at = timezone.now()
+    payment.refund_reason = (reason or payment.refund_reason)[:255]
+    payment.save(update_fields=['refunded_amount', 'refunded_at', 'refund_reason', 'updated_at'])
+    transition(payment, PaymentStatusChoices.REFUNDED, reason=f'{kind} refund')
+    return remaining
 
 
 @transaction.atomic
@@ -349,6 +396,8 @@ def refund_payment(*, payment, amount=None, reason='', notify_user=True):
         from .freedompay_flow import refund_now
 
         refund_now(payment, refund_amount, reason)
+    elif payment.provider in LOCAL_REFUND_PROVIDERS:
+        record_local_refund(payment, refund_amount, reason, currency=currency)
     elif not getattr(settings, 'STRIPE_MOCK_MODE', False) and payment.stripe_payment_intent_id:
         try:
             # The key is derived from the balance before this refund, so a
@@ -429,6 +478,7 @@ def mark_offline_paid(*, registration, amount=None):
     payment.currency = currency
     payment.method = Payment.METHOD_OFFLINE
     payment.status = PaymentStatusChoices.COMPLETED
+    mark_paid(payment)
     payment.save()
 
     _confirm_paid_registration(registration, payment)
