@@ -16,6 +16,8 @@ import logging
 from django.db import transaction
 from django.utils import translation
 
+from common.demo_seed import is_demo_address
+
 from . import types
 from .emails import render_email
 from .messages import build_message
@@ -69,7 +71,10 @@ def notify(user, type_key: str, *, event=None, **data):
                 body=message.body,
                 event=event,
             )
-            notification.email_queued = bool(user.email) and email_enabled(user, type_key)
+            # The demo accounts' addresses are undeliverable: the in-app row is kept, no email is queued.
+            notification.email_queued = (
+                bool(user.email) and not is_demo_address(user.email) and email_enabled(user, type_key)
+            )
             if notification.email_queued:
                 email = render_email(type_key, message, user=user)
                 enqueue_email(

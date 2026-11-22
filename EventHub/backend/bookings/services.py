@@ -271,7 +271,7 @@ def refund_booking(booking, *, actor, reason='', event_cancelled=False):
     from common.permissions import can_manage_event
     from payments import freedompay_flow
     from payments.models import Payment, Refund
-    from payments.services import _refund_payment_intent
+    from payments.services import LOCAL_REFUND_PROVIDERS, _refund_payment_intent, refund_remaining_locally
 
     # Lock order (ADR 0001): the payment first, then its booking.
     payment = Payment.objects.select_for_update().filter(booking_id=booking.pk).first()
@@ -283,11 +283,14 @@ def refund_booking(booking, *, actor, reason='', event_cancelled=False):
     if not event_cancelled and booking.seats.filter(is_checked_in=True).exists():
         raise ValueError('Some of these tickets were already used for entry.')
 
+    kind = Refund.Kind.EVENT_CANCELLED if event_cancelled else Refund.Kind.ORGANIZER
     if freedompay_flow.is_refundable_here(payment):
         # Freedom Pay is called even with PAYMENTS_MOCK_MODE: it is a real
         # (or emulated) gateway. Raises ValueError when it refuses.
-        kind = Refund.Kind.EVENT_CANCELLED if event_cancelled else Refund.Kind.ORGANIZER
         freedompay_flow.refund_remaining(payment, reason or 'Group booking refunded', kind=kind)
+    elif payment is not None and payment.provider in LOCAL_REFUND_PROVIDERS and payment.is_refundable:
+        # Demo (mock) money: no gateway holds it, so only the books change.
+        refund_remaining_locally(payment, reason or 'Group booking refunded', kind=kind)
     elif booking.stripe_payment_intent_id:
         # Idempotent: a retry after a crash can't refund twice.
         _refund_payment_intent(booking.stripe_payment_intent_id, key=f'booking-refund-{booking.pk}')
