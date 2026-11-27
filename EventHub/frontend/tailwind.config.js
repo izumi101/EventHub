@@ -1,51 +1,72 @@
+/**
+ * A design token as a Tailwind colour that also takes an opacity modifier.
+ *
+ * The tokens in styles.css are plain hex values behind CSS variables, so Tailwind
+ * cannot split them into channels: a bare 'var(--x)' string makes every
+ * `bg-primary/10`, `border-primary/30`, `text-muted-foreground/40`… generate NO
+ * rule at all (the class silently does nothing). As a function, Tailwind hands us
+ * the opacity and we mix the token with transparent instead. Without a modifier
+ * the plain variable is returned, so nothing else changes.
+ */
+const token =
+  (cssVar) =>
+  ({ opacityValue }) => {
+    if (opacityValue === undefined || String(opacityValue).startsWith('var(')) {
+      return `var(${cssVar})`;
+    }
+    return `color-mix(in srgb, var(${cssVar}) calc(${opacityValue} * 100%), transparent)`;
+  };
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./src/**/*.{html,ts}'],
   theme: {
     extend: {
       /* CSS-vars bridge — every colour comes from the tokens in styles.css */
-      colors: {
-        background: 'var(--background)',
-        foreground: 'var(--foreground)',
-        surface: 'var(--surface)',
-        'surface-sunken': 'var(--surface-sunken)',
-        'surface-elevated': 'var(--surface-elevated)',
-        card: 'var(--card)',
-        'card-foreground': 'var(--card-foreground)',
-        popover: 'var(--popover)',
-        'popover-foreground': 'var(--popover-foreground)',
-        primary: 'var(--primary)',
-        'primary-hover': 'var(--primary-hover)',
-        'primary-foreground': 'var(--primary-foreground)',
-        secondary: 'var(--secondary)',
-        'secondary-foreground': 'var(--secondary-foreground)',
-        'secondary-text': 'var(--text-secondary)',
-        muted: 'var(--muted)',
-        'muted-foreground': 'var(--muted-foreground)',
-        accent: 'var(--accent)',
-        'accent-foreground': 'var(--accent-foreground)',
-        'accent-text': 'var(--accent-text)',
-        destructive: 'var(--destructive)',
-        'destructive-foreground': 'var(--destructive-foreground)',
-        success: 'var(--success)',
-        'success-foreground': 'var(--success-foreground)',
-        warning: 'var(--warning)',
-        'warning-foreground': 'var(--warning-foreground)',
-        ember: 'var(--ember-500)',
-        pine: 'var(--pine-500)',
-        border: 'var(--border)',
-        'border-strong': 'var(--border-strong)',
-        input: 'var(--input)',
-        ring: 'var(--ring)',
-      },
+      colors: Object.fromEntries(
+        Object.entries({
+          background: '--background',
+          foreground: '--foreground',
+          surface: '--surface',
+          'surface-sunken': '--surface-sunken',
+          'surface-elevated': '--surface-elevated',
+          card: '--card',
+          'card-foreground': '--card-foreground',
+          popover: '--popover',
+          'popover-foreground': '--popover-foreground',
+          primary: '--primary',
+          'primary-hover': '--primary-hover',
+          'primary-foreground': '--primary-foreground',
+          secondary: '--secondary',
+          'secondary-foreground': '--secondary-foreground',
+          'secondary-text': '--text-secondary',
+          muted: '--muted',
+          'muted-foreground': '--muted-foreground',
+          accent: '--accent',
+          'accent-foreground': '--accent-foreground',
+          'accent-text': '--accent-text',
+          destructive: '--destructive',
+          'destructive-foreground': '--destructive-foreground',
+          success: '--success',
+          'success-foreground': '--success-foreground',
+          warning: '--warning',
+          'warning-foreground': '--warning-foreground',
+          ember: '--ember-500',
+          pine: '--pine-500',
+          border: '--border',
+          'border-strong': '--border-strong',
+          input: '--input',
+          ring: '--ring',
+        }).map(([name, cssVar]) => [name, token(cssVar)]),
+      ),
 
       /* Ember as TEXT must pass AA: #E8643A on paper is only 3.1:1, so text-primary /
          text-ember / text-accent use the darker (light) or lighter (dark) accent-text.
          Fills (bg-primary, border-ember, ring-ember…) keep the brand orange. */
       textColor: {
-        primary: 'var(--accent-text)',
-        ember: 'var(--accent-text)',
-        accent: 'var(--accent-text)',
+        primary: token('--accent-text'),
+        ember: token('--accent-text'),
+        accent: token('--accent-text'),
       },
 
       fontFamily: {

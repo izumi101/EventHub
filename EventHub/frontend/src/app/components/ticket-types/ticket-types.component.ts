@@ -224,7 +224,8 @@ const emptyTierForm = (): TierForm => ({
           </div>
         }
 
-        @if (loading) {
+        <!-- Prices need the event's currency: never show a tier before the event is loaded. -->
+        @if (loading || (!event && !eventFailed)) {
           <div class="flex justify-center py-16"><span class="spinner spinner-lg"></span></div>
         } @else if (tiers.length === 0) {
           <div class="flex flex-col items-center justify-center py-16 text-center">
@@ -243,19 +244,18 @@ const emptyTierForm = (): TierForm => ({
             @for (t of tiers; track t.id) {
               <div class="card p-4 flex items-center gap-4" [class.opacity-60]="!t.is_active">
                 <div
-                  class="w-14 h-14 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold"
+                  class="min-w-[3.5rem] h-14 px-3 rounded-xl flex flex-col items-center justify-center flex-shrink-0 font-bold whitespace-nowrap"
                   [class]="
-                    t.kind === 'donation'
-                      ? 'bg-ember/10 text-ember'
-                      : t.kind === 'free'
-                        ? 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]'
-                        : 'bg-primary/10 text-primary'
+                    t.kind === 'free'
+                      ? 'bg-[color:var(--pine-50)] text-[color:var(--pine-600)]'
+                      : 'bg-[color:var(--ember-50)] text-ember'
                   "
+                  data-testid="ticket-type-price"
                 >
                   @if (t.kind === 'free') {
                     <span class="text-sm">{{ 'common.free' | transloco }}</span>
                   } @else {
-                    <span class="text-base">{{ t.price | money: event?.currency }}</span>
+                    <span class="text-sm">{{ t.price | money: event?.currency }}</span>
                   }
                   @if (t.kind === 'donation') {
                     <span class="text-[9px] uppercase">{{ 'ticketTypes.min' | transloco }}</span>
@@ -320,6 +320,8 @@ export class TicketTypesComponent implements OnInit {
   event: EventModel | null = null;
   tiers: TicketType[] = [];
   loading = true;
+  /** The event (and so its currency) could not be loaded: tiers are shown without waiting for it. */
+  eventFailed = false;
   showForm = false;
   saving = false;
 
@@ -329,7 +331,15 @@ export class TicketTypesComponent implements OnInit {
 
   ngOnInit(): void {
     this.eventId = Number(this.route.snapshot.paramMap.get('id'));
-    this.eventService.getEvent(this.eventId).subscribe((e) => (this.event = e));
+    this.eventService.getEvent(this.eventId).subscribe({
+      next: (e) => (this.event = e),
+      error: (err: unknown) => {
+        this.eventFailed = true;
+        this.toast.error(
+          errorMessage(err, this.i18n, { fallback: this.i18n.t('ticketTypes.failedToLoadTicket') }),
+        );
+      },
+    });
     this.load();
   }
 
