@@ -19,12 +19,22 @@ import type {
 } from '../../services/organizer-dashboard.service';
 import { ToastService } from '../../services/toast.service';
 import { DashboardComponent, parseQuery, toQueryParams } from './dashboard.component';
-import { eventPage, organizerEvent, summary as makeSummary } from './dashboard.testing';
+import {
+  emptySales,
+  eventPage,
+  organizerEvent,
+  reviewsSummary,
+  summary as makeSummary,
+  todayBlock,
+} from './dashboard.testing';
 
 const API = environment.apiUrl;
 const SUMMARY_URL = `${API}/organizer/dashboard/`;
 const EVENTS_URL = `${API}/organizer/events/`;
 const ACTIVITY_URL = `${API}/organizer/activity/`;
+const SALES_URL = `${API}/organizer/sales/`;
+const TODAY_URL = `${API}/organizer/today/`;
+const REVIEWS_URL = `${API}/organizer/reviews/`;
 
 const organizerUser = {
   id: 1,
@@ -122,6 +132,19 @@ async function setup(options: Options = {}) {
   );
   listRequest().flush(options.first ?? eventPage(events(1, 20), 23));
   activityRequest().flush({ results: [], next_cursor: null });
+  // The batch A sections answer with nothing to show, so these tests stay about the list.
+  http.expectOne((r) => r.url === SALES_URL).flush(emptySales());
+  http.expectOne((r) => r.url === TODAY_URL).flush(todayBlock([]));
+  http
+    .expectOne((r) => r.url === REVIEWS_URL)
+    .flush(
+      reviewsSummary({
+        count: 0,
+        average: null,
+        distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        recent: [],
+      }),
+    );
   await settle();
   return ctx;
 }

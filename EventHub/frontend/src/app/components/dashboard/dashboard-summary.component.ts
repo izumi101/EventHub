@@ -1,5 +1,5 @@
 import { Component, computed, input, output } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { Params, RouterModule } from '@angular/router';
 import { TranslocoPipe } from '@jsverse/transloco';
 import {
   ArrowDown,
@@ -174,7 +174,7 @@ export function salesTrend(last: number, previous: number): SalesTrend | null {
           @if (s.upcoming_next_7_days > 0) {
             <a
               [routerLink]="[]"
-              [queryParams]="{ tab: 'upcoming' }"
+              [queryParams]="linkParams()"
               fragment="dashboard-events"
               [replaceUrl]="true"
               class="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:border-primary/40 transition-colors"
@@ -191,7 +191,7 @@ export function salesTrend(last: number, previous: number): SalesTrend | null {
           @if (s.pending_approval > 0) {
             <a
               [routerLink]="[]"
-              [queryParams]="{ tab: 'upcoming' }"
+              [queryParams]="linkParams()"
               fragment="dashboard-events"
               [replaceUrl]="true"
               class="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm text-foreground hover:border-primary/40 transition-colors"
@@ -213,6 +213,11 @@ export function salesTrend(last: number, previous: number): SalesTrend | null {
 export class DashboardSummaryComponent {
   readonly summary = input<DashboardSummary | null>(null);
   readonly status = input<SectionStatus>('loading');
+  /**
+   * Query params of the callouts (the Upcoming tab, plus whatever else the page
+   * keeps in its URL), so following one loses nothing.
+   */
+  readonly linkParams = input<Params>({ tab: 'upcoming' });
   readonly retry = output();
 
   readonly icons = { ArrowUp, ArrowDown, CalendarClock, ClipboardCheck };

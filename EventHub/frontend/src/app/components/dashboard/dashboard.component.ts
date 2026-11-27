@@ -1,5 +1,6 @@
 import {
   Component,
+  computed,
   DestroyRef,
   Injector,
   afterNextRender,
@@ -31,19 +32,25 @@ import {
   DASHBOARD_PAGE_SIZE,
   DASHBOARD_TABS,
   DEFAULT_ORDERING,
+  DEFAULT_SALES_RANGE,
   OrganizerDashboardService,
+  SALES_RANGES,
   SEARCH_MAX_LENGTH,
   type DashboardOrdering,
   type DashboardSummary,
   type DashboardTab,
   type OrganizerEvent,
   type OrganizerEventPage,
+  type SalesRange,
 } from '../../services/organizer-dashboard.service';
 import { ToastService } from '../../services/toast.service';
 import { isAdmin } from '../../utils/roles';
 import { DashboardActivityComponent } from './dashboard-activity.component';
 import { DashboardEventCardComponent } from './dashboard-event-card.component';
 import { DashboardModerationQueueComponent } from './dashboard-moderation-queue.component';
+import { DashboardReviewsComponent } from './dashboard-reviews.component';
+import { DashboardSalesComponent } from './dashboard-sales.component';
+import { DashboardTodayComponent } from './dashboard-today.component';
 import { DashboardSummaryComponent, type SectionStatus } from './dashboard-summary.component';
 import {
   DASHBOARD_PANEL_ID,
@@ -89,6 +96,16 @@ export function parseQuery(params: ParamMap): ListQuery {
   };
 }
 
+/** The sales chart's window from the URL; anything missing or unknown is the default. */
+export function parseRange(params: ParamMap): SalesRange {
+  return SALES_RANGES.find((r) => r === params.get('range')) ?? DEFAULT_SALES_RANGE;
+}
+
+/** The default window is left out of the URL, like the default tab. */
+export function rangeQueryParams(range: SalesRange): Params {
+  return range === DEFAULT_SALES_RANGE ? {} : { range };
+}
+
 /** State to query params; defaults are left out of the URL. */
 export function toQueryParams(query: ListQuery): Params {
   const params: Params = {};
@@ -122,6 +139,9 @@ const EMPTY_KEYS: Record<DashboardTab, { title: string; text: string }> = {
     DashboardEventCardComponent,
     DashboardActivityComponent,
     DashboardModerationQueueComponent,
+    DashboardSalesComponent,
+    DashboardReviewsComponent,
+    DashboardTodayComponent,
   ],
   template: `
     <div class="page-root">
@@ -162,12 +182,24 @@ const EMPTY_KEYS: Record<DashboardTab, { title: string; text: string }> = {
             <app-dashboard-summary
               [summary]="summary()"
               [status]="summaryStatus()"
+              [linkParams]="linkParams()"
               (retry)="loadSummary()"
             />
           </div>
 
+          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 min-w-0">
+              <app-dashboard-sales [range]="range()" (rangeChange)="setRange($event)" />
+            </div>
+            <div class="lg:col-span-1 min-w-0">
+              <app-dashboard-reviews />
+            </div>
+          </div>
+
           <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
             <div class="lg:col-span-2 min-w-0 space-y-4">
+              <app-dashboard-today [linkParams]="linkParams()" />
+
               <app-dashboard-toolbar
                 [tab]="query().tab"
                 [counts]="summary()?.tabs ?? null"
@@ -349,6 +381,14 @@ export class DashboardComponent {
   readonly emptyKeys = EMPTY_KEYS;
   readonly placeholders = [1, 2, 3];
 
+  /** The sales chart's window. It lives in the URL, next to the list's tab and search. */
+  readonly range = signal<SalesRange>(DEFAULT_SALES_RANGE);
+  /** Where the links that lead back to the upcoming list point: that tab, and the chart range kept. */
+  readonly linkParams = computed<Params>(() => ({
+    tab: 'upcoming',
+    ...rangeQueryParams(this.range()),
+  }));
+
   // Summary (independent section).
   readonly summary = signal<DashboardSummary | null>(null);
   readonly summaryStatus = signal<SectionStatus>('loading');
@@ -481,6 +521,12 @@ export class DashboardComponent {
         this.requestList(1);
       });
 
+    this.route.queryParamMap
+      .pipe(map(parseRange), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef))
+      .subscribe((range) => {
+        this.range.set(range);
+      });
+
     this.loadSummary();
   }
 
@@ -489,6 +535,17 @@ export class DashboardComponent {
   loadSummary(): void {
     this.summaryStatus.set('loading');
     this.summaryRequests$.next({ quiet: false });
+  }
+
+  // ── Sales chart → URL ──
+
+  setRange(range: SalesRange): void {
+    if (range === this.range()) return;
+    void this.router.navigate([], {
+      relativeTo: this.route,
+      queryParams: { ...toQueryParams(this.query()), ...rangeQueryParams(range) },
+      replaceUrl: true,
+    });
   }
 
   // ── Toolbar → URL ──
@@ -519,7 +576,7 @@ export class DashboardComponent {
     this.expectedQuery = query;
     void this.router.navigate([], {
       relativeTo: this.route,
-      queryParams: toQueryParams(query),
+      queryParams: { ...toQueryParams(query), ...rangeQueryParams(this.range()) },
       replaceUrl: true,
     });
   }

@@ -1,5 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { I18nTestingModule } from '../../i18n/testing';
 import { LanguageService } from '../../i18n/language.service';
@@ -34,7 +36,7 @@ function render(event: OrganizerEvent = organizerEvent(1)) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     imports: [I18nTestingModule, HostComponent],
-    providers: [provideRouter([])],
+    providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
   });
   const fixture = TestBed.createComponent(HostComponent);
   fixture.componentInstance.ev.set(event);
