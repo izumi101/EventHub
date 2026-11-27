@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.4.0](https://github.com/izumi101/EventHub/compare/v1.3.0...v1.4.0) (2026-11-27)
+
+
+### Features
+
+* **api:** organizer dashboard summary, event list and activity feed ([da7a6f5](https://github.com/izumi101/EventHub/commit/da7a6f5a7429fc90d8df7bb10ce6143457e80a70))
+* **api:** organizer sales chart, today block, reviews and ticket stock ([d028bc1](https://github.com/izumi101/EventHub/commit/d028bc1c9e1fd1c13d3620e84bd381df9f4a6992))
+* **frontend:** rebuild the organizer dashboard on the server API ([ab9a977](https://github.com/izumi101/EventHub/commit/ab9a9777f3a72275e721782bbc61d868f607f407))
+* **payments:** record when money arrived on payments and group bookings ([25d586b](https://github.com/izumi101/EventHub/commit/25d586ba27ed1b5399943d2638ff28f6153bf087))
+* realistic demo data for the public deployment, with batch A analytics backend ([fb8a703](https://github.com/izumi101/EventHub/commit/fb8a703ef3906c34d05bd2590d1df85dc8ea3806))
+* rebuild the organizer dashboard and stop outages looking like user errors ([fd1ec63](https://github.com/izumi101/EventHub/commit/fd1ec6315d7a6dd749dded5659c5f0ccdb6a6990))
+* **seed:** realistic demo data for the public deployment ([512d594](https://github.com/izumi101/EventHub/commit/512d594e4daf92b8528141c93fdacba0f4c55f61))
+
+
+### Bug Fixes
+
+* **api:** describe the organizer event list as one paginated page ([b6afb74](https://github.com/izumi101/EventHub/commit/b6afb74ef6057a9a37f8cc6dd126d0277da2cfff))
+* **frontend:** opacity on token colours, empty analytics chart, overflowing prices ([f728054](https://github.com/izumi101/EventHub/commit/f7280542b4307f3c5e1cce264e426edd984b161b))
+* **frontend:** opacity on token colours, empty analytics chart, overflowing prices ([6241268](https://github.com/izumi101/EventHub/commit/6241268bdeaa343e1f209816502c25f476240bf8))
+* **frontend:** page through My Events and the moderation queue ([0ffde6b](https://github.com/izumi101/EventHub/commit/0ffde6b3f8e1e0032189124bd9d46700642fa3c6))
+* **frontend:** tell outages apart from user errors in every form ([db5660f](https://github.com/izumi101/EventHub/commit/db5660f4db6d3db65db4fc4dc979acffd40b4268))
+
+
+### Documentation
+
+* organizer dashboard handoff and test run ([4e1141d](https://github.com/izumi101/EventHub/commit/4e1141d570834f4d4afa2bc63a5f84e7bb9342bb))
+* organizer dashboard phase 2 plan and batch A contract ([02813e8](https://github.com/izumi101/EventHub/commit/02813e8ffb35a99c4307c2f5757f95e17b90608e))
+
 ## [1.3.0](https://github.com/izumi101/EventHub/compare/v1.2.0...v1.3.0) (2026-11-21)
 
 
