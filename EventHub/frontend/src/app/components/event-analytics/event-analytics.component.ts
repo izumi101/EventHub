@@ -26,6 +26,16 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
     TranslocoPipe,
     LocalDatePipe,
   ],
+  styles: [
+    `
+      /* A KPI figure fills its card: 9% of the card width, between 15 and 24 px.
+         "4 367 625,00 ₸" (14 glyphs) then fits any card wider than ~130 px. */
+      .kpi-value {
+        font-size: clamp(0.95rem, 9cqi, 1.5rem);
+        line-height: 1.25;
+      }
+    `,
+  ],
   template: `
     <div class="page-root">
       <div class="container max-w-4xl py-8">
@@ -52,7 +62,12 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
           <div class="flex justify-center py-20"><span class="spinner spinner-lg"></span></div>
         } @else if (data) {
           <!-- KPI cards -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+          <!-- Each card is a size container: its figure scales with the card's width
+               (cqi) and never wraps or overflows, whatever the amount and screen. -->
+          <div
+            class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8 [&>*]:min-w-0 [&>*]:[container-type:inline-size]"
+            data-testid="kpis"
+          >
             <div class="card p-4">
               <div class="flex items-center gap-2 text-muted-foreground mb-1.5">
                 <lucide-icon [img]="icons.Wallet" class="w-4 h-4" />
@@ -60,7 +75,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                   'analytics.netRevenue' | transloco
                 }}</span>
               </div>
-              <p class="num text-2xl font-bold text-foreground">
+              <p class="num kpi-value font-bold text-foreground whitespace-nowrap">
                 {{ data.kpis.net_revenue | money: data.currency }}
               </p>
               @if (data.kpis.refunded > 0) {
@@ -79,7 +94,9 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                   'analytics.ticketsSold' | transloco
                 }}</span>
               </div>
-              <p class="num text-2xl font-bold text-foreground">{{ data.kpis.tickets_sold }}</p>
+              <p class="num kpi-value font-bold text-foreground whitespace-nowrap">
+                {{ data.kpis.tickets_sold }}
+              </p>
               <p class="text-xs text-muted-foreground mt-0.5">
                 {{
                   'analytics.soldthroughpctOfCapacityCapacity'
@@ -95,7 +112,9 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                   'analytics.checkedIn' | transloco
                 }}</span>
               </div>
-              <p class="num text-2xl font-bold text-foreground">{{ data.kpis.checked_in }}</p>
+              <p class="num kpi-value font-bold text-foreground whitespace-nowrap">
+                {{ data.kpis.checked_in }}
+              </p>
               <p class="text-xs text-muted-foreground mt-0.5">
                 {{
                   'analytics.checkinratepctOfSold'
@@ -110,7 +129,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                   'analytics.avgOrder' | transloco
                 }}</span>
               </div>
-              <p class="num text-2xl font-bold text-foreground">
+              <p class="num kpi-value font-bold text-foreground whitespace-nowrap">
                 {{ data.kpis.avg_order_value | money: data.currency }}
               </p>
               <p class="text-xs text-muted-foreground mt-0.5">
@@ -133,12 +152,15 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                 {{ 'analytics.noRegistrationsInThe' | transloco }}
               </p>
             } @else {
-              <div class="flex items-end gap-[3px] h-32">
+              <!-- Columns stretch to the chart height, so a bar's % height has a base. -->
+              <div class="flex items-stretch gap-[3px] h-32" data-testid="timeline-chart">
                 @for (day of data.timeline; track day.date) {
                   <div class="flex-1 flex flex-col justify-end group relative">
                     <div
-                      class="rounded-t bg-ember/80 group-hover:bg-ember transition-colors min-h-[2px]"
+                      class="rounded-t bg-ember opacity-80 group-hover:opacity-100 transition-opacity"
+                      [class.min-h-[2px]]="day.tickets > 0"
                       [style.height.%]="(day.tickets / maxTickets) * 100"
+                      data-testid="timeline-bar"
                     ></div>
                     <div
                       class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-foreground text-background text-[10px] font-medium rounded px-1.5 py-0.5 whitespace-nowrap z-10"
