@@ -25,6 +25,7 @@ import {
 } from 'lucide-angular';
 import { LocalDatePipe, LocalNumberPipe } from '../../i18n/locale.pipes';
 import { MoneyPipe } from '../../pipes/money.pipe';
+import { DashboardTicketTypesComponent } from './dashboard-ticket-types.component';
 import type { OrganizerEvent } from '../../services/organizer-dashboard.service';
 import { EVENT_STATUS_BADGE, EVENT_STATUS_LABEL } from '../../utils/event-status';
 
@@ -46,6 +47,7 @@ const MENU_ITEMS = '[role="menuitem"]:not([disabled])';
     MoneyPipe,
     LocalDatePipe,
     LocalNumberPipe,
+    DashboardTicketTypesComponent,
   ],
   template: `
     @let ev = event();
@@ -238,6 +240,8 @@ const MENU_ITEMS = '[role="menuitem"]:not([disabled])';
           </div>
         }
       </div>
+
+      <app-dashboard-ticket-types [eventId]="ev.id" [title]="ev.title" />
 
       <a
         [routerLink]="['/events', ev.id]"

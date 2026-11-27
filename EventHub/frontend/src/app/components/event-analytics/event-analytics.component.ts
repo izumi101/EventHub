@@ -13,7 +13,8 @@ import {
 } from 'lucide-angular';
 import { MoneyPipe } from '../../pipes/money.pipe';
 import { TranslocoPipe } from '@jsverse/transloco';
-import { LocalDatePipe } from '../../i18n/locale.pipes';
+import { LocalDatePipe, PluralPipe } from '../../i18n/locale.pipes';
+import { ticketTypeLabelKey } from '../../utils/ticket-type-label';
 
 @Component({
   selector: 'app-event-analytics',
@@ -25,6 +26,7 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
     LucideAngularModule,
     TranslocoPipe,
     LocalDatePipe,
+    PluralPipe,
   ],
   styles: [
     `
@@ -190,14 +192,33 @@ import { LocalDatePipe } from '../../i18n/locale.pipes';
                 </p>
               } @else {
                 <div class="space-y-2">
-                  @for (t of data.by_ticket_type; track t.name) {
+                  @for (t of data.by_ticket_type; track $index) {
                     <div
-                      class="flex items-center justify-between text-sm py-1.5 border-b border-border/60 last:border-0"
+                      class="flex items-start justify-between gap-3 text-sm py-1.5 border-b border-border/60 last:border-0"
+                      data-testid="ticket-type-row"
                     >
-                      <span class="text-foreground font-medium">{{ t.name }}</span>
-                      <span class="text-muted-foreground"
+                      <div class="min-w-0">
+                        <span class="text-foreground font-medium break-words">
+                          @if (labelKey(t); as key) {
+                            {{ key | transloco }}
+                          } @else {
+                            {{ t.name }}
+                          }
+                        </span>
+                        <p class="text-xs text-muted-foreground" data-testid="ticket-type-stock">
+                          @if (t.quantity === null || t.remaining === null) {
+                            {{ 'analytics.unlimited' | transloco }}
+                          } @else {
+                            {{
+                              'analytics.leftOfQuantity'
+                                | tPlural: t.remaining : { quantity: t.quantity }
+                            }}
+                          }
+                        </p>
+                      </div>
+                      <span class="text-muted-foreground text-right flex-shrink-0"
                         >{{ t.count }} ·
-                        <span class="num font-semibold text-foreground">{{
+                        <span class="num font-semibold text-foreground whitespace-nowrap">{{
                           t.revenue | money: data.currency
                         }}</span></span
                       >
@@ -254,6 +275,7 @@ export class EventAnalyticsComponent implements OnInit {
   loading = false;
 
   readonly icons = { TrendingUp, Ticket, UserCheck, Wallet, ChartColumn };
+  readonly labelKey = ticketTypeLabelKey;
 
   get maxTickets(): number {
     if (!this.data) return 0;
